@@ -1,6 +1,6 @@
 // PROTOTYPE JETABLE — disposition de l'écran de Séance (Q1 : la place du chat).
 // Variantes sur la vraie route #/lecon/<id>, choisies par ?variant=a|b|b2|c :
-//   a = colonne étroite fixe à gauche, b = tiroir repliable, b2 = tiroir + action suivante, c = bandeau en bas.
+//   a = colonne étroite fixe à gauche, b = tiroir repliable, b2 = plein écran sans chat, c = bandeau en bas.
 // Hypothèses : plus de saisie libre ; le prof propose 3-4 Réponses proposées (factices ici),
 // plus « Je ne sais pas 🤷 » et des boutons fixes de l'appli (Q3/Q4).
 // Rien n'est envoyé au serveur : cliquer une réponse l'ajoute localement, avec une fausse réponse du prof.
@@ -9,7 +9,7 @@
 const VARIANTES = {
   a: 'Colonne étroite fixe',
   b: 'Tiroir repliable',
-  b2: 'Tiroir + action suivante',
+  b2: 'Plein écran, sans chat',
   c: 'Bandeau en bas',
 };
 const FIXES = ["J'ai fini 👍", "Je n'ai pas compris 🤔", 'Leçon suivante ➡️'];
@@ -85,42 +85,50 @@ export async function ecranSessionPrototype({ profil, id, lecon, h, montrer, bad
     return h('div', { className: 'proto-b' }, lePanneau, tiroirOuvert ? null : ouvrir, tiroir);
   };
 
-  // (b2) Tiroir + action suivante : le tiroir se referme tout seul quand la leçon est prête ;
-  // une fois le quiz terminé, un bouton vert au-dessus de « Ton prof » lance l'action recommandée.
-  // Règle supposée : pas acquis → Revoir ; acquis → Défi (révision) ou Leçon suivante (libre).
+  // (b2) Plein écran, sans chat : la leçon prend tout l'écran, il n'y a plus de bouton « Ton prof ».
+  // - Début de leçon : l'intro et la question du prof au milieu de l'écran, les choix en dessous.
+  // - Fin de quiz : le retour du prof dans une fenêtre fermable, au-dessus d'un bouton vert
+  //   qui lance l'action recommandée d'après le score du quiz (pas la Maîtrise) :
+  //   score < 80 → Revoir ; score ≥ 80 → Défi (révision) ou Leçon suivante (libre).
   const ACTIONS = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Leçon suivante' };
-  const scenario = { mode: lecon.mode === 'revision' ? 'revision' : 'libre', cacherProf: false };
-  let etape = lecon.pages.length ? 'lecon' : 'generation'; // generation → lecon → quiz-fini → generation…
-  let resultat = null; // { score, maitrise } du dernier quiz terminé
-  const scores = (lecon.scores ?? []).map((s) => s.score);
-  // Même calcul que calculerMaitrise (lib/store.js), sans la pénalité d'inactivité.
-  const maitriseApres = (score) => {
-    const derniers = [...scores, score].slice(-3);
-    const pourcentage = Math.round(derniers.reduce((a, b) => a + b, 0) / derniers.length);
-    return { pourcentage, palier: pourcentage >= 80 ? 'acquis' : pourcentage >= 50 ? 'à consolider' : 'non acquis' };
+  // Début réel de la Leçon libre « les tornades » de Milo ; la 2e question est factice.
+  const QUESTIONS_DEBUT = [
+    { texte: "Salut Milo ! 🌪️ On va apprendre les tornades ensemble.\n\nAvant de commencer : pourquoi veux-tu en savoir plus sur les tornades ? Un exposé, un devoir, ou simple curiosité ?",
+      choix: ['Un exposé', 'Un devoir', 'Simple curiosité'] },
+    { texte: "Super, un exposé ! 🎤\n\nEt qu'est-ce que tu sais déjà sur les tornades ?",
+      choix: ['Rien du tout', 'Un peu', 'Pas mal de choses'] },
+  ];
+  const RETOURS = {
+    revoir: (s) => `${s} %, c'est un bon début ! 💪\n\nTu t'es trompé sur quelques questions, surtout sur la différence entre destinateur et destinataire. On revoit ça ensemble avec une page plus courte ?`,
+    defi: (s) => `Bravo, ${s} % ! 🎉\n\nTu maîtrises le schéma actantiel. Prêt pour un défi plus dur ?`,
+    suivante: (s) => `Bravo, ${s} % ! 🎉\n\nTu as bien compris cette partie. On passe à la suite ?`,
   };
-  const actionRecommandee = (palier) => (palier !== 'acquis' ? 'revoir' : scenario.mode === 'revision' ? 'defi' : 'suivante');
+  const scenario = { mode: lecon.mode === 'revision' ? 'revision' : 'libre' };
+  let etape = lecon.pages.length ? 'lecon' : 'debut'; // debut → generation → lecon → quiz-fini → generation…
+  let question = 0;
+  let resultat = null; // { score, action, retourVisible } du dernier quiz terminé
+  const actionRecommandee = (score) => (score < 80 ? 'revoir' : scenario.mode === 'revision' ? 'defi' : 'suivante');
   const finQuiz = (score) => {
-    resultat = { score, maitrise: maitriseApres(score) };
-    scores.push(score);
+    resultat = { score, retourVisible: true };
     etape = 'quiz-fini';
     rendu();
   };
-  const generer = (action) => {
-    messages.push({ role: 'eleve', texte: ACTIONS[action] }, { role: 'agent', texte: '⏳ Ton prof prépare ta leçon…' });
+  const generer = () => {
     etape = 'generation';
     resultat = null;
-    tiroirOuvert = true;
     rendu();
     setTimeout(() => {
-      messages.at(-1).texte = `(Prototype) C'est prêt ! Ta nouvelle page « ${ACTIONS[action]} » est affichée.\n\nLe tiroir se referme tout seul pour te laisser la leçon.`;
       etape = 'lecon';
-      tiroirOuvert = false;
-      nonLu = true;
       const iframe = lePanneau.querySelector('iframe');
       if (iframe) iframe.src = iframe.src; // simule l'arrivée de la nouvelle page
       rendu();
     }, 2500);
+  };
+  const repondreDebut = () => {
+    question += 1;
+    if (question < QUESTIONS_DEBUT.length) return rendu();
+    question = 0;
+    generer();
   };
   // Les vrais quiz de la page déclenchent aussi la fin du quiz (rien n'est enregistré).
   const recevoirScore = (ev) => {
@@ -131,31 +139,37 @@ export async function ecranSessionPrototype({ profil, id, lecon, h, montrer, bad
   window.addEventListener('message', recevoirScore);
 
   const varianteB2 = () => {
-    const fil = h('div', { className: 'messages' }, messages.map(bulle));
-    const tiroir = h('aside', { className: `proto-b-tiroir ${tiroirOuvert ? 'ouvert' : ''}` },
-      h('div', { className: 'proto-b-titre' }, h('strong', {}, '💬 Ton prof'),
-        h('button', { className: 'secondaire', onclick: () => { tiroirOuvert = false; rendu(); } }, '✕')),
-      fil, etape === 'generation' ? h('p', { className: 'doux' }, '⏳ Patiente un instant…') : reponses());
-    const action = resultat && actionRecommandee(resultat.maitrise.palier);
-    const vert = etape === 'quiz-fini' && !tiroirOuvert &&
-      h('button', { className: 'proto-b2-vert', onclick: () => generer(action) },
-        ACTIONS[action], h('small', {}, `Quiz : ${resultat.score} % · Maîtrise ${resultat.maitrise.pourcentage} % ${resultat.maitrise.palier}`));
-    const prof = !tiroirOuvert && !(scenario.cacherProf && etape === 'lecon') &&
-      h('button', { className: 'proto-b2-prof', onclick: () => { tiroirOuvert = true; nonLu = false; rendu(); } },
-        '💬 Ton prof', nonLu && h('span', { className: 'proto-pastille' }, '1'));
-    queueMicrotask(() => (fil.scrollTop = fil.scrollHeight));
-    return h('div', { className: 'proto-b' }, lePanneau, h('div', { className: 'proto-b2-pile' }, vert, prof), tiroir, panneauScenario());
+    let centre = null;
+    if (etape === 'debut') {
+      const q = QUESTIONS_DEBUT[question];
+      centre = h('div', { className: 'proto-b2-centre' },
+        h('div', { className: 'proto-b2-question' }, q.texte),
+        h('div', { className: 'proto-b2-choix' },
+          [...q.choix, 'Je ne sais pas 🤷'].map((t) => h('button', { onclick: repondreDebut }, t))));
+    }
+    if (etape === 'generation') centre = h('div', { className: 'proto-b2-centre' }, h('div', { className: 'proto-b2-question' }, '⏳ Ton prof prépare ta leçon…'));
+
+    let pile = null;
+    if (etape === 'quiz-fini') {
+      const action = actionRecommandee(resultat.score);
+      pile = h('div', { className: 'proto-b2-pile' },
+        resultat.retourVisible && h('div', { className: 'proto-b2-retour' },
+          h('button', { className: 'secondaire proto-b2-fermer', title: 'Fermer', onclick: () => { resultat.retourVisible = false; rendu(); } }, '✕'),
+          RETOURS[action](resultat.score)),
+        h('button', { className: 'proto-b2-vert', onclick: generer }, ACTIONS[action], h('small', {}, `Quiz : ${resultat.score} %`)));
+    }
+    // Au début, il n'y a pas encore de page : on cache le panneau de leçon.
+    return h('div', { className: `proto-b proto-b2 etape-${etape}` }, etape !== 'debut' && lePanneau, centre, pile, panneauScenario());
   };
   // Panneau de pilotage du prototype (ne fait pas partie du design évalué).
   const panneauScenario = () =>
     h('div', { className: 'proto-scenario' },
       h('strong', {}, '🧪 Scénario'),
+      h('div', {}, h('button', { onclick: () => { etape = 'debut'; question = 0; resultat = null; rendu(); } }, '▶ Début de leçon')),
       h('div', {}, 'Leçon : ',
         ['libre', 'revision'].map((m) => h('button', { className: scenario.mode === m ? 'actif' : '', onclick: () => { scenario.mode = m; rendu(); } }, m === 'libre' ? 'libre' : 'révision'))),
       h('div', {}, 'Finir le quiz : ',
-        [40, 70, 95].map((s) => h('button', { disabled: etape === 'generation', onclick: () => finQuiz(s) }, `${s} %`))),
-      h('label', {}, h('input', { type: 'checkbox', checked: scenario.cacherProf, onchange: (ev) => { scenario.cacherProf = ev.target.checked; rendu(); } }),
-        ' Masquer aussi « Ton prof » pendant la leçon'),
+        [40, 70, 95].map((s) => h('button', { disabled: etape === 'generation' || etape === 'debut', onclick: () => finQuiz(s) }, `${s} %`))),
       h('div', { className: 'doux' }, `Étape : ${etape}`));
 
   // (c) Bandeau en bas : dernier message du prof + boutons, historique dépliable.

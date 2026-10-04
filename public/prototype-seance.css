@@ -42,12 +42,20 @@ body.proto-mobile main { max-width: 390px; outline: 2px dashed var(--doux); }
 .proto-c-bascule { align-self: flex-start; font-size: .8rem; padding: .2rem .6rem; margin-bottom: .4rem; }
 .proto-c-dernier { white-space: pre-wrap; overflow-y: auto; max-height: 7.5em; }
 
-/* (b2) Tiroir + action suivante */
-.proto-b2-pile { position: absolute; right: 1rem; bottom: 1rem; display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
-.proto-b2-pile button { border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
-.proto-b2-prof { padding: .6rem 1.1rem; }
-.proto-b2-vert { display: flex; flex-direction: column; align-items: center; padding: .7rem 1.4rem; font-size: 1.15rem; font-weight: 600;
-  background: #2e9e5b; border-color: #2e9e5b; animation: proto-pulse 1.6s ease-in-out infinite; }
+/* (b2) Plein écran, sans chat */
+.proto-b2.etape-debut { border: 1px solid var(--bord); background: var(--carte); }
+.proto-b2-centre { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem; padding: 1.5rem; }
+.proto-b2.etape-generation .proto-b2-centre { background: rgba(0,0,0,.45); }
+.proto-b2-question { max-width: 560px; padding: 1.2rem 1.4rem; white-space: pre-wrap; font-size: 1.15rem;
+  background: var(--carte); color: var(--texte); border: 1px solid var(--bord); border-radius: 16px; box-shadow: 0 6px 24px rgba(0,0,0,.2); }
+.proto-b2-choix { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; max-width: 560px; }
+.proto-b2-choix button { padding: .7rem 1.2rem; font-size: 1.05rem; border-radius: 999px; }
+.proto-b2-pile { position: absolute; right: 1rem; bottom: 1rem; width: min(340px, calc(100% - 2rem)); display: flex; flex-direction: column; gap: .6rem; }
+.proto-b2-retour { position: relative; padding: .8rem 2.2rem .8rem 1rem; white-space: pre-wrap; max-height: 40vh; overflow-y: auto;
+  background: var(--carte); color: var(--texte); border: 1px solid var(--bord); border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+.proto-b2-fermer { position: absolute; top: .4rem; right: .4rem; padding: 0 .45rem; font-size: .8rem; line-height: 1.6; }
+.proto-b2-vert { display: flex; flex-direction: column; align-items: center; padding: .7rem 1.4rem; font-size: 1.15rem; font-weight: 600; border-radius: 999px;
+  background: #2e9e5b; border-color: #2e9e5b; box-shadow: 0 4px 14px rgba(0,0,0,.25); animation: proto-pulse 1.6s ease-in-out infinite; }
 .proto-b2-vert small { font-size: .75rem; font-weight: 400; opacity: .9; }
 @keyframes proto-pulse { 50% { box-shadow: 0 0 0 8px rgba(46,158,91,.25); } }
 

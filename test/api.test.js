@@ -280,18 +280,25 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
     assert.equal(reponse.status, 201);
     await sonderJusqua(nbLancements, (n) => n === 1, 'Pas de régénération après le premier tour');
     assert.equal((await appel('/api/eleves/prop-suite/propositions')).data.etat, 'en préparation');
-    // Un tour pendant une génération en cours ne la double pas.
+    assert.match(await fs.readFile(args, 'utf8'), /Les volcans \(Sciences\) : Maîtrise pas encore évaluée/);
+    // Un tour pendant une génération en cours ne la double pas : il en relance une seule, une fois celle-ci finie.
+    await appel(`/api/eleves/prop-suite/lecons/${reponse.data.id}/scores`, 'POST', { score: 30 });
     assert.equal((await appel(`/api/eleves/prop-suite/lecons/${reponse.data.id}/messages`, 'POST', { texte: 'ok' })).status, 200);
+    assert.equal((await appel(`/api/eleves/prop-suite/lecons/${reponse.data.id}/messages`, 'POST', { texte: 'ok' })).status, 200);
+    assert.equal(await nbLancements(), 1);
     return reponse;
   });
+  await sonderJusqua(nbLancements, (n) => n === 2, 'Pas de relance après la génération en cours');
   await attendrePropositions('prop-suite');
-  assert.equal(await nbLancements(), 1);
-  assert.match(await fs.readFile(args, 'utf8'), /Les volcans \(Sciences\) : Maîtrise pas encore évaluée/);
+  assert.equal(await nbLancements(), 2);
+  assert.match(await fs.readFile(args, 'utf8'), /Les volcans \(Sciences\) : Maîtrise 30 %, non acquis/);
 
   // Message suivant : nouvelle régénération, qui voit la Maîtrise à jour.
   await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/scores`, 'POST', { score: 90 });
+  await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/scores`, 'POST', { score: 90 });
+  await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/scores`, 'POST', { score: 90 });
   assert.equal((await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/messages`, 'POST', { texte: 'encore' })).status, 200);
-  await sonderJusqua(nbLancements, (n) => n === 2, 'Pas de régénération après un message');
+  await sonderJusqua(nbLancements, (n) => n === 3, 'Pas de régénération après un message');
   await attendrePropositions('prop-suite');
   const consignes = await fs.readFile(args, 'utf8');
   assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 90 %, acquis/);

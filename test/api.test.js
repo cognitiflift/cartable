@@ -209,6 +209,74 @@ test('Rebond : Défi après un quiz réussi en Leçon de révision', async () =>
   assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Rebond : Défi/);
 });
 
+test('Leçon terminée : un Défi réussi termine la Leçon de révision, un Défi raté ne la « dé-termine » pas', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  // Une Leçon sans les nouveaux champs (comme les Leçons existantes) se lit comme non terminée.
+  assert.equal(lecon.terminee, null);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const retour = async (score) => (await appel(`${url}/retours`, 'POST', { score })).data;
+  const rebond = (action) => appel(`${url}/rebonds`, 'POST', { action });
+  const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+
+  // Un quiz ordinaire réussi recommande un Défi sans terminer la Leçon, même deux fois de suite.
+  assert.equal((await retour(95)).messages.at(-1).retourQuiz.action, 'defi');
+  assert.equal((await retour(95)).terminee, null);
+  // Tant que la Leçon n'est pas terminée, aucun autre Rebond que celui recommandé.
+  assert.equal((await rebond('terminee')).status, 400);
+
+  // Défi raté : Revoir, toujours pas terminée.
+  assert.equal((await rebond('defi')).status, 200);
+  const rate = await retour(60);
+  assert.deepEqual(rate.messages.at(-1).retourQuiz, { score: 60, action: 'revoir' });
+  assert.equal(rate.terminee, null);
+  assert.equal((await rebond('defi')).status, 400);
+  assert.equal((await rebond('revoir')).status, 200);
+
+  // Quiz de la page Revoir réussi (pas un Défi), puis Défi réussi : Leçon terminée.
+  assert.equal((await retour(85)).messages.at(-1).retourQuiz.action, 'defi');
+  assert.equal((await rebond('defi')).status, 200);
+  const reussi = await retour(90);
+  assert.deepEqual(reussi.messages.at(-1).retourQuiz, { score: 90, action: 'terminee' });
+  assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Leçon est terminée/);
+  const terminee = reussi.terminee;
+  assert.ok(!Number.isNaN(Date.parse(terminee)));
+  assert.equal((await resume()).terminee, terminee);
+  assert.equal((await appel(url)).data.terminee, terminee);
+  // La Maîtrise ne dépend pas de l'état terminé.
+  assert.equal(reussi.maitrise, null);
+
+  // « Nouveau défi » sur une Leçon terminée, une seule fois par Retour de quiz.
+  assert.equal((await rebond('terminee')).status, 400);
+  const nouveau = await rebond('defi');
+  assert.equal(nouveau.status, 200);
+  assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Rebond : Défi/);
+  assert.equal((await rebond('defi')).status, 400);
+
+  // Nouveau Défi raté : Revoir, mais la Leçon reste terminée (même date).
+  const rateApres = await retour(30);
+  assert.equal(rateApres.messages.at(-1).retourQuiz.action, 'revoir');
+  assert.equal(rateApres.terminee, terminee);
+  // Sur une Leçon terminée, un nouveau Défi reste possible après chaque Retour de quiz.
+  assert.equal((await rebond('defi')).status, 200);
+  // Nouveau Défi réussi : toujours terminée, date de fin inchangée.
+  const reussiApres = await retour(100);
+  assert.equal(reussiApres.messages.at(-1).retourQuiz.action, 'terminee');
+  assert.equal(reussiApres.terminee, terminee);
+});
+
+test('Leçon terminée : une Leçon libre ne l\'est jamais', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes' })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await appel(`${url}/retours`, 'POST', { score: 90 });
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'defi' })).status, 400);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 200);
+  const apres = (await appel(`${url}/retours`, 'POST', { score: 100 })).data;
+  assert.equal(apres.messages.at(-1).retourQuiz.action, 'suivante');
+  assert.equal(apres.terminee, null);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).terminee, null);
+});
+
 test('révision : documents rangés dans sources/, formats refusés', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const refus = await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'virus.exe', data: pdf }] });

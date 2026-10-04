@@ -103,7 +103,7 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          badgeMaitrise(l.maitrise),
+          h('span', { className: 'ligne-maitrise' }, badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
 }
@@ -232,7 +232,10 @@ async function ecranSession(profil, id) {
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
-        h('button', { className: 'action-suivante', onclick: () => choisirRebond(action) }, LIBELLES_REBOND[action], h('small', {}, `Quiz : ${score} %`)));
+        action === 'terminee'
+          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`)),
+             h('button', { className: 'secondaire', onclick: () => choisirRebond('defi') }, '🏆 Nouveau défi')]
+          : h('button', { className: 'action-suivante', onclick: () => choisirRebond(action) }, LIBELLES_REBOND[action], h('small', {}, `Quiz : ${score} %`)));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
       const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -60,7 +60,7 @@ function avecScores(prompt, lecon) {
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
 // La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details }) {
+async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details, etatLecon }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
@@ -73,7 +73,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
       consignes: consignesLecon(profil),
     });
     const { texte, choix } = extraireChoix(reponse);
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }) });
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
@@ -150,31 +150,39 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 }
 
 // Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
-// Le score lui-même s'enregistre par /scores.
+// Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision (date de fin posée une
+// seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz.
 async function retourQuiz(slug, id, { score, page }) {
   const valeur = Number(score);
   if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
-  const { mode } = await store.lireLecon(slug, id);
+  const { mode, defiEnCours, terminee } = await store.lireLecon(slug, id);
   const arrondi = Math.round(valeur);
-  const retour = { score: arrondi, action: actionApresQuiz(arrondi, mode) };
+  const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours) };
   return tourDeParole({
     slug, id,
     prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '' }),
     affiche: `📝 Quiz terminé : ${retour.score} %`,
     premier: false,
     details: { retourQuiz: retour },
+    etatLecon: { defiEnCours: false, ...(retour.action === 'terminee' && { terminee: terminee ?? new Date().toISOString() }) },
   });
 }
 
-// Rebond accepté : l'action recommandée par le Retour de quiz, tant qu'il est le dernier message (pas encore choisi).
-const rebondRecommande = (lecon) => lecon.messages.at(-1)?.retourQuiz?.action;
+// Rebonds acceptés tant que le Retour de quiz est le dernier message (pas encore choisi) : l'action qu'il recommande,
+// et « Nouveau défi » sur une Leçon terminée.
+function rebondsProposes(lecon) {
+  const action = lecon.messages.at(-1)?.retourQuiz?.action;
+  if (!action) return [];
+  return lecon.terminee ? [action, 'defi'] : [action];
+}
 
 // Choix d'un Rebond : une action fermée, dont le serveur tire la consigne du prof et la phrase de l'Élève.
+// Choisir le Défi le met en cours jusqu'au Retour de quiz suivant.
 async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
-  if (rebondRecommande(await store.lireLecon(slug, id)) !== action) throw new HttpError(400, "Ce Rebond n'est pas proposé");
+  if (!rebondsProposes(await store.lireLecon(slug, id)).includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
   const { consigne, phrase } = REBONDS[action];
-  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false });
+  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false, etatLecon: action === 'defi' && { defiEnCours: true } });
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.

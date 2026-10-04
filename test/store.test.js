@@ -55,10 +55,22 @@ test('Deux créations simultanées sur le même sujet visent deux dossiers disti
   assert.deepEqual(lecons.map((l) => l.id).sort(), ['2026-10-04-les-volcans', '2026-10-04-les-volcans-2', '2026-10-04-les-volcans-3']);
 });
 
-test('La date est la date locale de création, même tard le soir', async () => {
+test('La date est la date locale de création, pas la date UTC', async (t) => {
+  const tz = process.env.TZ;
+  t.after(() => (tz === undefined ? delete process.env.TZ : (process.env.TZ = tz)));
+  // UTC+14 : le 4 octobre à 0 h 30 locale est encore le 3 octobre en UTC.
+  process.env.TZ = 'Pacific/Kiritimati';
+  mock.timers.setTime(new Date(2026, 9, 4, 0, 30).getTime());
+  assert.equal((await store.creerLecon('zoe', { sujet: 'Matin', mode: 'libre' })).id, '2026-10-04-matin');
+  // UTC−7 : le 4 octobre à 23 h 30 locale est déjà le 5 octobre en UTC.
+  process.env.TZ = 'America/Los_Angeles';
   mock.timers.setTime(new Date(2026, 9, 4, 23, 30).getTime());
-  const lecon = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
-  assert.equal(lecon.id, '2026-10-04-les-volcans');
+  assert.equal((await store.creerLecon('zoe', { sujet: 'Soir', mode: 'libre' })).id, '2026-10-04-soir');
+});
+
+test('Leçon libre : les ligatures sont développées (œ → oe, æ → ae)', async () => {
+  const lecon = await store.creerLecon('zoe', { sujet: 'Le cœur et l’ex æquo', mode: 'libre' });
+  assert.equal(lecon.id, '2026-10-04-le-coeur-et-l-ex-aequo');
 });
 
 test('Une Leçon existante à l\'ancien format l-… se liste, se lit et reçoit des scores', async () => {

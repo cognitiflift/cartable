@@ -14,6 +14,7 @@ const store = createStore(ROOT);
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
+const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -68,6 +69,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
       consignes: consignesLecon(profil),
     });
     await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse });
+    relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
     if (e instanceof HttpError) throw e;
@@ -84,10 +86,11 @@ function genererPropositions(slug, anciennes = []) {
   propositionsEnCours.set(slug, anciennes);
   (async () => {
     const profil = await store.lireEleve(slug);
+    const lecons = await store.listerLecons(slug);
     await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
       prompt: 'Prépare 4 Propositions de nouvelles Leçons pour cet élève.',
-      consignes: consignesPropositions(profil),
+      consignes: consignesPropositions(profil, lecons),
       teach: false,
     });
   })()
@@ -96,13 +99,28 @@ function genererPropositions(slug, anciennes = []) {
       if (anciennes.length && !(await store.lirePropositions(slug))) await store.ecrirePropositions(slug, anciennes);
     })
     .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
-    .finally(() => propositionsEnCours.delete(slug));
+    .finally(() => {
+      propositionsEnCours.delete(slug);
+      if (propositionsARelancer.delete(slug)) relancerPropositions(slug);
+    });
 }
 
 async function lirePropositions(slug) {
   if (propositionsEnCours.has(slug)) return { etat: 'en préparation', propositions: propositionsEnCours.get(slug) };
   const propositions = await store.lirePropositions(slug);
   return propositions ? { etat: 'prêtes', propositions } : { etat: 'indisponibles', propositions: [] };
+}
+
+// Après chaque tour de séance : Propositions mises à jour d'après les Leçons, sans retarder la réponse à l'élève.
+// Si une génération est déjà en cours, elle a lu les Leçons avant ce tour : on en relance une seule après elle.
+function relancerPropositions(slug) {
+  if (propositionsEnCours.has(slug)) {
+    propositionsARelancer.add(slug);
+    return;
+  }
+  store.lirePropositions(slug)
+    .then((anciennes) => genererPropositions(slug, anciennes ?? []))
+    .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`));
 }
 
 // « D'autres idées » : relance la génération sans l'attendre, jamais deux à la fois pour un même Élève.

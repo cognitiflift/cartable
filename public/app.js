@@ -148,7 +148,8 @@ function ecranNouvelleLecon(profil) {
     if (!actif) return;
     const enPreparation = etat === 'en préparation';
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
-    const cartes = propositions.map((p) => h('button', { className: 'carte', disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ sujet: p.titre })) },
+    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ sujet: p.titre })) },
+      h('span', { className: 'type' }, p.type === 'suite' ? '➡️ Pour aller plus loin' : '✨ Nouveau sujet'),
       p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
       autresIdees.disabled = true;

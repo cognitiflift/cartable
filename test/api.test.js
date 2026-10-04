@@ -11,14 +11,15 @@ let serveur, base, dossier;
 before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
   // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json.
-  // Dans le dossier des Propositions, il note chaque lancement (`lancements-propositions`) et écrit
-  // propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
+  // Dans le dossier des Propositions, il note chaque lancement (`lancements-propositions`) et ses arguments
+  // (`args-propositions`), et écrit propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
   // `autres` lui fait écrire d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
   // et le fichier `lent` le fait répondre lentement.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
   echo lancement >> '${dossier}/lancements-propositions'
+  printf '%s\n' "$@" > '${dossier}/args-propositions'
   while [ -e '${dossier}/attendre' ]; do sleep 0.05; done
   if [ -e '${dossier}/echouer' ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
@@ -34,7 +35,7 @@ if [ "$(basename "$PWD")" = propositions ]; then
   {"titre":"Les dinosaures","categorie":"Sciences","accroche":"Qui était le plus grand ?","type":"original"},
   {"titre":"Les pyramides","categorie":"Histoire","accroche":"Comment les a-t-on construites ?","type":"original"},
   {"titre":"Les fractions en cuisine","categorie":"Cuisine","accroche":"Une demi-tarte, ça fait combien ?","type":"original"},
-  {"titre":"Les planètes","categorie":"Sciences","accroche":"Pourquoi Mars est rouge ?","type":"original"}
+  {"titre":"Les planètes","categorie":"Sciences","accroche":"Pourquoi Mars est rouge ?","type":"suite"}
 ]
 FIN
   echo '{"result":"ok","session_id":"s-prop","is_error":false}'
@@ -59,7 +60,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
 
 after(async () => {
   serveur.kill();
-  for (const slug of ['zoe-test', 'prop-test', 'prop-lent', 'prop-echec', 'prop-autres', 'prop-double', 'prop-garde']) {
+  for (const slug of ['zoe-test', 'prop-test', 'prop-lent', 'prop-echec', 'prop-autres', 'prop-double', 'prop-garde', 'prop-suite']) {
     await fs.rm(path.join(import.meta.dirname, '..', 'eleves', slug), { recursive: true, force: true });
   }
   await fs.rm(dossier, { recursive: true, force: true });
@@ -179,6 +180,7 @@ test('Propositions : générées à la création du profil, Catégorie hors list
   assert.equal(propositions.length, 4);
   assert.deepEqual(propositions[0], { titre: 'Les dinosaures', categorie: 'Sciences', accroche: 'Qui était le plus grand ?', type: 'original' });
   assert.equal(propositions[2].categorie, 'Autre');
+  assert.deepEqual(propositions.map((p) => p.type), ['original', 'original', 'original', 'suite']);
 
   // Choisir une Proposition démarre une Leçon libre sur son sujet.
   const lecon = await appel('/api/eleves/prop-test/lecons', 'POST', { sujet: propositions[1].titre });
@@ -262,6 +264,39 @@ test('Propositions : une seconde demande pendant une génération en cours ne la
   // Une fois la génération finie, on peut de nouveau en demander une.
   assert.equal((await appel('/api/eleves/prop-double/propositions', 'POST')).status, 202);
   await attendrePropositions('prop-double');
+});
+
+test('Propositions : régénérées après chaque tour de séance, d\'après le titre, la Catégorie et la Maîtrise des Leçons', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Suite', age: 11, niveau: 'Primaire 6' })).status, 201);
+  await attendrePropositions('prop-suite');
+  const lancements = path.join(dossier, 'lancements-propositions');
+  const args = path.join(dossier, 'args-propositions');
+  const nbLancements = async () => (await fs.readFile(lancements, 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length;
+  await fs.rm(lancements, { force: true });
+
+  // Premier tour de la Leçon : régénération, sans retarder la réponse à l'élève (le faux agent des Propositions attend).
+  const { data: lecon } = await avecFichier('attendre', async () => {
+    const reponse = await appel('/api/eleves/prop-suite/lecons', 'POST', { sujet: 'les volcans' });
+    assert.equal(reponse.status, 201);
+    await sonderJusqua(nbLancements, (n) => n === 1, 'Pas de régénération après le premier tour');
+    assert.equal((await appel('/api/eleves/prop-suite/propositions')).data.etat, 'en préparation');
+    // Un tour pendant une génération en cours ne la double pas.
+    assert.equal((await appel(`/api/eleves/prop-suite/lecons/${reponse.data.id}/messages`, 'POST', { texte: 'ok' })).status, 200);
+    return reponse;
+  });
+  await attendrePropositions('prop-suite');
+  assert.equal(await nbLancements(), 1);
+  assert.match(await fs.readFile(args, 'utf8'), /Les volcans \(Sciences\) : Maîtrise pas encore évaluée/);
+
+  // Message suivant : nouvelle régénération, qui voit la Maîtrise à jour.
+  await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/scores`, 'POST', { score: 90 });
+  assert.equal((await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/messages`, 'POST', { texte: 'encore' })).status, 200);
+  await sonderJusqua(nbLancements, (n) => n === 2, 'Pas de régénération après un message');
+  await attendrePropositions('prop-suite');
+  const consignes = await fs.readFile(args, 'utf8');
+  assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 90 %, acquis/);
+  assert.match(consignes, /11 ans/);
+  assert.match(consignes, /Primaire 6/);
 });
 
 test('Concurrence : un second message pendant que l\'agent répond est refusé, puis la Leçon en accepte de nouveau', async () => {

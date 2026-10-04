@@ -68,6 +68,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
       consignes: consignesLecon(profil),
     });
     await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse });
+    relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
     if (e instanceof HttpError) throw e;
@@ -84,10 +85,11 @@ function genererPropositions(slug, anciennes = []) {
   propositionsEnCours.set(slug, anciennes);
   (async () => {
     const profil = await store.lireEleve(slug);
+    const lecons = await store.listerLecons(slug);
     await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
       prompt: 'Prépare 4 Propositions de nouvelles Leçons pour cet élève.',
-      consignes: consignesPropositions(profil),
+      consignes: consignesPropositions(profil, lecons),
       teach: false,
     });
   })()
@@ -103,6 +105,14 @@ async function lirePropositions(slug) {
   if (propositionsEnCours.has(slug)) return { etat: 'en préparation', propositions: propositionsEnCours.get(slug) };
   const propositions = await store.lirePropositions(slug);
   return propositions ? { etat: 'prêtes', propositions } : { etat: 'indisponibles', propositions: [] };
+}
+
+// Après chaque tour de séance : Propositions mises à jour d'après les Leçons, sans retarder la réponse à l'élève.
+function relancerPropositions(slug) {
+  if (propositionsEnCours.has(slug)) return;
+  store.lirePropositions(slug)
+    .then((anciennes) => genererPropositions(slug, anciennes ?? []))
+    .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`));
 }
 
 // « D'autres idées » : relance la génération sans l'attendre, jamais deux à la fois pour un même Élève.

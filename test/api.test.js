@@ -6,10 +6,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { slugify } from '../lib/store.js';
 
-let serveur, base, dossier;
+let serveur, base, dossier, eleves;
+const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
 
 before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
+  eleves = path.join(dossier, 'eleves'); // propre à cette exécution : jamais le `eleves/` du dépôt
   // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json.
   // Dans le dossier des Propositions, il note chaque lancement (`lancements-propositions`) et ses arguments
   // (`args-propositions`), et écrit propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
@@ -51,7 +53,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -60,9 +62,6 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
 
 after(async () => {
   serveur.kill();
-  for (const slug of ['zoe-test', 'prop-test', 'prop-lent', 'prop-echec', 'prop-autres', 'prop-double', 'prop-garde', 'prop-suite']) {
-    await fs.rm(path.join(import.meta.dirname, '..', 'eleves', slug), { recursive: true, force: true });
-  }
   await fs.rm(dossier, { recursive: true, force: true });
 });
 
@@ -73,6 +72,12 @@ const appel = async (url, method = 'GET', body) => {
 
 test('slugify retire accents et majuscules', () => {
   assert.equal(slugify('Zoé-Test'), 'zoe-test');
+});
+
+test('les Élèves sont rangés dans ELEVES_DIR, jamais dans le eleves/ du dépôt', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Isole-Test', age: 9, niveau: 'Primaire 4' })).status, 201);
+  assert.equal(JSON.parse(await fs.readFile(path.join(eleves, 'isole-test', 'profil.json'), 'utf8')).pseudo, 'Isole-Test');
+  await assert.rejects(fs.access(path.join(elevesDuDepot, 'isole-test')), { code: 'ENOENT' });
 });
 
 test('parcours : créer élève, leçon, message, fichier de leçon', async () => {
@@ -112,7 +117,7 @@ test('révision : documents rangés dans sources/, formats refusés', async () =
   assert.equal(lecon.status, 201);
   assert.equal(lecon.data.mode, 'revision');
   assert.match(lecon.data.messages[0].texte, /contrôle le/);
-  const sources = await fs.readdir(path.join(import.meta.dirname, '..', 'eleves', 'zoe-test', 'lecons', lecon.data.id, 'sources'));
+  const sources = await fs.readdir(path.join(eleves, 'zoe-test', 'lecons', lecon.data.id, 'sources'));
   assert.deepEqual(sources, ['01.pdf', '02.jpg']);
 });
 
@@ -136,7 +141,7 @@ test('Maîtrise : pas encore évaluée, puis moyenne des 3 derniers scores et pa
 test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semaines', async () => {
   const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' });
   // Les scores sont stockés en clair dans etat.json (Espace personnel lisible) : on y place un vieux score.
-  const fichier = path.join(import.meta.dirname, '..', 'eleves', 'zoe-test', 'lecons', lecon.id, 'etat.json');
+  const fichier = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'etat.json');
   const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
   etat.scores = [{ score: 90, date: new Date(Date.now() - 35 * 86_400_000).toISOString() }];
   await fs.writeFile(fichier, JSON.stringify(etat));
@@ -235,7 +240,7 @@ test('Propositions : « D\'autres idées » régénère sans attendre l\'agent, 
 test('Propositions : les anciennes restent servies pendant l\'écriture des nouvelles, et après un échec de régénération', async () => {
   assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Garde', age: 8, niveau: 'Primaire 3' })).status, 201);
   const anciennes = (await attendrePropositions('prop-garde')).propositions;
-  const fichier = path.join(import.meta.dirname, '..', 'eleves', 'prop-garde', 'propositions', 'propositions.json');
+  const fichier = path.join(eleves, 'prop-garde', 'propositions', 'propositions.json');
 
   await avecFichier('echouer', () => avecFichier('attendre', async () => {
     assert.equal((await appel('/api/eleves/prop-garde/propositions', 'POST')).status, 202);

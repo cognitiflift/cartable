@@ -83,3 +83,32 @@ test('révision : documents rangés dans sources/, formats refusés', async () =
   const sources = await fs.readdir(path.join(import.meta.dirname, '..', 'eleves', 'zoe-test', 'lecons', lecon.data.id, 'sources'));
   assert.deepEqual(sources, ['01.pdf', '02.jpg']);
 });
+
+test('Maîtrise : pas encore évaluée, puis moyenne des 3 derniers scores et paliers', async () => {
+  const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les fractions' });
+  const maitrise = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).maitrise;
+  assert.equal(await maitrise(), null);
+
+  assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: 140 })).status, 400);
+  const score = (s) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: s, page: '0001-volcans.html' });
+
+  assert.equal((await score(20)).status, 201);
+  assert.deepEqual(await maitrise(), { pourcentage: 20, palier: 'non acquis' });
+  await score(70);
+  await score(90);
+  assert.deepEqual(await maitrise(), { pourcentage: 60, palier: 'à consolider' });
+  await score(80);
+  assert.deepEqual(await maitrise(), { pourcentage: 80, palier: 'acquis' });
+});
+
+test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semaines', async () => {
+  const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' });
+  // Les scores sont stockés en clair dans etat.json (Espace personnel lisible) : on y place un vieux score.
+  const fichier = path.join(import.meta.dirname, '..', 'eleves', 'zoe-test', 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  etat.scores = [{ score: 90, date: new Date(Date.now() - 35 * 86_400_000).toISOString() }];
+  await fs.writeFile(fichier, JSON.stringify(etat));
+
+  const liste = await appel('/api/eleves/zoe-test/lecons');
+  assert.deepEqual(liste.data.find((l) => l.id === lecon.id).maitrise, { pourcentage: 70, palier: 'à consolider' });
+});

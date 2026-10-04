@@ -45,6 +45,14 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
+// À la reprise, l'agent reçoit les scores récents pour cibler les erreurs (l'élève ne voit pas cet ajout).
+function avecScores(prompt, lecon) {
+  if (!lecon.scores.length) return prompt;
+  const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
+  const m = lecon.maitrise;
+  return `[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]\n\n${prompt}`;
+}
+
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
 async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
@@ -54,7 +62,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
     const lecon = await store.lireLecon(slug, id);
     const { reponse, sessionId } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : prompt,
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : avecScores(prompt, lecon),
       sessionId: lecon.sessionId,
       profil,
     });
@@ -106,6 +114,8 @@ async function api(req, res, segments) {
       }
     } else if (!r3) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));
+    } else if (r3 === 'scores' && m === 'POST') {
+      return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req)));
     } else if (r3 === 'messages' && m === 'POST') {
       const { texte } = await lireCorps(req);
       if (typeof texte !== 'string' || !texte.trim()) throw new HttpError(400, 'Message vide');

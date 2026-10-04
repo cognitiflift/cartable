@@ -25,3 +25,8 @@ h2 { margin-top:1.5rem; }
 .panneau { display:flex; flex-direction:column; min-height:0; border:1px solid var(--bord); border-radius:12px; overflow:hidden; background:#fff; }
 .panneau select { margin:.4rem; } .panneau iframe { flex:1; border:0; } .vide { padding:2rem; color:var(--doux); background:var(--carte); flex:1; }
 @media (max-width:800px) { .session { grid-template-columns:1fr; height:auto; } .panneau { height:60vh; } .messages { max-height:50vh; } }
+.maitrise { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--doux); margin:.3rem 0; }
+.jauge { display:inline-block; width:60px; height:8px; border-radius:4px; background:var(--bord); overflow:hidden; }
+.jauge > span { display:block; height:100%; background:currentColor; }
+.maitrise.rouge { color:#d64545; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
+p .maitrise { display:inline-flex; }

@@ -1,6 +1,7 @@
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
 let config;
+let quitterEcran = () => {}; // nettoyage de l'écran précédent (écouteurs)
 
 const api = async (url, options = {}) => {
   const res = await fetch(`/api/${url}`, {
@@ -82,6 +83,15 @@ async function ecranProfil(profil) {
   } }));
 }
 
+const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };
+
+function badgeMaitrise(maitrise) {
+  if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
+  return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: maitrise.palier },
+    h('span', { className: 'jauge' }, h('span', { style: `width:${maitrise.pourcentage}%` })),
+    `${maitrise.pourcentage} % · ${maitrise.palier}`);
+}
+
 async function ecranAccueil(profil) {
   const lecons = await api(`eleves/${profil.slug}/lecons`);
   const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
@@ -93,6 +103,7 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
+          badgeMaitrise(l.maitrise),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
 }
@@ -151,6 +162,21 @@ async function ecranSession(profil, id) {
   const champ = h('textarea', { rows: 2, placeholder: 'Écris ici…', required: true });
   const bouton = h('button', {}, 'Envoyer');
   const erreur = h('p', { className: 'erreur' });
+  const entete = h('span', {});
+  let iframe;
+
+  const afficherEntete = () => entete.replaceChildren(` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise));
+  // Les quiz des pages de leçon envoient leur score par postMessage (voir les consignes de l'agent).
+  const recevoirScore = async (ev) => {
+    if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-score') return;
+    try {
+      lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: { score: ev.data.score, page: ev.data.page } });
+      afficherEntete();
+      erreur.textContent = `✅ Score enregistré : ${Math.round(ev.data.score)} %`;
+    } catch (e) { erreur.textContent = e.message; }
+  };
+  window.addEventListener('message', recevoirScore);
+  quitterEcran = () => window.removeEventListener('message', recevoirScore);
 
   const afficherMessages = () => {
     messages.replaceChildren(...lecon.messages.map((m) => h('div', { className: `msg ${m.role}` }, m.texte)));
@@ -161,7 +187,7 @@ async function ecranSession(profil, id) {
     const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
     choix.value = lecon.pages.at(-1);
     const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}`;
-    const iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
+    iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
     panneau.replaceChildren(choix, iframe);
   };
   const envoyer = async () => {
@@ -174,6 +200,7 @@ async function ecranSession(profil, id) {
     try {
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/messages`, { method: 'POST', body: { texte } });
       erreur.textContent = '';
+      afficherEntete();
       afficherMessages();
       afficherPanneau();
     } catch (e) { erreur.textContent = e.message; }
@@ -181,10 +208,11 @@ async function ecranSession(profil, id) {
     champ.focus();
   };
 
+  afficherEntete();
   afficherMessages();
   afficherPanneau();
   montrer(
-    h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), ` · ${lecon.titre}`),
+    h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete),
     h('div', { className: 'session' },
       h('div', { className: 'chat' }, messages, erreur,
         h('form', { onsubmit: (ev) => { ev.preventDefault(); envoyer(); } }, champ, bouton)),
@@ -193,6 +221,8 @@ async function ecranSession(profil, id) {
 }
 
 async function route() {
+  quitterEcran();
+  quitterEcran = () => {};
   try {
     config ??= await api('config');
     const [, page, id] = location.hash.split('/');

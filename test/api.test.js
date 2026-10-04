@@ -257,7 +257,10 @@ test('Leçon terminée : un Défi réussi termine la Leçon de révision, un Dé
   const rateApres = await retour(30);
   assert.equal(rateApres.messages.at(-1).retourQuiz.action, 'revoir');
   assert.equal(rateApres.terminee, terminee);
-  // Sur une Leçon terminée, un nouveau Défi reste possible après chaque Retour de quiz.
+  // Comme avant la fin, seul Revoir est proposé après un Défi raté.
+  assert.equal((await rebond('defi')).status, 400);
+  assert.equal((await rebond('revoir')).status, 200);
+  assert.equal((await retour(85)).messages.at(-1).retourQuiz.action, 'defi');
   assert.equal((await rebond('defi')).status, 200);
   // Nouveau Défi réussi : toujours terminée, date de fin inchangée.
   const reussiApres = await retour(100);

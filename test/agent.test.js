@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, promptDemarrageLibre } from '../lib/agent.js';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -29,6 +29,21 @@ test('consignes de Leçon : pas de saisie libre, Réponses proposées sur une li
   assert.match(consignes, /ne peut pas écrire/);
   assert.match(consignes, /CHOIX: /);
   assert.doesNotMatch(consignes, /panneau de droite/);
+});
+
+test('démarrage d\'une Leçon libre : le sujet, puis la consigne de cadrage avec des sujets voisins en CHOIX', () => {
+  const prompt = promptDemarrageLibre('les volcans');
+  assert.ok(prompt.startsWith('les volcans\n'));
+  assert.match(prompt, /inadapté à l'âge/);
+  assert.match(prompt, /choquant/);
+  assert.match(prompt, /ni page ni lesson\.json/);
+  assert.match(prompt, /une phrase bienveillante/);
+  assert.match(prompt, /CHOIX: .*3 ou 4 sujets voisins/);
+  assert.match(prompt, /Je ne sais pas/);
+});
+
+test('consignes de Leçon : pas de consigne de cadrage du sujet', () => {
+  assert.doesNotMatch(consignesLecon(profil), /choquant/);
 });
 
 test('consignes des Propositions : 4 originaux sans Leçon', () => {

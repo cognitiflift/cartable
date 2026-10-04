@@ -132,7 +132,7 @@ function ecranNouvelleLecon(profil) {
     }
   };
 
-  const sujet = h('input', { required: true, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
+  const sujet = h('input', { required: true, maxLength: 80, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
   const fichiers = h('input', { type: 'file', required: true, multiple: true, accept: '.pdf,image/*' });
   const dateControle = h('input', { type: 'date' });
   boutons.push(h('button', {}, 'Commencer'), h('button', {}, 'Réviser'));

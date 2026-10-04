@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -12,6 +12,7 @@ const ELEVES = process.env.ELEVES_DIR || path.join(ROOT, 'eleves');
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const store = createStore(ELEVES);
+const SUJET_MAX = 80; // sujet libre, après trim
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
@@ -192,8 +193,9 @@ async function api(req, res, segments) {
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));
         const sujet = typeof corps.sujet === 'string' ? corps.sujet.trim() : '';
         if (!sujet) throw new HttpError(400, 'Dis-moi ce que tu veux apprendre');
+        if (sujet.length > SUJET_MAX) throw new HttpError(400, `Ton sujet est trop long (${SUJET_MAX} caractères au plus)`);
         const lecon = await store.creerLecon(slug, { sujet, mode: 'libre' });
-        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: sujet, premier: true }));
+        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: promptDemarrageLibre(sujet), affiche: sujet, premier: true }));
       }
     } else if (!r3) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));

@@ -17,7 +17,8 @@ before(async () => {
   // (`args-propositions`), et écrit propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
   // `autres` lui fait écrire d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
-  // lui fait finir sa réponse par une ligne CHOIX.
+  // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
+  // (ni page ni lesson.json, des sujets voisins en CHOIX).
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
@@ -46,10 +47,14 @@ FIN
 fi
 touch '${dossier}'/demarre-"$(basename "$PWD")"
 while [ -e '${dossier}/lent' ]; do sleep 0.05; done
+printf '%s\\n' "$@" > '${dossier}'/args-"$(basename "$PWD")"
+if [ -e '${dossier}/refuser' ]; then
+  printf '%s\\n' '{"result":"Parlons plutôt d’autre chose.\\nCHOIX: Les volcans | Les dinosaures | Les planètes","session_id":"s-123","is_error":false}'
+  exit 0
+fi
 mkdir -p lessons
 echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
-printf '%s\\n' "$@" > '${dossier}'/args-"$(basename "$PWD")"
 if [ -e '${dossier}/choix' ]; then
   printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false}'
   exit 0
@@ -129,6 +134,35 @@ test('Séance : Réponses proposées sur le message du prof, retour de quiz avec
   assert.equal(retour.data.scores.length, 0); // le score s'enregistre par /scores
 });
 
+test('sujet libre : 80 caractères au plus, espaces autour non comptés', async () => {
+  const refus = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'a'.repeat(81) });
+  assert.equal(refus.status, 400);
+  assert.match(refus.data.erreur, /80/);
+  const lecon = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: `  ${'b'.repeat(80)}  ` });
+  assert.equal(lecon.status, 201);
+  assert.equal(lecon.data.sujet, 'b'.repeat(80));
+});
+
+test('sujet libre cadré : le prof reçoit la consigne ; s\'il refuse, la Leçon garde son sujet et propose des sujets voisins', async () => {
+  const lecon = await avecFichier('refuser', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'un sujet bizarre' })).data);
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.match(args, /un sujet bizarre/);
+  assert.match(args, /choquant/);
+  assert.equal(lecon.titre, 'un sujet bizarre');
+  assert.deepEqual(lecon.pages, []);
+  assert.equal(lecon.messages[0].texte, 'un sujet bizarre');
+  assert.deepEqual(lecon.messages.at(-1).choix, ['Les volcans', 'Les dinosaures', 'Les planètes']);
+  const resume = (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  assert.equal(resume.titre, 'un sujet bizarre');
+  assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data.titre, 'un sujet bizarre');
+
+  // L'élève choisit un sujet voisin : la Leçon démarre normalement, sans nouvelle consigne de cadrage.
+  const suite = (await message(lecon, 'Les volcans')).data;
+  assert.equal(suite.titre, 'Les volcans');
+  assert.deepEqual(suite.pages, ['0001-volcans.html']);
+  assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /choquant/);
+});
+
 test('révision : documents rangés dans sources/, formats refusés', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const refus = await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'virus.exe', data: pdf }] });
@@ -141,6 +175,7 @@ test('révision : documents rangés dans sources/, formats refusés', async () =
   assert.equal(lecon.status, 201);
   assert.equal(lecon.data.mode, 'revision');
   assert.match(lecon.data.messages[0].texte, /contrôle le/);
+  assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.data.id}`), 'utf8'), /choquant/);
   const sources = await fs.readdir(path.join(eleves, 'zoe-test', 'lecons', lecon.data.id, 'sources'));
   assert.deepEqual(sources, ['01.pdf', '02.jpg']);
 });

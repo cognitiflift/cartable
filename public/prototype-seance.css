@@ -21,7 +21,7 @@ body.proto-mobile main { max-width: 390px; outline: 2px dashed var(--doux); }
 }
 
 /* (b) Tiroir repliable */
-.proto-b { position: relative; height: var(--proto-h); }
+.proto-b { position: relative; height: var(--proto-h); overflow: hidden; border-radius: 12px; }
 .proto-b .panneau { height: 100%; }
 .proto-b-ouvrir { position: absolute; right: 1rem; bottom: 1rem; border-radius: 999px; padding: .6rem 1.1rem; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .proto-pastille { background: #d64545; border-radius: 999px; padding: 0 .45rem; margin-left: .4rem; font-size: .8rem; }
@@ -41,6 +41,23 @@ body.proto-mobile main { max-width: 390px; outline: 2px dashed var(--doux); }
 .proto-c-bandeau { flex: none; display: flex; flex-direction: column; padding: .6rem .8rem; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; }
 .proto-c-bascule { align-self: flex-start; font-size: .8rem; padding: .2rem .6rem; margin-bottom: .4rem; }
 .proto-c-dernier { white-space: pre-wrap; overflow-y: auto; max-height: 7.5em; }
+
+/* (b2) Tiroir + action suivante */
+.proto-b2-pile { position: absolute; right: 1rem; bottom: 1rem; display: flex; flex-direction: column; align-items: flex-end; gap: .6rem; }
+.proto-b2-pile button { border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.proto-b2-prof { padding: .6rem 1.1rem; }
+.proto-b2-vert { display: flex; flex-direction: column; align-items: center; padding: .7rem 1.4rem; font-size: 1.15rem; font-weight: 600;
+  background: #2e9e5b; border-color: #2e9e5b; animation: proto-pulse 1.6s ease-in-out infinite; }
+.proto-b2-vert small { font-size: .75rem; font-weight: 400; opacity: .9; }
+@keyframes proto-pulse { 50% { box-shadow: 0 0 0 8px rgba(46,158,91,.25); } }
+
+/* Panneau de scénario du prototype (ne fait pas partie du design évalué) */
+.proto-scenario { position: fixed; left: .8rem; bottom: .8rem; z-index: 1000; display: flex; flex-direction: column; gap: .3rem; max-width: 260px;
+  padding: .6rem .8rem; border-radius: 12px; background: #111; color: #fff; font-size: .8rem; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.proto-scenario button { padding: .1rem .5rem; margin: 0 .15rem; font-size: .8rem; background: #333; border-color: #555; color: #fff; }
+.proto-scenario button.actif { background: #f5b301; color: #111; }
+.proto-scenario input { padding: 0; }
+.proto-scenario .doux { color: #aaa; }
 
 /* Barre flottante du prototype (ne fait pas partie du design évalué) */
 .proto-barre { position: fixed; bottom: .8rem; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: .5rem;

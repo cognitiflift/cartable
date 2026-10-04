@@ -1,0 +1,56 @@
+/* PROTOTYPE JETABLE — disposition de l'écran de Séance. Voir prototype-seance.js. */
+:root { --proto-h: calc(100vh - 11rem); }
+main:has(.proto-cadre) { container-type: inline-size; padding-bottom: 3.5rem; }
+body.proto-mobile main { max-width: 390px; outline: 2px dashed var(--doux); }
+.proto-entete { margin: 0 0 .6rem; }
+
+/* Réponses proposées + boutons fixes, communs aux trois variantes */
+.proto-reponses { display: flex; flex-direction: column; gap: .5rem; margin-top: .6rem; flex: none; }
+.proto-proposees, .proto-fixes { display: flex; flex-wrap: wrap; gap: .4rem; }
+.proto-fixes button { font-size: .85rem; padding: .3rem .6rem; }
+.proto-reponses.vertical .proto-proposees { flex-direction: column; }
+.proto-reponses.vertical .proto-proposees button { text-align: left; }
+
+/* (a) Colonne étroite fixe */
+.proto-a { display: grid; grid-template-columns: 300px 1fr; gap: 1rem; height: var(--proto-h); }
+.proto-a-chat { display: flex; flex-direction: column; min-height: 0; }
+@container (max-width: 600px) {
+  .proto-a { grid-template-columns: 1fr; height: auto; }
+  .proto-a .messages { max-height: 40vh; }
+  .proto-a .panneau { height: 60vh; }
+}
+
+/* (b) Tiroir repliable */
+.proto-b { position: relative; height: var(--proto-h); }
+.proto-b .panneau { height: 100%; }
+.proto-b-ouvrir { position: absolute; right: 1rem; bottom: 1rem; border-radius: 999px; padding: .6rem 1.1rem; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.proto-pastille { background: #d64545; border-radius: 999px; padding: 0 .45rem; margin-left: .4rem; font-size: .8rem; }
+.proto-b-tiroir { position: absolute; top: 0; right: 0; bottom: 0; width: min(380px, 100%); display: flex; flex-direction: column;
+  padding: .8rem; background: var(--fond); border: 1px solid var(--bord); border-radius: 12px; box-shadow: -6px 0 20px rgba(0,0,0,.2);
+  transform: translateX(110%); transition: transform .2s; }
+.proto-b-tiroir.ouvert { transform: none; }
+.proto-b-titre { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+.proto-b-titre button { padding: .2rem .6rem; }
+
+/* (c) Bandeau en bas */
+.proto-c { display: flex; flex-direction: column; gap: .6rem; height: var(--proto-h); }
+.proto-c-lecon { flex: 1; min-height: 0; position: relative; display: flex; }
+.proto-c-lecon .panneau { flex: 1; }
+.proto-c-historique { position: absolute; left: 0; right: 0; bottom: 0; max-height: 75%; display: flex; flex-direction: column;
+  padding: .8rem; background: var(--fond); border: 1px solid var(--bord); border-radius: 12px; box-shadow: 0 -6px 20px rgba(0,0,0,.2); }
+.proto-c-bandeau { flex: none; display: flex; flex-direction: column; padding: .6rem .8rem; background: var(--carte); border: 1px solid var(--bord); border-radius: 12px; }
+.proto-c-bascule { align-self: flex-start; font-size: .8rem; padding: .2rem .6rem; margin-bottom: .4rem; }
+.proto-c-dernier { white-space: pre-wrap; overflow-y: auto; max-height: 7.5em; }
+
+/* Barre flottante du prototype (ne fait pas partie du design évalué) */
+.proto-barre { position: fixed; bottom: .8rem; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: .5rem;
+  padding: .35rem .6rem; border-radius: 999px; background: #111; color: #fff; font-size: .9rem; box-shadow: 0 4px 16px rgba(0,0,0,.4); white-space: nowrap; }
+.proto-barre button { padding: .2rem .6rem; background: #333; border-color: #555; color: #fff; }
+.proto-barre button.actif { background: #f5b301; color: #111; }
+@container (max-width: 600px) {
+  .proto-c { height: auto; }
+  .proto-c-lecon { height: 45vh; flex: none; }
+  .proto-c-dernier { max-height: 4.5em; }
+  .proto-reponses.ligne .proto-proposees { display: grid; grid-template-columns: 1fr 1fr; }
+  .proto-reponses.ligne .proto-proposees button { font-size: .85rem; padding: .35rem .5rem; }
+}

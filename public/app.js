@@ -191,6 +191,13 @@ function ecranNouvelleLecon(profil) {
 
 async function ecranSession(profil, id) {
   let lecon = await api(`eleves/${profil.slug}/lecons/${id}`);
+  // PROTOTYPE JETABLE (Q1 disposition de la Séance) : actif seulement avec ?variant=a|b|c dans l'URL.
+  const variante = new URLSearchParams(location.search).get('variant');
+  if (variante) {
+    const { ecranSessionPrototype } = await import('./prototype-seance.js');
+    quitterEcran = await ecranSessionPrototype({ profil, id, lecon, h, montrer, badgeMaitrise, variante });
+    return;
+  }
   const messages = h('div', { className: 'messages' });
   const panneau = h('div', { className: 'panneau' });
   const champ = h('textarea', { rows: 2, placeholder: 'Écris ici…', required: true });

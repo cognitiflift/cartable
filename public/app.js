@@ -118,15 +118,17 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
 function ecranNouvelleLecon(profil) {
   const erreur = h('p', { className: 'erreur' });
   const boutons = [];
+  let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
+  const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
   const demarrer = async (corps) => {
-    boutons.forEach((b) => (b.disabled = true));
+    activer(false);
     erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
     try {
       const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: await corps() });
       location.hash = `#/lecon/${lecon.id}`;
     } catch (e) {
       erreur.textContent = e.message;
-      boutons.forEach((b) => (b.disabled = false));
+      activer(true);
     }
   };
 
@@ -138,20 +140,29 @@ function ecranNouvelleLecon(profil) {
   // Propositions préparées en arrière-plan : on les lit sans attendre l'agent, et on revient voir tant qu'elles se préparent.
   const idees = h('div', {});
   let minuteur, actif = true;
+  // Les anciennes Propositions restent affichées et cliquables pendant qu'on en prépare de nouvelles.
   const afficherPropositions = async () => {
+    clearTimeout(minuteur);
     let etat, propositions;
     try { ({ etat, propositions } = await api(`eleves/${profil.slug}/propositions`)); } catch { return idees.replaceChildren(); }
     if (!actif) return;
-    if (etat === 'en préparation') {
-      idees.replaceChildren(h('h2', {}, '🎲 Des idées pour toi'), h('p', { className: 'doux' }, 'On prépare tes idées…'));
-      minuteur = setTimeout(afficherPropositions, 3000);
-      return;
-    }
-    if (!propositions.length) return idees.replaceChildren();
+    const enPreparation = etat === 'en préparation';
+    if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
     const cartes = propositions.map((p) => h('button', { className: 'carte', disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ sujet: p.titre })) },
       p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
-    boutons.push(...cartes);
-    idees.replaceChildren(h('h2', {}, '🎲 Des idées pour toi'), h('div', { className: 'grille' }, cartes));
+    const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
+      autresIdees.disabled = true;
+      // Un refus (génération déjà en cours) revient au même : on attend les Propositions qui se préparent.
+      await api(`eleves/${profil.slug}/propositions`, { method: 'POST' }).catch(() => {});
+      afficherPropositions();
+    } }, "🔄 D'autres idées");
+    boutonsIdees = [...cartes, autresIdees];
+    idees.replaceChildren(
+      h('h2', {}, '🎲 Des idées pour toi'),
+      cartes.length > 0 && h('div', { className: 'grille' }, cartes),
+      enPreparation
+        ? h('p', { className: 'doux' }, cartes.length ? '⏳ Nouvelles idées en préparation…' : 'On prépare tes idées…')
+        : autresIdees);
   };
   afficherPropositions();
   quitterEcran = () => { actif = false; clearTimeout(minuteur); };

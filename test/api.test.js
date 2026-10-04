@@ -12,7 +12,8 @@ before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
   // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json.
   // Dans le dossier des Propositions, il écrit propositions.json ; le fichier `attendre` le fait patienter,
-  // le fichier `echouer` le fait échouer.
+  // le fichier `echouer` le fait échouer. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
+  // et le fichier `lent` le fait répondre lentement.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
@@ -32,6 +33,8 @@ FIN
   echo '{"result":"ok","session_id":"s-prop","is_error":false}'
   exit 0
 fi
+touch '${dossier}'/demarre-"$(basename "$PWD")"
+while [ -e '${dossier}/lent' ]; do sleep 0.05; done
 mkdir -p lessons
 echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
@@ -134,14 +137,33 @@ test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semain
   assert.deepEqual(liste.data.find((l) => l.id === lecon.id).maitrise, { pourcentage: 70, palier: 'à consolider' });
 });
 
-const attendrePropositions = async (slug) => {
+// Interroge `lire` toutes les 50 ms (5 s au plus) jusqu'à ce que `ok` accepte la valeur lue.
+const sonderJusqua = async (lire, ok, echec) => {
   for (let i = 0; i < 100; i++) {
-    const { data } = await appel(`/api/eleves/${slug}/propositions`);
-    if (data.etat !== 'en préparation') return data;
+    const valeur = await lire();
+    if (ok(valeur)) return valeur;
     await new Promise((r) => setTimeout(r, 50));
   }
-  throw new Error('Propositions jamais prêtes');
+  throw new Error(echec);
 };
+const existe = (fichier) => fs.access(fichier).then(() => true, () => false);
+const demarre = (lecon) => existe(path.join(dossier, `demarre-${lecon.id}`));
+const message = (lecon, texte) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/messages`, 'POST', { texte });
+
+// Pose un fichier de contrôle du faux `claude` (attendre, echouer, lent) le temps de `fn`.
+const avecFichier = async (nom, fn) => {
+  await fs.writeFile(path.join(dossier, nom), '');
+  try {
+    return await fn();
+  } finally {
+    await fs.rm(path.join(dossier, nom), { force: true });
+  }
+};
+
+const attendrePropositions = (slug) => sonderJusqua(
+  async () => (await appel(`/api/eleves/${slug}/propositions`)).data,
+  (data) => data.etat !== 'en préparation',
+  'Propositions jamais prêtes');
 
 test('Propositions : générées à la création du profil, Catégorie hors liste ramenée à « Autre », choisir une démarre une Leçon libre', async () => {
   assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Test', age: 9, niveau: 'Primaire 4' })).status, 201);
@@ -160,30 +182,60 @@ test('Propositions : générées à la création du profil, Catégorie hors list
 });
 
 test('Propositions : « en préparation » tant que l\'agent travaille, sans retarder la création', async () => {
-  await fs.writeFile(path.join(dossier, 'attendre'), '');
-  try {
+  await avecFichier('attendre', async () => {
     assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Lent', age: 14, niveau: 'Secondaire 2' })).status, 201);
     assert.deepEqual((await appel('/api/eleves/prop-lent/propositions')).data, { etat: 'en préparation', propositions: [] });
     // Le sujet libre reste utilisable pendant la préparation.
     assert.equal((await appel('/api/eleves/prop-lent/lecons', 'POST', { sujet: 'les volcans' })).status, 201);
-  } finally {
-    await fs.rm(path.join(dossier, 'attendre'));
-  }
+  });
   assert.equal((await attendrePropositions('prop-lent')).etat, 'prêtes');
 });
 
 test('Propositions : un échec de génération laisse l\'appli utilisable, sans Propositions', async () => {
-  await fs.writeFile(path.join(dossier, 'echouer'), '');
-  try {
+  await avecFichier('echouer', async () => {
     assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Echec', age: 7, niveau: 'Primaire 2' })).status, 201);
     assert.deepEqual(await attendrePropositions('prop-echec'), { etat: 'indisponibles', propositions: [] });
-  } finally {
-    await fs.rm(path.join(dossier, 'echouer'));
-  }
+  });
   assert.equal((await appel('/api/eleves/prop-echec/lecons', 'POST', { sujet: 'les volcans' })).status, 201);
 });
 
-
 test('Propositions : élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne/propositions')).status, 404);
+});
+
+test('Concurrence : un second message pendant que l\'agent répond est refusé, puis la Leçon en accepte de nouveau', async () => {
+  const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' });
+  await fs.rm(path.join(dossier, `demarre-${lecon.id}`), { force: true });
+  const { premier } = await avecFichier('lent', async () => {
+    const premier = message(lecon, 'premier');
+    await sonderJusqua(() => demarre(lecon), Boolean, "L'agent n'a jamais démarré");
+    // Sans verrou, le second message attendrait l'agent lent : on le borne pour échouer plutôt que bloquer.
+    let minuteur;
+    const sansReponse = new Promise((r) => (minuteur = setTimeout(() => r({ status: 'pas de réponse en 2 s' }), 2000)));
+    const second = await Promise.race([message(lecon, 'second'), sansReponse]);
+    clearTimeout(minuteur);
+    assert.equal(second.status, 409);
+    assert.equal(second.data.erreur, 'L\'agent est déjà en train de répondre');
+    return { premier }; // pas encore résolue : l'agent attend la levée de `lent`
+  });
+  assert.equal((await premier).status, 200);
+
+  const apres = await message(lecon, 'troisième');
+  assert.equal(apres.status, 200);
+  const envoyes = apres.data.messages.filter((m) => m.role === 'eleve').map((m) => m.texte);
+  assert.deepEqual(envoyes, ['les volcans', 'premier', 'troisième']);
+});
+
+test('Concurrence : deux Leçons différentes reçoivent des messages en même temps', async () => {
+  const { data: a } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' });
+  const { data: b } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les fractions' });
+  await Promise.all([a, b].map((l) => fs.rm(path.join(dossier, `demarre-${l.id}`), { force: true })));
+  const { reponses } = await avecFichier('lent', async () => {
+    const reponses = Promise.all([message(a, 'ok'), message(b, 'ok')]);
+    reponses.catch(() => {}); // une erreur éventuelle est constatée plus bas
+    // Les deux agents ont démarré alors qu'aucun n'a encore répondu.
+    await sonderJusqua(() => Promise.all([demarre(a), demarre(b)]), (d) => d.every(Boolean), 'Les deux agents ne travaillent pas en même temps');
+    return { reponses };
+  });
+  assert.deepEqual((await reponses).map((r) => r.status), [200, 200]);
 });

@@ -280,7 +280,23 @@ test('Leçon terminée : une Leçon libre ne l\'est jamais', async () => {
   assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).terminee, null);
 });
 
-test('révision : documents rangés dans sources/, formats refusés', async () => {
+test('Leçon terminée : une Leçon existante, sans les nouveaux champs, se lit comme non terminée', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  // Leçon d'avant les Leçons terminées : etat.json tel qu'il était écrit alors.
+  const fichier = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'etat.json');
+  const { id, sujet, mode, sessionId, creee, derniereActivite, messages, scores } = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  await fs.writeFile(fichier, JSON.stringify({ id, sujet, mode, sessionId, creee, derniereActivite, messages, scores }));
+  assert.equal((await appel(url)).data.terminee, null);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).terminee, null);
+  // Pas de Défi en cours : un quiz réussi recommande un Défi, sans terminer la Leçon.
+  const apres = (await appel(`${url}/retours`, 'POST', { score: 90 })).data;
+  assert.equal(apres.messages.at(-1).retourQuiz.action, 'defi');
+  assert.equal(apres.terminee, null);
+});
+
+test('révision :documents rangés dans sources/, formats refusés', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const refus = await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'virus.exe', data: pdf }] });
   assert.equal(refus.status, 400);

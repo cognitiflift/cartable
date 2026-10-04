@@ -15,16 +15,24 @@ button:disabled { opacity:.5; cursor:wait; }
 form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; }
 .erreur { color:#c0392b; min-height:1.5em; }
 h2 { margin-top:1.5rem; }
-.session { display:grid; grid-template-columns:minmax(280px, 2fr) 3fr; gap:1rem; height:calc(100vh - 8rem); }
-.chat { display:flex; flex-direction:column; min-height:0; }
-.messages { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:.6rem; padding-right:.4rem; }
-.msg { padding:.6rem .9rem; border-radius:12px; white-space:pre-wrap; max-width:95%; }
-.msg.agent { background:var(--carte); border:1px solid var(--bord); align-self:flex-start; }
-.msg.eleve { background:var(--accent); color:#fff; align-self:flex-end; }
-.chat form { display:flex; gap:.5rem; margin-top:.6rem; } .chat textarea { flex:1; resize:none; }
-.panneau { display:flex; flex-direction:column; min-height:0; border:1px solid var(--bord); border-radius:12px; overflow:hidden; background:#fff; }
-.panneau select { margin:.4rem; } .panneau iframe { flex:1; border:0; } .vide { padding:2rem; color:var(--doux); background:var(--carte); flex:1; }
-@media (max-width:800px) { .session { grid-template-columns:1fr; height:auto; } .panneau { height:60vh; } .messages { max-height:50vh; } }
+/* Séance : la zone de leçon remplit l'écran sous l'en-tête, quelle que soit sa hauteur. */
+body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
+body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; }
+body:has(.seance) main > p { margin:0 0 .6rem; }
+.seance { position:relative; flex:1; min-height:0; border:1px solid var(--bord); border-radius:12px; overflow:hidden; background:var(--carte); }
+.panneau { display:flex; flex-direction:column; height:100%; background:#fff; }
+.panneau select { margin:.4rem; } .panneau iframe { flex:1; border:0; }
+.seance-centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; padding:1.5rem; overflow-y:auto; }
+.seance-centre.voile { background:rgba(0,0,0,.45); }
+.bulle-prof { max-width:560px; padding:1.2rem 1.4rem; white-space:pre-wrap; font-size:1.15rem; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:16px; box-shadow:0 6px 24px rgba(0,0,0,.2); }
+.choix { display:flex; flex-wrap:wrap; justify-content:center; gap:.6rem; max-width:560px; }
+.choix button { padding:.7rem 1.2rem; font-size:1.05rem; border-radius:999px; }
+.apres-quiz { position:absolute; right:1rem; bottom:1rem; width:min(340px, calc(100% - 2rem)); display:flex; flex-direction:column; gap:.6rem; }
+.retour { position:relative; padding:.8rem 2.2rem .8rem 1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
+.retour .fermer { position:absolute; top:.4rem; right:.4rem; padding:0 .45rem; font-size:.8rem; line-height:1.6; }
+.action-suivante { display:flex; flex-direction:column; align-items:center; padding:.7rem 1.4rem; font-size:1.15rem; font-weight:600; border-radius:999px; background:#2e9e5b; border-color:#2e9e5b; box-shadow:0 4px 14px rgba(0,0,0,.25); animation:pulsation 1.6s ease-in-out infinite; }
+.action-suivante small { font-size:.75rem; font-weight:400; opacity:.9; }
+@keyframes pulsation { 50% { box-shadow:0 0 0 8px rgba(46,158,91,.25); } }
 .maitrise { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--doux); margin:.3rem 0; }
 .jauge { display:inline-block; width:60px; height:8px; border-radius:4px; background:var(--bord); overflow:hidden; }
 .jauge > span { display:block; height:100%; background:currentColor; }

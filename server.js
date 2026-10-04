@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -58,7 +58,8 @@ function avecScores(prompt, lecon) {
 }
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
+// La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
+async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
@@ -70,7 +71,8 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
       sessionId: lecon.sessionId,
       consignes: consignesLecon(profil),
     });
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse });
+    const { texte, choix } = extraireChoix(reponse);
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }) });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
@@ -140,10 +142,27 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
     `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle} (organise la révision espacée jusqu'à cette date)` : ''}.`,
-    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (n'ajoute pas de notions hors programme) avec un quiz d'évaluation. Si un passage est illisible, demande-le à l'élève.`,
+    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (n'ajoute pas de notions hors programme) avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
   ].join('\n');
   const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
   return tourDeParole({ slug, id: lecon.id, prompt, affiche, premier: true });
+}
+
+// Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
+// Le score lui-même s'enregistre par /scores.
+async function retourQuiz(slug, id, { score, page }) {
+  const valeur = Number(score);
+  if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
+  const { mode } = await store.lireLecon(slug, id);
+  const arrondi = Math.round(valeur);
+  const retour = { score: arrondi, action: actionApresQuiz(arrondi, mode) };
+  return tourDeParole({
+    slug, id,
+    prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '' }),
+    affiche: `📝 Quiz terminé : ${retour.score} %`,
+    premier: false,
+    details: { retourQuiz: retour },
+  });
 }
 
 async function api(req, res, segments) {
@@ -180,6 +199,8 @@ async function api(req, res, segments) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));
     } else if (r3 === 'scores' && m === 'POST') {
       return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req)));
+    } else if (r3 === 'retours' && m === 'POST') {
+      return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
     } else if (r3 === 'messages' && m === 'POST') {
       const { texte } = await lireCorps(req);
       if (typeof texte !== 'string' || !texte.trim()) throw new HttpError(400, 'Message vide');

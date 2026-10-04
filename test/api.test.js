@@ -16,7 +16,8 @@ before(async () => {
   // Dans le dossier des Propositions, il note chaque lancement (`lancements-propositions`) et ses arguments
   // (`args-propositions`), et écrit propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
   // `autres` lui fait écrire d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
-  // et le fichier `lent` le fait répondre lentement.
+  // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
+  // lui fait finir sa réponse par une ligne CHOIX.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
@@ -48,6 +49,11 @@ while [ -e '${dossier}/lent' ]; do sleep 0.05; done
 mkdir -p lessons
 echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
+printf '%s\\n' "$@" > '${dossier}'/args-"$(basename "$PWD")"
+if [ -e '${dossier}/choix' ]; then
+  printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false}'
+  exit 0
+fi
 echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
 `, { mode: 0o755 });
   const port = 3100 + Math.floor(Math.random() * 500);
@@ -103,6 +109,24 @@ test('parcours : créer élève, leçon, message, fichier de leçon', async () =
   const page = await fetch(`${base}/fichiers/zoe-test/${lecon.data.id}/lessons/0001-volcans.html`);
   assert.equal(page.status, 200);
   assert.equal((await fetch(`${base}/fichiers/zoe-test/${lecon.data.id}/..%2F..%2Fprofil.json`)).status, 403);
+});
+
+test('Séance : Réponses proposées sur le message du prof, retour de quiz avec action recommandée', async () => {
+  await fs.writeFile(path.join(dossier, 'choix'), '');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les tornades' })).data;
+  await fs.rm(path.join(dossier, 'choix'));
+  assert.equal(lecon.messages.at(-1).texte, 'Pourquoi ?');
+  assert.deepEqual(lecon.messages.at(-1).choix, ['Un exposé', 'Un devoir']);
+
+  const retours = `/api/eleves/zoe-test/lecons/${lecon.id}/retours`;
+  assert.equal((await appel(retours, 'POST', { score: 'beaucoup' })).status, 400);
+  const retour = await appel(retours, 'POST', { score: 70, page: '0001-volcans.html' });
+  assert.equal(retour.status, 200);
+  const [eleve, prof] = retour.data.messages.slice(-2);
+  assert.equal(eleve.texte, '📝 Quiz terminé : 70 %');
+  assert.deepEqual(prof.retourQuiz, { score: 70, action: 'revoir' });
+  assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Quiz terminé : 0001-volcans\.html, 70 %/);
+  assert.equal(retour.data.scores.length, 0); // le score s'enregistre par /scores
 });
 
 test('révision : documents rangés dans sources/, formats refusés', async () => {

@@ -189,69 +189,99 @@ function ecranNouvelleLecon(profil) {
     erreur);
 }
 
+// Suites proposées après un quiz : libellé du bouton vert et message envoyé au prof.
+const SUITES = {
+  revoir: ['🔁 Revoir', "🔁 Je veux revoir ce que j'ai raté."],
+  defi: ['🏆 Défi', '🏆 Je veux un défi plus difficile.'],
+  suivante: ['➡️ Leçon suivante', '➡️ Je veux passer à la leçon suivante.'],
+};
+
+// Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
+// Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
+// Tout se déduit du dernier message du prof.
 async function ecranSession(profil, id) {
   let lecon = await api(`eleves/${profil.slug}/lecons/${id}`);
-  const messages = h('div', { className: 'messages' });
-  const panneau = h('div', { className: 'panneau' });
-  const champ = h('textarea', { rows: 2, placeholder: 'Écris ici…', required: true });
-  const bouton = h('button', {}, 'Envoyer');
-  const erreur = h('p', { className: 'erreur' });
+  let attente = null; // { texte, centre } pendant que le prof travaille
+  let retourFerme = false;
+  const erreur = h('span', { className: 'erreur' });
   const entete = h('span', {});
-  let iframe;
+  const panneau = h('div', { className: 'panneau' });
+  const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
+  let pagesAffichees, iframe;
 
   const afficherEntete = () => entete.replaceChildren(` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise));
-  // Les quiz des pages de leçon envoient leur score par postMessage (voir les consignes de l'agent).
-  const recevoirScore = async (ev) => {
-    if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-score') return;
+  // Le panneau n'est reconstruit que si les pages changent : l'iframe garde sinon sa position (et son quiz).
+  const afficherPanneau = () => {
+    panneau.style.display = lecon.pages.length ? '' : 'none';
+    if (!lecon.pages.length || pagesAffichees === lecon.pages.join()) return;
+    pagesAffichees = lecon.pages.join();
+    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}`;
+    const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
+    choix.value = lecon.pages.at(-1);
+    iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
+    panneau.replaceChildren(choix, iframe);
+  };
+
+  const afficher = () => {
+    afficherPanneau();
+    const prof = lecon.messages.findLast((m) => m.role === 'agent');
+    const voile = lecon.pages.length ? 'voile' : '';
+    const bulle = (...enfants) => h('div', { className: 'bulle-prof' }, ...enfants);
+    let contenu = null;
+    if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
+    else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
+    else if (prof?.retourQuiz) {
+      const [libelle, texte] = SUITES[prof.retourQuiz.action];
+      contenu = h('div', { className: 'apres-quiz' },
+        !retourFerme && h('div', { className: 'retour' },
+          h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
+          prof.texte),
+        h('button', { className: 'action-suivante', onclick: () => repondre(texte) }, libelle, h('small', {}, `Quiz : ${prof.retourQuiz.score} %`)));
+    } else if (prof && (prof.choix || !lecon.pages.length)) {
+      // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
+      const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];
+      contenu = h('div', { className: `seance-centre ${voile}` },
+        bulle(prof.texte),
+        h('div', { className: 'choix' }, choix.map((c) => h('button', { onclick: () => repondre(c) }, c))));
+    }
+    calque.replaceChildren(...garder([contenu]));
+  };
+
+  // Un tour de parole : on montre que le prof travaille, puis l'écran suit son nouveau message.
+  const tour = async (nouvelleAttente, requete) => {
+    attente = nouvelleAttente;
+    erreur.textContent = '';
+    afficher();
     try {
-      lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: { score: ev.data.score, page: ev.data.page } });
-      afficherEntete();
-      erreur.textContent = `✅ Score enregistré : ${Math.round(ev.data.score)} %`;
+      lecon = await requete();
+      retourFerme = false;
     } catch (e) { erreur.textContent = e.message; }
+    attente = null;
+    afficherEntete();
+    afficher();
+  };
+  const repondre = (texte) => tour({ texte: '⏳ Ton prof prépare la suite…', centre: true },
+    () => api(`eleves/${profil.slug}/lecons/${id}/messages`, { method: 'POST', body: { texte } }));
+
+  // Les quiz des pages de leçon envoient leur score par postMessage (voir les consignes de l'agent) :
+  // on l'enregistre, puis le prof le commente.
+  const recevoirScore = async (ev) => {
+    if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-score' || attente) return;
+    const corps = { score: ev.data.score, page: ev.data.page };
+    try {
+      lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
+      afficherEntete();
+    } catch (e) { return (erreur.textContent = e.message); }
+    tour({ texte: '⏳ Ton prof regarde ton quiz…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
   };
   window.addEventListener('message', recevoirScore);
   quitterEcran = () => window.removeEventListener('message', recevoirScore);
 
-  const afficherMessages = () => {
-    messages.replaceChildren(...lecon.messages.map((m) => h('div', { className: `msg ${m.role}` }, m.texte)));
-    messages.scrollTop = messages.scrollHeight;
-  };
-  const afficherPanneau = () => {
-    if (!lecon.pages.length) return panneau.replaceChildren(h('div', { className: 'vide' }, 'Les leçons apparaîtront ici.'));
-    const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
-    choix.value = lecon.pages.at(-1);
-    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}`;
-    iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
-    panneau.replaceChildren(choix, iframe);
-  };
-  const envoyer = async () => {
-    const texte = champ.value.trim();
-    if (!texte) return;
-    bouton.disabled = champ.disabled = true;
-    erreur.textContent = '⏳ Ton prof réfléchit…';
-    messages.append(h('div', { className: 'msg eleve' }, texte));
-    champ.value = '';
-    try {
-      lecon = await api(`eleves/${profil.slug}/lecons/${id}/messages`, { method: 'POST', body: { texte } });
-      erreur.textContent = '';
-      afficherEntete();
-      afficherMessages();
-      afficherPanneau();
-    } catch (e) { erreur.textContent = e.message; }
-    bouton.disabled = champ.disabled = false;
-    champ.focus();
-  };
-
   afficherEntete();
-  afficherMessages();
-  afficherPanneau();
+  afficher();
   montrer(
-    h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete),
-    h('div', { className: 'session' },
-      h('div', { className: 'chat' }, messages, erreur,
-        h('form', { onsubmit: (ev) => { ev.preventDefault(); envoyer(); } }, champ, bouton)),
-      panneau));
-  champ.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); envoyer(); } });
+    h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
+    h('div', { className: 'seance' }, panneau, calque));
 }
 
 async function route() {

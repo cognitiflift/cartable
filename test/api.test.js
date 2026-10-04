@@ -182,6 +182,8 @@ test('Rebond : l\'action recommandée par le dernier Retour de quiz construit la
   assert.equal(suite.status, 200);
   const consigne = await fs.readFile(args, 'utf8');
   assert.match(consigne, /Rebond : Étape suivante/);
+  // Un Rebond déjà choisi ne se rejoue pas (double clic).
+  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
   assert.match(consigne, /même Leçon/);
   assert.doesNotMatch(consigne, /Je veux/);
   const eleve = suite.data.messages.at(-2);
@@ -290,12 +292,14 @@ test('Propositions : générées à la création du profil, Catégorie hors list
   assert.equal(propositions[2].categorie, 'Autre');
   assert.deepEqual(propositions.map((p) => p.type), ['original', 'original', 'original', 'suite']);
 
-  // Choisir une Proposition démarre une Leçon libre sur son sujet.
-  const lecon = await appel('/api/eleves/prop-test/lecons', 'POST', { sujet: propositions[1].titre });
+  // Choisir une Proposition démarre une Leçon libre sur son sujet, sans la consigne de cadrage du sujet libre.
+  assert.equal((await appel('/api/eleves/prop-test/lecons', 'POST', { proposition: 'Un sujet inventé' })).status, 400);
+  const lecon = await appel('/api/eleves/prop-test/lecons', 'POST', { proposition: propositions[1].titre });
   assert.equal(lecon.status, 201);
   assert.equal(lecon.data.mode, 'libre');
   assert.equal(lecon.data.sujet, 'Les pyramides');
   assert.equal(lecon.data.messages[0].texte, 'Les pyramides');
+  assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.data.id}`), 'utf8'), /choquant/);
 });
 
 test('Propositions : « en préparation » tant que l\'agent travaille, sans retarder la création', async () => {

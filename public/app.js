@@ -148,7 +148,7 @@ function ecranNouvelleLecon(profil) {
     if (!actif) return;
     const enPreparation = etat === 'en préparation';
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
-    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ sujet: p.titre })) },
+    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre })) },
       h('span', { className: 'type' }, p.type === 'suite' ? '➡️ Pour aller plus loin' : '✨ Nouveau sujet'),
       p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
@@ -190,7 +190,7 @@ function ecranNouvelleLecon(profil) {
 }
 
 // Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
-const REBONDS = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Prêt pour la suite ?' };
+const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Prêt pour la suite ?' };
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
@@ -232,7 +232,7 @@ async function ecranSession(profil, id) {
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
-        h('button', { className: 'action-suivante', onclick: () => choisirRebond(action) }, REBONDS[action], h('small', {}, `Quiz : ${score} %`)));
+        h('button', { className: 'action-suivante', onclick: () => choisirRebond(action) }, LIBELLES_REBOND[action], h('small', {}, `Quiz : ${score} %`)));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
       const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];

@@ -166,18 +166,23 @@ async function retourQuiz(slug, id, { score, page }) {
   });
 }
 
-// Rebonds acceptés : l'action recommandée par le dernier Retour de quiz de la Leçon.
-const rebondsPossibles = (lecon) => {
-  const retour = lecon.messages.findLast((m) => m.retourQuiz)?.retourQuiz;
-  return retour ? [retour.action] : [];
-};
+// Rebond accepté : l'action recommandée par le Retour de quiz, tant qu'il est le dernier message (pas encore choisi).
+const rebondRecommande = (lecon) => lecon.messages.at(-1)?.retourQuiz?.action;
 
 // Choix d'un Rebond : une action fermée, dont le serveur tire la consigne du prof et la phrase de l'Élève.
 async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
-  if (!rebondsPossibles(await store.lireLecon(slug, id)).includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
+  if (rebondRecommande(await store.lireLecon(slug, id)) !== action) throw new HttpError(400, "Ce Rebond n'est pas proposé");
   const { consigne, phrase } = REBONDS[action];
   return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false });
+}
+
+// Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
+async function nouvelleDepuisProposition(slug, titre) {
+  const proposition = (await store.lirePropositions(slug))?.find((p) => p.titre === titre);
+  if (!proposition) throw new HttpError(400, "Cette idée n'est plus proposée");
+  const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre' });
+  return tourDeParole({ slug, id: lecon.id, prompt: proposition.titre, premier: true });
 }
 
 async function api(req, res, segments) {
@@ -205,6 +210,7 @@ async function api(req, res, segments) {
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));
+        if (corps.proposition !== undefined) return json(res, 201, await nouvelleDepuisProposition(slug, corps.proposition));
         const sujet = typeof corps.sujet === 'string' ? corps.sujet.trim() : '';
         if (!sujet) throw new HttpError(400, 'Dis-moi ce que tu veux apprendre');
         if (sujet.length > SUJET_MAX) throw new HttpError(400, `Ton sujet est trop long (${SUJET_MAX} caractères au plus)`);

@@ -163,6 +163,50 @@ test('sujet libre cadré : le prof reçoit la consigne ; s\'il refuse, la Leçon
   assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /choquant/);
 });
 
+test('Rebond : l\'action recommandée par le dernier Retour de quiz construit la consigne du prof', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les séismes' })).data;
+  const rebonds = `/api/eleves/zoe-test/lecons/${lecon.id}/rebonds`;
+  const args = path.join(dossier, `args-${lecon.id}`);
+  // Sans Retour de quiz, aucun Rebond n'est proposé.
+  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
+
+  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 90 });
+  assert.equal((await appel(rebonds, 'POST', { action: 'sauter' })).status, 400);
+  assert.equal((await appel(rebonds, 'POST', { action: 'toString' })).status, 400);
+  assert.equal((await appel(rebonds, 'POST', { texte: 'Je veux passer à la suite.' })).status, 400);
+  const incoherent = await appel(rebonds, 'POST', { action: 'defi' }); // Leçon libre : Étape suivante seulement
+  assert.equal(incoherent.status, 400);
+  assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data.messages.length, 4);
+
+  const suite = await appel(rebonds, 'POST', { action: 'suivante' });
+  assert.equal(suite.status, 200);
+  const consigne = await fs.readFile(args, 'utf8');
+  assert.match(consigne, /Rebond : Étape suivante/);
+  assert.match(consigne, /même Leçon/);
+  assert.doesNotMatch(consigne, /Je veux/);
+  const eleve = suite.data.messages.at(-2);
+  assert.equal(eleve.role, 'eleve');
+  assert.equal(eleve.texte, '➡️ Je suis prêt pour la suite.');
+
+  // Après un quiz raté, seul Revoir est accepté.
+  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 40 });
+  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
+  assert.equal((await appel(rebonds, 'POST', { action: 'revoir' })).status, 200);
+  assert.match(await fs.readFile(args, 'utf8'), /Rebond : Revoir/);
+});
+
+test('Rebond : Défi après un quiz réussi en Leçon de révision', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const rebonds = `/api/eleves/zoe-test/lecons/${lecon.id}/rebonds`;
+  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 85 });
+  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
+  const defi = await appel(rebonds, 'POST', { action: 'defi' });
+  assert.equal(defi.status, 200);
+  assert.equal(defi.data.messages.at(-2).texte, '🏆 Je veux un défi plus difficile.');
+  assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Rebond : Défi/);
+});
+
 test('révision : documents rangés dans sources/, formats refusés', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const refus = await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'virus.exe', data: pdf }] });

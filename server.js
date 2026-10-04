@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -166,6 +166,20 @@ async function retourQuiz(slug, id, { score, page }) {
   });
 }
 
+// Rebonds acceptés : l'action recommandée par le dernier Retour de quiz de la Leçon.
+const rebondsPossibles = (lecon) => {
+  const retour = lecon.messages.findLast((m) => m.retourQuiz)?.retourQuiz;
+  return retour ? [retour.action] : [];
+};
+
+// Choix d'un Rebond : une action fermée, dont le serveur tire la consigne du prof et la phrase de l'Élève.
+async function rebond(slug, id, { action }) {
+  if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
+  if (!rebondsPossibles(await store.lireLecon(slug, id)).includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
+  const { consigne, phrase } = REBONDS[action];
+  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false });
+}
+
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
@@ -203,6 +217,8 @@ async function api(req, res, segments) {
       return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req)));
     } else if (r3 === 'retours' && m === 'POST') {
       return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
+    } else if (r3 === 'rebonds' && m === 'POST') {
+      return json(res, 200, await rebond(slug, id, await lireCorps(req)));
     } else if (r3 === 'messages' && m === 'POST') {
       const { texte } = await lireCorps(req);
       if (typeof texte !== 'string' || !texte.trim()) throw new HttpError(400, 'Message vide');

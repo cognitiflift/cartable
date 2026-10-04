@@ -189,12 +189,8 @@ function ecranNouvelleLecon(profil) {
     erreur);
 }
 
-// Suites proposées après un quiz : libellé du bouton vert et message envoyé au prof.
-const SUITES = {
-  revoir: ['🔁 Revoir', "🔁 Je veux revoir ce que j'ai raté."],
-  defi: ['🏆 Défi', '🏆 Je veux un défi plus difficile.'],
-  suivante: ['➡️ Leçon suivante', '➡️ Je veux passer à la leçon suivante.'],
-};
+// Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
+const REBONDS = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Prêt pour la suite ?' };
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
@@ -231,12 +227,12 @@ async function ecranSession(profil, id) {
     if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
-      const [libelle, texte] = SUITES[prof.retourQuiz.action];
+      const { action, score } = prof.retourQuiz;
       contenu = h('div', { className: 'apres-quiz' },
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
-        h('button', { className: 'action-suivante', onclick: () => repondre(texte) }, libelle, h('small', {}, `Quiz : ${prof.retourQuiz.score} %`)));
+        h('button', { className: 'action-suivante', onclick: () => choisirRebond(action) }, REBONDS[action], h('small', {}, `Quiz : ${score} %`)));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
       const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];
@@ -262,6 +258,8 @@ async function ecranSession(profil, id) {
   };
   const repondre = (texte) => tour({ texte: '⏳ Ton prof prépare la suite…', centre: true },
     () => api(`eleves/${profil.slug}/lecons/${id}/messages`, { method: 'POST', body: { texte } }));
+  const choisirRebond = (action) => tour({ texte: '⏳ Ton prof prépare la suite…', centre: true },
+    () => api(`eleves/${profil.slug}/lecons/${id}/rebonds`, { method: 'POST', body: { action } }));
 
   // Les quiz des pages de leçon envoient leur score par postMessage (voir les consignes de l'agent) :
   // on l'enregistre, puis le prof le commente.

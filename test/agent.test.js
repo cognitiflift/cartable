@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, promptDemarrageLibre } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from '../lib/agent.js';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -17,11 +17,34 @@ test('Réponses proposées : aucune sans ligne CHOIX, 4 au plus, casse et ** tol
   assert.deepEqual(extraireChoix('CHOIX:'), { texte: '' });
 });
 
-test('action après un quiz : Revoir sous 80 %, sinon Défi (révision) ou Leçon suivante (libre)', () => {
+test('action après un quiz : Revoir sous 80 %, sinon Défi (révision) ou Étape suivante (libre)', () => {
   assert.equal(actionApresQuiz(79, 'revision'), 'revoir');
   assert.equal(actionApresQuiz(40, 'libre'), 'revoir');
   assert.equal(actionApresQuiz(80, 'revision'), 'defi');
   assert.equal(actionApresQuiz(95, 'libre'), 'suivante');
+});
+
+test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {
+  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante']);
+  assert.match(REBONDS.revoir.consigne, /Rebond : Revoir/);
+  assert.match(REBONDS.revoir.consigne, /raté/);
+  assert.match(REBONDS.defi.consigne, /Rebond : Défi/);
+  assert.match(REBONDS.defi.consigne, /plus difficile/);
+  assert.match(REBONDS.suivante.consigne, /Rebond : Étape suivante/);
+  assert.match(REBONDS.suivante.consigne, /même Leçon/);
+  for (const { phrase, consigne } of Object.values(REBONDS)) {
+    assert.ok(phrase.length > 0);
+    assert.match(consigne, /Crée/);
+    assert.doesNotMatch(phrase + consigne, /leçon suivante/i);
+  }
+});
+
+test('ni les consignes de Leçon ni le retour de quiz ne parlent de « Leçon suivante »', () => {
+  assert.doesNotMatch(consignesLecon(profil), /leçon suivante/i);
+  assert.match(consignesLecon(profil), /Étape suivante/);
+  const retour = promptRetourQuiz({ score: 90, page: 'p.html', action: 'suivante' });
+  assert.doesNotMatch(retour, /leçon suivante/i);
+  assert.match(retour, /étape suivante/);
 });
 
 test('consignes de Leçon : pas de saisie libre, Réponses proposées sur une ligne CHOIX', () => {

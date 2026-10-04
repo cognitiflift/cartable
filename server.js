@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions } from './lib/agent.js';
+import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -205,4 +206,4 @@ const serveur = http.createServer(async (req, res) => {
   }
 });
 
-serveur.listen(PORT, HOST, () => console.log(`Cartable : http://localhost:${PORT}`));
+serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT })));

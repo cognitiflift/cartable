@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -12,6 +12,7 @@ const ELEVES = process.env.ELEVES_DIR || path.join(ROOT, 'eleves');
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const store = createStore(ELEVES);
+const SUJET_MAX = 80; // sujet libre, après trim
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
@@ -58,7 +59,8 @@ function avecScores(prompt, lecon) {
 }
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
+// La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
+async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
@@ -70,7 +72,8 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
       sessionId: lecon.sessionId,
       consignes: consignesLecon(profil),
     });
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse });
+    const { texte, choix } = extraireChoix(reponse);
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }) });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
@@ -140,10 +143,46 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
     `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle} (organise la révision espacée jusqu'à cette date)` : ''}.`,
-    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (n'ajoute pas de notions hors programme) avec un quiz d'évaluation. Si un passage est illisible, demande-le à l'élève.`,
+    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (n'ajoute pas de notions hors programme) avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
   ].join('\n');
   const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
   return tourDeParole({ slug, id: lecon.id, prompt, affiche, premier: true });
+}
+
+// Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
+// Le score lui-même s'enregistre par /scores.
+async function retourQuiz(slug, id, { score, page }) {
+  const valeur = Number(score);
+  if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
+  const { mode } = await store.lireLecon(slug, id);
+  const arrondi = Math.round(valeur);
+  const retour = { score: arrondi, action: actionApresQuiz(arrondi, mode) };
+  return tourDeParole({
+    slug, id,
+    prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '' }),
+    affiche: `📝 Quiz terminé : ${retour.score} %`,
+    premier: false,
+    details: { retourQuiz: retour },
+  });
+}
+
+// Rebond accepté : l'action recommandée par le Retour de quiz, tant qu'il est le dernier message (pas encore choisi).
+const rebondRecommande = (lecon) => lecon.messages.at(-1)?.retourQuiz?.action;
+
+// Choix d'un Rebond : une action fermée, dont le serveur tire la consigne du prof et la phrase de l'Élève.
+async function rebond(slug, id, { action }) {
+  if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
+  if (rebondRecommande(await store.lireLecon(slug, id)) !== action) throw new HttpError(400, "Ce Rebond n'est pas proposé");
+  const { consigne, phrase } = REBONDS[action];
+  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false });
+}
+
+// Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
+async function nouvelleDepuisProposition(slug, titre) {
+  const proposition = (await store.lirePropositions(slug))?.find((p) => p.titre === titre);
+  if (!proposition) throw new HttpError(400, "Cette idée n'est plus proposée");
+  const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre' });
+  return tourDeParole({ slug, id: lecon.id, prompt: proposition.titre, premier: true });
 }
 
 async function api(req, res, segments) {
@@ -171,15 +210,21 @@ async function api(req, res, segments) {
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));
+        if (corps.proposition !== undefined) return json(res, 201, await nouvelleDepuisProposition(slug, corps.proposition));
         const sujet = typeof corps.sujet === 'string' ? corps.sujet.trim() : '';
         if (!sujet) throw new HttpError(400, 'Dis-moi ce que tu veux apprendre');
+        if (sujet.length > SUJET_MAX) throw new HttpError(400, `Ton sujet est trop long (${SUJET_MAX} caractères au plus)`);
         const lecon = await store.creerLecon(slug, { sujet, mode: 'libre' });
-        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: sujet, premier: true }));
+        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: promptDemarrageLibre(sujet), affiche: sujet, premier: true }));
       }
     } else if (!r3) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));
     } else if (r3 === 'scores' && m === 'POST') {
       return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req)));
+    } else if (r3 === 'retours' && m === 'POST') {
+      return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
+    } else if (r3 === 'rebonds' && m === 'POST') {
+      return json(res, 200, await rebond(slug, id, await lireCorps(req)));
     } else if (r3 === 'messages' && m === 'POST') {
       const { texte } = await lireCorps(req);
       if (typeof texte !== 'string' || !texte.trim()) throw new HttpError(400, 'Message vide');

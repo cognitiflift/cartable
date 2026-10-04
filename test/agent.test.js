@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from '../lib/agent.js';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -22,6 +22,22 @@ test('action après un quiz : Revoir sous 80 %, sinon Défi (révision) ou Étap
   assert.equal(actionApresQuiz(40, 'libre'), 'revoir');
   assert.equal(actionApresQuiz(80, 'revision'), 'defi');
   assert.equal(actionApresQuiz(95, 'libre'), 'suivante');
+});
+
+test('Retour de quiz : un Défi réussi en révision termine la Leçon, sinon même action qu\'après un quiz', () => {
+  assert.equal(actionRetourQuiz(80, 'revision', true), 'terminee');
+  assert.equal(actionRetourQuiz(100, 'revision', true), 'terminee');
+  assert.equal(actionRetourQuiz(79, 'revision', true), 'revoir'); // Défi raté
+  assert.equal(actionRetourQuiz(90, 'revision', false), 'defi'); // quiz ordinaire réussi
+  assert.equal(actionRetourQuiz(90, 'libre', true), 'suivante'); // une Leçon libre n'est jamais terminée
+  assert.equal(actionRetourQuiz(50, 'libre', false), 'revoir');
+});
+
+test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est terminée', () => {
+  const retour = promptRetourQuiz({ score: 90, page: 'defi.html', action: 'terminee' });
+  assert.match(retour, /Leçon est terminée/);
+  assert.match(retour, /nouveau défi/);
+  assert.doesNotMatch(retour, /undefined/);
 });
 
 test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {

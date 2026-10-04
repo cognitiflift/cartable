@@ -30,14 +30,16 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 .apres-quiz { position:absolute; right:1rem; bottom:1rem; width:min(340px, calc(100% - 2rem)); display:flex; flex-direction:column; gap:.6rem; }
 .retour { position:relative; padding:.8rem 2.2rem .8rem 1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
 .retour .fermer { position:absolute; top:.4rem; right:.4rem; padding:0 .45rem; font-size:.8rem; line-height:1.6; }
-.action-suivante { display:flex; flex-direction:column; align-items:center; padding:.7rem 1.4rem; font-size:1.15rem; font-weight:600; border-radius:999px; background:#2e9e5b; border-color:#2e9e5b; box-shadow:0 4px 14px rgba(0,0,0,.25); animation:pulsation 1.6s ease-in-out infinite; }
-.action-suivante small { font-size:.75rem; font-weight:400; opacity:.9; }
+.action-suivante, .lecon-terminee { display:flex; flex-direction:column; align-items:center; padding:.7rem 1.4rem; font-size:1.15rem; font-weight:600; border-radius:999px; background:#2e9e5b; border-color:#2e9e5b; box-shadow:0 4px 14px rgba(0,0,0,.25); animation:pulsation 1.6s ease-in-out infinite; }
+.action-suivante small, .lecon-terminee small { font-size:.75rem; font-weight:400; opacity:.9; }
+.lecon-terminee { background:#d4a017; color:#fff; animation:none; }
 @keyframes pulsation { 50% { box-shadow:0 0 0 8px rgba(46,158,91,.25); } }
 .maitrise { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--doux); margin:.3rem 0; }
 .jauge { display:inline-block; width:60px; height:8px; border-radius:4px; background:var(--bord); overflow:hidden; }
 .jauge > span { display:block; height:100%; background:currentColor; }
 .maitrise.rouge { color:#d64545; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
 p .maitrise { display:inline-flex; }
+.ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }

@@ -13,7 +13,7 @@ const store = createStore(ROOT);
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
-const propositionsEnCours = new Set(); // élèves dont les Propositions se préparent : un seul tour à la fois
+const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -77,10 +77,11 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
   }
 }
 
-// Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas, et un échec laisse simplement l'Élève sans Propositions.
-function genererPropositions(slug) {
+// Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
+// (l'agent réécrit le fichier sur place) ; s'il échoue sans laisser de Propositions utilisables, on les remet.
+function genererPropositions(slug, anciennes = []) {
   if (propositionsEnCours.has(slug)) return;
-  propositionsEnCours.add(slug);
+  propositionsEnCours.set(slug, anciennes);
   (async () => {
     const profil = await store.lireEleve(slug);
     await lancerAgent({
@@ -91,13 +92,25 @@ function genererPropositions(slug) {
     });
   })()
     .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
+    .then(async () => {
+      if (anciennes.length && !(await store.lirePropositions(slug))) await store.ecrirePropositions(slug, anciennes);
+    })
+    .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
     .finally(() => propositionsEnCours.delete(slug));
 }
 
 async function lirePropositions(slug) {
+  if (propositionsEnCours.has(slug)) return { etat: 'en préparation', propositions: propositionsEnCours.get(slug) };
   const propositions = await store.lirePropositions(slug);
-  if (propositions) return { etat: 'prêtes', propositions };
-  return { etat: propositionsEnCours.has(slug) ? 'en préparation' : 'indisponibles', propositions: [] };
+  return propositions ? { etat: 'prêtes', propositions } : { etat: 'indisponibles', propositions: [] };
+}
+
+// « D'autres idées » : relance la génération sans l'attendre, jamais deux à la fois pour un même Élève.
+async function regenererPropositions(slug) {
+  const anciennes = await store.lirePropositions(slug); // 404 si l'Élève n'existe pas
+  if (propositionsEnCours.has(slug)) throw new HttpError(409, 'Des idées sont déjà en préparation');
+  genererPropositions(slug, anciennes ?? []);
+  return lirePropositions(slug);
 }
 
 async function nouvelleRevision(slug, { fichiers, dateControle }) {
@@ -131,6 +144,7 @@ async function api(req, res, segments) {
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
+    if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
       if (m === 'GET') return json(res, 200, await store.listerLecons(slug));

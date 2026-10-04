@@ -11,15 +11,22 @@ let serveur, base, dossier;
 before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
   // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json.
-  // Dans le dossier des Propositions, il écrit propositions.json ; le fichier `attendre` le fait patienter,
-  // le fichier `echouer` le fait échouer. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
+  // Dans le dossier des Propositions, il note chaque lancement (`lancements-propositions`) et écrit
+  // propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
+  // `autres` lui fait écrire d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
   // et le fichier `lent` le fait répondre lentement.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
+  echo lancement >> '${dossier}/lancements-propositions'
   while [ -e '${dossier}/attendre' ]; do sleep 0.05; done
   if [ -e '${dossier}/echouer' ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
+    exit 0
+  fi
+  if [ -e '${dossier}/autres' ]; then
+    echo '[{"titre":"Les abeilles","categorie":"Sciences","accroche":"Comment font-elles le miel ?","type":"original"}]' > propositions.json
+    echo '{"result":"ok","session_id":"s-prop","is_error":false}'
     exit 0
   fi
   cat > propositions.json <<'FIN'
@@ -52,7 +59,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
 
 after(async () => {
   serveur.kill();
-  for (const slug of ['zoe-test', 'prop-test', 'prop-lent', 'prop-echec']) {
+  for (const slug of ['zoe-test', 'prop-test', 'prop-lent', 'prop-echec', 'prop-autres', 'prop-double', 'prop-garde']) {
     await fs.rm(path.join(import.meta.dirname, '..', 'eleves', slug), { recursive: true, force: true });
   }
   await fs.rm(dossier, { recursive: true, force: true });
@@ -201,6 +208,60 @@ test('Propositions : un échec de génération laisse l\'appli utilisable, sans 
 
 test('Propositions : élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne/propositions')).status, 404);
+  assert.equal((await appel('/api/eleves/personne/propositions', 'POST')).status, 404);
+});
+
+test('Propositions : « D\'autres idées » régénère sans attendre l\'agent, en gardant les anciennes visibles', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Autres', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const anciennes = (await attendrePropositions('prop-autres')).propositions;
+  assert.equal(anciennes[0].titre, 'Les dinosaures');
+
+  const { etat, propositions } = await avecFichier('autres', async () => {
+    await avecFichier('attendre', async () => {
+      const relance = await appel('/api/eleves/prop-autres/propositions', 'POST');
+      assert.equal(relance.status, 202);
+      assert.deepEqual(relance.data, { etat: 'en préparation', propositions: anciennes });
+      // Pendant la génération, les anciennes Propositions restent lisibles (et donc cliquables).
+      assert.deepEqual((await appel('/api/eleves/prop-autres/propositions')).data, { etat: 'en préparation', propositions: anciennes });
+    });
+    return attendrePropositions('prop-autres');
+  });
+  assert.equal(etat, 'prêtes');
+  assert.equal(propositions[0].titre, 'Les abeilles');
+});
+
+test('Propositions : les anciennes restent servies pendant l\'écriture des nouvelles, et après un échec de régénération', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Garde', age: 8, niveau: 'Primaire 3' })).status, 201);
+  const anciennes = (await attendrePropositions('prop-garde')).propositions;
+  const fichier = path.join(import.meta.dirname, '..', 'eleves', 'prop-garde', 'propositions', 'propositions.json');
+
+  await avecFichier('echouer', () => avecFichier('attendre', async () => {
+    assert.equal((await appel('/api/eleves/prop-garde/propositions', 'POST')).status, 202);
+    await fs.writeFile(fichier, '[{"titre":"Les'); // l'agent est en train d'écrire
+    assert.deepEqual((await appel('/api/eleves/prop-garde/propositions')).data, { etat: 'en préparation', propositions: anciennes });
+  }).then(() => attendrePropositions('prop-garde')).then((data) => {
+    assert.deepEqual(data, { etat: 'prêtes', propositions: anciennes });
+  }));
+});
+
+test('Propositions : une seconde demande pendant une génération en cours ne lance pas de second agent', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Double', age: 12, niveau: 'Secondaire 1' })).status, 201);
+  await attendrePropositions('prop-double');
+  const lancements = path.join(dossier, 'lancements-propositions');
+  await fs.rm(lancements, { force: true });
+
+  await avecFichier('attendre', async () => {
+    assert.equal((await appel('/api/eleves/prop-double/propositions', 'POST')).status, 202);
+    const second = await appel('/api/eleves/prop-double/propositions', 'POST');
+    assert.equal(second.status, 409);
+    assert.equal(second.data.erreur, 'Des idées sont déjà en préparation');
+  });
+  await attendrePropositions('prop-double');
+  assert.equal((await fs.readFile(lancements, 'utf8')).trim().split('\n').length, 1);
+
+  // Une fois la génération finie, on peut de nouveau en demander une.
+  assert.equal((await appel('/api/eleves/prop-double/propositions', 'POST')).status, 202);
+  await attendrePropositions('prop-double');
 });
 
 test('Concurrence : un second message pendant que l\'agent répond est refusé, puis la Leçon en accepte de nouveau', async () => {

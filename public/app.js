@@ -135,7 +135,29 @@ function ecranNouvelleLecon(profil) {
   const dateControle = h('input', { type: 'date' });
   boutons.push(h('button', {}, 'Commencer'), h('button', {}, 'Réviser'));
 
+  // Propositions préparées en arrière-plan : on les lit sans attendre l'agent, et on revient voir tant qu'elles se préparent.
+  const idees = h('div', {});
+  let minuteur, actif = true;
+  const afficherPropositions = async () => {
+    let etat, propositions;
+    try { ({ etat, propositions } = await api(`eleves/${profil.slug}/propositions`)); } catch { return idees.replaceChildren(); }
+    if (!actif) return;
+    if (etat === 'en préparation') {
+      idees.replaceChildren(h('h2', {}, '🎲 Des idées pour toi'), h('p', { className: 'doux' }, 'On prépare tes idées…'));
+      minuteur = setTimeout(afficherPropositions, 3000);
+      return;
+    }
+    if (!propositions.length) return idees.replaceChildren();
+    const cartes = propositions.map((p) => h('button', { className: 'carte', disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ sujet: p.titre })) },
+      p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
+    boutons.push(...cartes);
+    idees.replaceChildren(h('h2', {}, '🎲 Des idées pour toi'), h('div', { className: 'grille' }, cartes));
+  };
+  afficherPropositions();
+  quitterEcran = () => { actif = false; clearTimeout(minuteur); };
+
   montrer(
+    idees,
     h('h2', {}, '📄 Réviser une leçon de classe'),
     h('form', { className: 'colonne', onsubmit: (ev) => {
       ev.preventDefault();

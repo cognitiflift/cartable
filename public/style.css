@@ -30,3 +30,5 @@ h2 { margin-top:1.5rem; }
 .jauge > span { display:block; height:100%; background:currentColor; }
 .maitrise.rouge { color:#d64545; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
 p .maitrise { display:inline-flex; }
+.doux { color:var(--doux); }
+.carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
-import { lancerAgent } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions } from './lib/agent.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -13,6 +13,7 @@ const store = createStore(ROOT);
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
+const propositionsEnCours = new Set(); // élèves dont les Propositions se préparent : un seul tour à la fois
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -64,7 +65,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
       cwd: store.leconDir(slug, id),
       prompt: premier ? `/mattpocock-skills:teach ${prompt}` : avecScores(prompt, lecon),
       sessionId: lecon.sessionId,
-      profil,
+      consignes: consignesLecon(profil),
     });
     await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse });
     return store.lireLecon(slug, id);
@@ -74,6 +75,29 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier }) {
   } finally {
     enCours.delete(id);
   }
+}
+
+// Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas, et un échec laisse simplement l'Élève sans Propositions.
+function genererPropositions(slug) {
+  if (propositionsEnCours.has(slug)) return;
+  propositionsEnCours.add(slug);
+  (async () => {
+    const profil = await store.lireEleve(slug);
+    await lancerAgent({
+      cwd: await store.preparerPropositionsDir(slug),
+      prompt: 'Prépare 4 Propositions de nouvelles Leçons pour cet élève.',
+      consignes: consignesPropositions(profil),
+      teach: false,
+    });
+  })()
+    .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
+    .finally(() => propositionsEnCours.delete(slug));
+}
+
+async function lirePropositions(slug) {
+  const propositions = await store.lirePropositions(slug);
+  if (propositions) return { etat: 'prêtes', propositions };
+  return { etat: propositionsEnCours.has(slug) ? 'en préparation' : 'indisponibles', propositions: [] };
 }
 
 async function nouvelleRevision(slug, { fichiers, dateControle }) {
@@ -97,10 +121,16 @@ async function api(req, res, segments) {
 
   if (!slug) {
     if (m === 'GET') return json(res, 200, await store.listerEleves());
-    if (m === 'POST') return json(res, 201, await store.creerEleve(await lireCorps(req)));
+    if (m === 'POST') {
+      const profil = await store.creerEleve(await lireCorps(req));
+      genererPropositions(profil.slug);
+      return json(res, 201, profil);
+    }
   } else if (!r2) {
     if (m === 'GET') return json(res, 200, await store.lireEleve(slug));
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
+  } else if (r2 === 'propositions' && !id) {
+    if (m === 'GET') return json(res, 200, await lirePropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
       if (m === 'GET') return json(res, 200, await store.listerLecons(slug));

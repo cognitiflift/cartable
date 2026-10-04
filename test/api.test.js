@@ -10,9 +10,28 @@ let serveur, base, dossier;
 
 before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
-  // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json
+  // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json.
+  // Dans le dossier des Propositions, il écrit propositions.json ; le fichier `attendre` le fait patienter,
+  // le fichier `echouer` le fait échouer.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
+if [ "$(basename "$PWD")" = propositions ]; then
+  while [ -e '${dossier}/attendre' ]; do sleep 0.05; done
+  if [ -e '${dossier}/echouer' ]; then
+    echo '{"result":"You have hit your limit","is_error":true}'
+    exit 0
+  fi
+  cat > propositions.json <<'FIN'
+[
+  {"titre":"Les dinosaures","categorie":"Sciences","accroche":"Qui était le plus grand ?","type":"original"},
+  {"titre":"Les pyramides","categorie":"Histoire","accroche":"Comment les a-t-on construites ?","type":"original"},
+  {"titre":"Les fractions en cuisine","categorie":"Cuisine","accroche":"Une demi-tarte, ça fait combien ?","type":"original"},
+  {"titre":"Les planètes","categorie":"Sciences","accroche":"Pourquoi Mars est rouge ?","type":"original"}
+]
+FIN
+  echo '{"result":"ok","session_id":"s-prop","is_error":false}'
+  exit 0
+fi
 mkdir -p lessons
 echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
@@ -30,7 +49,9 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
 
 after(async () => {
   serveur.kill();
-  await fs.rm(path.join(import.meta.dirname, '..', 'eleves', 'zoe-test'), { recursive: true, force: true });
+  for (const slug of ['zoe-test', 'prop-test', 'prop-lent', 'prop-echec']) {
+    await fs.rm(path.join(import.meta.dirname, '..', 'eleves', slug), { recursive: true, force: true });
+  }
   await fs.rm(dossier, { recursive: true, force: true });
 });
 
@@ -111,4 +132,58 @@ test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semain
 
   const liste = await appel('/api/eleves/zoe-test/lecons');
   assert.deepEqual(liste.data.find((l) => l.id === lecon.id).maitrise, { pourcentage: 70, palier: 'à consolider' });
+});
+
+const attendrePropositions = async (slug) => {
+  for (let i = 0; i < 100; i++) {
+    const { data } = await appel(`/api/eleves/${slug}/propositions`);
+    if (data.etat !== 'en préparation') return data;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error('Propositions jamais prêtes');
+};
+
+test('Propositions : générées à la création du profil, Catégorie hors liste ramenée à « Autre », choisir une démarre une Leçon libre', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Test', age: 9, niveau: 'Primaire 4' })).status, 201);
+  const { etat, propositions } = await attendrePropositions('prop-test');
+  assert.equal(etat, 'prêtes');
+  assert.equal(propositions.length, 4);
+  assert.deepEqual(propositions[0], { titre: 'Les dinosaures', categorie: 'Sciences', accroche: 'Qui était le plus grand ?', type: 'original' });
+  assert.equal(propositions[2].categorie, 'Autre');
+
+  // Choisir une Proposition démarre une Leçon libre sur son sujet.
+  const lecon = await appel('/api/eleves/prop-test/lecons', 'POST', { sujet: propositions[1].titre });
+  assert.equal(lecon.status, 201);
+  assert.equal(lecon.data.mode, 'libre');
+  assert.equal(lecon.data.sujet, 'Les pyramides');
+  assert.equal(lecon.data.messages[0].texte, 'Les pyramides');
+});
+
+test('Propositions : « en préparation » tant que l\'agent travaille, sans retarder la création', async () => {
+  await fs.writeFile(path.join(dossier, 'attendre'), '');
+  try {
+    assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Lent', age: 14, niveau: 'Secondaire 2' })).status, 201);
+    assert.deepEqual((await appel('/api/eleves/prop-lent/propositions')).data, { etat: 'en préparation', propositions: [] });
+    // Le sujet libre reste utilisable pendant la préparation.
+    assert.equal((await appel('/api/eleves/prop-lent/lecons', 'POST', { sujet: 'les volcans' })).status, 201);
+  } finally {
+    await fs.rm(path.join(dossier, 'attendre'));
+  }
+  assert.equal((await attendrePropositions('prop-lent')).etat, 'prêtes');
+});
+
+test('Propositions : un échec de génération laisse l\'appli utilisable, sans Propositions', async () => {
+  await fs.writeFile(path.join(dossier, 'echouer'), '');
+  try {
+    assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Echec', age: 7, niveau: 'Primaire 2' })).status, 201);
+    assert.deepEqual(await attendrePropositions('prop-echec'), { etat: 'indisponibles', propositions: [] });
+  } finally {
+    await fs.rm(path.join(dossier, 'echouer'));
+  }
+  assert.equal((await appel('/api/eleves/prop-echec/lecons', 'POST', { sujet: 'les volcans' })).status, 201);
+});
+
+
+test('Propositions : élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne/propositions')).status, 404);
 });

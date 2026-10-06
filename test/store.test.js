@@ -93,3 +93,29 @@ test('Leçon de révision : identifiant date + revision, suffixe -2 le même jou
   assert.equal(seconde.id, '2026-10-04-revision-2');
   assert.equal((await store.lireLecon('zoe', premiere.id)).mode, 'revision');
 });
+
+test('Nombre de Propositions : 4 par défaut, réglable de 2 à 10 à la création comme à la modification', async () => {
+  assert.equal((await store.lireEleve('zoe')).nombrePropositions, 4);
+  assert.equal((await store.creerEleve({ pseudo: 'Léo', age: 9, niveau: 'Primaire 4', nombrePropositions: 2 })).nombrePropositions, 2);
+  assert.equal((await store.modifierProfil('zoe', { nombrePropositions: '10' })).nombrePropositions, 10);
+  assert.equal((await store.modifierProfil('zoe', { age: 11 })).nombrePropositions, 10);
+  for (const invalide of [1, 11, 3.5, 'beaucoup', '']) {
+    await assert.rejects(store.modifierProfil('zoe', { nombrePropositions: invalide }), { status: 400, message: /Nombre de Propositions/ });
+    await assert.rejects(store.creerEleve({ pseudo: 'Max', age: 9, niveau: 'Primaire 4', nombrePropositions: invalide }), { status: 400 });
+  }
+});
+
+test('Nombre de Propositions : un Élève existant sans ce champ en a 4', async () => {
+  const fichier = path.join(dossier, 'zoe', 'profil.json');
+  const { nombrePropositions, ...ancien } = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  await fs.writeFile(fichier, JSON.stringify(ancien));
+  assert.equal((await store.lireEleve('zoe')).nombrePropositions, 4);
+});
+
+test('Propositions : lecture coupée au nombre de l\'Élève, marque « au programme » lue en booléen', async () => {
+  const propositions = ['A', 'B', 'C', 'D', 'E'].map((titre, i) => ({ titre, categorie: 'Sciences', accroche: '', type: 'original', auProgramme: [true, 'oui', undefined, false, true][i] }));
+  await store.ecrirePropositions('zoe', propositions);
+  assert.deepEqual((await store.lirePropositions('zoe')).map((p) => [p.titre, p.auProgramme]), [['A', true], ['B', false], ['C', false], ['D', false]]);
+  await store.modifierProfil('zoe', { nombrePropositions: 2 });
+  assert.deepEqual((await store.lirePropositions('zoe')).map((p) => p.titre), ['A', 'B']);
+});

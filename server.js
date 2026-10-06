@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -94,7 +94,7 @@ function genererPropositions(slug, anciennes = []) {
     const lecons = await store.listerLecons(slug);
     await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
-      prompt: 'Prépare 4 Propositions de nouvelles Leçons pour cet élève.',
+      prompt: `Prépare ${profil.nombrePropositions} Propositions de nouvelles Leçons pour cet élève.`,
       consignes: consignesPropositions(profil, lecons),
       teach: false,
     });
@@ -195,7 +195,7 @@ async function nouvelleDepuisProposition(slug, titre) {
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
-  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES });
+  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
   if (!slug) {

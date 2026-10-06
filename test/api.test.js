@@ -36,10 +36,11 @@ if [ "$(basename "$PWD")" = propositions ]; then
   fi
   cat > propositions.json <<'FIN'
 [
-  {"titre":"Les dinosaures","categorie":"Sciences","accroche":"Qui était le plus grand ?","type":"original"},
-  {"titre":"Les pyramides","categorie":"Histoire","accroche":"Comment les a-t-on construites ?","type":"original"},
+  {"titre":"Les dinosaures","categorie":"Sciences","accroche":"Qui était le plus grand ?","type":"original","auProgramme":true},
+  {"titre":"Les pyramides","categorie":"Histoire","accroche":"Comment les a-t-on construites ?","type":"original","auProgramme":"oui"},
   {"titre":"Les fractions en cuisine","categorie":"Cuisine","accroche":"Une demi-tarte, ça fait combien ?","type":"original"},
-  {"titre":"Les planètes","categorie":"Sciences","accroche":"Pourquoi Mars est rouge ?","type":"suite"}
+  {"titre":"Les planètes","categorie":"Sciences","accroche":"Pourquoi Mars est rouge ?","type":"suite","auProgramme":true},
+  {"titre":"Les nuages","categorie":"Sciences","accroche":"De quoi sont-ils faits ?","type":"original"}
 ]
 FIN
   echo '{"result":"ok","session_id":"s-prop","is_error":false}'
@@ -375,9 +376,11 @@ test('Propositions : générées à la création du profil, Catégorie hors list
   const { etat, propositions } = await attendrePropositions('prop-test');
   assert.equal(etat, 'prêtes');
   assert.equal(propositions.length, 4);
-  assert.deepEqual(propositions[0], { titre: 'Les dinosaures', categorie: 'Sciences', accroche: 'Qui était le plus grand ?', type: 'original' });
+  assert.deepEqual(propositions[0], { titre: 'Les dinosaures', categorie: 'Sciences', accroche: 'Qui était le plus grand ?', type: 'original', auProgramme: true });
   assert.equal(propositions[2].categorie, 'Autre');
   assert.deepEqual(propositions.map((p) => p.type), ['original', 'original', 'original', 'suite']);
+  // Marque absente ou invalide : pas au programme. Le faux agent en écrit 5 : on n'en garde que 4, le nombre par défaut.
+  assert.deepEqual(propositions.map((p) => p.auProgramme), [true, false, false, true]);
 
   // Choisir une Proposition démarre une Leçon libre sur son sujet, sans la consigne de cadrage du sujet libre.
   assert.equal((await appel('/api/eleves/prop-test/lecons', 'POST', { proposition: 'Un sujet inventé' })).status, 400);
@@ -387,6 +390,46 @@ test('Propositions : générées à la création du profil, Catégorie hors list
   assert.equal(lecon.data.sujet, 'Les pyramides');
   assert.equal(lecon.data.messages[0].texte, 'Les pyramides');
   assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.data.id}`), 'utf8'), /choquant/);
+});
+
+test('Nombre de Propositions : réglé à la création et dans le profil, 400 hors de 2 à 10 ou non entier', async () => {
+  for (const invalide of [1, 11, 3.5, 'beaucoup']) {
+    const cree = await appel('/api/eleves', 'POST', { pseudo: 'Nb-Invalide', age: 9, niveau: 'Primaire 4', nombrePropositions: invalide });
+    assert.equal(cree.status, 400);
+    assert.match(cree.data.erreur, /Nombre de Propositions : un nombre entier de 2 à 10/);
+  }
+  const cree = await appel('/api/eleves', 'POST', { pseudo: 'Nb-Test', age: 9, niveau: 'Primaire 4', nombrePropositions: 7 });
+  assert.equal(cree.status, 201);
+  assert.equal(cree.data.nombrePropositions, 7);
+  for (const invalide of [1, 11, 3.5, 'beaucoup']) {
+    assert.equal((await appel('/api/eleves/nb-test', 'PUT', { nombrePropositions: invalide })).status, 400);
+  }
+  assert.equal((await appel('/api/eleves/nb-test', 'PUT', { age: 9, niveau: 'Primaire 4', nombrePropositions: '3' })).data.nombrePropositions, 3);
+  assert.equal((await appel('/api/eleves/nb-test')).data.nombrePropositions, 3);
+});
+
+test('Nombre de Propositions : un Élève existant sans ce champ en a 4', async () => {
+  await fs.mkdir(path.join(eleves, 'ancien', 'lecons'), { recursive: true });
+  await fs.writeFile(path.join(eleves, 'ancien', 'profil.json'), JSON.stringify({ pseudo: 'Ancien', slug: 'ancien', age: 10, niveau: 'Primaire 5' }));
+  assert.equal((await appel('/api/eleves/ancien')).data.nombrePropositions, 4);
+  assert.equal((await appel('/api/eleves/ancien/propositions', 'POST')).status, 202);
+  assert.equal((await attendrePropositions('ancien')).propositions.length, 4);
+});
+
+test('Propositions : l\'agent est prié d\'en écrire le nombre réglé, dont 2 au programme ; l\'API n\'en garde pas plus', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Prop-Trois', age: 9, niveau: 'Primaire 4', nombrePropositions: 3 })).status, 201);
+  const { propositions } = await attendrePropositions('prop-trois');
+  assert.deepEqual(propositions.map((p) => p.titre), ['Les dinosaures', 'Les pyramides', 'Les fractions en cuisine']);
+  const args = await fs.readFile(path.join(dossier, 'args-propositions'), 'utf8');
+  assert.match(args, /Prépare 3 Propositions/);
+  assert.match(args, /3 sujets originaux/);
+  assert.match(args, /Exactement 2 d'entre eux sont au programme scolaire officiel de Primaire 4/);
+
+  // Baisser le réglage ne relance pas de génération : on montre seulement les premières.
+  await fs.rm(path.join(dossier, 'lancements-propositions'), { force: true });
+  assert.equal((await appel('/api/eleves/prop-trois', 'PUT', { nombrePropositions: 2 })).status, 200);
+  assert.deepEqual((await appel('/api/eleves/prop-trois/propositions')).data, { etat: 'prêtes', propositions: propositions.slice(0, 2) });
+  await assert.rejects(fs.access(path.join(dossier, 'lancements-propositions')), { code: 'ENOENT' });
 });
 
 test('Propositions : « en préparation » tant que l\'agent travaille, sans retarder la création', async () => {

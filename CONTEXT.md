@@ -12,7 +12,7 @@ _Avoid_: utilisateur, compte (sauf pour parler de la création d'un Élève)
 Nom choisi par l'Élève pour se reconnaître au démarrage.
 
 **Profil**:
-Âge (libre) et **Niveau de scolarité** de l'Élève, définis à sa création, utilisés pour adapter les propositions de l'agent.
+Âge (libre), **Niveau de scolarité** et nombre de Propositions (2 à 10, 4 par défaut) de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
 
 **Niveau de scolarité**:
 Classe de l'Élève dans le système scolaire belge francophone, choisie dans une liste fermée (sauf précision contraire de l'Élève).

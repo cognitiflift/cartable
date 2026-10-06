@@ -85,22 +85,47 @@ test('consignes de Leçon : pas de consigne de cadrage du sujet', () => {
   assert.doesNotMatch(consignesLecon(profil), /choquant/);
 });
 
-test('consignes des Propositions : 4 originaux sans Leçon', () => {
-  const consignes = consignesPropositions(profil, []);
+test('consignes des Propositions : uniquement des originaux sans Leçon, au nombre réglé', () => {
+  const consignes = consignesPropositions({ ...profil, nombrePropositions: 6 }, []);
   assert.match(consignes, /11 ans/);
   assert.match(consignes, /Primaire 6/);
-  assert.match(consignes, /4 sujets originaux/);
+  assert.match(consignes, /6 sujets originaux/);
   assert.doesNotMatch(consignes, /"suite"/);
 });
 
-test('consignes des Propositions : 2 suites et 2 originaux, d\'après le titre, la Catégorie et la Maîtrise des Leçons', () => {
-  const consignes = consignesPropositions(profil, [
+test('consignes des Propositions : suites et originaux répartis par l\'agent, d\'après le titre, la Catégorie et la Maîtrise des Leçons', () => {
+  const consignes = consignesPropositions({ ...profil, nombrePropositions: 5 }, [
     { titre: 'Les volcans', categorie: 'Sciences', maitrise: { pourcentage: 85, palier: 'acquis' } },
     { titre: 'Les fractions', categorie: 'Mathématiques', maitrise: null },
   ]);
-  assert.match(consignes, /2 suites/);
-  assert.match(consignes, /2 sujets originaux/);
+  assert.match(consignes, /5 sujets de nouvelles Leçons/);
+  assert.doesNotMatch(consignes, /\b4 sujets/);
   assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 85 %, acquis/);
   assert.match(consignes, /Les fractions \(Mathématiques\) : Maîtrise pas encore évaluée/);
   assert.match(consignes, /"suite"/);
+});
+
+test('consignes des Propositions : 2 au programme scolaire du Niveau de scolarité, même quand il n\'y en a que 2', () => {
+  for (const lecons of [[], [{ titre: 'Les volcans', categorie: 'Sciences', maitrise: null }]]) {
+    const consignes = consignesPropositions({ ...profil, nombrePropositions: 2 }, lecons);
+    assert.match(consignes, /2 sujets/);
+    assert.match(consignes, /Exactement 2 d'entre eux sont au programme scolaire officiel de Primaire 6/);
+    assert.match(consignes, /"auProgramme": true ou false/);
+  }
+});
+
+test('consignes des Propositions : sans titres déjà proposés, pas de consigne de variété', () => {
+  for (const dejaProposes of [undefined, []]) {
+    assert.doesNotMatch(consignesPropositions({ ...profil, nombrePropositions: 4 }, [], dejaProposes), /déjà proposés/);
+  }
+});
+
+test('consignes des Propositions : « D\'autres idées » liste les titres déjà proposés et demande d\'autres matières et d\'autres angles, suites comprises', () => {
+  const consignes = consignesPropositions({ ...profil, nombrePropositions: 4 }, [{ titre: 'Les volcans', categorie: 'Sciences', maitrise: null }], ['Les dinosaures', 'Les pyramides']);
+  assert.match(consignes, /déjà proposés/);
+  assert.match(consignes, /- Les dinosaures\n- Les pyramides/);
+  assert.match(consignes, /même reformulé/);
+  assert.match(consignes, /d'autres matières/);
+  assert.match(consignes, /d'autres angles/);
+  assert.match(consignes, /suites/);
 });

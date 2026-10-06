@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -86,22 +86,32 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
 // (l'agent réécrit le fichier sur place) ; s'il échoue sans laisser de Propositions utilisables, on les remet.
-function genererPropositions(slug, anciennes = []) {
+// `varier` (« D'autres idées » seulement) : l'agent reçoit l'historique des titres déjà proposés pour s'en écarter.
+function genererPropositions(slug, anciennes = [], { varier = false } = {}) {
   if (propositionsEnCours.has(slug)) return;
   propositionsEnCours.set(slug, anciennes);
   (async () => {
     const profil = await store.lireEleve(slug);
     const lecons = await store.listerLecons(slug);
+    const dejaProposes = varier ? await store.lireHistoriquePropositions(slug) : [];
     await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
-      prompt: 'Prépare 4 Propositions de nouvelles Leçons pour cet élève.',
-      consignes: consignesPropositions(profil, lecons),
+      prompt: `Prépare ${profil.nombrePropositions} Propositions de nouvelles Leçons pour cet élève.`,
+      consignes: consignesPropositions(profil, lecons, dejaProposes),
       teach: false,
     });
   })()
     .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
     .then(async () => {
-      if (anciennes.length && !(await store.lirePropositions(slug))) await store.ecrirePropositions(slug, anciennes);
+      // Un lot validé et nouveau, que l'Élève va voir, rejoint l'historique, même si l'agent a échoué après l'avoir écrit.
+      // Un lot raté (restauré) ou laissé tel quel n'y entre pas.
+      const lot = await store.lirePropositions(slug);
+      if (!lot) {
+        if (anciennes.length) await store.ecrirePropositions(slug, anciennes);
+        return;
+      }
+      const titres = lot.map((p) => p.titre);
+      if (titres.join('\n') !== anciennes.map((p) => p.titre).join('\n')) await store.ajouterHistoriquePropositions(slug, titres);
     })
     .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
     .finally(() => {
@@ -132,7 +142,7 @@ function relancerPropositions(slug) {
 async function regenererPropositions(slug) {
   const anciennes = await store.lirePropositions(slug); // 404 si l'Élève n'existe pas
   if (propositionsEnCours.has(slug)) throw new HttpError(409, 'Des idées sont déjà en préparation');
-  genererPropositions(slug, anciennes ?? []);
+  genererPropositions(slug, anciennes ?? [], { varier: true });
   return lirePropositions(slug);
 }
 
@@ -195,7 +205,7 @@ async function nouvelleDepuisProposition(slug, titre) {
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
-  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES });
+  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
   if (!slug) {

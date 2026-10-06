@@ -12,7 +12,7 @@ _Avoid_: utilisateur, compte (sauf pour parler de la création d'un Élève)
 Nom choisi par l'Élève pour se reconnaître au démarrage.
 
 **Profil**:
-Âge (libre) et **Niveau de scolarité** de l'Élève, définis à sa création, utilisés pour adapter les propositions de l'agent.
+Âge (libre), **Niveau de scolarité** et nombre de Propositions (2 à 10, 4 par défaut) de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
 
 **Niveau de scolarité**:
 Classe de l'Élève dans le système scolaire belge francophone, choisie dans une liste fermée (sauf précision contraire de l'Élève).
@@ -58,7 +58,7 @@ Ce que l'appli propose à l'Élève après un quiz, d'après le score de ce quiz
 _Avoid_: suite (réservé aux Propositions), leçon suivante
 
 **Proposition**:
-Sujet de nouvelle Leçon suggéré par l'agent, affiché dès l'écran « Nouvelle leçon ». Soit une **suite** de ce que l'Élève a déjà étudié, soit un sujet **original** adapté à son âge et son Niveau de scolarité.
+Sujet de nouvelle Leçon suggéré par l'agent, affiché dès l'écran « Nouvelle leçon ». Soit une **suite** de ce que l'Élève a déjà étudié, soit un sujet **original** adapté à son âge et son Niveau de scolarité. Indépendamment de ce type, une Proposition peut être **au programme** : rattachée au programme scolaire officiel du Niveau de scolarité de l'Élève (2 par lot). Le nombre de Propositions d'un lot (2 à 10, 4 par défaut) se règle dans le profil de l'Élève. « D'autres idées » demande un lot qui s'écarte, par la matière et par l'angle, des 10 derniers titres proposés.
 
 **Maîtrise**:
 Mesure de ce que l'Élève sait d'une Leçon, exprimée en pourcentage et en trois paliers : _non acquis_, _à consolider_, _acquis_. Affichée à côté de chaque Leçon.

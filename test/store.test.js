@@ -119,3 +119,13 @@ test('Propositions : lecture coupée au nombre de l\'Élève, marque « au progr
   await store.modifierProfil('zoe', { nombrePropositions: 2 });
   assert.deepEqual((await store.lirePropositions('zoe')).map((p) => p.titre), ['A', 'B']);
 });
+
+test('Historique des Propositions : vide au départ, les titres de chaque lot s\'ajoutent, 10 au plus, les plus anciens sortent', async () => {
+  assert.deepEqual(await store.lireHistoriquePropositions('zoe'), []);
+  await store.ajouterHistoriquePropositions('zoe', ['T1', 'T2', 'T3', 'T4']);
+  assert.deepEqual(await store.lireHistoriquePropositions('zoe'), ['T1', 'T2', 'T3', 'T4']);
+  await store.ajouterHistoriquePropositions('zoe', ['T5', 'T6', 'T7', 'T8']);
+  await store.ajouterHistoriquePropositions('zoe', ['T9', 'T10', 'T11', 'T12']);
+  assert.deepEqual(await store.lireHistoriquePropositions('zoe'), ['T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']);
+  await assert.rejects(store.lireHistoriquePropositions('personne'), { status: 404 });
+});

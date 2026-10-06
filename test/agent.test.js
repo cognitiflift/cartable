@@ -113,3 +113,19 @@ test('consignes des Propositions : 2 au programme scolaire du Niveau de scolarit
     assert.match(consignes, /"auProgramme": true ou false/);
   }
 });
+
+test('consignes des Propositions : sans titres déjà proposés, pas de consigne de variété', () => {
+  for (const dejaProposes of [undefined, []]) {
+    assert.doesNotMatch(consignesPropositions({ ...profil, nombrePropositions: 4 }, [], dejaProposes), /déjà proposés/);
+  }
+});
+
+test('consignes des Propositions : « D\'autres idées » liste les titres déjà proposés et demande d\'autres matières et d\'autres angles, suites comprises', () => {
+  const consignes = consignesPropositions({ ...profil, nombrePropositions: 4 }, [{ titre: 'Les volcans', categorie: 'Sciences', maitrise: null }], ['Les dinosaures', 'Les pyramides']);
+  assert.match(consignes, /déjà proposés/);
+  assert.match(consignes, /- Les dinosaures\n- Les pyramides/);
+  assert.match(consignes, /même reformulé/);
+  assert.match(consignes, /d'autres matières/);
+  assert.match(consignes, /d'autres angles/);
+  assert.match(consignes, /suites/);
+});

@@ -15,7 +15,8 @@ before(async () => {
   // Faux `claude` : écrit lesson.json et une page, renvoie un JSON comme --output-format json.
   // Dans le dossier des Propositions, il note chaque lancement (`lancements-propositions`) et ses arguments
   // (`args-propositions`), et écrit propositions.json ; le fichier `attendre` le fait patienter, le fichier `echouer` le fait échouer, le fichier
-  // `autres` lui fait écrire d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
+  // `autres` lui fait écrire d'autres idées, `inchange` le fait réussir sans réécrire propositions.json et
+  // `ecrire-puis-echouer` le fait échouer après avoir écrit d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX).
@@ -25,6 +26,15 @@ if [ "$(basename "$PWD")" = propositions ]; then
   echo lancement >> '${dossier}/lancements-propositions'
   printf '%s\n' "$@" > '${dossier}/args-propositions'
   while [ -e '${dossier}/attendre' ]; do sleep 0.05; done
+  if [ -e '${dossier}/inchange' ]; then
+    echo '{"result":"ok","session_id":"s-prop","is_error":false}'
+    exit 0
+  fi
+  if [ -e '${dossier}/ecrire-puis-echouer' ]; then
+    echo '[{"titre":"Les abeilles","categorie":"Sciences","accroche":"Comment font-elles le miel ?","type":"original"}]' > propositions.json
+    echo '{"result":"You have hit your limit","is_error":true}'
+    exit 0
+  fi
   if [ -e '${dossier}/echouer' ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
     exit 0
@@ -74,7 +84,8 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
 
 after(async () => {
   serveur.kill();
-  await fs.rm(dossier, { recursive: true, force: true });
+  // Un faux `claude` de Propositions lancé juste avant l'arrêt peut encore écrire ici : on réessaie.
+  await fs.rm(dossier, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 const appel = async (url, method = 'GET', body) => {
@@ -546,6 +557,89 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
   assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 90 %, acquis/);
   assert.match(consignes, /11 ans/);
   assert.match(consignes, /Primaire 6/);
+});
+
+const historique = (slug) => fs.readFile(path.join(eleves, slug, 'historique-propositions.json'), 'utf8').then(JSON.parse);
+const argsPropositions = () => fs.readFile(path.join(dossier, 'args-propositions'), 'utf8');
+
+test('Historique des Propositions : « D\'autres idées » transmet les titres des lots précédents à l\'agent, puis y ajoute le nouveau lot', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Hist-Test', age: 10, niveau: 'Primaire 5' })).status, 201);
+  await attendrePropositions('hist-test');
+  assert.doesNotMatch(await argsPropositions(), /déjà proposés/);
+  const premierLot = ['Les dinosaures', 'Les pyramides', 'Les fractions en cuisine', 'Les planètes'];
+  assert.deepEqual(await historique('hist-test'), premierLot); // lot automatique, vu par l'Élève
+
+  await avecFichier('autres', async () => {
+    assert.equal((await appel('/api/eleves/hist-test/propositions', 'POST')).status, 202);
+    await attendrePropositions('hist-test');
+  });
+  const consignes = await argsPropositions();
+  assert.match(consignes, /déjà proposés/);
+  assert.match(consignes, new RegExp(premierLot.map((t) => `- ${t}`).join('\n')));
+  assert.deepEqual(await historique('hist-test'), [...premierLot, 'Les abeilles']);
+});
+
+test('Historique des Propositions : au plus les 10 titres les plus récents', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Hist-Dix', age: 10, niveau: 'Primaire 5' })).status, 201);
+  await attendrePropositions('hist-dix');
+  const vieux = Array.from({ length: 10 }, (_, i) => `Vieux sujet ${i + 1}`);
+  await fs.writeFile(path.join(eleves, 'hist-dix', 'historique-propositions.json'), JSON.stringify(vieux));
+
+  await avecFichier('autres', async () => {
+    assert.equal((await appel('/api/eleves/hist-dix/propositions', 'POST')).status, 202);
+    await attendrePropositions('hist-dix');
+  });
+  assert.match(await argsPropositions(), new RegExp(vieux.map((t) => `- ${t}`).join('\n')));
+  assert.deepEqual(await historique('hist-dix'), [...vieux.slice(1), 'Les abeilles']);
+
+  assert.equal((await appel('/api/eleves/hist-dix/propositions', 'POST')).status, 202);
+  await attendrePropositions('hist-dix');
+  const consignes = await argsPropositions();
+  assert.doesNotMatch(consignes, /- Vieux sujet 1\n/);
+  assert.match(consignes, /- Vieux sujet 2\n[^]*- Vieux sujet 10\n- Les abeilles\n/);
+  assert.deepEqual(await historique('hist-dix'), [...vieux.slice(5), 'Les abeilles', 'Les dinosaures', 'Les pyramides', 'Les fractions en cuisine', 'Les planètes']);
+});
+
+test('Historique des Propositions : la génération automatique après un tour de séance ne le transmet pas', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Hist-Auto', age: 10, niveau: 'Primaire 5' })).status, 201);
+  await attendrePropositions('hist-auto');
+  const lancements = path.join(dossier, 'lancements-propositions');
+  await fs.rm(lancements, { force: true });
+  assert.equal((await appel('/api/eleves/hist-auto/lecons', 'POST', { sujet: 'les volcans' })).status, 201);
+  await sonderJusqua(() => existe(lancements), Boolean, 'Pas de régénération après le tour');
+  await attendrePropositions('hist-auto');
+  const consignes = await argsPropositions();
+  assert.match(consignes, /Les volcans \(Sciences\)/);
+  assert.doesNotMatch(consignes, /déjà proposés/);
+  assert.equal((await historique('hist-auto')).length, 4); // le second lot automatique, identique, n'est pas nouveau
+});
+
+test('Historique des Propositions : une génération ratée ne le modifie pas', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Hist-Echec', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const anciennes = (await attendrePropositions('hist-echec')).propositions;
+  const avant = await historique('hist-echec');
+  await avecFichier('echouer', async () => {
+    assert.equal((await appel('/api/eleves/hist-echec/propositions', 'POST')).status, 202);
+    assert.deepEqual(await attendrePropositions('hist-echec'), { etat: 'prêtes', propositions: anciennes });
+  });
+  assert.deepEqual(await historique('hist-echec'), avant);
+});
+
+test('Historique des Propositions : seul un lot nouveau y entre, même si l\'agent échoue après l\'avoir écrit', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Hist-Lot', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const anciennes = (await attendrePropositions('hist-lot')).propositions;
+  const avant = await historique('hist-lot');
+  await avecFichier('inchange', async () => {
+    assert.equal((await appel('/api/eleves/hist-lot/propositions', 'POST')).status, 202);
+    assert.deepEqual(await attendrePropositions('hist-lot'), { etat: 'prêtes', propositions: anciennes });
+  });
+  assert.deepEqual(await historique('hist-lot'), avant);
+
+  await avecFichier('ecrire-puis-echouer', async () => {
+    assert.equal((await appel('/api/eleves/hist-lot/propositions', 'POST')).status, 202);
+    assert.equal((await attendrePropositions('hist-lot')).propositions[0].titre, 'Les abeilles');
+  });
+  assert.deepEqual(await historique('hist-lot'), [...avant, 'Les abeilles']);
 });
 
 test('Concurrence : un second message pendant que l\'agent répond est refusé, puis la Leçon en accepte de nouveau', async () => {

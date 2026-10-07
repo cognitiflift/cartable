@@ -56,14 +56,16 @@ function formulaireProfil({ profil, titre, envoyer }) {
   const age = h('input', { name: 'age', type: 'number', min: 3, max: 99, required: true, value: profil?.age ?? '' });
   const niveau = h('select', { name: 'niveau' }, config.niveaux.map((n) => h('option', { value: n, selected: n === profil?.niveau }, n)));
   const nombrePropositions = h('input', { name: 'nombrePropositions', type: 'number', min: 2, max: 10, required: true, value: profil?.nombrePropositions ?? config.nombrePropositionsDefaut });
+  const modele = h('select', { name: 'modele' }, config.modeles.map((m) => h('option', { value: m.id, selected: m.id === (profil?.modele ?? config.modeleDefaut) }, `${m.libelle} — ${m.description}`)));
   const form = h('form', { className: 'colonne', onsubmit: async (ev) => {
     ev.preventDefault();
-    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value }); } catch (e) { erreur.textContent = e.message; }
+    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value }); } catch (e) { erreur.textContent = e.message; }
   } },
     !profil && h('label', {}, 'Pseudo', h('br'), pseudo),
     h('label', {}, 'Âge', h('br'), age),
     h('label', {}, 'Classe', h('br'), niveau),
     h('label', {}, "Nombre d'idées de leçons proposées (2 à 10)", h('br'), nombrePropositions),
+    h('label', {}, 'Modèle', h('br'), modele),
     h('button', {}, profil ? 'Enregistrer' : 'Créer'),
     erreur);
   return [h('h2', {}, titre), form];

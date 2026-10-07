@@ -997,6 +997,30 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
   assert.match(consignes, /Primaire 6/);
 });
 
+test('Modèle : la config liste Haiku, Sonnet et Opus ; chaque appel à l\'agent passe le Modèle de l\'Élève, même une session reprise', async () => {
+  const { data: config } = await appel('/api/config');
+  assert.equal(config.modeleDefaut, 'haiku');
+  assert.deepEqual(config.modeles.map((m) => m.id), ['haiku', 'sonnet', 'opus']);
+  assert.ok(config.modeles.every((m) => m.libelle && m.description));
+
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Mod-Invalide', age: 9, niveau: 'Primaire 4', modele: 'fable' })).status, 400);
+  const cree = await appel('/api/eleves', 'POST', { pseudo: 'Mod-Test', age: 9, niveau: 'Primaire 4', modele: 'opus' });
+  assert.equal(cree.data.modele, 'opus');
+  await attendrePropositions('mod-test');
+  assert.match(await argsPropositions(), /--model\nopus\n/);
+
+  const lecon = (await appel('/api/eleves/mod-test/lecons', 'POST', { sujet: 'les comètes' })).data;
+  const args = () => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.match(await args(), /--model\nopus\n/);
+
+  // Changer de Modèle vaut dès l'appel suivant, dans la même session.
+  assert.equal((await appel('/api/eleves/mod-test', 'PUT', { modele: 'sonnet' })).data.modele, 'sonnet');
+  assert.equal((await appel(`/api/eleves/mod-test/lecons/${lecon.id}/messages`, 'POST', { texte: 'ok' })).status, 200);
+  assert.match(await args(), /--model\nsonnet\n/);
+  assert.match(await args(), /--resume\ns-123/);
+  await attendrePropositions('mod-test');
+});
+
 const historique = (slug) => fs.readFile(path.join(eleves, slug, 'historique-propositions.json'), 'utf8').then(JSON.parse);
 const argsPropositions = () => fs.readFile(path.join(dossier, 'args-propositions'), 'utf8');
 

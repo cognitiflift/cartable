@@ -582,6 +582,52 @@ test('Objectifs : consignes demandées au prof, et à la reprise d\'une Leçon s
   assert.doesNotMatch(await args(avec), /n'a pas encore d'Objectifs/);
 });
 
+test('Élargir la mission : quand tous les Objectifs sont atteints, l\'Étape suivante propose d\'élargir avant toute page', async () => {
+  const args = async (lecon) => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  await avecFichier('objectifs', async () => {
+    const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data;
+    const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+    // Des Objectifs restent à atteindre : consigne d'Étape suivante inchangée.
+    await appel(`${url}/scores`, 'POST', { score: 90, page: '0001-volcans.html', objectifs: [1, 2] });
+    await appel(`${url}/retours`, 'POST', { score: 90, page: '0001-volcans.html' });
+    assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 200);
+    assert.match(await args(lecon), /Rebond : Étape suivante/);
+    assert.doesNotMatch(await args(lecon), /élargir/);
+    assert.match(await args(lecon), /Crée une page nouvelle/);
+
+    // Tous atteints : proposer d'élargir la mission avant toute page, par une question avec CHOIX.
+    await appel(`${url}/scores`, 'POST', { score: 90, page: '0001-volcans.html', objectifs: [3] });
+    await appel(`${url}/retours`, 'POST', { score: 90, page: '0001-volcans.html' });
+    assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 200);
+    const consigne = await args(lecon);
+    assert.match(consigne, /tous ses Objectifs/);
+    assert.match(consigne, /élargir sa mission/);
+    assert.match(consigne, /ligne CHOIX/);
+    assert.match(consigne, /MISSION\.md/);
+    assert.match(consigne, /learning record/);
+    assert.match(consigne, /à la fin de la liste/);
+    assert.match(consigne, /nouveau sujet/);
+    assert.doesNotMatch(consigne, /Crée une page nouvelle/);
+    assert.doesNotMatch(consigne, /n'ajoute pas de ligne CHOIX/);
+  });
+});
+
+test('Élargir la mission : après l\'ajout d\'Objectifs, le Niveau reste le même puis remonte', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const score = async (objectifs) => (await appel(`${url}/scores`, 'POST', { score: 90, page: '0001-volcans.html', objectifs })).data;
+  assert.equal((await score([1, 2, 3])).niveau, 4);
+  // Le prof ajoute deux Objectifs à la fin de la liste.
+  const meta = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'lesson.json');
+  const contenu = JSON.parse(await fs.readFile(meta, 'utf8'));
+  contenu.objectifs.push('Comparer deux types d’éruption', 'Expliquer les risques volcaniques');
+  await fs.writeFile(meta, JSON.stringify(contenu));
+  const lue = (await appel(url)).data;
+  assert.equal(lue.niveau, 4);
+  assert.deepEqual(lue.objectifs.map((o) => o.atteint), [true, true, true, false, false]);
+  assert.equal((await score([5])).niveau, 5);
+});
+
 test('Dépassement : le résultat bonus est gardé avec le score, un résultat invalide est ignoré, la Maîtrise n\'en dépend pas', async () => {
   const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les marées' });
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;

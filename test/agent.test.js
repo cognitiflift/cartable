@@ -30,9 +30,11 @@ test('Annonce de la suite : rien sans ligne ENSUITE, casse et ** tolérés, titr
   assert.deepEqual(extraireEnsuite('Bravo !\nENSUITE:'), { texte: 'Bravo !' });
 });
 
-test('action après un quiz : Revoir sous 80 %, sinon Défi (révision) ou Étape suivante (libre)', () => {
+test('action après un quiz : en révision Revoir sous 80 %, sinon Défi ; en Leçon libre toujours Étape suivante', () => {
   assert.equal(actionApresQuiz(79, 'revision'), 'revoir');
-  assert.equal(actionApresQuiz(40, 'libre'), 'revoir');
+  assert.equal(actionApresQuiz(40, 'libre'), 'suivante');
+  assert.equal(actionApresQuiz(0, 'libre'), 'suivante');
+  assert.equal(actionApresQuiz(79, 'libre'), 'suivante');
   assert.equal(actionApresQuiz(80, 'revision'), 'defi');
   assert.equal(actionApresQuiz(95, 'libre'), 'suivante');
 });
@@ -43,7 +45,8 @@ test('Retour de quiz : un Défi réussi en révision termine la Leçon, sinon m�
   assert.equal(actionRetourQuiz(79, 'revision', true), 'revoir'); // Défi raté
   assert.equal(actionRetourQuiz(90, 'revision', false), 'defi'); // quiz ordinaire réussi
   assert.equal(actionRetourQuiz(90, 'libre', true), 'suivante'); // une Leçon libre n'est jamais terminée
-  assert.equal(actionRetourQuiz(50, 'libre', false), 'revoir');
+  assert.equal(actionRetourQuiz(50, 'libre', false), 'suivante'); // pas de Revoir en Leçon libre
+  assert.equal(actionRetourQuiz(50, 'libre', true), 'suivante');
 });
 
 test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est terminée', () => {
@@ -154,4 +157,14 @@ test('consignes des Propositions : « D\'autres idées » liste les titres déj�
   assert.match(consignes, /d'autres matières/);
   assert.match(consignes, /d'autres angles/);
   assert.match(consignes, /suites/);
+});
+
+test('consignes : Étape suivante est une page nouvelle choisie selon la zone proximale ; Revoir est réservé à la révision', () => {
+  const consignes = consignesLecon(profil);
+  assert.match(consignes, /Étape suivante[^.]*page nouvelle[^.]*zone proximale/);
+  assert.match(consignes, /Leçon libre[^.]*toujours[^.]*Étape suivante/);
+  assert.match(consignes, /Revoir[^.]*Leçon de révision/);
+  assert.match(REBONDS.suivante.consigne, /page nouvelle/);
+  assert.match(REBONDS.suivante.consigne, /zone proximale/);
+  assert.match(REBONDS.suivante.consigne, /raté/);
 });

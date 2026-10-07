@@ -146,7 +146,7 @@ test('Séance : Réponses proposées sur le message du prof, retour de quiz avec
   assert.equal(retour.status, 200);
   const [eleve, prof] = retour.data.messages.slice(-2);
   assert.equal(eleve.texte, '📝 Quiz terminé : 70 %');
-  assert.deepEqual(prof.retourQuiz, { score: 70, action: 'revoir' });
+  assert.deepEqual(prof.retourQuiz, { score: 70, action: 'suivante' }); // Leçon libre : toujours Étape suivante
   assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Quiz terminé : 0001-volcans\.html, 70 %/);
   assert.equal(retour.data.scores.length, 0); // le score s'enregistre par /scores
 });
@@ -207,11 +207,12 @@ test('Rebond : l\'action recommandée par le dernier Retour de quiz construit la
   assert.equal(eleve.role, 'eleve');
   assert.equal(eleve.texte, '➡️ Je suis prêt pour la suite.');
 
-  // Après un quiz raté, seul Revoir est accepté.
-  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 40 });
-  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
-  assert.equal((await appel(rebonds, 'POST', { action: 'revoir' })).status, 200);
-  assert.match(await fs.readFile(args, 'utf8'), /Rebond : Revoir/);
+  // Leçon libre : même après un quiz raté, Étape suivante ; Revoir est refusé.
+  const rate = await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 40 });
+  assert.equal(rate.data.messages.at(-1).retourQuiz.action, 'suivante');
+  assert.equal((await appel(rebonds, 'POST', { action: 'revoir' })).status, 400);
+  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 200);
+  assert.match(await fs.readFile(args, 'utf8'), /Rebond : Étape suivante/);
 });
 
 test('Continuer : en Leçon libre, le prof annonce la suite après le quiz ; la Leçon et la liste l\'exposent', async () => {

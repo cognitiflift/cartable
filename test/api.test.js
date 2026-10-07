@@ -145,7 +145,7 @@ test('Séance : Réponses proposées sur le message du prof, retour de quiz avec
   assert.equal(retour.status, 200);
   const [eleve, prof] = retour.data.messages.slice(-2);
   assert.equal(eleve.texte, '📝 Quiz terminé : 70 %');
-  assert.deepEqual(prof.retourQuiz, { score: 70, action: 'revoir' });
+  assert.deepEqual(prof.retourQuiz, { score: 70, action: 'suivante' }); // Leçon libre : toujours Étape suivante
   assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Quiz terminé : 0001-volcans\.html, 70 %/);
   assert.equal(retour.data.scores.length, 0); // le score s'enregistre par /scores
 });
@@ -206,11 +206,51 @@ test('Rebond : l\'action recommandée par le dernier Retour de quiz construit la
   assert.equal(eleve.role, 'eleve');
   assert.equal(eleve.texte, '➡️ Je suis prêt pour la suite.');
 
-  // Après un quiz raté, seul Revoir est accepté.
-  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 40 });
-  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
-  assert.equal((await appel(rebonds, 'POST', { action: 'revoir' })).status, 200);
-  assert.match(await fs.readFile(args, 'utf8'), /Rebond : Revoir/);
+  // Leçon libre : même après un quiz raté, Étape suivante ; Revoir est refusé.
+  const rate = await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 40 });
+  assert.equal(rate.data.messages.at(-1).retourQuiz.action, 'suivante');
+  assert.equal((await appel(rebonds, 'POST', { action: 'revoir' })).status, 400);
+  assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 200);
+  assert.match(await fs.readFile(args, 'utf8'), /Rebond : Étape suivante/);
+});
+
+test('Rebonds proposés : exposés par la Leçon lue, pas par la liste ; la route refuse les autres', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const rebond = (action) => appel(`${url}/rebonds`, 'POST', { action });
+  assert.deepEqual(lecon.rebondsProposes, []);
+  assert.equal((await rebond('defi')).status, 400);
+
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 50 })).data.rebondsProposes, ['revoir']);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).rebondsProposes, undefined);
+  assert.equal((await rebond('defi')).status, 400);
+  const revoir = await rebond('revoir');
+  assert.equal(revoir.status, 200);
+  assert.deepEqual(revoir.data.rebondsProposes, []);
+
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 90 })).data.rebondsProposes, ['defi']);
+  assert.equal((await rebond('defi')).status, 200);
+  const termine = (await appel(`${url}/retours`, 'POST', { score: 90 })).data;
+  assert.equal(termine.messages.at(-1).retourQuiz.action, 'terminee');
+  assert.deepEqual(termine.rebondsProposes, ['defi']);
+  assert.deepEqual((await appel(url)).data.rebondsProposes, ['defi']);
+});
+
+test('Score enregistré pendant un Défi en cours : marqué « quiz de Défi »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const quiz = async (score) => {
+    await appel(`${url}/scores`, 'POST', { score, page: 'p.html' });
+    return (await appel(`${url}/retours`, 'POST', { score, page: 'p.html' })).data;
+  };
+  await quiz(90);
+  await appel(`${url}/rebonds`, 'POST', { action: 'defi' });
+  const apres = await quiz(95);
+  assert.equal(apres.scores[0].defi, undefined);
+  assert.equal(apres.scores[1].defi, true);
+  assert.equal(apres.scores[1].score, 95);
 });
 
 test('Rebond : Défi après un quiz réussi en Leçon de révision', async () => {

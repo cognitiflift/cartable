@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore } from '../lib/store.js';
+import { createStore, rebondsProposes } from '../lib/store.js';
 
 let dossier, store;
 
@@ -128,4 +128,19 @@ test('Historique des Propositions : vide au départ, les titres de chaque lot s\
   await store.ajouterHistoriquePropositions('zoe', ['T9', 'T10', 'T11', 'T12']);
   assert.deepEqual(await store.lireHistoriquePropositions('zoe'), ['T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']);
   await assert.rejects(store.lireHistoriquePropositions('personne'), { status: 404 });
+});
+
+test('Rebonds proposés : aucun si le dernier message n\'est pas un Retour de quiz', () => {
+  assert.deepEqual(rebondsProposes([]), []);
+  assert.deepEqual(rebondsProposes([{ role: 'agent', texte: 'Bonjour !' }]), []);
+  const retour = { role: 'agent', texte: 'Bravo', retourQuiz: { score: 90, action: 'suivante' } };
+  assert.deepEqual(rebondsProposes([retour, { role: 'eleve', texte: '➡️ Je suis prêt pour la suite.' }, { role: 'agent', texte: 'Page prête' }]), []);
+});
+
+test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Nouveau défi après une Leçon terminée', () => {
+  const apres = (action) => rebondsProposes([{ role: 'agent', texte: '…', retourQuiz: { score: 50, action } }]);
+  assert.deepEqual(apres('revoir'), ['revoir']);
+  assert.deepEqual(apres('defi'), ['defi']);
+  assert.deepEqual(apres('suivante'), ['suivante']);
+  assert.deepEqual(apres('terminee'), ['defi']);
 });

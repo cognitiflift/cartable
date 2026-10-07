@@ -237,8 +237,8 @@ async function ecranSession(profil, id) {
           prof.texte),
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`)),
-             h('button', { className: 'secondaire', onclick: () => choisirRebond('defi') }, '🏆 Nouveau défi')]
-          : h('button', { className: 'action-suivante', onclick: () => choisirRebond(action) }, LIBELLES_REBOND[action], h('small', {}, `Quiz : ${score} %`)));
+             ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, r === 'defi' ? '🏆 Nouveau défi' : LIBELLES_REBOND[r]))]
+          : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, LIBELLES_REBOND[r], h('small', {}, `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
       const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];

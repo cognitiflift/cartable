@@ -146,10 +146,10 @@ test('Rebonds proposés : aucun si le dernier message n\'est pas un Retour de qu
   assert.deepEqual(rebondsProposes([retour, { role: 'eleve', texte: '➡️ Je suis prêt pour la suite.' }, { role: 'agent', texte: 'Page prête' }]), []);
 });
 
-test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Nouveau défi après une Leçon terminée', () => {
+test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Réviser après une Leçon terminée', () => {
   const apres = (action) => rebondsProposes([{ role: 'agent', texte: '…', retourQuiz: { score: 50, action } }]);
   assert.deepEqual(apres('revoir'), ['revoir']);
   assert.deepEqual(apres('defi'), ['defi']);
   assert.deepEqual(apres('suivante'), ['suivante']);
-  assert.deepEqual(apres('terminee'), ['defi']);
+  assert.deepEqual(apres('terminee'), ['reviser']);
 });

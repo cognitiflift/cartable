@@ -543,6 +543,84 @@ test('Élargir la mission : après l\'ajout d\'Objectifs, le Niveau reste le mê
   assert.equal((await score([5])).niveau, 5);
 });
 
+test('Dépassement : le résultat bonus est gardé avec le score, un résultat invalide est ignoré, la Maîtrise n\'en dépend pas', async () => {
+  const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les marées' });
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const score = (corps) => appel(`${url}/scores`, 'POST', { page: '0001-volcans.html', ...corps });
+  const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  assert.equal((await appel(url)).data.depassement, false);
+
+  // Invalides : ignorés sans erreur, le score principal s'enregistre quand même.
+  for (const bonus of [{ reussies: 2, total: 4 }, { reussies: 3, total: 2 }, { reussies: -1, total: 3 }, { reussies: 1.5, total: 3 }, { total: 3 }, 'beaucoup']) {
+    const r = await score({ score: 60, bonus });
+    assert.equal(r.status, 201);
+    assert.equal(r.data.scores.at(-1).bonus, undefined);
+  }
+  const sansBonus = (await appel(url)).data;
+  assert.equal(sansBonus.depassement, false);
+
+  // 1 bonus sur 3 : gardé, pas de Dépassement réussi.
+  const un = await score({ score: 60, bonus: { reussies: 1, total: 3 } });
+  assert.deepEqual(un.data.scores.at(-1).bonus, { reussies: 1, total: 3 });
+  assert.equal(un.data.depassement, false);
+
+  // 2 bonus sur 3 : Dépassement réussi, sans effet sur le score ni la Maîtrise.
+  const deux = await score({ score: 60, bonus: { reussies: 2, total: 3 } });
+  assert.equal(deux.data.scores.at(-1).score, 60);
+  assert.deepEqual(deux.data.maitrise, sansBonus.maitrise);
+  assert.equal(deux.data.depassement, true);
+  assert.equal((await resume()).depassement, true);
+  // Acquis pour toujours : un quiz suivant sans bonus ne le retire pas.
+  await score({ score: 60 });
+  assert.equal((await resume()).depassement, true);
+});
+
+test('Dépassement : le Retour de quiz accepte le résultat bonus, le Rebond et la fin de Leçon n\'en dépendent pas', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const retour = (corps) => appel(`${url}/retours`, 'POST', { page: '0001-volcans.html', ...corps });
+  const args = path.join(dossier, `args-${lecon.id}`);
+
+  // Toutes les questions bonus réussies ne rattrapent pas un quiz raté.
+  const rate = await retour({ score: 70, bonus: { reussies: 3, total: 3 } });
+  assert.equal(rate.status, 200);
+  assert.deepEqual(rate.data.messages.at(-1).retourQuiz, { score: 70, action: 'revoir', bonus: { reussies: 3, total: 3 } });
+  assert.match(await fs.readFile(args, 'utf8'), /bonus : 3 sur 3/);
+  // Un résultat invalide est ignoré sans erreur.
+  const invalide = await retour({ score: 90, bonus: { reussies: 5, total: 3 } });
+  assert.equal(invalide.status, 200);
+  assert.deepEqual(invalide.data.messages.at(-1).retourQuiz, { score: 90, action: 'defi' });
+  assert.doesNotMatch(await fs.readFile(args, 'utf8'), /bonus : \d/);
+  // Aucune question bonus réussie n'empêche le Défi, ni sa réussite de terminer la Leçon.
+  assert.equal((await retour({ score: 90, bonus: { reussies: 0, total: 2 } })).data.messages.at(-1).retourQuiz.action, 'defi');
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'defi' })).status, 200);
+  const defi = await retour({ score: 85, bonus: { reussies: 0, total: 3 } });
+  assert.equal(defi.data.messages.at(-1).retourQuiz.action, 'terminee');
+  assert.ok(defi.data.terminee);
+});
+
+test('Dépassement : le prof reçoit la consigne de l\'encart et des questions bonus, fidèle au document en révision, aucun en Revoir', async () => {
+  const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les aurores' })).data;
+  const argsLibre = await fs.readFile(path.join(dossier, `args-${libre.id}`), 'utf8');
+  assert.match(argsLibre, /🚀 Pour aller plus loin/);
+  assert.match(argsLibre, /2 ou 3 questions bonus/);
+  assert.match(argsLibre, /bonus: \{ reussies/);
+
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const revision = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const argsRevision = path.join(dossier, `args-${revision.id}`);
+  const demarrage = await fs.readFile(argsRevision, 'utf8');
+  assert.doesNotMatch(demarrage, /n'ajoute pas de notions hors programme/);
+  assert.match(demarrage, /fidèle au document/);
+  assert.match(demarrage, /seul le Dépassement va au-delà/);
+  assert.match(demarrage, /hors document/);
+
+  await appel(`/api/eleves/zoe-test/lecons/${revision.id}/retours`, 'POST', { score: 40 });
+  assert.equal((await appel(`/api/eleves/zoe-test/lecons/${revision.id}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  assert.match(await fs.readFile(argsRevision, 'utf8'), /Rebond : Revoir[\s\S]*pas de Dépassement/);
+});
+
 // Interroge `lire` toutes les 50 ms (5 s au plus) jusqu'à ce que `ok` accepte la valeur lue.
 const sonderJusqua = async (lire, ok, echec) => {
   for (let i = 0; i < 100; i++) {

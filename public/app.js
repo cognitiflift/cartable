@@ -105,7 +105,8 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          h('span', { className: 'ligne-maitrise' }, l.niveau && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveau}`), badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
+          h('span', { className: 'ligne-maitrise' }, l.niveau && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveau}`), badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆'),
+            l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));

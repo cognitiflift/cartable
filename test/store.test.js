@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles } from '../lib/store.js';
+import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, depassementLecon } from '../lib/store.js';
 
 let dossier, store;
 
@@ -154,6 +154,15 @@ test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Révi
   assert.deepEqual(apres('terminee'), ['reviser']);
 });
 
+test('Dépassement d\'une Leçon libre (🚀) : un quiz avec 2 bonus réussis, hors quiz faits en Révisant', () => {
+  const bonus = { reussies: 2, total: 3 };
+  assert.equal(depassementLecon([{ score: 40, bonus }], 'libre'), true);
+  assert.equal(depassementLecon([{ score: 90, bonus: { reussies: 1, total: 3 } }], 'libre'), false);
+  assert.equal(depassementLecon([{ score: 90, bonus, reviser: true }], 'libre'), false);
+  // La Leçon de révision a ses Étoiles, pas de 🚀.
+  assert.equal(depassementLecon([{ score: 40, bonus }], 'revision'), false);
+});
+
 test('Étoiles : aucune pour une Leçon libre', () => {
   assert.equal(etoilesLecon([{ score: 100, bonus: { reussies: 3, total: 3 } }], '2026-10-01T10:00:00.000Z', 'libre'), null);
 });
@@ -184,6 +193,22 @@ test('Nouvelles Étoiles : celles gagnées entre avant et après, dans l\'ordre 
   assert.deepEqual(nouvellesEtoiles({ quiz: true, bonus: false, defi: false }, { quiz: true, bonus: false, defi: true }), ['defi']);
   assert.deepEqual(nouvellesEtoiles(aucune, aucune), []);
   assert.deepEqual(nouvellesEtoiles(null, null), []);
+});
+
+test('Étoiles gagnées par un Retour de quiz : comparées aux scores déjà comptés par les Retours précédents', () => {
+  const revision = { terminee: null, termineeApres: null, mode: 'revision' };
+  // Son score vient d'être enregistré : il compte.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 85 }], dejaComptes: 0, ...revision }), ['quiz']);
+  // Sans score enregistré pour ce quiz : rien de nouveau, même si un score plus ancien a la même valeur.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 85 }], dejaComptes: 1, ...revision }), []);
+  // Un score plus ancien de même valeur ne masque pas l'Étoile du nouveau.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 85, defi: true }, { score: 85 }], dejaComptes: 1, ...revision }), ['quiz']);
+  // Un score enregistré sans Retour (Retour échoué) est compté au Retour suivant : aucune Étoile manquée.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 90 }, { score: 40 }], dejaComptes: 0, ...revision }), ['quiz']);
+  // La fin posée par ce Retour donne l'Étoile « defi », une seule fois.
+  assert.deepEqual(etoilesGagnees({ scores: [], dejaComptes: 0, terminee: null, termineeApres: '2026-10-01', mode: 'revision' }), ['defi']);
+  assert.deepEqual(etoilesGagnees({ scores: [], dejaComptes: 0, terminee: '2026-10-01', termineeApres: '2026-10-01', mode: 'revision' }), []);
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 100 }], dejaComptes: 0, terminee: null, termineeApres: null, mode: 'libre' }), []);
 });
 
 test('Rebonds proposés à une date : Réviser s\'ajoute à Étape suivante quand la dernière page date de plus de 7 jours', () => {

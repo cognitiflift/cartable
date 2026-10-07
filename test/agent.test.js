@@ -80,11 +80,13 @@ test('consigne d\'Étape suivante : rappelle au prof le titre annoncé, s\'il es
   assert.equal(consigneRebond('revoir', { ensuite: 'Les volcans endormis' }), REBONDS.revoir.consigne);
 });
 
-test('consigne de Réviser en Leçon libre : une page de révision des pages déjà vues, avec son quiz', () => {
+test('consigne de Réviser en Leçon libre : une page de révision des pages déjà vues, avec son quiz et son Dépassement', () => {
   const consigne = consigneRebond('reviser', { mode: 'libre' });
   assert.match(consigne, /Rebond : Réviser/);
   assert.match(consigne, /page de révision des pages déjà vues/);
   assert.match(consigne, /mini-quiz/);
+  assert.doesNotMatch(consigne, /ni Dépassement|pas de Dépassement/);
+  assert.match(consigne, /Pour aller plus loin/);
   assert.doesNotMatch(consigne, /Document source/);
   assert.equal(consigneRebond('reviser', { mode: 'revision' }), REBONDS.reviser.consigne);
 });

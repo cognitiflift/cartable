@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, QUIZ_REUSSI, validerBonus, etoilesLecon, nouvellesEtoiles } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, QUIZ_REUSSI, validerScore, validerBonus, etoilesGagnees } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -50,8 +50,9 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
-// À la reprise, l'agent reçoit les scores récents pour cibler les erreurs (l'élève ne voit pas cet ajout),
-// et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs.
+// À chaque tour après le premier (quand l'Élève Continue sa Leçon), l'agent reçoit les scores récents pour cibler les
+// erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs),
+// la demande de fixer ses Objectifs.
 function preambule(prompt, lecon) {
   const lignes = [];
   if (lecon.scores.length) {
@@ -175,16 +176,12 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 // met aussi fin à la phase Réviser.
 // Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le prof peut seulement le commenter.
 async function retourQuiz(slug, id, { score, page, bonus }) {
-  const valeur = Number(score);
-  if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
-  const { mode, defiEnCours, reviserEnCours, terminee, scores } = await store.lireLecon(slug, id);
-  const arrondi = Math.round(valeur);
+  const arrondi = validerScore(score);
+  const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
   const resultatBonus = validerBonus(bonus);
   const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
   const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
-  // Nouvelles Étoiles : avant ce quiz (sans son score, déjà enregistré par /scores) et après (avec la fin éventuelle).
-  const avant = scores.at(-1)?.score === arrondi ? scores.slice(0, -1) : scores;
-  const etoiles = nouvellesEtoiles(etoilesLecon(avant, terminee, mode), etoilesLecon(scores, termineeApres, mode));
+  const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
   const retour = {
     score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
   };
@@ -196,6 +193,7 @@ async function retourQuiz(slug, id, { score, page, bonus }) {
     details: { retourQuiz: retour },
     etatLecon: {
       defiEnCours: false,
+      scoresCommentes: scores.length,
       ...(defiEnCours && arrondi >= QUIZ_REUSSI && { reviserEnCours: false }),
       ...(action === 'terminee' && { terminee: termineeApres }),
     },

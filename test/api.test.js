@@ -380,8 +380,8 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
     const page = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'lessons', '0001-volcans.html');
     const rebond = (action) => appel(`${url}/rebonds`, 'POST', { action });
-    const quiz = async (score, objectifs) => {
-      await appel(`${url}/scores`, 'POST', { score, page: '0001-volcans.html', objectifs });
+    const quiz = async (score, objectifs, bonus) => {
+      await appel(`${url}/scores`, 'POST', { score, page: '0001-volcans.html', objectifs, bonus });
       return (await appel(`${url}/retours`, 'POST', { score, page: '0001-volcans.html' })).data;
     };
 
@@ -406,7 +406,7 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     assert.equal((await rebond('revoir')).status, 200);
     assert.deepEqual((await quiz(90, [2])).rebondsProposes, ['defi']);
     assert.equal((await rebond('defi')).status, 200);
-    const fin = await quiz(95, [2, 3]);
+    const fin = await quiz(95, [2, 3], { reussies: 3, total: 3 });
     assert.deepEqual(fin.messages.at(-1).retourQuiz, { score: 95, action: 'suivante' });
     assert.deepEqual(fin.rebondsProposes, ['suivante']);
     assert.equal(fin.reviserEnCours, false);
@@ -415,7 +415,9 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     // Scores de la révision marqués : ils comptent dans la Maîtrise, n'atteignent aucun Objectif, Niveau inchangé.
     assert.deepEqual(fin.scores.map((s) => s.reviser), [undefined, true, true, true]);
     assert.deepEqual(fin.objectifs.map((o) => o.atteint), [true, false, false]);
-    assert.equal(fin.niveau, 2);
+    assert.equal(fin.niveauLecon, 2);
+    // Dépassement réussi en Révisant : pas de 🚀, la révision ne rapporte rien.
+    assert.equal(fin.depassement, false);
     assert.equal(fin.maitrise.pourcentage, 78); // (50 + 90 + 95) / 3
   }));
 
@@ -496,6 +498,10 @@ test('Maîtrise : pas encore évaluée, puis moyenne des 3 derniers scores et pa
   assert.equal(await maitrise(), null);
 
   assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: 140 })).status, 400);
+  // Comme le Retour de quiz : un score absent ou vide est refusé (pas compté comme 0 %).
+  for (const score of [null, '', undefined]) {
+    assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score })).status, 400);
+  }
   const score = (s) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: s, page: '0001-volcans.html' });
 
   assert.equal((await score(20)).status, 201);
@@ -528,25 +534,25 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
     assert.equal(res.status, 201);
     return res.data;
   };
-  assert.equal(lecon.niveau, 1);
+  assert.equal(lecon.niveauLecon, 1);
   assert.deepEqual(lecon.objectifs, [
     { texte: 'Nommer les parties d’un volcan', atteint: false },
     { texte: 'Expliquer une éruption', atteint: false },
     { texte: 'Situer trois volcans', atteint: false },
   ]);
-  assert.equal((await resume()).niveau, 1);
+  assert.equal((await resume()).niveauLecon, 1);
 
   // Quiz raté : rien ne change.
-  assert.equal((await score(60, [1])).niveau, 1);
+  assert.equal((await score(60, [1])).niveauLecon, 1);
   // Quiz réussi couvrant l'Objectif 1 : Niveau 2 ; numéros inexistants ou mal formés ignorés sans erreur.
   const reussi = await score(85, [1, 9, 0, '2', 1.5]);
-  assert.equal(reussi.niveau, 2);
+  assert.equal(reussi.niveauLecon, 2);
   assert.deepEqual(reussi.objectifs.map((o) => o.atteint), [true, false, false]);
   assert.deepEqual(reussi.scores.at(-1).objectifs, [1]);
   // Objectif déjà atteint, puis quiz raté : le Niveau ne bouge pas, l'Objectif reste atteint.
-  assert.equal((await score(100, [1])).niveau, 2);
-  assert.equal((await score(20, [1, 2])).niveau, 2);
-  assert.equal((await resume()).niveau, 2);
+  assert.equal((await score(100, [1])).niveauLecon, 2);
+  assert.equal((await score(20, [1, 2])).niveauLecon, 2);
+  assert.equal((await resume()).niveauLecon, 2);
   assert.deepEqual((await resume()).objectifs.map((o) => o.atteint), [true, false, false]);
   // Objectifs absents ou mal formés : le score s'enregistre quand même.
   assert.equal((await appel(`${url}/scores`, 'POST', { score: 90, objectifs: 'tous' })).status, 201);
@@ -557,13 +563,13 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
 
 test('Niveau de Leçon : pas de Niveau sans Objectifs, ni pour une Leçon de révision', async () => {
   const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les geysers' })).data;
-  assert.equal(libre.niveau, null);
+  assert.equal(libre.niveauLecon, null);
   assert.deepEqual(libre.objectifs, []);
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const revision = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
-  assert.equal(revision.niveau, null);
+  assert.equal(revision.niveauLecon, null);
   assert.equal(revision.objectifs.length, 3);
-  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === revision.id).niveau, null);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === revision.id).niveauLecon, null);
 });
 
 test('Objectifs : consignes demandées au prof, et à la reprise d\'une Leçon sans Objectifs, demande de les ajouter', async () => {
@@ -616,16 +622,16 @@ test('Élargir la mission : après l\'ajout d\'Objectifs, le Niveau reste le mê
   const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
   const score = async (objectifs) => (await appel(`${url}/scores`, 'POST', { score: 90, page: '0001-volcans.html', objectifs })).data;
-  assert.equal((await score([1, 2, 3])).niveau, 4);
+  assert.equal((await score([1, 2, 3])).niveauLecon, 4);
   // Le prof ajoute deux Objectifs à la fin de la liste.
   const meta = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'lesson.json');
   const contenu = JSON.parse(await fs.readFile(meta, 'utf8'));
   contenu.objectifs.push('Comparer deux types d’éruption', 'Expliquer les risques volcaniques');
   await fs.writeFile(meta, JSON.stringify(contenu));
   const lue = (await appel(url)).data;
-  assert.equal(lue.niveau, 4);
+  assert.equal(lue.niveauLecon, 4);
   assert.deepEqual(lue.objectifs.map((o) => o.atteint), [true, true, true, false, false]);
-  assert.equal((await score([5])).niveau, 5);
+  assert.equal((await score([5])).niveauLecon, 5);
 });
 
 test('Dépassement : le résultat bonus est gardé avec le score, un résultat invalide est ignoré, la Maîtrise n\'en dépend pas', async () => {
@@ -704,6 +710,22 @@ test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision,
   const apres = (await appel(url)).data;
   assert.equal(apres.maitrise.palier, 'non acquis');
   assert.deepEqual(apres.etoiles, { quiz: true, bonus: true, defi: true });
+});
+
+test('Étoiles : le Retour de quiz n\'annonce que ce qu\'il fait gagner, avec ou sans score enregistré avant lui', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const score = (s) => appel(`${url}/scores`, 'POST', { score: s });
+  const retour = async (s) => (await appel(`${url}/retours`, 'POST', { score: s })).data.messages.at(-1).retourQuiz.nouvellesEtoiles;
+
+  // Retour sans score enregistré avant lui : aucune Étoile.
+  assert.equal(await retour(90), undefined);
+  // Score puis Retour : l'Étoile « quiz » est annoncée.
+  await score(85);
+  assert.deepEqual(await retour(85), ['quiz']);
+  // Retour de même valeur qu'un score plus ancien, sans nouveau score : pas d'Étoile une seconde fois.
+  assert.equal(await retour(85), undefined);
 });
 
 test('Étoiles : aucune pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {

@@ -41,6 +41,8 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 p .maitrise { display:inline-flex; }
 .ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
 .niveau { font-size:.85rem; font-weight:600; white-space:nowrap; }
+.etoiles { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
+.nouvelle-etoile { padding:.4rem 1rem; border-radius:999px; background:#d4a017; color:#fff; font-weight:600; }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }

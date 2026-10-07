@@ -87,6 +87,11 @@ async function ecranProfil(profil) {
 
 const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };
 
+// Trois Étoiles d'une Leçon de révision, pleines ou vides.
+const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
+const etoiles = (e) => h('span', { className: 'etoiles' },
+  Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
+
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
   return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: maitrise.palier },
@@ -105,7 +110,7 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          h('span', { className: 'ligne-maitrise' }, l.niveau && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveau}`), badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆'),
+          h('span', { className: 'ligne-maitrise' }, l.niveau && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveau}`), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
             l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
@@ -234,13 +239,14 @@ async function ecranSession(profil, id) {
     if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
-      const { action, score, ensuite } = prof.retourQuiz;
+      const { action, score, ensuite, nouvellesEtoiles } = prof.retourQuiz;
       contenu = h('div', { className: 'apres-quiz' },
+        nouvellesEtoiles?.length > 0 && h('div', { className: 'nouvelle-etoile' }, '⭐ Nouvelle étoile !'),
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
-          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`)),
+          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), lecon.etoiles && etoiles(lecon.etoiles)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, r === 'defi' ? '🏆 Nouveau défi' : libelleRebond(r, ensuite)))]
           : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {

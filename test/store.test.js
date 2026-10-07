@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore, rebondsProposes, depassementReussi } from '../lib/store.js';
+import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles } from '../lib/store.js';
 
 let dossier, store;
 
@@ -152,4 +152,36 @@ test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Nouve
   assert.deepEqual(apres('defi'), ['defi']);
   assert.deepEqual(apres('suivante'), ['suivante']);
   assert.deepEqual(apres('terminee'), ['defi']);
+});
+
+test('Étoiles : aucune pour une Leçon libre', () => {
+  assert.equal(etoilesLecon([{ score: 100, bonus: { reussies: 3, total: 3 } }], '2026-10-01T10:00:00.000Z', 'libre'), null);
+});
+
+test('Étoiles : un historique ancien, sans contexte, donne « quiz » et « defi » d\'après ses scores et sa fin', () => {
+  assert.deepEqual(etoilesLecon([], null, 'revision'), { quiz: false, bonus: false, defi: false });
+  assert.deepEqual(etoilesLecon([{ score: 60, date: '2026-09-01' }, { score: 85, date: '2026-09-02' }], null, 'revision'), { quiz: true, bonus: false, defi: false });
+  assert.deepEqual(etoilesLecon([{ score: 90, date: '2026-09-02' }], '2026-09-03T10:00:00.000Z', 'revision'), { quiz: true, bonus: false, defi: true });
+});
+
+test('Étoiles : « quiz » seulement pour un quiz ordinaire réussi, pas un Défi', () => {
+  assert.equal(etoilesLecon([{ score: 95, defi: true }], null, 'revision').quiz, false);
+  assert.equal(etoilesLecon([{ score: 79 }], null, 'revision').quiz, false);
+  assert.equal(etoilesLecon([{ score: 80 }], null, 'revision').quiz, true);
+});
+
+test('Étoiles : « bonus » dès 2 questions bonus réussies dans un même quiz, même sous 80 %', () => {
+  assert.equal(etoilesLecon([{ score: 40, bonus: { reussies: 2, total: 3 } }], null, 'revision').bonus, true);
+  assert.equal(etoilesLecon([{ score: 40, bonus: { reussies: 2, total: 2 } }], null, 'revision').bonus, true);
+  assert.equal(etoilesLecon([{ score: 90, bonus: { reussies: 1, total: 3 } }, { score: 90, bonus: { reussies: 1, total: 3 } }], null, 'revision').bonus, false);
+  // Acquise pour toujours : un quiz suivant raté ne la retire pas.
+  assert.equal(etoilesLecon([{ score: 40, bonus: { reussies: 2, total: 3 } }, { score: 10 }], null, 'revision').bonus, true);
+});
+
+test('Nouvelles Étoiles : celles gagnées entre avant et après, dans l\'ordre quiz, bonus, defi', () => {
+  const aucune = { quiz: false, bonus: false, defi: false };
+  assert.deepEqual(nouvellesEtoiles(aucune, { quiz: true, bonus: true, defi: false }), ['quiz', 'bonus']);
+  assert.deepEqual(nouvellesEtoiles({ quiz: true, bonus: false, defi: false }, { quiz: true, bonus: false, defi: true }), ['defi']);
+  assert.deepEqual(nouvellesEtoiles(aucune, aucune), []);
+  assert.deepEqual(nouvellesEtoiles(null, null), []);
 });

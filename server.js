@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, validerBonus } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, validerBonus, etoilesLecon, nouvellesEtoiles } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -176,17 +176,24 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 async function retourQuiz(slug, id, { score, page, bonus }) {
   const valeur = Number(score);
   if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
-  const { mode, defiEnCours, terminee } = await store.lireLecon(slug, id);
+  const { mode, defiEnCours, terminee, scores } = await store.lireLecon(slug, id);
   const arrondi = Math.round(valeur);
   const resultatBonus = validerBonus(bonus);
-  const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours), ...(resultatBonus && { bonus: resultatBonus }) };
+  const action = actionRetourQuiz(arrondi, mode, defiEnCours);
+  const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
+  // Nouvelles Étoiles : avant ce quiz (sans son score, déjà enregistré par /scores) et après (avec la fin éventuelle).
+  const avant = scores.at(-1)?.score === arrondi ? scores.slice(0, -1) : scores;
+  const etoiles = nouvellesEtoiles(etoilesLecon(avant, terminee, mode), etoilesLecon(scores, termineeApres, mode));
+  const retour = {
+    score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
+  };
   return tourDeParole({
     slug, id,
     prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '', mode }),
     affiche: `📝 Quiz terminé : ${retour.score} %`,
     premier: false,
     details: { retourQuiz: retour },
-    etatLecon: { defiEnCours: false, ...(retour.action === 'terminee' && { terminee: terminee ?? new Date().toISOString() }) },
+    etatLecon: { defiEnCours: false, ...(action === 'terminee' && { terminee: termineeApres }) },
   });
 }
 

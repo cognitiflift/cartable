@@ -329,7 +329,7 @@ test('Leçon terminée : un Défi réussi termine la Leçon de révision, un Dé
   assert.equal((await retour(85)).messages.at(-1).retourQuiz.action, 'defi');
   assert.equal((await rebond('defi')).status, 200);
   const reussi = await retour(90);
-  assert.deepEqual(reussi.messages.at(-1).retourQuiz, { score: 90, action: 'terminee' });
+  assert.deepEqual(reussi.messages.at(-1).retourQuiz, { score: 90, action: 'terminee', nouvellesEtoiles: ['defi'] });
   assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Leçon est terminée/);
   const terminee = reussi.terminee;
   assert.ok(!Number.isNaN(Date.parse(terminee)));
@@ -527,6 +527,70 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   // Acquis pour toujours : un quiz suivant sans bonus ne le retire pas.
   await score({ score: 60 });
   assert.equal((await resume()).depassement, true);
+});
+
+test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  // Comme l'écran : le score s'enregistre, puis le Retour de quiz.
+  const quiz = async (corps) => {
+    await appel(`${url}/scores`, 'POST', { page: '0001-volcans.html', ...corps });
+    return (await appel(`${url}/retours`, 'POST', { page: '0001-volcans.html', ...corps })).data;
+  };
+  const args = path.join(dossier, `args-${lecon.id}`);
+
+  assert.deepEqual(lecon.etoiles, { quiz: false, bonus: false, defi: false });
+  assert.deepEqual((await resume()).etoiles, { quiz: false, bonus: false, defi: false });
+
+  // 2 bonus sur 3 sous 80 % : Étoile « bonus », pas « quiz ».
+  const bonus = await quiz({ score: 60, bonus: { reussies: 2, total: 3 } });
+  assert.deepEqual(bonus.etoiles, { quiz: false, bonus: true, defi: false });
+  assert.deepEqual(bonus.messages.at(-1).retourQuiz.nouvellesEtoiles, ['bonus']);
+  assert.match(await fs.readFile(args, 'utf8'), /Nouvelle étoile/);
+
+  // Un quiz qui ne gagne rien n'annonce aucune Étoile.
+  const rien = await quiz({ score: 50, bonus: { reussies: 2, total: 3 } });
+  assert.equal(rien.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
+  assert.doesNotMatch(await fs.readFile(args, 'utf8'), /Nouvelle étoile/);
+
+  // Quiz ordinaire réussi : Étoile « quiz ».
+  const reussi = await quiz({ score: 85 });
+  assert.deepEqual(reussi.etoiles, { quiz: true, bonus: true, defi: false });
+  assert.deepEqual(reussi.messages.at(-1).retourQuiz.nouvellesEtoiles, ['quiz']);
+
+  // Défi réussi : Étoile « defi », Leçon terminée.
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'defi' })).status, 200);
+  const defi = await quiz({ score: 90 });
+  assert.ok(defi.terminee);
+  assert.deepEqual(defi.etoiles, { quiz: true, bonus: true, defi: true });
+  assert.deepEqual(defi.messages.at(-1).retourQuiz.nouvellesEtoiles, ['defi']);
+  assert.deepEqual((await resume()).etoiles, { quiz: true, bonus: true, defi: true });
+
+  // Une Étoile ne se perd jamais, même si la Maîtrise baisse.
+  for (const score of [10, 10, 10]) await appel(`${url}/scores`, 'POST', { score });
+  const apres = (await appel(url)).data;
+  assert.equal(apres.maitrise.palier, 'non acquis');
+  assert.deepEqual(apres.etoiles, { quiz: true, bonus: true, defi: true });
+});
+
+test('Étoiles : aucune pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
+  const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Les volcans' })).data;
+  await appel(`/api/eleves/zoe-test/lecons/${libre.id}/scores`, 'POST', { score: 100, bonus: { reussies: 3, total: 3 } });
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${libre.id}`)).data;
+  assert.equal(lue.etoiles, null);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, null);
+
+  // Leçon de révision d'avant cette version : scores sans contexte, date de fin posée.
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const ancienne = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const fichier = path.join(eleves, 'zoe-test', 'lecons', ancienne.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  etat.scores = [{ score: 85, date: '2026-09-01T10:00:00.000Z' }];
+  etat.terminee = '2026-09-02T10:00:00.000Z';
+  await fs.writeFile(fichier, JSON.stringify(etat));
+  assert.deepEqual((await appel(`/api/eleves/zoe-test/lecons/${ancienne.id}`)).data.etoiles, { quiz: true, bonus: false, defi: true });
 });
 
 test('Dépassement : le Retour de quiz accepte le résultat bonus, le Rebond et la fin de Leçon n\'en dépendent pas', async () => {

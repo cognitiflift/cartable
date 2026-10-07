@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, QUIZ_REUSSI, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -161,7 +161,8 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 
 // Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
 // Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision (date de fin posée une
-// seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz.
+// seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz, et un Défi réussi
+// met aussi fin à la phase Réviser.
 async function retourQuiz(slug, id, { score, page }) {
   const valeur = Number(score);
   if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
@@ -174,17 +175,24 @@ async function retourQuiz(slug, id, { score, page }) {
     affiche: `📝 Quiz terminé : ${retour.score} %`,
     premier: false,
     details: { retourQuiz: retour },
-    etatLecon: { defiEnCours: false, ...(retour.action === 'terminee' && { terminee: terminee ?? new Date().toISOString() }) },
+    etatLecon: {
+      defiEnCours: false,
+      ...(defiEnCours && arrondi >= QUIZ_REUSSI && { reviserEnCours: false }),
+      ...(retour.action === 'terminee' && { terminee: terminee ?? new Date().toISOString() }),
+    },
   });
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
-// consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant.
+// consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant ;
+// choisir Réviser ouvre la phase Réviser jusqu'au Défi réussi.
+const ETAT_APRES_REBOND = { defi: { defiEnCours: true }, reviser: { reviserEnCours: true } };
+
 async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
   if (!(await store.lireLecon(slug, id)).rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
   const { consigne, phrase } = REBONDS[action];
-  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false, etatLecon: action === 'defi' ? { defiEnCours: true } : undefined });
+  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false, etatLecon: ETAT_APRES_REBOND[action] });
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.

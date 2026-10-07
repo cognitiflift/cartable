@@ -39,18 +39,26 @@ test('Retour de quiz : un Défi réussi en révision termine la Leçon, sinon m�
 test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est terminée', () => {
   const retour = promptRetourQuiz({ score: 90, page: 'defi.html', action: 'terminee' });
   assert.match(retour, /Leçon est terminée/);
-  assert.match(retour, /nouveau défi/);
+  assert.match(retour, /réviser/);
+  assert.doesNotMatch(retour, /nouveau défi/i);
   assert.doesNotMatch(retour, /undefined/);
 });
 
 test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {
-  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante']);
+  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante', 'reviser']);
   assert.match(REBONDS.revoir.consigne, /Rebond : Revoir/);
   assert.match(REBONDS.revoir.consigne, /raté/);
   assert.match(REBONDS.defi.consigne, /Rebond : Défi/);
   assert.match(REBONDS.defi.consigne, /plus difficile/);
   assert.match(REBONDS.suivante.consigne, /Rebond : Étape suivante/);
   assert.match(REBONDS.suivante.consigne, /même Leçon/);
+  assert.equal(REBONDS.reviser.phrase, '📚 Je veux réviser.');
+  assert.match(REBONDS.reviser.consigne, /Rebond : Réviser/);
+  assert.match(REBONDS.reviser.consigne, /page de révision/);
+  assert.match(REBONDS.reviser.consigne, /fidèle au Document source/);
+  assert.match(REBONDS.reviser.consigne, /sources\//);
+  assert.match(REBONDS.reviser.consigne, /tous ses Objectifs/);
+  assert.match(REBONDS.reviser.consigne, /Pour aller plus loin/);
   for (const { phrase, consigne } of Object.values(REBONDS)) {
     assert.ok(phrase.length > 0);
     assert.match(consigne, /Crée/);

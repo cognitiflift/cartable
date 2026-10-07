@@ -193,7 +193,7 @@ function ecranNouvelleLecon(profil) {
 }
 
 // Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
-const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Prêt pour la suite ?' };
+const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Prêt pour la suite ?', reviser: '📚 Réviser' };
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
@@ -237,7 +237,7 @@ async function ecranSession(profil, id) {
           prof.texte),
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`)),
-             ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, r === 'defi' ? '🏆 Nouveau défi' : LIBELLES_REBOND[r]))]
+             ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, LIBELLES_REBOND[r]))]
           : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, LIBELLES_REBOND[r], h('small', {}, `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.

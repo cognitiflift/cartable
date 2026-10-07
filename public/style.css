@@ -45,3 +45,4 @@ p .maitrise { display:inline-flex; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }
 .carte.suite { border-left:4px solid var(--accent); } .carte.suite .type { color:var(--accent); }
 .carte .au-programme { display:block; width:fit-content; font-size:.75rem; font-weight:600; padding:.1rem .5rem; margin-bottom:.4rem; border-radius:999px; background:var(--accent); color:#fff; }
+.carte .continuer { display:block; font-size:.9rem; margin-top:.3rem; color:var(--accent); font-weight:600; }

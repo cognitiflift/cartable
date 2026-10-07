@@ -19,7 +19,8 @@ before(async () => {
   // `ecrire-puis-echouer` le fait échouer après avoir écrit d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
-  // (ni page ni lesson.json, des sujets voisins en CHOIX).
+  // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait finir sa réponse par une
+  // ligne ENSUITE (titre de la prochaine page annoncée).
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
@@ -66,6 +67,10 @@ fi
 mkdir -p lessons
 echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
+if [ -e '${dossier}/ensuite' ]; then
+  printf '%s\\n' '{"result":"Bravo !\\nENSUITE: Les volcans endormis","session_id":"s-123","is_error":false}'
+  exit 0
+fi
 if [ -e '${dossier}/choix' ]; then
   printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false}'
   exit 0
@@ -207,6 +212,37 @@ test('Rebond : l\'action recommandée par le dernier Retour de quiz construit la
   assert.equal((await appel(rebonds, 'POST', { action: 'suivante' })).status, 400);
   assert.equal((await appel(rebonds, 'POST', { action: 'revoir' })).status, 200);
   assert.match(await fs.readFile(args, 'utf8'), /Rebond : Revoir/);
+});
+
+test('Continuer : en Leçon libre, le prof annonce la suite après le quiz ; la Leçon et la liste l\'exposent', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les laves' })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const args = path.join(dossier, `args-${lecon.id}`);
+  assert.equal(lecon.ensuite, null);
+
+  const retour = (await avecFichier('ensuite', () => appel(`${url}/retours`, 'POST', { score: 40 }))).data;
+  assert.match(await fs.readFile(args, 'utf8'), /ENSUITE: <titre court>/);
+  const prof = retour.messages.at(-1);
+  assert.equal(prof.texte, 'Bravo !');
+  assert.equal(prof.retourQuiz.ensuite, 'Les volcans endormis');
+  assert.equal(retour.ensuite, 'Les volcans endormis');
+  assert.equal((await appel(url)).data.ensuite, 'Les volcans endormis');
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).ensuite, 'Les volcans endormis');
+
+  // Étape suivante : le prof se voit rappeler le titre annoncé.
+  await appel(`${url}/retours`, 'POST', { score: 90 }); // sans ligne ENSUITE : plus de titre annoncé
+  assert.equal((await appel(url)).data.ensuite, null);
+  await avecFichier('ensuite', () => appel(`${url}/retours`, 'POST', { score: 90 }));
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 200);
+  assert.match(await fs.readFile(args, 'utf8'), /annoncé cette page : « Les volcans endormis »/);
+});
+
+test('Continuer : une Leçon de révision n\'annonce pas de suite', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 85 });
+  assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /ENSUITE/);
+  assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data.ensuite, null);
 });
 
 test('Rebond : Défi après un quiz réussi en Leçon de révision', async () => {

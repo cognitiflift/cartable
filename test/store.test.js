@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore, depassementReussi } from '../lib/store.js';
+import { createStore, rebondsProposes, depassementReussi } from '../lib/store.js';
 
 let dossier, store;
 
@@ -137,4 +137,19 @@ test('Dépassement réussi : au moins 2 questions bonus réussies, quel que soit
   assert.equal(depassementReussi({ reussies: 1, total: 3 }), false);
   assert.equal(depassementReussi({ reussies: 1, total: 1 }), false);
   assert.equal(depassementReussi(undefined), false);
+});
+
+test('Rebonds proposés : aucun si le dernier message n\'est pas un Retour de quiz', () => {
+  assert.deepEqual(rebondsProposes([]), []);
+  assert.deepEqual(rebondsProposes([{ role: 'agent', texte: 'Bonjour !' }]), []);
+  const retour = { role: 'agent', texte: 'Bravo', retourQuiz: { score: 90, action: 'suivante' } };
+  assert.deepEqual(rebondsProposes([retour, { role: 'eleve', texte: '➡️ Je suis prêt pour la suite.' }, { role: 'agent', texte: 'Page prête' }]), []);
+});
+
+test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Nouveau défi après une Leçon terminée', () => {
+  const apres = (action) => rebondsProposes([{ role: 'agent', texte: '…', retourQuiz: { score: 50, action } }]);
+  assert.deepEqual(apres('revoir'), ['revoir']);
+  assert.deepEqual(apres('defi'), ['defi']);
+  assert.deepEqual(apres('suivante'), ['suivante']);
+  assert.deepEqual(apres('terminee'), ['defi']);
 });

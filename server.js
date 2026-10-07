@@ -180,18 +180,11 @@ async function retourQuiz(slug, id, { score, page, bonus }) {
   });
 }
 
-// Rebond accepté tant que le Retour de quiz est le dernier message (pas encore choisi) : l'action qu'il recommande,
-// ou « Nouveau défi » après le Défi réussi qui a terminé la Leçon.
-const rebondPropose = (lecon) => {
-  const action = lecon.messages.at(-1)?.retourQuiz?.action;
-  return action === 'terminee' ? 'defi' : action;
-};
-
-// Choix d'un Rebond : une action fermée, dont le serveur tire la consigne du prof et la phrase de l'Élève.
-// Choisir le Défi le met en cours jusqu'au Retour de quiz suivant.
+// Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
+// consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant.
 async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
-  if (rebondPropose(await store.lireLecon(slug, id)) !== action) throw new HttpError(400, "Ce Rebond n'est pas proposé");
+  if (!(await store.lireLecon(slug, id)).rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
   const { consigne, phrase } = REBONDS[action];
   return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false, etatLecon: action === 'defi' ? { defiEnCours: true } : undefined });
 }

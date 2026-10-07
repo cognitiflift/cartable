@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from '../lib/agent.js';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -17,9 +17,24 @@ test('Réponses proposées : aucune sans ligne CHOIX, 4 au plus, casse et ** tol
   assert.deepEqual(extraireChoix('CHOIX:'), { texte: '' });
 });
 
-test('action après un quiz : Revoir sous 80 %, sinon Défi (révision) ou Étape suivante (libre)', () => {
+test('Annonce de la suite : la ligne ENSUITE est retirée du texte et donne le titre', () => {
+  assert.deepEqual(extraireEnsuite('Bravo !\nTu as tout compris.\nENSUITE:  Les volcans endormis '), {
+    texte: 'Bravo !\nTu as tout compris.',
+    ensuite: 'Les volcans endormis',
+  });
+});
+
+test('Annonce de la suite : rien sans ligne ENSUITE, casse et ** tolérés, titre vide ignoré', () => {
+  assert.deepEqual(extraireEnsuite('Bravo !'), { texte: 'Bravo !' });
+  assert.deepEqual(extraireEnsuite('Bravo !\n**Ensuite :** Les laves'), { texte: 'Bravo !', ensuite: 'Les laves' });
+  assert.deepEqual(extraireEnsuite('Bravo !\nENSUITE:'), { texte: 'Bravo !' });
+});
+
+test('action après un quiz : en révision Revoir sous 80 %, sinon Défi ; en Leçon libre toujours Étape suivante', () => {
   assert.equal(actionApresQuiz(79, 'revision'), 'revoir');
-  assert.equal(actionApresQuiz(40, 'libre'), 'revoir');
+  assert.equal(actionApresQuiz(40, 'libre'), 'suivante');
+  assert.equal(actionApresQuiz(0, 'libre'), 'suivante');
+  assert.equal(actionApresQuiz(79, 'libre'), 'suivante');
   assert.equal(actionApresQuiz(80, 'revision'), 'defi');
   assert.equal(actionApresQuiz(95, 'libre'), 'suivante');
 });
@@ -30,24 +45,67 @@ test('Retour de quiz : un Défi réussi en révision termine la Leçon, sinon m�
   assert.equal(actionRetourQuiz(79, 'revision', true), 'revoir'); // Défi raté
   assert.equal(actionRetourQuiz(90, 'revision', false), 'defi'); // quiz ordinaire réussi
   assert.equal(actionRetourQuiz(90, 'libre', true), 'suivante'); // une Leçon libre n'est jamais terminée
-  assert.equal(actionRetourQuiz(50, 'libre', false), 'revoir');
+  assert.equal(actionRetourQuiz(50, 'libre', false), 'suivante'); // pas de Revoir en Leçon libre
+  assert.equal(actionRetourQuiz(50, 'libre', true), 'suivante');
+});
+
+test('Retour de quiz en phase Réviser d\'une Leçon libre : règles d\'une révision, puis Étape suivante après le Défi réussi', () => {
+  assert.equal(actionRetourQuiz(79, 'libre', false, true), 'revoir');
+  assert.equal(actionRetourQuiz(80, 'libre', false, true), 'defi');
+  assert.equal(actionRetourQuiz(60, 'libre', true, true), 'revoir'); // Défi raté
+  assert.equal(actionRetourQuiz(80, 'libre', true, true), 'suivante'); // Défi réussi : fin de la phase
+  // Leçon de révision : la phase Réviser ne change rien, un Défi réussi la termine toujours.
+  assert.equal(actionRetourQuiz(90, 'revision', true, true), 'terminee');
+  assert.equal(actionRetourQuiz(50, 'revision', false, true), 'revoir');
 });
 
 test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est terminée', () => {
   const retour = promptRetourQuiz({ score: 90, page: 'defi.html', action: 'terminee' });
   assert.match(retour, /Leçon est terminée/);
-  assert.match(retour, /nouveau défi/);
+  assert.match(retour, /réviser/);
+  assert.doesNotMatch(retour, /nouveau défi/i);
   assert.doesNotMatch(retour, /undefined/);
 });
 
+test('Retour de quiz en Leçon libre : le prof finit par une ligne ENSUITE, pas en révision', () => {
+  assert.match(promptRetourQuiz({ score: 40, page: 'p.html', action: 'revoir', mode: 'libre' }), /ENSUITE: <titre court>/);
+  assert.doesNotMatch(promptRetourQuiz({ score: 85, page: 'p.html', action: 'defi', mode: 'revision' }), /ENSUITE/);
+});
+
+test('consigne d\'Étape suivante : rappelle au prof le titre annoncé, s\'il est connu', () => {
+  const consigne = consigneRebond('suivante', { ensuite: 'Les volcans endormis' });
+  assert.match(consigne, /Rebond : Étape suivante/);
+  assert.match(consigne, /« Les volcans endormis »/);
+  assert.equal(consigneRebond('suivante', { ensuite: null }), REBONDS.suivante.consigne);
+  assert.equal(consigneRebond('revoir', { ensuite: 'Les volcans endormis' }), REBONDS.revoir.consigne);
+});
+
+test('consigne de Réviser en Leçon libre : une page de révision des pages déjà vues, avec son quiz et son Dépassement', () => {
+  const consigne = consigneRebond('reviser', { mode: 'libre' });
+  assert.match(consigne, /Rebond : Réviser/);
+  assert.match(consigne, /page de révision des pages déjà vues/);
+  assert.match(consigne, /mini-quiz/);
+  assert.doesNotMatch(consigne, /ni Dépassement|pas de Dépassement/);
+  assert.match(consigne, /Pour aller plus loin/);
+  assert.doesNotMatch(consigne, /Document source/);
+  assert.equal(consigneRebond('reviser', { mode: 'revision' }), REBONDS.reviser.consigne);
+});
+
 test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {
-  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante']);
+  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante', 'reviser']);
   assert.match(REBONDS.revoir.consigne, /Rebond : Revoir/);
   assert.match(REBONDS.revoir.consigne, /raté/);
   assert.match(REBONDS.defi.consigne, /Rebond : Défi/);
   assert.match(REBONDS.defi.consigne, /plus difficile/);
   assert.match(REBONDS.suivante.consigne, /Rebond : Étape suivante/);
   assert.match(REBONDS.suivante.consigne, /même Leçon/);
+  assert.equal(REBONDS.reviser.phrase, '📚 Je veux réviser.');
+  assert.match(REBONDS.reviser.consigne, /Rebond : Réviser/);
+  assert.match(REBONDS.reviser.consigne, /page de révision/);
+  assert.match(REBONDS.reviser.consigne, /fidèle au Document source/);
+  assert.match(REBONDS.reviser.consigne, /sources\//);
+  assert.match(REBONDS.reviser.consigne, /tous ses Objectifs/);
+  assert.match(REBONDS.reviser.consigne, /Pour aller plus loin/);
   for (const { phrase, consigne } of Object.values(REBONDS)) {
     assert.ok(phrase.length > 0);
     assert.match(consigne, /Crée/);
@@ -128,4 +186,14 @@ test('consignes des Propositions : « D\'autres idées » liste les titres déj�
   assert.match(consignes, /d'autres matières/);
   assert.match(consignes, /d'autres angles/);
   assert.match(consignes, /suites/);
+});
+
+test('consignes : Étape suivante est une page nouvelle choisie selon la zone proximale ; Revoir est réservé à la révision', () => {
+  const consignes = consignesLecon(profil);
+  assert.match(consignes, /Étape suivante[^.]*page nouvelle[^.]*zone proximale/);
+  assert.match(consignes, /Leçon libre[^.]*toujours[^.]*Étape suivante/);
+  assert.match(consignes, /Revoir[^.]*Leçon de révision/);
+  assert.match(REBONDS.suivante.consigne, /page nouvelle/);
+  assert.match(REBONDS.suivante.consigne, /zone proximale/);
+  assert.match(REBONDS.suivante.consigne, /raté/);
 });

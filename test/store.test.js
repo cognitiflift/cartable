@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore } from '../lib/store.js';
+import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, depassementLecon } from '../lib/store.js';
 
 let dossier, store;
 
@@ -128,4 +128,96 @@ test('Historique des Propositions : vide au départ, les titres de chaque lot s\
   await store.ajouterHistoriquePropositions('zoe', ['T9', 'T10', 'T11', 'T12']);
   assert.deepEqual(await store.lireHistoriquePropositions('zoe'), ['T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']);
   await assert.rejects(store.lireHistoriquePropositions('personne'), { status: 404 });
+});
+
+test('Dépassement réussi : au moins 2 questions bonus réussies, quel que soit le total', () => {
+  assert.equal(depassementReussi({ reussies: 2, total: 3 }), true);
+  assert.equal(depassementReussi({ reussies: 3, total: 3 }), true);
+  assert.equal(depassementReussi({ reussies: 2, total: 2 }), true);
+  assert.equal(depassementReussi({ reussies: 1, total: 3 }), false);
+  assert.equal(depassementReussi({ reussies: 1, total: 1 }), false);
+  assert.equal(depassementReussi(undefined), false);
+});
+
+test('Rebonds proposés : aucun si le dernier message n\'est pas un Retour de quiz', () => {
+  assert.deepEqual(rebondsProposes([]), []);
+  assert.deepEqual(rebondsProposes([{ role: 'agent', texte: 'Bonjour !' }]), []);
+  const retour = { role: 'agent', texte: 'Bravo', retourQuiz: { score: 90, action: 'suivante' } };
+  assert.deepEqual(rebondsProposes([retour, { role: 'eleve', texte: '➡️ Je suis prêt pour la suite.' }, { role: 'agent', texte: 'Page prête' }]), []);
+});
+
+test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Réviser après une Leçon terminée', () => {
+  const apres = (action) => rebondsProposes([{ role: 'agent', texte: '…', retourQuiz: { score: 50, action } }]);
+  assert.deepEqual(apres('revoir'), ['revoir']);
+  assert.deepEqual(apres('defi'), ['defi']);
+  assert.deepEqual(apres('suivante'), ['suivante']);
+  assert.deepEqual(apres('terminee'), ['reviser']);
+});
+
+test('Dépassement d\'une Leçon libre (🚀) : un quiz avec 2 bonus réussis, hors quiz faits en Révisant', () => {
+  const bonus = { reussies: 2, total: 3 };
+  assert.equal(depassementLecon([{ score: 40, bonus }], 'libre'), true);
+  assert.equal(depassementLecon([{ score: 90, bonus: { reussies: 1, total: 3 } }], 'libre'), false);
+  assert.equal(depassementLecon([{ score: 90, bonus, reviser: true }], 'libre'), false);
+  // La Leçon de révision a ses Étoiles, pas de 🚀.
+  assert.equal(depassementLecon([{ score: 40, bonus }], 'revision'), false);
+});
+
+test('Étoiles : aucune pour une Leçon libre', () => {
+  assert.equal(etoilesLecon([{ score: 100, bonus: { reussies: 3, total: 3 } }], '2026-10-01T10:00:00.000Z', 'libre'), null);
+});
+
+test('Étoiles : un historique ancien, sans contexte, donne « quiz » et « defi » d\'après ses scores et sa fin', () => {
+  assert.deepEqual(etoilesLecon([], null, 'revision'), { quiz: false, bonus: false, defi: false });
+  assert.deepEqual(etoilesLecon([{ score: 60, date: '2026-09-01' }, { score: 85, date: '2026-09-02' }], null, 'revision'), { quiz: true, bonus: false, defi: false });
+  assert.deepEqual(etoilesLecon([{ score: 90, date: '2026-09-02' }], '2026-09-03T10:00:00.000Z', 'revision'), { quiz: true, bonus: false, defi: true });
+});
+
+test('Étoiles : « quiz » seulement pour un quiz ordinaire réussi, pas un Défi', () => {
+  assert.equal(etoilesLecon([{ score: 95, defi: true }], null, 'revision').quiz, false);
+  assert.equal(etoilesLecon([{ score: 79 }], null, 'revision').quiz, false);
+  assert.equal(etoilesLecon([{ score: 80 }], null, 'revision').quiz, true);
+});
+
+test('Étoiles : « bonus » dès 2 questions bonus réussies dans un même quiz, même sous 80 %', () => {
+  assert.equal(etoilesLecon([{ score: 40, bonus: { reussies: 2, total: 3 } }], null, 'revision').bonus, true);
+  assert.equal(etoilesLecon([{ score: 40, bonus: { reussies: 2, total: 2 } }], null, 'revision').bonus, true);
+  assert.equal(etoilesLecon([{ score: 90, bonus: { reussies: 1, total: 3 } }, { score: 90, bonus: { reussies: 1, total: 3 } }], null, 'revision').bonus, false);
+  // Acquise pour toujours : un quiz suivant raté ne la retire pas.
+  assert.equal(etoilesLecon([{ score: 40, bonus: { reussies: 2, total: 3 } }, { score: 10 }], null, 'revision').bonus, true);
+});
+
+test('Nouvelles Étoiles : celles gagnées entre avant et après, dans l\'ordre quiz, bonus, defi', () => {
+  const aucune = { quiz: false, bonus: false, defi: false };
+  assert.deepEqual(nouvellesEtoiles(aucune, { quiz: true, bonus: true, defi: false }), ['quiz', 'bonus']);
+  assert.deepEqual(nouvellesEtoiles({ quiz: true, bonus: false, defi: false }, { quiz: true, bonus: false, defi: true }), ['defi']);
+  assert.deepEqual(nouvellesEtoiles(aucune, aucune), []);
+  assert.deepEqual(nouvellesEtoiles(null, null), []);
+});
+
+test('Étoiles gagnées par un Retour de quiz : comparées aux scores déjà comptés par les Retours précédents', () => {
+  const revision = { terminee: null, termineeApres: null, mode: 'revision' };
+  // Son score vient d'être enregistré : il compte.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 85 }], dejaComptes: 0, ...revision }), ['quiz']);
+  // Sans score enregistré pour ce quiz : rien de nouveau, même si un score plus ancien a la même valeur.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 85 }], dejaComptes: 1, ...revision }), []);
+  // Un score plus ancien de même valeur ne masque pas l'Étoile du nouveau.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 85, defi: true }, { score: 85 }], dejaComptes: 1, ...revision }), ['quiz']);
+  // Un score enregistré sans Retour (Retour échoué) est compté au Retour suivant : aucune Étoile manquée.
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 90 }, { score: 40 }], dejaComptes: 0, ...revision }), ['quiz']);
+  // La fin posée par ce Retour donne l'Étoile « defi », une seule fois.
+  assert.deepEqual(etoilesGagnees({ scores: [], dejaComptes: 0, terminee: null, termineeApres: '2026-10-01', mode: 'revision' }), ['defi']);
+  assert.deepEqual(etoilesGagnees({ scores: [], dejaComptes: 0, terminee: '2026-10-01', termineeApres: '2026-10-01', mode: 'revision' }), []);
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 100 }], dejaComptes: 0, terminee: null, termineeApres: null, mode: 'libre' }), []);
+});
+
+test('Rebonds proposés à une date : Réviser s\'ajoute à Étape suivante quand la dernière page date de plus de 7 jours', () => {
+  const messages = [{ role: 'agent', texte: '…', retourQuiz: { score: 50, action: 'suivante' } }];
+  const maintenant = Date.parse('2026-10-15T12:00:00.000Z');
+  assert.deepEqual(rebondsProposes(messages, Date.parse('2026-10-07T11:59:00.000Z'), maintenant), ['suivante', 'reviser']);
+  assert.deepEqual(rebondsProposes(messages, Date.parse('2026-10-08T12:00:00.000Z'), maintenant), ['suivante']); // 7 jours pile
+  assert.deepEqual(rebondsProposes(messages, null, maintenant), ['suivante']); // aucune page
+  // Seulement après une Étape suivante proposée.
+  const revoir = [{ role: 'agent', texte: '…', retourQuiz: { score: 50, action: 'revoir' } }];
+  assert.deepEqual(rebondsProposes(revoir, Date.parse('2026-09-01T00:00:00.000Z'), maintenant), ['revoir']);
 });

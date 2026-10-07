@@ -20,7 +20,7 @@ before(async () => {
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait finir sa réponse par une
-  // ligne ENSUITE (titre de la prochaine page annoncée).
+  // ligne ENSUITE (titre de la prochaine page annoncée) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 if [ "$(basename "$PWD")" = propositions ]; then
@@ -65,7 +65,11 @@ if [ -e '${dossier}/refuser' ]; then
   exit 0
 fi
 mkdir -p lessons
-echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
+if [ -e '${dossier}/objectifs' ]; then
+  echo '{"titre":"Les volcans","categorie":"Sciences","objectifs":["Nommer les parties d’un volcan","Expliquer une éruption","Situer trois volcans"]}' > lesson.json
+else
+  echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
+fi
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
 if [ -e '${dossier}/ensuite' ]; then
   printf '%s\\n' '{"result":"Bravo !\\nENSUITE: Les volcans endormis","session_id":"s-123","is_error":false}'
@@ -428,6 +432,69 @@ test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semain
 
   const liste = await appel('/api/eleves/zoe-test/lecons');
   assert.deepEqual(liste.data.find((l) => l.id === lecon.id).maitrise, { pourcentage: 70, palier: 'à consolider' });
+});
+
+test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre un nouvel Objectif', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  const score = async (s, objectifs) => {
+    const res = await appel(`${url}/scores`, 'POST', { score: s, page: '0001-volcans.html', objectifs });
+    assert.equal(res.status, 201);
+    return res.data;
+  };
+  assert.equal(lecon.niveau, 1);
+  assert.deepEqual(lecon.objectifs, [
+    { texte: 'Nommer les parties d’un volcan', atteint: false },
+    { texte: 'Expliquer une éruption', atteint: false },
+    { texte: 'Situer trois volcans', atteint: false },
+  ]);
+  assert.equal((await resume()).niveau, 1);
+
+  // Quiz raté : rien ne change.
+  assert.equal((await score(60, [1])).niveau, 1);
+  // Quiz réussi couvrant l'Objectif 1 : Niveau 2 ; numéros inexistants ou mal formés ignorés sans erreur.
+  const reussi = await score(85, [1, 9, 0, '2', 1.5]);
+  assert.equal(reussi.niveau, 2);
+  assert.deepEqual(reussi.objectifs.map((o) => o.atteint), [true, false, false]);
+  assert.deepEqual(reussi.scores.at(-1).objectifs, [1]);
+  // Objectif déjà atteint, puis quiz raté : le Niveau ne bouge pas, l'Objectif reste atteint.
+  assert.equal((await score(100, [1])).niveau, 2);
+  assert.equal((await score(20, [1, 2])).niveau, 2);
+  assert.equal((await resume()).niveau, 2);
+  assert.deepEqual((await resume()).objectifs.map((o) => o.atteint), [true, false, false]);
+  // Objectifs absents ou mal formés : le score s'enregistre quand même.
+  assert.equal((await appel(`${url}/scores`, 'POST', { score: 90, objectifs: 'tous' })).status, 201);
+
+  // Le Retour de quiz accepte aussi les numéros.
+  assert.equal((await appel(`${url}/retours`, 'POST', { score: 90, page: '0001-volcans.html', objectifs: [2] })).status, 200);
+});
+
+test('Niveau de Leçon : pas de Niveau sans Objectifs, ni pour une Leçon de révision', async () => {
+  const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les geysers' })).data;
+  assert.equal(libre.niveau, null);
+  assert.deepEqual(libre.objectifs, []);
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const revision = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
+  assert.equal(revision.niveau, null);
+  assert.equal(revision.objectifs.length, 3);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === revision.id).niveau, null);
+});
+
+test('Objectifs : consignes demandées au prof, et à la reprise d\'une Leçon sans Objectifs, demande de les ajouter', async () => {
+  const sans = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les laves' })).data;
+  const args = async (lecon) => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.match(await args(sans), /"objectifs"/);
+  assert.match(await args(sans), /objectifs: \[/);
+  await message(sans, 'ok');
+  assert.match(await args(sans), /n'a pas encore d'Objectifs/);
+
+  const avec = await avecFichier('objectifs', async () => {
+    const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les cratères' })).data;
+    await message(lecon, 'ok');
+    return lecon;
+  });
+  assert.doesNotMatch(await args(avec), /n'a pas encore d'Objectifs/);
 });
 
 // Interroge `lire` toutes les 50 ms (5 s au plus) jusqu'à ce que `ok` accepte la valeur lue.

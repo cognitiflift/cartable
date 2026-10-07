@@ -105,7 +105,7 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          h('span', { className: 'ligne-maitrise' }, badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
+          h('span', { className: 'ligne-maitrise' }, l.niveau && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveau}`), badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
@@ -274,7 +274,7 @@ async function ecranSession(profil, id) {
   // on l'enregistre, puis le prof le commente.
   const recevoirScore = async (ev) => {
     if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-score' || attente) return;
-    const corps = { score: ev.data.score, page: ev.data.page };
+    const { type, ...corps } = ev.data; // score, page, Objectifs couverts… : le serveur valide
     try {
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();

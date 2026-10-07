@@ -177,10 +177,10 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 async function retourQuiz(slug, id, { score, page, bonus }) {
   const valeur = Number(score);
   if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
-  const { mode, defiEnCours, terminee } = await store.lireLecon(slug, id);
+  const { mode, defiEnCours, reviserEnCours, terminee } = await store.lireLecon(slug, id);
   const arrondi = Math.round(valeur);
   const resultatBonus = validerBonus(bonus);
-  const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours), ...(resultatBonus && { bonus: resultatBonus }) };
+  const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours), ...(resultatBonus && { bonus: resultatBonus }) };
   return tourDeParole({
     slug, id,
     prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '', mode }),

@@ -112,6 +112,25 @@ test('Nombre de Propositions : un Élève existant sans ce champ en a 4', async 
   assert.equal((await store.lireEleve('zoe')).nombrePropositions, 4);
 });
 
+test('Modèle : Haiku par défaut, réglable à la création comme à la modification, sans toucher au reste du Profil', async () => {
+  assert.equal((await store.lireEleve('zoe')).modele, 'haiku');
+  assert.equal((await store.creerEleve({ pseudo: 'Léo', age: 9, niveau: 'Primaire 4', modele: 'opus' })).modele, 'opus');
+  const profil = await store.modifierProfil('zoe', { modele: 'sonnet' });
+  assert.deepEqual([profil.modele, profil.age, profil.niveau, profil.nombrePropositions], ['sonnet', 10, 'Primaire 5', 4]);
+  assert.equal((await store.modifierProfil('zoe', { age: 11 })).modele, 'sonnet');
+  for (const invalide of ['fable', 'gpt', '', 42]) {
+    await assert.rejects(store.modifierProfil('zoe', { modele: invalide }), { status: 400, message: /Modèle/ });
+    await assert.rejects(store.creerEleve({ pseudo: 'Max', age: 9, niveau: 'Primaire 4', modele: invalide }), { status: 400 });
+  }
+});
+
+test('Modèle : un Élève existant sans ce champ a Haiku', async () => {
+  const fichier = path.join(dossier, 'zoe', 'profil.json');
+  const { modele, ...ancien } = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  await fs.writeFile(fichier, JSON.stringify(ancien));
+  assert.equal((await store.lireEleve('zoe')).modele, 'haiku');
+});
+
 test('Propositions : lecture coupée au nombre de l\'Élève, marque « au programme » lue en booléen', async () => {
   const propositions = ['A', 'B', 'C', 'D', 'E'].map((titre, i) => ({ titre, categorie: 'Sciences', accroche: '', type: 'original', auProgramme: [true, 'oui', undefined, false, true][i] }));
   await store.ecrirePropositions('zoe', propositions);

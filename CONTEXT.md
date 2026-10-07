@@ -12,7 +12,11 @@ _Avoid_: utilisateur, compte (sauf pour parler de la création d'un Élève)
 Nom choisi par l'Élève pour se reconnaître au démarrage.
 
 **Profil**:
-Âge (libre), **Niveau de scolarité** et nombre de Propositions (2 à 10, 4 par défaut) de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
+Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut) et **Modèle** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
+
+**Modèle**:
+Modèle de langage avec lequel l'agent travaille pour un Élève (Séances comme Propositions), choisi dans une liste fermée ; Haiku par défaut. Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.
+_Avoid_: IA (trop vague : désigne aussi bien l'agent)
 
 **Niveau de scolarité**:
 Classe de l'Élève dans le système scolaire belge francophone, choisie dans une liste fermée (sauf précision contraire de l'Élève).

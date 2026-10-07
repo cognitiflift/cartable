@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -71,6 +71,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
       prompt: premier ? `/mattpocock-skills:teach ${prompt}` : avecScores(prompt, lecon),
       sessionId: lecon.sessionId,
       consignes: consignesLecon(profil),
+      modele: profil.modele,
     });
     const { texte, choix } = extraireChoix(reponse);
     await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon });
@@ -98,6 +99,7 @@ function genererPropositions(slug, anciennes = [], { varier = false } = {}) {
       cwd: await store.preparerPropositionsDir(slug),
       prompt: `Prépare ${profil.nombrePropositions} Propositions de nouvelles Leçons pour cet élève.`,
       consignes: consignesPropositions(profil, lecons, dejaProposes),
+      modele: profil.modele,
       teach: false,
     });
   })()
@@ -205,7 +207,7 @@ async function nouvelleDepuisProposition(slug, titre) {
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
-  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT });
+  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
   if (!slug) {

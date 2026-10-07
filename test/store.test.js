@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore } from '../lib/store.js';
+import { createStore, depassementReussi } from '../lib/store.js';
 
 let dossier, store;
 
@@ -128,4 +128,13 @@ test('Historique des Propositions : vide au départ, les titres de chaque lot s\
   await store.ajouterHistoriquePropositions('zoe', ['T9', 'T10', 'T11', 'T12']);
   assert.deepEqual(await store.lireHistoriquePropositions('zoe'), ['T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']);
   await assert.rejects(store.lireHistoriquePropositions('personne'), { status: 404 });
+});
+
+test('Dépassement réussi : au moins 2 questions bonus réussies, quel que soit le total', () => {
+  assert.equal(depassementReussi({ reussies: 2, total: 3 }), true);
+  assert.equal(depassementReussi({ reussies: 3, total: 3 }), true);
+  assert.equal(depassementReussi({ reussies: 2, total: 2 }), true);
+  assert.equal(depassementReussi({ reussies: 1, total: 3 }), false);
+  assert.equal(depassementReussi({ reussies: 1, total: 1 }), false);
+  assert.equal(depassementReussi(undefined), false);
 });

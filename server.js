@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, validerBonus } from './lib/store.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -153,7 +153,7 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
     `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle} (organise la révision espacée jusqu'à cette date)` : ''}.`,
-    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (n'ajoute pas de notions hors programme) avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
+    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document) avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
   ].join('\n');
   const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
   return tourDeParole({ slug, id: lecon.id, prompt, affiche, premier: true });
@@ -162,12 +162,14 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 // Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
 // Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision (date de fin posée une
 // seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz.
-async function retourQuiz(slug, id, { score, page }) {
+// Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le prof peut seulement le commenter.
+async function retourQuiz(slug, id, { score, page, bonus }) {
   const valeur = Number(score);
   if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
   const { mode, defiEnCours, terminee } = await store.lireLecon(slug, id);
   const arrondi = Math.round(valeur);
-  const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours) };
+  const resultatBonus = validerBonus(bonus);
+  const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours), ...(resultatBonus && { bonus: resultatBonus }) };
   return tourDeParole({
     slug, id,
     prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '' }),

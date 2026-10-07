@@ -105,7 +105,8 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          h('span', { className: 'ligne-maitrise' }, badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
+          h('span', { className: 'ligne-maitrise' }, badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆'),
+            l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
 }
@@ -271,7 +272,7 @@ async function ecranSession(profil, id) {
   // on l'enregistre, puis le prof le commente.
   const recevoirScore = async (ev) => {
     if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-score' || attente) return;
-    const corps = { score: ev.data.score, page: ev.data.page };
+    const corps = { score: ev.data.score, page: ev.data.page, bonus: ev.data.bonus };
     try {
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();

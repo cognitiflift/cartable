@@ -40,6 +40,7 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 .maitrise.rouge { color:#d64545; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
 p .maitrise { display:inline-flex; }
 .ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
+.niveau { font-size:.85rem; font-weight:600; white-space:nowrap; }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }

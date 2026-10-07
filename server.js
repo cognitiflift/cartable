@@ -50,12 +50,19 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
-// À la reprise, l'agent reçoit les scores récents pour cibler les erreurs (l'élève ne voit pas cet ajout).
-function avecScores(prompt, lecon) {
-  if (!lecon.scores.length) return prompt;
-  const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
-  const m = lecon.maitrise;
-  return `[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]\n\n${prompt}`;
+// À la reprise, l'agent reçoit les scores récents pour cibler les erreurs (l'élève ne voit pas cet ajout),
+// et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs.
+function preambule(prompt, lecon) {
+  const lignes = [];
+  if (lecon.scores.length) {
+    const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
+    const m = lecon.maitrise;
+    lignes.push(`[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]`);
+  }
+  if (!lecon.objectifs.length) {
+    lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
+  }
+  return lignes.length ? `${lignes.join('\n')}\n\n${prompt}` : prompt;
 }
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
@@ -68,7 +75,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
     const lecon = await store.lireLecon(slug, id);
     const { reponse, sessionId } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : avecScores(prompt, lecon),
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : preambule(prompt, lecon),
       sessionId: lecon.sessionId,
       consignes: consignesLecon(profil),
     });

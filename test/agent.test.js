@@ -49,6 +49,16 @@ test('Retour de quiz : un Défi réussi en révision termine la Leçon, sinon m�
   assert.equal(actionRetourQuiz(50, 'libre', true), 'suivante');
 });
 
+test('Retour de quiz en phase Réviser d\'une Leçon libre : règles d\'une révision, puis Étape suivante après le Défi réussi', () => {
+  assert.equal(actionRetourQuiz(79, 'libre', false, true), 'revoir');
+  assert.equal(actionRetourQuiz(80, 'libre', false, true), 'defi');
+  assert.equal(actionRetourQuiz(60, 'libre', true, true), 'revoir'); // Défi raté
+  assert.equal(actionRetourQuiz(80, 'libre', true, true), 'suivante'); // Défi réussi : fin de la phase
+  // Leçon de révision : la phase Réviser ne change rien, un Défi réussi la termine toujours.
+  assert.equal(actionRetourQuiz(90, 'revision', true, true), 'terminee');
+  assert.equal(actionRetourQuiz(50, 'revision', false, true), 'revoir');
+});
+
 test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est terminée', () => {
   const retour = promptRetourQuiz({ score: 90, page: 'defi.html', action: 'terminee' });
   assert.match(retour, /Leçon est terminée/);
@@ -68,6 +78,15 @@ test('consigne d\'Étape suivante : rappelle au prof le titre annoncé, s\'il es
   assert.match(consigne, /« Les volcans endormis »/);
   assert.equal(consigneRebond('suivante', { ensuite: null }), REBONDS.suivante.consigne);
   assert.equal(consigneRebond('revoir', { ensuite: 'Les volcans endormis' }), REBONDS.revoir.consigne);
+});
+
+test('consigne de Réviser en Leçon libre : une page de révision des pages déjà vues, avec son quiz', () => {
+  const consigne = consigneRebond('reviser', { mode: 'libre' });
+  assert.match(consigne, /Rebond : Réviser/);
+  assert.match(consigne, /page de révision des pages déjà vues/);
+  assert.match(consigne, /mini-quiz/);
+  assert.doesNotMatch(consigne, /Document source/);
+  assert.equal(consigneRebond('reviser', { mode: 'revision' }), REBONDS.reviser.consigne);
 });
 
 test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {

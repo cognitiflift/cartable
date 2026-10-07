@@ -44,3 +44,12 @@ test('Niveau de Leçon : null sans Objectifs ou pour une Leçon de révision', (
   assert.equal(niveauLecon([], 'libre'), null);
   assert.equal(niveauLecon(objectifsAtteints(objectifs, []), 'revision'), null);
 });
+
+test('Objectifs atteints : en Leçon libre, un quiz fait en Révisant n’atteint rien et ne change pas le Niveau', () => {
+  const revise = { ...score(100, [2, 3]), reviser: true };
+  const libre = objectifsAtteints(objectifs, [score(85, [1]), revise], 'libre');
+  assert.deepEqual(libre.map((o) => o.atteint), [true, false, false]);
+  assert.equal(niveauLecon(libre, 'libre'), 2);
+  // Leçon de révision : la phase Réviser compte comme une révision ordinaire.
+  assert.deepEqual(objectifsAtteints(objectifs, [revise], 'revision').map((o) => o.atteint), [false, true, true]);
+});

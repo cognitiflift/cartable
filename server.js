@@ -177,10 +177,10 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 async function retourQuiz(slug, id, { score, page, bonus }) {
   const valeur = Number(score);
   if (score === null || score === '' || !Number.isFinite(valeur) || valeur < 0 || valeur > 100) throw new HttpError(400, 'Score invalide (0 à 100)');
-  const { mode, defiEnCours, terminee, scores } = await store.lireLecon(slug, id);
+  const { mode, defiEnCours, reviserEnCours, terminee, scores } = await store.lireLecon(slug, id);
   const arrondi = Math.round(valeur);
   const resultatBonus = validerBonus(bonus);
-  const action = actionRetourQuiz(arrondi, mode, defiEnCours);
+  const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
   const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
   // Nouvelles Étoiles : avant ce quiz (sans son score, déjà enregistré par /scores) et après (avec la fin éventuelle).
   const avant = scores.at(-1)?.score === arrondi ? scores.slice(0, -1) : scores;

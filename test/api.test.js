@@ -374,6 +374,51 @@ test('Leçon terminée : un Défi réussi termine la Leçon de révision, un Dé
   assert.deepEqual(reussiApres.rebondsProposes, ['reviser']);
 });
 
+test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape suivante, révision sans rien rapporter, puis Étape suivante', () =>
+  avecFichier('objectifs', async () => {
+    const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les sources chaudes' })).data;
+    const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+    const page = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'lessons', '0001-volcans.html');
+    const rebond = (action) => appel(`${url}/rebonds`, 'POST', { action });
+    const quiz = async (score, objectifs) => {
+      await appel(`${url}/scores`, 'POST', { score, page: '0001-volcans.html', objectifs });
+      return (await appel(`${url}/retours`, 'POST', { score, page: '0001-volcans.html' })).data;
+    };
+
+    // Dernière page récente : seulement Étape suivante.
+    assert.deepEqual((await quiz(85, [1])).rebondsProposes, ['suivante']);
+    assert.equal((await rebond('reviser')).status, 400);
+    // La page la plus récente vieillit de 8 jours : Réviser s'ajoute.
+    const ilYa8Jours = new Date(Date.now() - 8 * 86_400_000);
+    await fs.utimes(page, ilYa8Jours, ilYa8Jours);
+    assert.deepEqual((await appel(url)).data.rebondsProposes, ['suivante', 'reviser']);
+
+    const reviser = await rebond('reviser');
+    assert.equal(reviser.status, 200);
+    assert.equal(reviser.data.reviserEnCours, true);
+    assert.equal(reviser.data.messages.at(-2).texte, '📚 Je veux réviser.');
+    const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+    assert.match(args, /Rebond : Réviser/);
+    assert.match(args, /page de révision des pages déjà vues/);
+
+    // Règles d'une révision : raté → Revoir, réussi → Défi, Défi réussi → Étape suivante et fin de la phase.
+    assert.deepEqual((await quiz(50, [2])).rebondsProposes, ['revoir']);
+    assert.equal((await rebond('revoir')).status, 200);
+    assert.deepEqual((await quiz(90, [2])).rebondsProposes, ['defi']);
+    assert.equal((await rebond('defi')).status, 200);
+    const fin = await quiz(95, [2, 3]);
+    assert.deepEqual(fin.messages.at(-1).retourQuiz, { score: 95, action: 'suivante' });
+    assert.deepEqual(fin.rebondsProposes, ['suivante']);
+    assert.equal(fin.reviserEnCours, false);
+    assert.equal(fin.terminee, null);
+
+    // Scores de la révision marqués : ils comptent dans la Maîtrise, n'atteignent aucun Objectif, Niveau inchangé.
+    assert.deepEqual(fin.scores.map((s) => s.reviser), [undefined, true, true, true]);
+    assert.deepEqual(fin.objectifs.map((o) => o.atteint), [true, false, false]);
+    assert.equal(fin.niveau, 2);
+    assert.equal(fin.maitrise.pourcentage, 78); // (50 + 90 + 95) / 3
+  }));
+
 test('Réviser en cours : les scores faits en Révisant sont marqués, jusqu\'au Défi réussi', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;

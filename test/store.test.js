@@ -185,3 +185,14 @@ test('Nouvelles Étoiles : celles gagnées entre avant et après, dans l\'ordre 
   assert.deepEqual(nouvellesEtoiles(aucune, aucune), []);
   assert.deepEqual(nouvellesEtoiles(null, null), []);
 });
+
+test('Rebonds proposés à une date : Réviser s\'ajoute à Étape suivante quand la dernière page date de plus de 7 jours', () => {
+  const messages = [{ role: 'agent', texte: '…', retourQuiz: { score: 50, action: 'suivante' } }];
+  const maintenant = Date.parse('2026-10-15T12:00:00.000Z');
+  assert.deepEqual(rebondsProposes(messages, Date.parse('2026-10-07T11:59:00.000Z'), maintenant), ['suivante', 'reviser']);
+  assert.deepEqual(rebondsProposes(messages, Date.parse('2026-10-08T12:00:00.000Z'), maintenant), ['suivante']); // 7 jours pile
+  assert.deepEqual(rebondsProposes(messages, null, maintenant), ['suivante']); // aucune page
+  // Seulement après une Étape suivante proposée.
+  const revoir = [{ role: 'agent', texte: '…', retourQuiz: { score: 50, action: 'revoir' } }];
+  assert.deepEqual(rebondsProposes(revoir, Date.parse('2026-09-01T00:00:00.000Z'), maintenant), ['revoir']);
+});

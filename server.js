@@ -2,8 +2,8 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, QUIZ_REUSSI, promptRetourQuiz, promptDemarrageLibre, REBONDS } from './lib/agent.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, QUIZ_REUSSI } from './lib/store.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -50,16 +50,24 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
-// À la reprise, l'agent reçoit les scores récents pour cibler les erreurs (l'élève ne voit pas cet ajout).
-function avecScores(prompt, lecon) {
-  if (!lecon.scores.length) return prompt;
-  const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
-  const m = lecon.maitrise;
-  return `[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]\n\n${prompt}`;
+// À la reprise, l'agent reçoit les scores récents pour cibler les erreurs (l'élève ne voit pas cet ajout),
+// et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs.
+function preambule(prompt, lecon) {
+  const lignes = [];
+  if (lecon.scores.length) {
+    const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
+    const m = lecon.maitrise;
+    lignes.push(`[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]`);
+  }
+  if (!lecon.objectifs.length) {
+    lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
+  }
+  return lignes.length ? `${lignes.join('\n')}\n\n${prompt}` : prompt;
 }
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
 // La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
+// Un Retour de quiz garde en plus le titre annoncé par sa ligne ENSUITE (retirée du texte).
 async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details, etatLecon }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
@@ -68,11 +76,13 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
     const lecon = await store.lireLecon(slug, id);
     const { reponse, sessionId } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : avecScores(prompt, lecon),
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : preambule(prompt, lecon),
       sessionId: lecon.sessionId,
       consignes: consignesLecon(profil),
     });
-    const { texte, choix } = extraireChoix(reponse);
+    const annonce = details?.retourQuiz ? extraireEnsuite(reponse) : { texte: reponse };
+    const { texte, choix } = extraireChoix(annonce.texte);
+    if (annonce.ensuite) details = { ...details, retourQuiz: { ...details.retourQuiz, ensuite: annonce.ensuite } };
     await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
@@ -171,7 +181,7 @@ async function retourQuiz(slug, id, { score, page }) {
   const retour = { score: arrondi, action: actionRetourQuiz(arrondi, mode, defiEnCours) };
   return tourDeParole({
     slug, id,
-    prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '' }),
+    prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '', mode }),
     affiche: `📝 Quiz terminé : ${retour.score} %`,
     premier: false,
     details: { retourQuiz: retour },
@@ -190,9 +200,9 @@ const ETAT_APRES_REBOND = { defi: { defiEnCours: true }, reviser: { reviserEnCou
 
 async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
-  if (!(await store.lireLecon(slug, id)).rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
-  const { consigne, phrase } = REBONDS[action];
-  return tourDeParole({ slug, id, prompt: consigne, affiche: phrase, premier: false, etatLecon: ETAT_APRES_REBOND[action] });
+  const lecon = await store.lireLecon(slug, id);
+  if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
+  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, etatLecon: ETAT_APRES_REBOND[action] });
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.

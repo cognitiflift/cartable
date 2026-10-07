@@ -105,7 +105,8 @@ async function ecranAccueil(profil) {
       h('h2', {}, c),
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          h('span', { className: 'ligne-maitrise' }, badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
+          h('span', { className: 'ligne-maitrise' }, l.niveau && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveau}`), badgeMaitrise(l.maitrise), l.terminee && h('span', { title: 'Leçon terminée' }, '🏆')),
+          h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
 }
@@ -193,7 +194,9 @@ function ecranNouvelleLecon(profil) {
 }
 
 // Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
-const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Prêt pour la suite ?', reviser: '📚 Réviser' };
+// L'Étape suivante montre le titre de la page annoncée par le prof, s'il est connu.
+const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Étape suivante', reviser: '📚 Réviser' };
+const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `${LIBELLES_REBOND.suivante} : ${ensuite}` : LIBELLES_REBOND[action]);
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
@@ -230,15 +233,15 @@ async function ecranSession(profil, id) {
     if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
-      const { action, score } = prof.retourQuiz;
+      const { action, score, ensuite } = prof.retourQuiz;
       contenu = h('div', { className: 'apres-quiz' },
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`)),
-             ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, LIBELLES_REBOND[r]))]
-          : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, LIBELLES_REBOND[r], h('small', {}, `Quiz : ${score} %`))));
+             ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]
+          : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
       const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];
@@ -271,7 +274,7 @@ async function ecranSession(profil, id) {
   // on l'enregistre, puis le prof le commente.
   const recevoirScore = async (ev) => {
     if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-score' || attente) return;
-    const corps = { score: ev.data.score, page: ev.data.page };
+    const { type, ...corps } = ev.data; // score, page, Objectifs couverts… : le serveur valide
     try {
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();

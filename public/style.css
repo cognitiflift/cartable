@@ -40,8 +40,10 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 .maitrise.rouge { color:#d64545; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
 p .maitrise { display:inline-flex; }
 .ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
+.niveau { font-size:.85rem; font-weight:600; white-space:nowrap; }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }
 .carte.suite { border-left:4px solid var(--accent); } .carte.suite .type { color:var(--accent); }
 .carte .au-programme { display:block; width:fit-content; font-size:.75rem; font-weight:600; padding:.1rem .5rem; margin-bottom:.4rem; border-radius:999px; background:var(--accent); color:#fff; }
+.carte .continuer { display:block; font-size:.9rem; margin-top:.3rem; color:var(--accent); font-weight:600; }

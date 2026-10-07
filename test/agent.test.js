@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, REBONDS } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from '../lib/agent.js';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -15,6 +15,19 @@ test('Réponses proposées : aucune sans ligne CHOIX, 4 au plus, casse et ** tol
   assert.deepEqual(extraireChoix('Ta page est prête.'), { texte: 'Ta page est prête.' });
   assert.deepEqual(extraireChoix('Alors ?\n**Choix :** a | b | c | d | e | |').choix, ['a', 'b', 'c', 'd']);
   assert.deepEqual(extraireChoix('CHOIX:'), { texte: '' });
+});
+
+test('Annonce de la suite : la ligne ENSUITE est retirée du texte et donne le titre', () => {
+  assert.deepEqual(extraireEnsuite('Bravo !\nTu as tout compris.\nENSUITE:  Les volcans endormis '), {
+    texte: 'Bravo !\nTu as tout compris.',
+    ensuite: 'Les volcans endormis',
+  });
+});
+
+test('Annonce de la suite : rien sans ligne ENSUITE, casse et ** tolérés, titre vide ignoré', () => {
+  assert.deepEqual(extraireEnsuite('Bravo !'), { texte: 'Bravo !' });
+  assert.deepEqual(extraireEnsuite('Bravo !\n**Ensuite :** Les laves'), { texte: 'Bravo !', ensuite: 'Les laves' });
+  assert.deepEqual(extraireEnsuite('Bravo !\nENSUITE:'), { texte: 'Bravo !' });
 });
 
 test('action après un quiz : en révision Revoir sous 80 %, sinon Défi ; en Leçon libre toujours Étape suivante', () => {
@@ -41,6 +54,19 @@ test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est termin
   assert.match(retour, /Leçon est terminée/);
   assert.match(retour, /nouveau défi/);
   assert.doesNotMatch(retour, /undefined/);
+});
+
+test('Retour de quiz en Leçon libre : le prof finit par une ligne ENSUITE, pas en révision', () => {
+  assert.match(promptRetourQuiz({ score: 40, page: 'p.html', action: 'revoir', mode: 'libre' }), /ENSUITE: <titre court>/);
+  assert.doesNotMatch(promptRetourQuiz({ score: 85, page: 'p.html', action: 'defi', mode: 'revision' }), /ENSUITE/);
+});
+
+test('consigne d\'Étape suivante : rappelle au prof le titre annoncé, s\'il est connu', () => {
+  const consigne = consigneRebond('suivante', { ensuite: 'Les volcans endormis' });
+  assert.match(consigne, /Rebond : Étape suivante/);
+  assert.match(consigne, /« Les volcans endormis »/);
+  assert.equal(consigneRebond('suivante', { ensuite: null }), REBONDS.suivante.consigne);
+  assert.equal(consigneRebond('revoir', { ensuite: 'Les volcans endormis' }), REBONDS.revoir.consigne);
 });
 
 test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {

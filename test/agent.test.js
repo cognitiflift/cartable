@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT } from '../lib/agent.js';
 import path from 'node:path';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
@@ -16,19 +16,6 @@ test('Réponses proposées : aucune sans ligne CHOIX, 4 au plus, casse et ** tol
   assert.deepEqual(extraireChoix('Ta page est prête.'), { texte: 'Ta page est prête.' });
   assert.deepEqual(extraireChoix('Alors ?\n**Choix :** a | b | c | d | e | |').choix, ['a', 'b', 'c', 'd']);
   assert.deepEqual(extraireChoix('CHOIX:'), { texte: '' });
-});
-
-test('Annonce de la suite : la ligne ENSUITE est retirée du texte et donne le titre', () => {
-  assert.deepEqual(extraireEnsuite('Bravo !\nTu as tout compris.\nENSUITE:  Les volcans endormis '), {
-    texte: 'Bravo !\nTu as tout compris.',
-    ensuite: 'Les volcans endormis',
-  });
-});
-
-test('Annonce de la suite : rien sans ligne ENSUITE, casse et ** tolérés, titre vide ignoré', () => {
-  assert.deepEqual(extraireEnsuite('Bravo !'), { texte: 'Bravo !' });
-  assert.deepEqual(extraireEnsuite('Bravo !\n**Ensuite :** Les laves'), { texte: 'Bravo !', ensuite: 'Les laves' });
-  assert.deepEqual(extraireEnsuite('Bravo !\nENSUITE:'), { texte: 'Bravo !' });
 });
 
 test('action après un quiz : en révision Revoir sous 80 %, sinon Défi ; en Leçon libre toujours Étape suivante', () => {
@@ -58,19 +45,6 @@ test('Retour de quiz en phase Réviser d\'une Leçon libre : règles d\'une rév
   // Leçon de révision : la phase Réviser ne change rien, un Défi réussi la termine toujours.
   assert.equal(actionRetourQuiz(90, 'revision', true, true), 'terminee');
   assert.equal(actionRetourQuiz(50, 'revision', false, true), 'revoir');
-});
-
-test('Retour de quiz d\'un Défi réussi : le prof sait que la Leçon est terminée', () => {
-  const retour = promptRetourQuiz({ score: 90, page: 'defi.html', action: 'terminee' });
-  assert.match(retour, /Leçon est terminée/);
-  assert.match(retour, /réviser/);
-  assert.doesNotMatch(retour, /nouveau défi/i);
-  assert.doesNotMatch(retour, /undefined/);
-});
-
-test('Retour de quiz en Leçon libre : le prof finit par une ligne ENSUITE, pas en révision', () => {
-  assert.match(promptRetourQuiz({ score: 40, page: 'p.html', action: 'revoir', mode: 'libre' }), /ENSUITE: <titre court>/);
-  assert.doesNotMatch(promptRetourQuiz({ score: 85, page: 'p.html', action: 'defi', mode: 'revision' }), /ENSUITE/);
 });
 
 test('consigne d\'Étape suivante : rappelle au prof le titre annoncé, s\'il est connu', () => {
@@ -114,12 +88,13 @@ test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par act
   }
 });
 
-test('ni les consignes de Leçon ni le retour de quiz ne parlent de « Leçon suivante »', () => {
+test('les consignes de Leçon ne parlent pas de « Leçon suivante »', () => {
   assert.doesNotMatch(consignesLecon(profil), /leçon suivante/i);
   assert.match(consignesLecon(profil), /Étape suivante/);
-  const retour = promptRetourQuiz({ score: 90, page: 'p.html', action: 'suivante' });
-  assert.doesNotMatch(retour, /leçon suivante/i);
-  assert.match(retour, /étape suivante/);
+});
+
+test('consignes de Leçon : en Leçon libre, le prof écrit dans lesson.json le titre de la page qu\'il prévoit ensuite', () => {
+  assert.match(consignesLecon(profil), /En Leçon libre, chaque fois que tu crées une page de leçon, mets aussi à jour dans lesson.json le champ "ensuite"/);
 });
 
 test('consignes de Leçon : toute nouvelle page utilise le Kit, documenté, sans quiz ni style de base réécrits', () => {
@@ -244,4 +219,55 @@ test('Préambule de relais : sans scores ni Objectifs, il demande de fixer les O
   assert.doesNotMatch(texte, /Scores aux quiz|dernier quiz|annoncé/);
   assert.match(texte, /n'a pas encore d'Objectifs/);
   assert.match(texte, /« Veux-tu aller plus loin \? » \(réponses proposées : Oui \| Non\)/);
+});
+
+// Leçon dont le dernier quiz a des résultats par question (Kit) : une question ratée, une juste, une bonus ratée.
+const leconAvecResultats = (mode = 'revision') => ({
+  mode,
+  scores: [
+    { score: 30, page: '0001-volcans.html', date: '2026-10-01T10:00:00.000Z' },
+    {
+      score: 50, page: '0002-eruptions.html', date: '2026-10-02T10:00:00.000Z', bonus: { reussies: 0, total: 1 },
+      questions: [
+        { id: 'q1', enonce: 'Qu’est-ce que le magma ?', choisie: 'De la lave refroidie', bonne: 'De la roche fondue sous terre', juste: false, bonus: false, objectifs: [1] },
+        { id: 'q2', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false, objectifs: [1] },
+        { id: 'b1', enonce: 'Qu’est-ce qu’un geyser ?', choisie: 'Un volcan', bonne: 'Une source qui jaillit', juste: false, bonus: true, objectifs: [] },
+      ],
+    },
+  ],
+});
+
+test('consigne de Rebond : chaque Rebond transmet les questions ratées du dernier quiz et les réponses choisies, et demande un encart en tête de page', () => {
+  for (const action of ['revoir', 'defi', 'suivante', 'reviser']) {
+    const consigne = consigneRebond(action, leconAvecResultats(action === 'suivante' ? 'libre' : 'revision'));
+    assert.match(consigne, /Résultats du dernier quiz : 0002-eruptions\.html, 50 %/, action);
+    assert.match(consigne, /« Qu’est-ce que le magma \? » : il a choisi « De la lave refroidie », la bonne réponse était « De la roche fondue sous terre »/, action);
+    assert.match(consigne, /« Qu’est-ce qu’un geyser \? » \(bonus 🚀\) : il a choisi « Un volcan »/, action);
+    assert.doesNotMatch(consigne, /Où sort la lave/, action); // les questions justes ne sont que comptées
+    assert.match(consigne, /1 question juste sur 2/, action);
+    assert.match(consigne, /Commence la page par un court encart/, action);
+  }
+  // Revoir reprend nommément les questions ratées.
+  assert.match(consigneRebond('revoir', leconAvecResultats()), /reprends nommément chacune des questions ratées/);
+  assert.doesNotMatch(consigneRebond('defi', leconAvecResultats()), /nommément/);
+});
+
+test('consigne de Rebond : sans résultats par question (anciennes Leçons), le score seul ; sans quiz, rien de plus', () => {
+  const ancienne = { mode: 'revision', scores: [{ score: 40, page: 'p.html', date: '2026-10-01T10:00:00.000Z' }] };
+  const consigne = consigneRebond('revoir', ancienne);
+  assert.match(consigne, /Résultats du dernier quiz : p\.html, 40 %/);
+  assert.doesNotMatch(consigne, /court encart|il a choisi/);
+  assert.equal(consigneRebond('defi', { mode: 'revision', scores: [] }), REBONDS.defi.consigne);
+  // Tout juste : pas d'encart sur ce qui a été raté.
+  const parfait = { mode: 'revision', scores: [{ score: 100, page: 'p.html', date: '2026-10-01T10:00:00.000Z', questions: [{ id: 'q1', enonce: 'A ?', choisie: 'a', bonne: 'a', juste: true, bonus: false, objectifs: [] }] }] };
+  assert.match(consigneRebond('defi', parfait), /Toutes ses réponses étaient justes/);
+  assert.doesNotMatch(consigneRebond('defi', parfait), /court encart/);
+});
+
+test('Préambule de relais : les résultats par question du dernier quiz y figurent, sauf quand la consigne les porte déjà', () => {
+  const lecon = { ...leconAvecResultats(), objectifs: [], maitrise: null, ensuite: null, pages: [], messages: [] };
+  assert.match(preambuleRelais(lecon), /« Qu’est-ce que le magma \? » : il a choisi « De la lave refroidie »/);
+  const sans = preambuleRelais(lecon, { resultatsQuiz: false });
+  assert.match(sans, /Scores aux quiz/);
+  assert.doesNotMatch(sans, /Résultats du dernier quiz|magma/);
 });

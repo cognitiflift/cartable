@@ -1006,7 +1006,7 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
   assert.match(consignes, /Primaire 6/);
 });
 
-test('Modèle : la config liste Haiku, Sonnet et Opus ; chaque appel à l\'agent passe le Modèle de l\'Élève, même une session reprise', async () => {
+test('Modèle : la config liste Haiku, Sonnet et Opus ; chaque appel à l\'agent passe le Modèle de l\'Élève', async () => {
   const { data: config } = await appel('/api/config');
   assert.equal(config.modeleDefaut, 'haiku');
   assert.deepEqual(config.modeles.map((m) => m.id), ['haiku', 'sonnet', 'opus']);
@@ -1022,11 +1022,10 @@ test('Modèle : la config liste Haiku, Sonnet et Opus ; chaque appel à l\'agent
   const args = () => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
   assert.match(await args(), /--model\nopus\n/);
 
-  // Changer de Modèle vaut dès l'appel suivant, dans la même session.
+  // Changer de Modèle vaut dès l'appel suivant (une session neuve depuis la première page).
   assert.equal((await appel('/api/eleves/mod-test', 'PUT', { modele: 'sonnet' })).data.modele, 'sonnet');
   assert.equal((await appel(`/api/eleves/mod-test/lecons/${lecon.id}/messages`, 'POST', { texte: 'ok' })).status, 200);
   assert.match(await args(), /--model\nsonnet\n/);
-  assert.match(await args(), /--resume\ns-123/);
   await attendrePropositions('mod-test');
 });
 
@@ -1206,4 +1205,40 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.equal(data.total.tours, 6 + propositions.tours);
 
   assert.equal((await appel('/api/eleves/inconnu/couts')).status, 404);
+});
+
+test('Session neuve : la première Séance reprend sa session ; après la première page, chaque tour repart sans --resume, avec le préambule de relais', async () => {
+  const args = async (lecon) => (await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8')).split('\n');
+  // Première Séance sans page encore (le prof cadre le sujet) : la session est reprise.
+  const lecon = await avecFichier('refuser', async () => {
+    const cree = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'un sujet flou' })).data;
+    await message(cree, 'Les volcans');
+    return cree;
+  });
+  let recus = await args(lecon);
+  assert.equal(recus[recus.indexOf('--resume') + 1], 's-123');
+  assert.ok(!recus.join('\n').includes('Passage de relais'));
+
+  // La première page existe : le tour suivant démarre une session neuve, avec le skill teach et le préambule.
+  await message(lecon, 'Les volcans');
+  await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: 60, page: '0001-volcans.html' });
+  for (const tour of [
+    () => message(lecon, 'ok'),
+    () => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 60, page: '0001-volcans.html' }),
+    () => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/rebonds`, 'POST', { action: 'suivante' }),
+  ]) {
+    assert.equal((await tour()).status, 200);
+    recus = await args(lecon);
+    assert.ok(!recus.includes('--resume'));
+    assert.equal(recus[recus.indexOf('-p') + 1], '/mattpocock-skills:teach [Passage de relais de l\'appli : tu reprends cette Leçon dans une session neuve, sans souvenir des tours précédents. Avant d\'agir, relis MISSION.md, les learning records (learning-records/), NOTES.md et lesson.json du dossier courant, et au besoin les pages déjà créées.]');
+    assert.match(recus.join('\n'), /Résultats du dernier quiz : 0001-volcans\.html, 60 %/);
+  }
+});
+
+test('Prompt système allégé : sections dynamiques exclues, réglages utilisateur seulement, aucun serveur MCP', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les geysers' })).data;
+  const recus = (await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8')).split('\n');
+  assert.ok(recus.includes('--exclude-dynamic-system-prompt-sections'));
+  assert.ok(recus.includes('--strict-mcp-config'));
+  assert.equal(recus[recus.indexOf('--setting-sources') + 1], 'user');
 });

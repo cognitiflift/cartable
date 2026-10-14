@@ -15,7 +15,7 @@ Nom choisi par l'Élève pour se reconnaître au démarrage.
 Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut) et **Modèle** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
 
 **Modèle**:
-Modèle de langage avec lequel l'agent écrit les Pages de leçon d'un Élève, choisi dans une liste fermée ; Sonnet par défaut pour un nouveau Profil (un Profil existant garde le sien). Les Propositions utilisent toujours Haiku, et un **Modèle de secours** prend le relais quand le Modèle choisi n'est pas disponible. Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.
+Modèle de langage avec lequel l'agent écrit les Pages de leçon d'un Élève, choisi dans une liste fermée ; Sonnet par défaut pour un nouveau Profil (un Profil existant garde le sien). Les Propositions utilisent toujours Haiku, et un **Modèle de secours** le remplace quand il est surchargé ou indisponible (pas quand le quota est épuisé). Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.
 _Avoid_: IA (trop vague : désigne aussi bien l'agent)
 
 **Niveau de scolarité**:
@@ -99,3 +99,13 @@ Retravailler une Leçon comme une Leçon de révision (Revoir ou Défi selon le 
 
 **Type de tâche**:
 Ce que l'appli demande à l'agent à un tour donné, dans une liste fermée : **première Séance** (les tours d'une Leçon qui n'a pas encore de Page de leçon), **page** (une Séance suivante ; le Retour de quiz, composé par l'appli, n'est pas un tour de l'agent), **Rebond** (Étape suivante, Revoir, Défi, Réviser) et **Propositions**. Le Coût d'un tour et le Modèle en dépendent.
+
+**Relais**:
+Fonctionnement des tours de l'agent dans une Leçon qui a déjà sa première Page de leçon : chacun démarre une **session neuve** et reçoit le **préambule de relais**, au lieu de reprendre la conversation précédente. Il allège le Coût d'un tour ; la première Séance, elle, reprend toujours sa session.
+_Avoid_: reprise (c'est justement ce que le relais évite)
+
+**Session neuve**:
+Appel à l'agent qui ne reprend pas la conversation des tours précédents : l'agent n'en garde aucun souvenir et repart des fichiers de la Leçon (mission, traces d'apprentissage, notes, pages) et du préambule de relais.
+
+**Préambule de relais**:
+Texte que l'appli ajoute en tête de chaque tour en session neuve, invisible pour l'Élève : ce que l'appli sait de la Leçon (pages déjà créées, Objectifs atteints ou non, scores récents et Maîtrise, résultats du dernier quiz avec la demande d'un court encart sur ce qui a été raté, page annoncée pour la suite, question en attente). Les résultats du dernier quiz n'y figurent pas quand la consigne du Rebond les porte déjà.

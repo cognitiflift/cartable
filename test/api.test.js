@@ -21,14 +21,23 @@ before(async () => {
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait finir sa réponse par une
   // ligne ENSUITE (titre de la prochaine page annoncée) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
+  // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
+  // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
+USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
+if [ "$(basename "$PWD")" = propositions ]; then
+  COUT=',"total_cost_usd":0.0625,'"$USAGE"',"modelUsage":{"claude-haiku-test":{"costUSD":0.0625}}'
+else
+  COUT=',"total_cost_usd":0.25,'"$USAGE"',"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}'
+fi
+[ -e '${dossier}/sans-cout' ] && COUT=''
 if [ "$(basename "$PWD")" = propositions ]; then
   echo lancement >> '${dossier}/lancements-propositions'
   printf '%s\n' "$@" > '${dossier}/args-propositions'
   while [ -e '${dossier}/attendre' ]; do sleep 0.05; done
   if [ -e '${dossier}/inchange' ]; then
-    echo '{"result":"ok","session_id":"s-prop","is_error":false}'
+    echo '{"result":"ok","session_id":"s-prop","is_error":false'"$COUT"'}'
     exit 0
   fi
   if [ -e '${dossier}/ecrire-puis-echouer' ]; then
@@ -42,7 +51,7 @@ if [ "$(basename "$PWD")" = propositions ]; then
   fi
   if [ -e '${dossier}/autres' ]; then
     echo '[{"titre":"Les abeilles","categorie":"Sciences","accroche":"Comment font-elles le miel ?","type":"original"}]' > propositions.json
-    echo '{"result":"ok","session_id":"s-prop","is_error":false}'
+    echo '{"result":"ok","session_id":"s-prop","is_error":false'"$COUT"'}'
     exit 0
   fi
   cat > propositions.json <<'FIN'
@@ -54,14 +63,14 @@ if [ "$(basename "$PWD")" = propositions ]; then
   {"titre":"Les nuages","categorie":"Sciences","accroche":"De quoi sont-ils faits ?","type":"original"}
 ]
 FIN
-  echo '{"result":"ok","session_id":"s-prop","is_error":false}'
+  echo '{"result":"ok","session_id":"s-prop","is_error":false'"$COUT"'}'
   exit 0
 fi
 touch '${dossier}'/demarre-"$(basename "$PWD")"
 while [ -e '${dossier}/lent' ]; do sleep 0.05; done
 printf '%s\\n' "$@" > '${dossier}'/args-"$(basename "$PWD")"
 if [ -e '${dossier}/refuser' ]; then
-  printf '%s\\n' '{"result":"Parlons plutôt d’autre chose.\\nCHOIX: Les volcans | Les dinosaures | Les planètes","session_id":"s-123","is_error":false}'
+  printf '%s\\n' '{"result":"Parlons plutôt d’autre chose.\\nCHOIX: Les volcans | Les dinosaures | Les planètes","session_id":"s-123","is_error":false'"$COUT"'}'
   exit 0
 fi
 mkdir -p lessons
@@ -72,14 +81,14 @@ else
 fi
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
 if [ -e '${dossier}/ensuite' ]; then
-  printf '%s\\n' '{"result":"Bravo !\\nENSUITE: Les volcans endormis","session_id":"s-123","is_error":false}'
+  printf '%s\\n' '{"result":"Bravo !\\nENSUITE: Les volcans endormis","session_id":"s-123","is_error":false'"$COUT"'}'
   exit 0
 fi
 if [ -e '${dossier}/choix' ]; then
-  printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false}'
+  printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false'"$COUT"'}'
   exit 0
 fi
-echo '{"result":"Bonjour !","session_id":"s-123","is_error":false}'
+echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
 `, { mode: 0o755 });
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
@@ -1049,26 +1058,33 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
   assert.match(consignes, /Primaire 6/);
 });
 
-test('Modèle : la config liste Haiku, Sonnet et Opus ; chaque appel à l\'agent passe le Modèle de l\'Élève, même une session reprise', async () => {
+test('Modèle selon la tâche : les Pages de leçon passent le Modèle de l\'Élève (effort medium), même une session reprise ; les Propositions passent toujours Haiku (effort low) ; un Modèle de secours à chaque appel', async () => {
   const { data: config } = await appel('/api/config');
-  assert.equal(config.modeleDefaut, 'haiku');
+  assert.equal(config.modeleDefaut, 'sonnet');
   assert.deepEqual(config.modeles.map((m) => m.id), ['haiku', 'sonnet', 'opus']);
   assert.ok(config.modeles.every((m) => m.libelle && m.description));
 
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Mod-Defaut', age: 9, niveau: 'Primaire 4' })).data.modele, 'sonnet');
+  await attendrePropositions('mod-defaut');
   assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Mod-Invalide', age: 9, niveau: 'Primaire 4', modele: 'fable' })).status, 400);
   const cree = await appel('/api/eleves', 'POST', { pseudo: 'Mod-Test', age: 9, niveau: 'Primaire 4', modele: 'opus' });
   assert.equal(cree.data.modele, 'opus');
   await attendrePropositions('mod-test');
-  assert.match(await argsPropositions(), /--model\nopus\n/);
+  assert.match(await argsPropositions(), /--model\nhaiku\n/);
+  assert.match(await argsPropositions(), /--effort\nlow\n/);
+  assert.match(await argsPropositions(), /--fallback-model\nsonnet\n/);
 
   const lecon = (await appel('/api/eleves/mod-test/lecons', 'POST', { sujet: 'les comètes' })).data;
   const args = () => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
   assert.match(await args(), /--model\nopus\n/);
+  assert.match(await args(), /--effort\nmedium\n/);
+  assert.match(await args(), /--fallback-model\nsonnet\n/);
 
   // Changer de Modèle vaut dès l'appel suivant, dans la même session.
   assert.equal((await appel('/api/eleves/mod-test', 'PUT', { modele: 'sonnet' })).data.modele, 'sonnet');
   assert.equal((await appel(`/api/eleves/mod-test/lecons/${lecon.id}/messages`, 'POST', { texte: 'ok' })).status, 200);
   assert.match(await args(), /--model\nsonnet\n/);
+  assert.match(await args(), /--fallback-model\nhaiku\n/);
   assert.match(await args(), /--resume\ns-123/);
   await attendrePropositions('mod-test');
 });
@@ -1191,4 +1207,62 @@ test('Concurrence : deux Leçons différentes reçoivent des messages en même t
     return { reponses };
   });
   assert.deepEqual((await reponses).map((r) => r.status), [200, 200]);
+});
+
+test('Coût mesuré : chaque tour du prof s\'ajoute au coût cumulé de la Leçon, exposé par la Leçon lue et par la liste', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cout-Lecon', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const lecons = '/api/eleves/cout-lecon/lecons';
+  const lecon = (await appel(lecons, 'POST', { sujet: 'les volcans' })).data;
+  assert.deepEqual(lecon.cout, { coutUsd: 0.25, tours: 1, entree: 10, sortie: 100, cacheLu: 1000, cacheEcrit: 200, dureeMs: 1000 });
+
+  await appel(`${lecons}/${lecon.id}/retours`, 'POST', { score: 90 });
+  const apresRebond = (await appel(`${lecons}/${lecon.id}/rebonds`, 'POST', { action: 'suivante' })).data;
+  assert.equal(apresRebond.cout.coutUsd, 0.75);
+  assert.equal(apresRebond.cout.tours, 3);
+
+  // Un tour sans coût ni usage compte comme un tour gratuit, sans rien casser.
+  const sansCout = await avecFichier('sans-cout', () => appel(`${lecons}/${lecon.id}/messages`, 'POST', { texte: 'ok' }));
+  assert.equal(sansCout.status, 200);
+  assert.equal(sansCout.data.cout.coutUsd, 0.75);
+  assert.equal(sansCout.data.cout.tours, 4);
+
+  assert.equal((await appel(`${lecons}/${lecon.id}`)).data.cout.coutUsd, 0.75);
+  assert.equal((await appel(lecons)).data.find((l) => l.id === lecon.id).cout.coutUsd, 0.75);
+  await attendrePropositions('cout-lecon');
+});
+
+test('Coût mesuré : la route de l\'Élève donne le total et le détail par Leçon et par type de tâche, Propositions comprises', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cout-Eleve', age: 10, niveau: 'Primaire 5' })).status, 201);
+  await attendrePropositions('cout-eleve');
+  assert.equal((await appel('/api/eleves/cout-eleve/couts')).data.parTache.propositions.coutUsd, 0.0625);
+
+  const lecons = '/api/eleves/cout-eleve/lecons';
+  const a = (await appel(lecons, 'POST', { sujet: 'les volcans' })).data;
+  await appel(`${lecons}/${a.id}/messages`, 'POST', { texte: 'ok' }); // la Leçon a déjà sa page : tour de page
+  await appel(`${lecons}/${a.id}/retours`, 'POST', { score: 90 }); // Retour de quiz : tour de page
+  await appel(`${lecons}/${a.id}/rebonds`, 'POST', { action: 'suivante' });
+  const b = await avecFichier('refuser', async () => (await appel(lecons, 'POST', { sujet: 'un sujet bizarre' })).data);
+  await avecFichier('refuser', () => appel(`${lecons}/${b.id}/messages`, 'POST', { texte: 'Je ne sais pas' })); // toujours sans page
+  await attendrePropositions('cout-eleve');
+
+  const { status, data } = await appel('/api/eleves/cout-eleve/couts');
+  assert.equal(status, 200);
+  const parId = Object.fromEntries(data.lecons.map((l) => [l.id, l]));
+  assert.equal(parId[a.id].titre, 'Les volcans');
+  assert.equal(parId[a.id].total.coutUsd, 1);
+  assert.deepEqual(Object.fromEntries(Object.entries(parId[a.id].parTache).map(([t, c]) => [t, c.tours])),
+    { premiereSeance: 1, page: 2, rebond: 1, propositions: 0 });
+  assert.equal(parId[b.id].total.coutUsd, 0.5);
+  assert.equal(parId[b.id].parTache.premiereSeance.tours, 2);
+
+  const propositions = data.parTache.propositions;
+  assert.ok(propositions.tours >= 2); // à la création, puis après les tours de séance
+  assert.equal(propositions.coutUsd, propositions.tours * 0.0625);
+  assert.equal(data.parTache.premiereSeance.coutUsd, 0.75);
+  assert.equal(data.parTache.page.coutUsd, 0.5);
+  assert.equal(data.parTache.rebond.coutUsd, 0.25);
+  assert.equal(data.total.coutUsd, 1.5 + propositions.coutUsd);
+  assert.equal(data.total.tours, 6 + propositions.tours);
+
+  assert.equal((await appel('/api/eleves/inconnu/couts')).status, 404);
 });

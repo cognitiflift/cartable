@@ -81,10 +81,17 @@ async function ecranNouvelEleve() {
 }
 
 async function ecranProfil(profil) {
+  // Pour le parent : coût total des tours du prof (indicateur relatif, quota de l'abonnement). Jamais pendant la Séance.
+  const cout = h('p', { className: 'cout' });
   montrer(...formulaireProfil({ profil, titre: 'Mon profil', envoyer: async (champs) => {
     await api(`eleves/${profil.slug}`, { method: 'PUT', body: champs });
     location.hash = '#/';
-  } }));
+  } }), cout);
+  const couts = await api(`eleves/${profil.slug}/couts`).catch(() => null);
+  if (couts) {
+    const { coutUsd, tours } = couts.total;
+    cout.textContent = `Coût total : ${coutUsd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })} (${tours} appel${tours > 1 ? 's' : ''} au prof)`;
+  }
 }
 
 const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };

@@ -69,23 +69,26 @@ function preambule(prompt, lecon) {
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
 // La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
 // Un Retour de quiz garde en plus le titre annoncé par sa ligne ENSUITE (retirée du texte).
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details, etatLecon }) {
+// `tache` : type de tâche du tour, gardé avec son coût ; par défaut, première Séance tant que la Leçon n'a aucune
+// Page de leçon, page ensuite.
+async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details, etatLecon, tache }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
-    const { reponse, sessionId } = await lancerAgent({
+    const { reponse, sessionId, cout } = await lancerAgent({
       cwd: store.leconDir(slug, id),
       prompt: premier ? `/mattpocock-skills:teach ${prompt}` : preambule(prompt, lecon),
       sessionId: lecon.sessionId,
       consignes: consignesLecon(profil),
       modele: profil.modele,
+      tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
     const annonce = details?.retourQuiz ? extraireEnsuite(reponse) : { texte: reponse };
     const { texte, choix } = extraireChoix(annonce.texte);
     if (annonce.ensuite) details = { ...details, retourQuiz: { ...details.retourQuiz, ensuite: annonce.ensuite } };
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon });
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon, cout });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
@@ -106,13 +109,15 @@ function genererPropositions(slug, anciennes = [], { varier = false } = {}) {
     const profil = await store.lireEleve(slug);
     const lecons = await store.listerLecons(slug);
     const dejaProposes = varier ? await store.lireHistoriquePropositions(slug) : [];
-    await lancerAgent({
+    const { cout } = await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
       prompt: `Prépare ${profil.nombrePropositions} Propositions de nouvelles Leçons pour cet élève.`,
       consignes: consignesPropositions(profil, lecons, dejaProposes),
       modele: profil.modele,
+      tache: 'propositions',
       teach: false,
     });
+    await store.enregistrerCoutPropositions(slug, cout);
   })()
     .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
     .then(async () => {
@@ -192,6 +197,7 @@ async function retourQuiz(slug, id, { score, page, bonus }) {
     prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '', mode }),
     affiche: `📝 Quiz terminé : ${retour.score} %`,
     premier: false,
+    tache: 'page',
     details: { retourQuiz: retour },
     etatLecon: {
       defiEnCours: false,
@@ -211,7 +217,7 @@ async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
   const lecon = await store.lireLecon(slug, id);
   if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
-  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, etatLecon: ETAT_APRES_REBOND[action] });
+  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', etatLecon: ETAT_APRES_REBOND[action] });
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
@@ -238,6 +244,8 @@ async function api(req, res, segments) {
   } else if (!r2) {
     if (m === 'GET') return json(res, 200, await store.lireEleve(slug));
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
+  } else if (r2 === 'couts' && !id) {
+    if (m === 'GET') return json(res, 200, await store.lireCouts(slug));
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));

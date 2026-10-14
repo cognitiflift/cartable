@@ -81,7 +81,8 @@ async function ecranNouvelEleve() {
 }
 
 async function ecranProfil(profil) {
-  // Pour le parent : coût total des tours du prof (indicateur relatif, quota de l'abonnement). Jamais pendant la Séance.
+  // Pour le parent : Coût d'un tour cumulé (CONTEXT.md), un indicateur relatif du quota partagé de l'abonnement, pas de
+  // l'argent dépensé : affiché en tokens, avec son équivalent indicatif au tarif de l'API. Jamais pendant la Séance.
   const cout = h('p', { className: 'cout' });
   montrer(...formulaireProfil({ profil, titre: 'Mon profil', envoyer: async (champs) => {
     await api(`eleves/${profil.slug}`, { method: 'PUT', body: champs });
@@ -89,8 +90,10 @@ async function ecranProfil(profil) {
   } }), cout);
   const couts = await api(`eleves/${profil.slug}/couts`).catch(() => null);
   if (couts) {
-    const { coutUsd, tours } = couts.total;
-    cout.textContent = `Coût total : ${coutUsd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })} (${tours} appel${tours > 1 ? 's' : ''} au prof)`;
+    const { coutUsd, tours, entree, sortie, cacheLu, cacheEcrit } = couts.total;
+    const tokens = (entree + sortie + cacheLu + cacheEcrit).toLocaleString('fr-BE', { notation: 'compact', maximumFractionDigits: 1 });
+    const equivalent = coutUsd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+    cout.textContent = `Quota utilisé (indicatif) : ${tokens} tokens en ${tours} appel${tours > 1 ? 's' : ''} au prof, l'équivalent de ${equivalent} au tarif de l'API. Ce n'est pas une dépense : l'abonnement se mesure en quota partagé.`;
   }
 }
 

@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TACHES, coutDuTour, cumulerCouts } from '../lib/cout.js';
+import { coutDuTour, cumulerCouts } from '../lib/cout.js';
+import { TACHES, validerTache } from '../lib/tache.js';
 
-test('Types de tâche : un ensemble fermé (première Séance, page, Rebond, Propositions)', () => {
+test('Types de tâche : un ensemble fermé (première Séance, page, Rebond, Propositions), tout autre refusé', () => {
   assert.deepEqual(TACHES, ['premiereSeance', 'page', 'rebond', 'propositions']);
+  assert.equal(validerTache('rebond'), 'rebond');
+  assert.throws(() => validerTache('retourQuiz'), /Type de tâche inconnu/);
 });
 
 test('Coût d\'un tour : coût, usage, durée et Modèle tirés de la réponse JSON de claude -p', () => {

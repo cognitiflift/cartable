@@ -5,6 +5,7 @@
 // Usage : node scripts/comparer-couts.js [dossier des élèves, par défaut eleves/ ou ELEVES_DIR] [--depuis AAAA-MM-JJ]
 import fs from 'node:fs';
 import path from 'node:path';
+import { TACHES_APRES_PREMIERE_PAGE } from '../lib/tache.js';
 
 const args = process.argv.slice(2);
 const iDepuis = args.indexOf('--depuis');
@@ -27,7 +28,7 @@ for (const slug of dossiers(eleves)) {
     const etat = lireJson(path.join(dir, 'etat.json'));
     const titre = lireJson(path.join(dir, 'lesson.json'))?.titre || etat?.sujet || id;
     for (const tour of etat?.couts ?? []) {
-      if (!['page', 'rebond'].includes(tour.tache) || (depuis && tour.date < depuis)) continue;
+      if (!TACHES_APRES_PREMIERE_PAGE.includes(tour.tache) ||(depuis && tour.date < depuis)) continue;
       lignes.push({ lecon: `${slug} / ${titre}`, mode: tour.relais ? 'après' : 'avant', ...tour });
     }
   }
@@ -55,8 +56,9 @@ for (const lecon of [...new Set(lignes.map((l) => l.lecon))].sort()) {
     if (tours.length) tableau[`${lecon} — ${mode}`] = resume(tours);
   }
 }
-// « page » compte aussi les Retours de quiz (tant que le prof les écrit) : le détail par type de tâche les sépare.
-for (const tache of ['page', 'rebond', null]) {
+// Détail par type de tâche, puis total. Le Retour de quiz, composé par l'appli, n'est pas un tour du prof : aucun
+// type de tâche ne le compte.
+for (const tache of [...TACHES_APRES_PREMIERE_PAGE, null]) {
   for (const mode of ['avant', 'après']) {
     const tours = lignes.filter((l) => l.mode === mode && (!tache || l.tache === tache));
     if (tours.length) tableau[`${tache ? `Tâche ${tache}` : 'TOTAL'} — ${mode}`] = resume(tours);

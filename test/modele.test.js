@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TACHES } from '../lib/cout.js';
+import { TACHES } from '../lib/tache.js';
 import { modeleDeLaTache } from '../lib/modele.js';
 
 test('Modèle selon la tâche : les Pages de leçon prennent le Modèle du Profil avec l\'effort medium', () => {

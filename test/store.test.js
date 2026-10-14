@@ -240,3 +240,15 @@ test('Rebonds proposés à une date : Réviser s\'ajoute à Étape suivante quan
   const revoir = [{ role: 'agent', texte: '…', retourQuiz: { score: 50, action: 'revoir' } }];
   assert.deepEqual(rebondsProposes(revoir, Date.parse('2026-09-01T00:00:00.000Z'), maintenant), ['revoir']);
 });
+
+test('Coût de l\'Élève : une Leçon illisible est écartée sans faire échouer le reste', async () => {
+  const lisible = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
+  const illisible = await store.creerLecon('zoe', { sujet: 'Les fractions', mode: 'libre' });
+  const cout = { tache: 'page', coutUsd: 0.25, entree: 1, sortie: 2, cacheLu: 3, cacheEcrit: 4, dureeMs: 5, modeles: [] };
+  for (const { id } of [lisible, illisible]) await store.enregistrerTour('zoe', id, { question: 'ok', reponse: 'ok', cout });
+  await fs.writeFile(path.join(store.leconDir('zoe', illisible.id), 'lesson.json'), '{ pas du JSON');
+
+  const couts = await store.lireCouts('zoe');
+  assert.deepEqual(couts.lecons.map((l) => l.id), [lisible.id]);
+  assert.equal(couts.total.coutUsd, 0.25);
+});

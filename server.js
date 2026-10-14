@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -51,7 +51,7 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
-// À chaque tour après le premier (quand l'Élève Continue sa Leçon), l'agent reçoit les scores récents pour cibler les
+// Tour repris dans la session en cours (première Séance, ou CARTABLE_RELAIS=0) : l'agent reçoit les scores récents pour cibler les
 // erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs),
 // la demande de fixer ses Objectifs.
 function preambule(prompt, lecon) {
@@ -78,10 +78,12 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
+    // Session neuve dès que la Leçon a sa première page : le prof relance le skill teach et reçoit le préambule de relais.
+    const neuve = RELAIS && lecon.pages.length > 0;
     const { reponse, sessionId, cout } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : preambule(prompt, lecon),
-      sessionId: lecon.sessionId,
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon)}\n\n${prompt}` : preambule(prompt, lecon),
+      sessionId: neuve ? null : lecon.sessionId,
       consignes: consignesLecon(profil),
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
@@ -89,7 +91,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
     const annonce = details?.retourQuiz ? extraireEnsuite(reponse) : { texte: reponse };
     const { texte, choix } = extraireChoix(annonce.texte);
     if (annonce.ensuite) details = { ...details, retourQuiz: { ...details.retourQuiz, ensuite: annonce.ensuite } };
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon, cout });
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon, cout: cout && { ...cout, relais: neuve } });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {

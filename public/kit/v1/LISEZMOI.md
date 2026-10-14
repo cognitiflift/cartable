@@ -74,7 +74,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
 
-Une question mal formée est ignorée. Il faut au moins une question hors bonus.
+Une question mal formée est ignorée. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
 ## Ce que fait le Kit
 

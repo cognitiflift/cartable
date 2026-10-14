@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz } from './lib/retour.js';
 
@@ -52,15 +52,17 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
-// Tour repris dans la session en cours (première Séance, ou CARTABLE_RELAIS=0) : l'agent reçoit les scores récents pour cibler les
-// erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs),
-// la demande de fixer ses Objectifs.
-function preambule(prompt, lecon) {
+// Tour repris dans la session en cours (première Séance, ou CARTABLE_RELAIS=0) : l'agent reçoit les scores récents et
+// les résultats du dernier quiz pour cibler les erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a
+// pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs. `resultatsQuiz: false` : comme pour le
+// préambule de relais.
+function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   const lignes = [];
   if (lecon.scores.length) {
     const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
     const m = lecon.maitrise;
     lignes.push(`[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]`);
+    if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1)));
   }
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
@@ -83,7 +85,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
     const neuve = RELAIS && lecon.pages.length > 0;
     const { reponse, sessionId, cout } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz })}\n\n${prompt}` : preambule(prompt, lecon),
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz })}\n\n${prompt}` : preambule(prompt, lecon, { resultatsQuiz }),
       sessionId: neuve ? null : lecon.sessionId,
       consignes: consignesLecon(profil),
       modele: profil.modele,

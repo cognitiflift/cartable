@@ -245,7 +245,7 @@ test('consigne de Rebond : chaque Rebond transmet les questions ratées du derni
     assert.match(consigne, /« Qu’est-ce qu’un geyser \? » \(bonus 🚀\) : il a choisi « Un volcan »/, action);
     assert.doesNotMatch(consigne, /Où sort la lave/, action); // les questions justes ne sont que comptées
     assert.match(consigne, /1 question juste sur 2/, action);
-    assert.match(consigne, /Commence la page par un court encart/, action);
+    assert.match(consigne, /commence par un court encart sur ce qu'il a raté/, action);
   }
   // Revoir reprend nommément les questions ratées.
   assert.match(consigneRebond('revoir', leconAvecResultats()), /reprends nommément chacune des questions ratées/);
@@ -270,4 +270,13 @@ test('Préambule de relais : les résultats par question du dernier quiz y figur
   const sans = preambuleRelais(lecon, { resultatsQuiz: false });
   assert.match(sans, /Scores aux quiz/);
   assert.doesNotMatch(sans, /Résultats du dernier quiz|magma/);
+});
+
+test('Préambule de relais : après un quiz raté en partie, toute nouvelle page commence par l\'encart sur ce qui a été raté, une seule fois', () => {
+  const lecon = { ...leconAvecResultats('libre'), objectifs: [], maitrise: null, ensuite: null, pages: [], messages: [] };
+  const texte = preambuleRelais(lecon);
+  assert.equal(texte.split('court encart sur ce qu\'il a raté').length, 2);
+  assert.doesNotMatch(preambuleRelais(lecon, { resultatsQuiz: false }), /court encart/); // la consigne du Rebond le porte
+  const parfait = { ...lecon, scores: [{ score: 100, page: 'p.html', date: '2026-10-01T10:00:00.000Z', questions: [{ id: 'q1', enonce: 'A ?', choisie: 'a', bonne: 'a', juste: true, bonus: false, objectifs: [] }] }] };
+  assert.doesNotMatch(preambuleRelais(parfait), /court encart/);
 });

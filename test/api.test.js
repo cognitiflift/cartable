@@ -769,6 +769,14 @@ test('Résultats par question : la consigne du Rebond suivant porte les question
   assert.match(consigne, /reprends nommément chacune des questions ratées/);
   assert.match(consigne, /court encart sur ce qu'il a raté/);
   assert.equal(consigne.split('Résultats du dernier quiz').length, 2); // pas répétés par le préambule de relais
+  assert.equal(consigne.split('court encart').length, 2);
+
+  // Un tour de page ordinaire après ce quiz porte aussi les résultats et l'encart, par le préambule de relais.
+  assert.equal((await message(lecon, 'ok')).status, 200);
+  const page = await fs.readFile(args, 'utf8');
+  assert.equal(page.split('Résultats du dernier quiz').length, 2);
+  assert.match(page, /il a choisi « De la lave refroidie »/);
+  assert.equal(page.split('court encart sur ce qu\'il a raté').length, 2);
 });
 
 test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {

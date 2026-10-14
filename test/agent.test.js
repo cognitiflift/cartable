@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, preambuleRelais, REBONDS } from '../lib/agent.js';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -196,4 +196,39 @@ test('consignes : Étape suivante est une page nouvelle choisie selon la zone pr
   assert.match(REBONDS.suivante.consigne, /page nouvelle/);
   assert.match(REBONDS.suivante.consigne, /zone proximale/);
   assert.match(REBONDS.suivante.consigne, /raté/);
+});
+
+test('Préambule de relais : la session neuve reçoit l\'état de la Leçon et la consigne de relire les fichiers de teach', () => {
+  const texte = preambuleRelais({
+    objectifs: [{ texte: 'Nommer les parties d’un volcan', atteint: true }, { texte: 'Expliquer une éruption', atteint: false }],
+    scores: [
+      { score: 50, page: '0001-volcans.html', date: '2026-10-01T10:00:00.000Z' },
+      { score: 90, page: '0002-eruptions.html', date: '2026-10-02T10:00:00.000Z', objectifs: [1], bonus: { reussies: 1, total: 2 } },
+    ],
+    maitrise: { pourcentage: 72, palier: 'En cours' },
+    ensuite: 'Les volcans endormis',
+    pages: ['0001-volcans.html', '0002-eruptions.html'],
+    messages: [],
+  });
+  assert.match(texte, /session neuve/);
+  assert.match(texte, /MISSION\.md/);
+  assert.match(texte, /learning-records/);
+  assert.match(texte, /NOTES\.md/);
+  assert.match(texte, /1\. Nommer les parties d’un volcan : atteint/);
+  assert.match(texte, /2\. Expliquer une éruption : pas encore atteint/);
+  assert.match(texte, /50 % \(0001-volcans\.html\) le 2026-10-01 ; 90 % \(0002-eruptions\.html\) le 2026-10-02/);
+  assert.match(texte, /Maîtrise : 72 %, En cours/);
+  assert.match(texte, /Résultats du dernier quiz : 0002-eruptions\.html, 90 % ; questions bonus : 1 sur 2/);
+  assert.match(texte, /« Les volcans endormis »/);
+  assert.match(texte, /0001-volcans\.html, 0002-eruptions\.html/);
+});
+
+test('Préambule de relais : sans scores ni Objectifs, il demande de fixer les Objectifs ; une question en attente est rappelée', () => {
+  const texte = preambuleRelais({
+    objectifs: [], scores: [], maitrise: null, ensuite: null, pages: ['0001-volcans.html'],
+    messages: [{ role: 'eleve', texte: 'ok' }, { role: 'agent', texte: 'Veux-tu aller plus loin ?', choix: ['Oui', 'Non'] }],
+  });
+  assert.doesNotMatch(texte, /Scores aux quiz|dernier quiz|annoncé/);
+  assert.match(texte, /n'a pas encore d'Objectifs/);
+  assert.match(texte, /« Veux-tu aller plus loin \? » \(réponses proposées : Oui \| Non\)/);
 });

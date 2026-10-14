@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, extraireEnsuite, actionApresQuiz, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS, DOSSIER_KIT } from '../lib/agent.js';
+import path from 'node:path';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
 
@@ -119,6 +120,18 @@ test('ni les consignes de Leçon ni le retour de quiz ne parlent de « Leçon su
   const retour = promptRetourQuiz({ score: 90, page: 'p.html', action: 'suivante' });
   assert.doesNotMatch(retour, /leçon suivante/i);
   assert.match(retour, /étape suivante/);
+});
+
+test('consignes de Leçon : toute nouvelle page utilise le Kit, documenté, sans quiz ni style de base réécrits', () => {
+  const consignes = consignesLecon(profil);
+  assert.match(consignes, /\/kit\/v1\/quiz\.js/);
+  assert.match(consignes, /\/kit\/v1\/base\.css/);
+  assert.match(consignes, /id="cartable-quiz"/);
+  assert.ok(consignes.includes(path.join(DOSSIER_KIT, 'v1', 'LISEZMOI.md')));
+  assert.match(consignes, /n'écris jamais ton propre quiz/i);
+  assert.match(consignes, /propres au sujet/);
+  // Le Kit envoie le score : le prof n'a plus à écrire l'envoi.
+  assert.doesNotMatch(consignes, /postMessage/);
 });
 
 test('consignes de Leçon : pas de saisie libre, Réponses proposées sur une ligne CHOIX', () => {

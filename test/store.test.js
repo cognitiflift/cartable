@@ -112,8 +112,8 @@ test('Nombre de Propositions : un Élève existant sans ce champ en a 4', async 
   assert.equal((await store.lireEleve('zoe')).nombrePropositions, 4);
 });
 
-test('Modèle : Haiku par défaut, réglable à la création comme à la modification, sans toucher au reste du Profil', async () => {
-  assert.equal((await store.lireEleve('zoe')).modele, 'haiku');
+test('Modèle : Sonnet par défaut pour un nouveau Profil, réglable à la création comme à la modification, sans toucher au reste du Profil', async () => {
+  assert.equal((await store.lireEleve('zoe')).modele, 'sonnet');
   assert.equal((await store.creerEleve({ pseudo: 'Léo', age: 9, niveau: 'Primaire 4', modele: 'opus' })).modele, 'opus');
   const profil = await store.modifierProfil('zoe', { modele: 'sonnet' });
   assert.deepEqual([profil.modele, profil.age, profil.niveau, profil.nombrePropositions], ['sonnet', 10, 'Primaire 5', 4]);
@@ -124,7 +124,7 @@ test('Modèle : Haiku par défaut, réglable à la création comme à la modific
   }
 });
 
-test('Modèle : un Élève existant sans ce champ a Haiku', async () => {
+test('Modèle : un Élève existant sans ce champ garde Haiku, le Modèle par défaut d\'alors', async () => {
   const fichier = path.join(dossier, 'zoe', 'profil.json');
   const { modele, ...ancien } = JSON.parse(await fs.readFile(fichier, 'utf8'));
   await fs.writeFile(fichier, JSON.stringify(ancien));

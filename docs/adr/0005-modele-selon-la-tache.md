@@ -12,11 +12,21 @@ Une table fermée, tenue par l'appli, associe donc à chaque type de tâche un M
 
 Le Retour de quiz n'est plus une tâche du prof (ADR 0002) : il ne figure pas dans la table. Les nouveaux Profils ont Sonnet par défaut ; les Profils existants gardent leur Modèle, rien ne change sans l'accord du parent. Chaque appel passe aussi un **Modèle de secours** (`--fallback-model`) qui prend le relais quand le Modèle principal est surchargé ou indisponible ; le Modèle réellement utilisé est relevé avec le coût d'un tour.
 
+Le Modèle de secours fait partie de la même table : il n'est jamais le Modèle principal (`claude` refuse un secours identique) et c'est le Modèle juste moins cher quand il existe, pour ménager le quota quand il s'épuise : Opus → Sonnet, Sonnet → Haiku. Haiku, le moins cher, a Sonnet pour secours ; c'est le cas des Propositions et des Profils réglés sur Haiku.
+
+| Modèle principal | Modèle de secours |
+| --- | --- |
+| Opus | Sonnet |
+| Sonnet | Haiku |
+| Haiku | Sonnet |
+
 ## Considered Options
 
 - Un seul Modèle pour tout, celui du Profil : rejeté, il est soit trop faible pour les pages, soit trop cher pour les Propositions.
 - Opus par défaut pour les pages : rejeté, quota consommé trop vite pour un gain que rien ne mesure encore ; le parent peut le choisir dans le Profil.
 - Laisser le prof choisir son Modèle ou son effort : rejeté, dans l'esprit de l'ADR 0002 les règles restent fixées par l'appli.
+- Un Modèle de secours unique (Haiku) pour tous les appels : rejeté, il serait identique au Modèle principal des Propositions et des Profils réglés sur Haiku.
+- Un Modèle de secours plus cher que le principal (Opus pour Sonnet) : rejeté, le secours sert justement quand le quota est sous tension.
 - Passer les Profils existants à Sonnet : rejeté, le parent a peut-être choisi Haiku pour préserver son quota.
 
 ## Consequences

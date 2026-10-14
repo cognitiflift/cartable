@@ -1,0 +1,20 @@
+# L'appli sert le quiz et le style de base de chaque Page de leçon (le Kit), au lieu de laisser le prof les construire dans chaque Leçon
+
+Le skill `teach` construit chaque page à partir des composants qu'il écrit dans le dossier de la Leçon. Appliqué tel quel, cela a donné sept Leçons réelles et sept quiz différents (de 48 à 134 lignes) : seuls trois gèrent les questions bonus du Dépassement, et celui de la Leçon sur les volcans n'envoie même pas le score à l'appli, si bien que ses quiz n'ont jamais été enregistrés sans que personne ne s'en aperçoive. Or le quiz est le contrat entre la page et l'appli (score, Objectifs couverts, questions bonus, bientôt les résultats par question, la confiance, d'autres formats) : toute évolution de ce contrat devrait être réimplémentée correctement par le prof dans chaque Leçon, ce qui n'arrivera pas.
+
+Nous nous écartons donc sciemment de `teach` : l'appli sert elle-même un **Kit**, sous un chemin stable et versionné, qui contient le quiz (affichage, mélange des réponses, correction, score hors questions bonus, Objectifs couverts, résultats par question, envoi à l'appli) et la feuille de style de base (typographie lisible, thèmes par Catégorie, mode sombre). Dans une nouvelle Page de leçon, le prof n'écrit plus son quiz ni sa feuille de style de base : il déclare les questions comme des **données** (énoncé, réponses, bonne réponse, explication, drapeau bonus, Objectifs), que le Kit affiche et corrige. Il garde la liberté d'écrire dans sa Leçon des composants propres au sujet (un atelier d'écriture, un schéma à compléter), pour que les Leçons ne deviennent pas toutes pareilles. Les raisons : un contrat fiable que le prof ne peut plus casser, des évolutions faites une seule fois et testées pour toutes les Leçons, moins de tokens dépensés à réécrire le même quiz, et moins de code écrit par le prof qui s'exécute dans la page.
+
+Les anciennes Leçons gardent leurs propres composants et s'ouvrent comme avant ; seules leurs nouvelles pages passent au Kit. Le quiz des volcans n'est pas corrigé rétroactivement.
+
+## Considered Options
+
+- Laisser le prof construire son quiz dans chaque Leçon, comme `teach` le demande, avec des consignes plus strictes : rejeté, c'est déjà le cas aujourd'hui et sept Leçons ont donné sept quiz, dont un muet.
+- Un composant modèle que le prof recopie dans le dossier de la Leçon : rejeté, les copies divergent et une correction ne profite pas aux pages déjà écrites.
+- Tout servir par l'appli, y compris le contenu de la page (gabarits fixes) : rejeté, les Leçons perdraient les activités propres au sujet qui font leur intérêt.
+- Migrer les anciennes Leçons vers le Kit : écarté pour l'instant, coûteux et risqué pour des pages qui fonctionnent (hors celle des volcans).
+
+## Consequences
+
+- Les questions deviennent des données structurées, réutilisables plus tard (Banque de Questions, Révisions du jour).
+- Le Kit étant versionné, une page déjà créée continue d'utiliser la version qu'elle cite ; une évolution incompatible passe par une nouvelle version.
+- Le prof doit pouvoir lire une courte documentation du Kit (format des questions, exemple) pour écrire des pages justes du premier coup.

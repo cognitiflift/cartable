@@ -98,7 +98,4 @@ Récompenses d'une Leçon de révision, au nombre de trois, acquises pour toujou
 Retravailler une Leçon comme une Leçon de révision (Revoir ou Défi selon le score), dans la même Leçon. Sur une Leçon de révision terminée, c'est la seule suite proposée : elle repart du Document source et permet de gagner les Étoiles manquantes, ou de s'entraîner encore avant un contrôle. Sur une Leçon libre, elle n'est proposée que si la dernière Page de leçon date de plus d'une semaine : elle repart des pages déjà vues, ne rapporte rien et ne change ni les Objectifs ni le Niveau de Leçon (seulement la Maîtrise) ; après le Défi, l'Élève retrouve l'Étape suivante.
 
 **Type de tâche**:
-Ce que l'appli demande au prof à un tour donné, dans une liste fermée : **première Séance** (les tours d'une Leçon qui n'a pas encore de Page de leçon), **page** (une Séance suivante, ou un Retour de quiz), **Rebond** (Étape suivante, Revoir, Défi, Réviser) et **Propositions**.
-
-**Coût d'un tour**:
-Coût et usage de tokens (en entrée, en sortie, lus et écrits dans le cache), durée et Modèle d'un appel au prof, gardés avec son Type de tâche. Indicateur relatif (l'abonnement Pro est partagé avec le parent) : cumulé par Leçon et par Élève, montré au parent dans le Profil, jamais à l'Élève pendant la Séance.
+Ce que l'appli demande à l'agent à un tour donné, dans une liste fermée : **première Séance** (les tours d'une Leçon qui n'a pas encore de Page de leçon), **page** (une Séance suivante, et le Retour de quiz tant qu'il passe par l'agent), **Rebond** (Étape suivante, Revoir, Défi, Réviser) et **Propositions**. Le Coût d'un tour et le Modèle en dépendent.

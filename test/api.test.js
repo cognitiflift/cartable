@@ -1236,6 +1236,16 @@ test('Concurrence : un second message pendant que l\'agent répond est refusé, 
   assert.deepEqual(envoyes, ['les volcans', 'premier', 'troisième']);
 });
 
+test('Concurrence : la Leçon est occupée pendant qu\'un Retour de quiz l\'écrit, sans Retour perdu ni compté deux fois', async () => {
+  await appel('/api/eleves', 'POST', { pseudo: 'Retour-Occupe', age: 10, niveau: 'Primaire 5' });
+  const { data: lecon } = await appel('/api/eleves/retour-occupe/lecons', 'POST', { sujet: 'les volcans' });
+  const url = `/api/eleves/retour-occupe/lecons/${lecon.id}`;
+  const statuts = (await Promise.all(Array.from({ length: 5 }, () => appel(`${url}/retours`, 'POST', { score: 90 })))).map((r) => r.status);
+  assert.equal(statuts.filter((s) => s === 200).length + statuts.filter((s) => s === 409).length, 5);
+  const retours = (await appel(url)).data.messages.filter((m) => m.retourQuiz);
+  assert.equal(retours.length, statuts.filter((s) => s === 200).length);
+});
+
 test('Concurrence : deux Leçons différentes reçoivent des messages en même temps', async () => {
   const { data: a } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' });
   const { data: b } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les fractions' });

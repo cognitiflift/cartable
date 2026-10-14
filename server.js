@@ -187,27 +187,32 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 // Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
 async function retourQuiz(slug, id, { score, bonus, questions }) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
-  // Pas d'écriture concurrente de l'état pendant qu'un tour du prof est en cours sur cette Leçon.
+  // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
-  const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
-  const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
-  const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
-  const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
-  const retour = {
-    score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
-  };
-  await store.enregistrerTour(slug, id, {
-    question: `📝 Quiz terminé : ${retour.score} %`,
-    reponse: texteRetourQuiz({ ...retour, questions: resultats }),
-    details: { retourQuiz: retour },
-    etatLecon: {
-      defiEnCours: false,
-      scoresCommentes: scores.length,
-      ...(defiEnCours && arrondi >= QUIZ_REUSSI && { reviserEnCours: false }),
-      ...(action === 'terminee' && { terminee: termineeApres }),
-    },
-  });
-  return store.lireLecon(slug, id);
+  enCours.add(id);
+  try {
+    const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
+    const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
+    const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
+    const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
+    const retour = {
+      score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
+    };
+    await store.enregistrerTour(slug, id, {
+      question: `📝 Quiz terminé : ${retour.score} %`,
+      reponse: texteRetourQuiz({ ...retour, questions: resultats }),
+      details: { retourQuiz: retour },
+      etatLecon: {
+        defiEnCours: false,
+        scoresCommentes: scores.length,
+        ...(defiEnCours && arrondi >= QUIZ_REUSSI && { reviserEnCours: false }),
+        ...(action === 'terminee' && { terminee: termineeApres }),
+      },
+    });
+    return await store.lireLecon(slug, id);
+  } finally {
+    enCours.delete(id);
+  }
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la

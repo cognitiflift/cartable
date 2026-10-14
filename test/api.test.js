@@ -161,7 +161,7 @@ test('Séance : Réponses proposées sur le message du prof, retour de quiz avec
   const [eleve, prof] = retour.data.messages.slice(-2);
   assert.equal(eleve.texte, '📝 Quiz terminé : 70 %');
   assert.equal(prof.role, 'agent');
-  assert.equal(prof.texte, 'Bien joué, 70 % : tu es sur la bonne voie ! 💪');
+  assert.equal(prof.texte, 'Bien joué : 70 %. Tu es sur la bonne voie ! 💪\nLa prochaine page commencera par ce que tu as raté.');
   assert.deepEqual(prof.retourQuiz, { score: 70, action: 'suivante' }); // Leçon libre : toujours Étape suivante
   assert.equal(retour.data.scores.length, 0); // le score s'enregistre par /scores
   assert.equal(retour.data.cout.tours, 1); // aucun tour du prof compté pour le Retour
@@ -760,7 +760,7 @@ test('Résultats par question : la consigne du Rebond suivant porte les question
   await appel(`${url}/scores`, 'POST', corps);
   const retour = (await appel(`${url}/retours`, 'POST', corps)).data;
   assert.deepEqual(retour.rebondsProposes, ['revoir']);
-  assert.match(retour.messages.at(-1).texte, /Tu as trouvé 1 réponse sur 2\./);
+  assert.match(retour.messages.at(-1).texte, /: 1 réponse sur 2\./);
 
   assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
   const consigne = await fs.readFile(args, 'utf8');

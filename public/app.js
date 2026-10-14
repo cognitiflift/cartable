@@ -251,10 +251,9 @@ async function ecranSession(profil, id) {
     if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
-      const { action, score, nouvellesEtoiles } = prof.retourQuiz;
+      const { action, score } = prof.retourQuiz;
       const { ensuite } = lecon; // titre prévu par le prof (lesson.json), ou annoncé par un ancien Retour de quiz
       contenu = h('div', { className: 'apres-quiz' },
-        nouvellesEtoiles?.length > 0 && h('div', { className: 'nouvelle-etoile' }, '⭐ Nouvelle étoile !'),
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),

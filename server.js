@@ -202,7 +202,7 @@ async function retourQuiz(slug, id, { score, bonus, questions }) {
     };
     await store.enregistrerTour(slug, id, {
       question: `📝 Quiz terminé : ${retour.score} %`,
-      reponse: texteRetourQuiz({ ...retour, questions: resultats }),
+      reponse: texteRetourQuiz({ ...retour, questions: resultats, rang: scores.length }),
       details: { retourQuiz: retour },
       etatLecon: {
         defiEnCours: false,

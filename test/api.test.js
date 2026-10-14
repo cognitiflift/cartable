@@ -585,7 +585,7 @@ test('Objectifs : consignes demandées au prof, et à la reprise d\'une Leçon s
   const sans = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les laves' })).data;
   const args = async (lecon) => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
   assert.match(await args(sans), /"objectifs"/);
-  assert.match(await args(sans), /objectifs: \[/);
+  assert.match(await args(sans), /"objectifs": \[/);
   await message(sans, 'ok');
   assert.match(await args(sans), /n'a pas encore d'Objectifs/);
 
@@ -673,6 +673,58 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   // Acquis pour toujours : un quiz suivant sans bonus ne le retire pas.
   await score({ score: 60 });
   assert.equal((await resume()).depassement, true);
+});
+
+test('Kit : servi sous son chemin versionné (quiz, logique, style de base, documentation)', async () => {
+  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
+    const res = await fetch(`${base}/kit/v1/${fichier}`);
+    assert.equal(res.status, 200, fichier);
+    assert.match(res.headers.get('content-type'), new RegExp(type));
+  }
+  assert.equal((await fetch(`${base}/kit/v9/quiz.js`)).status, 404);
+
+  // Le prof peut lire la documentation du Kit, hors du dossier de la Leçon.
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les geysers' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.ok(args.includes(`--add-dir\n${path.join(import.meta.dirname, '..', 'public', 'kit')}\n`));
+});
+
+test('Résultats par question : enregistrés avec le score, questions mal formées ignorées, score recalculé hors bonus', async () => {
+  const { data: lecon } = await avecFichier('objectifs', () => appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'le magma' }));
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const q = (id, juste, autres = {}) => ({ id, enonce: `Question ${id} ?`, choisie: juste ? 'oui' : 'non', bonne: 'oui', juste, bonus: false, objectifs: [1], ...autres });
+  const r = await appel(`${url}/scores`, 'POST', {
+    score: 100, // annoncé par la page, démenti par ses questions
+    page: '0002-magma.html',
+    objectifs: [1, 2],
+    questions: [
+      q('q1', true),
+      q('q2', false, { objectifs: [2, 9, 'x'] }),
+      q('q3', true, { bonus: true }),
+      { id: 'q4', enonce: 'Sans juste', choisie: 'a', bonne: 'b' },
+      { enonce: 'Sans id', choisie: 'a', bonne: 'a', juste: true },
+      'pas une question',
+    ],
+  });
+  assert.equal(r.status, 201);
+  const entree = r.data.scores.at(-1);
+  assert.equal(entree.score, 50);
+  assert.deepEqual(entree.bonus, { reussies: 1, total: 1 });
+  assert.deepEqual(entree.questions, [
+    { id: 'q1', enonce: 'Question q1 ?', choisie: 'oui', bonne: 'oui', juste: true, bonus: false, objectifs: [1] },
+    { id: 'q2', enonce: 'Question q2 ?', choisie: 'non', bonne: 'oui', juste: false, bonus: false, objectifs: [2] },
+    { id: 'q3', enonce: 'Question q3 ?', choisie: 'oui', bonne: 'oui', juste: true, bonus: true, objectifs: [1] },
+  ]);
+
+  // Le Retour de quiz s'appuie sur le même score que celui enregistré.
+  const retour = await appel(`${url}/retours`, 'POST', { score: 100, page: '0002-magma.html', questions: [q('q1', true), q('q2', false)] });
+  assert.equal(retour.data.messages.at(-1).retourQuiz.score, 50);
+
+  // Questions toutes mal formées, ou absentes : le score de la page fait foi, sans résultats par question.
+  const sans = await appel(`${url}/scores`, 'POST', { score: 70, questions: [{ id: 'x' }] });
+  assert.equal(sans.status, 201);
+  assert.equal(sans.data.scores.at(-1).score, 70);
+  assert.equal(sans.data.scores.at(-1).questions, undefined);
 });
 
 test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {
@@ -785,7 +837,7 @@ test('Dépassement : le prof reçoit la consigne de l\'encart et des questions b
   const argsLibre = await fs.readFile(path.join(dossier, `args-${libre.id}`), 'utf8');
   assert.match(argsLibre, /🚀 Pour aller plus loin/);
   assert.match(argsLibre, /2 ou 3 questions bonus/);
-  assert.match(argsLibre, /bonus: \{ reussies/);
+  assert.match(argsLibre, /"bonus": true/); // question bonus déclarée au Kit
 
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const revision = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;

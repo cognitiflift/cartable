@@ -2,7 +2,8 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, validerScore, validerBonus, etoilesGagnees } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
+import { resultatQuiz } from './lib/resultats.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 
@@ -14,7 +15,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const store = createStore(ELEVES);
 const SUJET_MAX = 80; // sujet libre, après trim
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.md': 'text/markdown; charset=utf-8' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
@@ -182,10 +183,10 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
 // seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz, et un Défi réussi
 // met aussi fin à la phase Réviser.
 // Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le prof peut seulement le commenter.
-async function retourQuiz(slug, id, { score, page, bonus }) {
-  const arrondi = validerScore(score);
+// Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
+async function retourQuiz(slug, id, { score, page, bonus, questions }) {
+  const { score: arrondi, bonus: resultatBonus } = resultatQuiz({ score, bonus, questions });
   const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
-  const resultatBonus = validerBonus(bonus);
   const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
   const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
   const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });

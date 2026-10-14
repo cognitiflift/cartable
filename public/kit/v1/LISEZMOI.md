@@ -71,7 +71,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - `reponses` : 2 à 5 réponses en texte. Le Kit les mélange : n'écris pas « toutes les réponses ci-dessus ».
   - `bonne` : index (à partir de 0) de la bonne réponse dans `reponses`.
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
-  - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score.
+  - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score. Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
 
 Une question mal formée est ignorée. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.

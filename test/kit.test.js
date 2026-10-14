@@ -65,3 +65,18 @@ test('Kit : un quiz tout juste vaut 100 %, sans champ bonus quand il n\'a pas de
   assert.equal(message.bonus, undefined);
   assert.deepEqual(message.objectifs, [3]);
 });
+
+test('Kit : une question dont l\'énoncé commence par 🚀 est une question bonus, même sans "bonus": true', () => {
+  const quiz = lireQuiz({
+    objectifs: [1],
+    questions: [
+      { id: 'q1', type: 'qcm', enonce: 'Question comptée', reponses: ['a', 'b'], bonne: 0 },
+      { id: 'b1', type: 'qcm', enonce: '🚀 Pour aller plus loin', reponses: ['a', 'b'], bonne: 0 },
+    ],
+  });
+  assert.equal(quiz.questions[1].bonus, true);
+  assert.equal(quiz.questions[1].enonce, 'Pour aller plus loin', 'le 🚀 est affiché par le Kit, pas répété');
+  const message = messageScore(quiz, { q1: 0, b1: 1 }, 'p.html');
+  assert.equal(message.score, 100);
+  assert.deepEqual(message.bonus, { reussies: 0, total: 1 });
+});

@@ -43,6 +43,8 @@ export function bonusDesQuestions(questions) {
   return total ? { reussies: justes, total } : null;
 }
 
+const ROCKET = /^🚀\s*/u;
+
 function questionValide(q) {
   if (!q || typeof q !== 'object') return null;
   const [id, enonce] = [texte(q.id, ID_MAX), texte(q.enonce)];
@@ -51,14 +53,17 @@ function questionValide(q) {
   const reponses = q.reponses.map((r) => texte(r));
   if (!reponses.every(Boolean)) return null;
   if (!Number.isInteger(q.bonne) || q.bonne < 0 || q.bonne >= reponses.length) return null;
+  // Un énoncé qui commence par 🚀 marque une question bonus, même sans `bonus: true` (oubli constaté du prof) : elle
+  // reste hors score. Le 🚀 est retiré de l'énoncé, le Kit l'affiche lui-même.
+  const fusee = ROCKET.test(enonce);
   return {
     id,
     type: 'qcm',
-    enonce,
+    enonce: fusee ? texte(enonce.replace(ROCKET, '')) ?? enonce : enonce,
     reponses,
     bonne: q.bonne,
     explication: texte(q.explication) ?? '',
-    bonus: q.bonus === true,
+    bonus: q.bonus === true || fusee,
     ...(Array.isArray(q.objectifs) && { objectifs: numeros(q.objectifs) }),
   };
 }

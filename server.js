@@ -4,8 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
+import { texteRetourQuiz } from './lib/retour.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -68,11 +69,11 @@ function preambule(prompt, lecon) {
 }
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
-// La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
-// Un Retour de quiz garde en plus le titre annoncé par sa ligne ENSUITE (retirée du texte).
+// La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées.
 // `tache` : type de tâche du tour, gardé avec son coût ; par défaut, première Séance tant que la Leçon n'a aucune
-// Page de leçon, page ensuite.
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details, etatLecon, tache }) {
+// Page de leçon, page ensuite. `resultatsQuiz: false` : le prompt porte déjà les résultats du dernier quiz (Rebond),
+// le préambule de relais ne les répète pas.
+async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
@@ -82,16 +83,14 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, detai
     const neuve = RELAIS && lecon.pages.length > 0;
     const { reponse, sessionId, cout } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon)}\n\n${prompt}` : preambule(prompt, lecon),
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz })}\n\n${prompt}` : preambule(prompt, lecon),
       sessionId: neuve ? null : lecon.sessionId,
       consignes: consignesLecon(profil),
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    const annonce = details?.retourQuiz ? extraireEnsuite(reponse) : { texte: reponse };
-    const { texte, choix } = extraireChoix(annonce.texte);
-    if (annonce.ensuite) details = { ...details, retourQuiz: { ...details.retourQuiz, ensuite: annonce.ensuite } };
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon, cout: cout && { ...cout, relais: neuve } });
+    const { texte, choix } = extraireChoix(reponse);
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon, cout: cout && { ...cout, relais: neuve } });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
@@ -180,14 +179,16 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
   return tourDeParole({ slug, id: lecon.id, prompt, affiche, premier: true });
 }
 
-// Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
-// Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision (date de fin posée une
-// seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz, et un Défi réussi
-// met aussi fin à la phase Réviser.
-// Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le prof peut seulement le commenter.
+// Fin de quiz : Retour de quiz instantané (ADR 0002), composé par l'appli sans tour du prof ; il porte l'action que
+// l'appli propose ensuite. Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision
+// (date de fin posée une seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de
+// quiz, et un Défi réussi met aussi fin à la phase Réviser.
+// Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le Retour le salue seulement.
 // Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
-async function retourQuiz(slug, id, { score, page, bonus, questions }) {
-  const { score: arrondi, bonus: resultatBonus } = resultatQuiz({ score, bonus, questions });
+async function retourQuiz(slug, id, { score, bonus, questions }) {
+  const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
+  // Pas d'écriture concurrente de l'état pendant qu'un tour du prof est en cours sur cette Leçon.
+  if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
   const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
   const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
@@ -195,12 +196,9 @@ async function retourQuiz(slug, id, { score, page, bonus, questions }) {
   const retour = {
     score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
   };
-  return tourDeParole({
-    slug, id,
-    prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '', mode }),
-    affiche: `📝 Quiz terminé : ${retour.score} %`,
-    premier: false,
-    tache: 'page',
+  await store.enregistrerTour(slug, id, {
+    question: `📝 Quiz terminé : ${retour.score} %`,
+    reponse: texteRetourQuiz({ ...retour, questions: resultats }),
     details: { retourQuiz: retour },
     etatLecon: {
       defiEnCours: false,
@@ -209,6 +207,7 @@ async function retourQuiz(slug, id, { score, page, bonus, questions }) {
       ...(action === 'terminee' && { terminee: termineeApres }),
     },
   });
+  return store.lireLecon(slug, id);
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -220,7 +219,7 @@ async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
   const lecon = await store.lireLecon(slug, id);
   if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
-  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', etatLecon: ETAT_APRES_REBOND[action] });
+  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.

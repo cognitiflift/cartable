@@ -248,7 +248,8 @@ async function ecranSession(profil, id) {
     if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
-      const { action, score, ensuite, nouvellesEtoiles } = prof.retourQuiz;
+      const { action, score, nouvellesEtoiles } = prof.retourQuiz;
+      const { ensuite } = lecon; // titre prévu par le prof (lesson.json), ou annoncé par un ancien Retour de quiz
       contenu = h('div', { className: 'apres-quiz' },
         nouvellesEtoiles?.length > 0 && h('div', { className: 'nouvelle-etoile' }, '⭐ Nouvelle étoile !'),
         !retourFerme && h('div', { className: 'retour' },
@@ -295,7 +296,7 @@ async function ecranSession(profil, id) {
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();
     } catch (e) { return (erreur.textContent = e.message); }
-    tour({ texte: '⏳ Ton prof regarde ton quiz…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
+    tour({ texte: '⏳ Un instant…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
   };
   window.addEventListener('message', recevoirScore);
   quitterEcran = () => window.removeEventListener('message', recevoirScore);

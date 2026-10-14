@@ -19,8 +19,8 @@ before(async () => {
   // `ecrire-puis-echouer` le fait échouer après avoir écrit d'autres idées. Dans une Leçon, il signale son démarrage (`demarre-<leçon>`)
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
-  // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait finir sa réponse par une
-  // ligne ENSUITE (titre de la prochaine page annoncée) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
+  // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait écrire dans lesson.json
+  // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
   const faux = path.join(dossier, 'faux-claude.sh');
@@ -79,11 +79,8 @@ if [ -e '${dossier}/objectifs' ]; then
 else
   echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 fi
+[ -e '${dossier}/ensuite' ] && echo '{"titre":"Les volcans","categorie":"Sciences","ensuite":"Les volcans endormis"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
-if [ -e '${dossier}/ensuite' ]; then
-  printf '%s\\n' '{"result":"Bravo !\\nENSUITE: Les volcans endormis","session_id":"s-123","is_error":false'"$COUT"'}'
-  exit 0
-fi
 if [ -e '${dossier}/choix' ]; then
   printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false'"$COUT"'}'
   exit 0
@@ -155,13 +152,19 @@ test('Séance : Réponses proposées sur le message du prof, retour de quiz avec
 
   const retours = `/api/eleves/zoe-test/lecons/${lecon.id}/retours`;
   assert.equal((await appel(retours, 'POST', { score: 'beaucoup' })).status, 400);
+  // Retour de quiz instantané : composé par l'appli, sans lancer le prof.
+  const demarre = path.join(dossier, `demarre-${lecon.id}`);
+  await fs.rm(demarre);
   const retour = await appel(retours, 'POST', { score: 70, page: '0001-volcans.html' });
   assert.equal(retour.status, 200);
+  await assert.rejects(fs.access(demarre), { code: 'ENOENT' });
   const [eleve, prof] = retour.data.messages.slice(-2);
   assert.equal(eleve.texte, '📝 Quiz terminé : 70 %');
+  assert.equal(prof.role, 'agent');
+  assert.equal(prof.texte, 'Bien joué, 70 % : tu es sur la bonne voie ! 💪');
   assert.deepEqual(prof.retourQuiz, { score: 70, action: 'suivante' }); // Leçon libre : toujours Étape suivante
-  assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Quiz terminé : 0001-volcans\.html, 70 %/);
   assert.equal(retour.data.scores.length, 0); // le score s'enregistre par /scores
+  assert.equal(retour.data.cout.tours, 1); // aucun tour du prof compté pour le Retour
 });
 
 test('sujet libre : 80 caractères au plus, espaces autour non comptés', async () => {
@@ -267,34 +270,49 @@ test('Score enregistré pendant un Défi en cours : marqué « quiz de Défi »'
   assert.equal(apres.scores[1].score, 95);
 });
 
-test('Continuer : en Leçon libre, le prof annonce la suite après le quiz ; la Leçon et la liste l\'exposent', async () => {
+test('Continuer : en Leçon libre, le prof écrit la suite prévue dans lesson.json en créant la page ; la Leçon et la liste l\'exposent', async () => {
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les laves' })).data;
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
   const args = path.join(dossier, `args-${lecon.id}`);
   assert.equal(lecon.ensuite, null);
+  assert.match(await fs.readFile(args, 'utf8'), /"ensuite": "<titre court/);
 
-  const retour = (await avecFichier('ensuite', () => appel(`${url}/retours`, 'POST', { score: 40 }))).data;
-  assert.match(await fs.readFile(args, 'utf8'), /ENSUITE: <titre court>/);
-  const prof = retour.messages.at(-1);
-  assert.equal(prof.texte, 'Bravo !');
-  assert.equal(prof.retourQuiz.ensuite, 'Les volcans endormis');
-  assert.equal(retour.ensuite, 'Les volcans endormis');
-  assert.equal((await appel(url)).data.ensuite, 'Les volcans endormis');
+  const page = await avecFichier('ensuite', () => message(lecon, 'ok'));
+  assert.equal(page.data.ensuite, 'Les volcans endormis');
   assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).ensuite, 'Les volcans endormis');
 
-  // Étape suivante : le prof se voit rappeler le titre annoncé.
-  await appel(`${url}/retours`, 'POST', { score: 90 }); // sans ligne ENSUITE : plus de titre annoncé
-  assert.equal((await appel(url)).data.ensuite, null);
-  await avecFichier('ensuite', () => appel(`${url}/retours`, 'POST', { score: 90 }));
+  // Le Retour de quiz, instantané, garde le titre annoncé ; l'Étape suivante le rappelle au prof.
+  const retour = (await appel(`${url}/retours`, 'POST', { score: 40 })).data;
+  assert.equal(retour.ensuite, 'Les volcans endormis');
   assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 200);
   assert.match(await fs.readFile(args, 'utf8'), /annoncé cette page : « Les volcans endormis »/);
+  // La nouvelle page n'annonce rien : plus de titre annoncé.
+  assert.equal((await appel(url)).data.ensuite, null);
+});
+
+test('Continuer : une ancienne Leçon libre garde le titre annoncé par son dernier Retour de quiz, tant que lesson.json n\'en a pas', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les geysers' })).data;
+  const dir = path.join(eleves, 'zoe-test', 'lecons', lecon.id);
+  const etat = JSON.parse(await fs.readFile(path.join(dir, 'etat.json'), 'utf8'));
+  etat.messages.push(
+    { role: 'eleve', texte: '📝 Quiz terminé : 70 %' },
+    { role: 'agent', texte: 'Bravo !', retourQuiz: { score: 70, action: 'suivante', ensuite: 'Les geysers d\'Islande' } },
+  );
+  await fs.writeFile(path.join(dir, 'etat.json'), JSON.stringify(etat));
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  assert.equal((await appel(url)).data.ensuite, 'Les geysers d\'Islande');
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).ensuite, 'Les geysers d\'Islande');
+
+  // Dès que le prof l'écrit dans lesson.json, c'est ce titre-là qui compte.
+  await fs.writeFile(path.join(dir, 'lesson.json'), JSON.stringify({ titre: 'Les geysers', ensuite: 'Les sources chaudes' }));
+  assert.equal((await appel(url)).data.ensuite, 'Les sources chaudes');
 });
 
 test('Continuer : une Leçon de révision n\'annonce pas de suite', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
-  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const lecon = await avecFichier('ensuite', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
+  assert.equal(lecon.ensuite, null);
   await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/retours`, 'POST', { score: 85 });
-  assert.doesNotMatch(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /ENSUITE/);
   assert.equal((await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data.ensuite, null);
 });
 
@@ -339,7 +357,7 @@ test('Leçon terminée : un Défi réussi termine la Leçon de révision, un Dé
   assert.equal((await rebond('defi')).status, 200);
   const reussi = await retour(90);
   assert.deepEqual(reussi.messages.at(-1).retourQuiz, { score: 90, action: 'terminee', nouvellesEtoiles: ['defi'] });
-  assert.match(await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8'), /Leçon est terminée/);
+  assert.match(reussi.messages.at(-1).texte, /ta Leçon est terminée/);
   const terminee = reussi.terminee;
   assert.ok(!Number.isNaN(Date.parse(terminee)));
   assert.equal((await resume()).terminee, terminee);
@@ -727,6 +745,32 @@ test('Résultats par question : enregistrés avec le score, questions mal formé
   assert.equal(sans.data.scores.at(-1).questions, undefined);
 });
 
+test('Résultats par question : la consigne du Rebond suivant porte les questions ratées et les réponses choisies, une seule fois', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const args = path.join(dossier, `args-${lecon.id}`);
+  const corps = {
+    score: 50, page: '0001-volcans.html',
+    questions: [
+      { id: 'q1', enonce: 'Qu’est-ce que le magma ?', choisie: 'De la lave refroidie', bonne: 'De la roche fondue', juste: false, bonus: false },
+      { id: 'q2', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false },
+    ],
+  };
+  await appel(`${url}/scores`, 'POST', corps);
+  const retour = (await appel(`${url}/retours`, 'POST', corps)).data;
+  assert.deepEqual(retour.rebondsProposes, ['revoir']);
+  assert.match(retour.messages.at(-1).texte, /Tu as trouvé 1 réponse sur 2\./);
+
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(args, 'utf8');
+  assert.match(consigne, /Rebond : Revoir/);
+  assert.match(consigne, /« Qu’est-ce que le magma \? » : il a choisi « De la lave refroidie », la bonne réponse était « De la roche fondue »/);
+  assert.match(consigne, /reprends nommément chacune des questions ratées/);
+  assert.match(consigne, /court encart sur ce qu'il a raté/);
+  assert.equal(consigne.split('Résultats du dernier quiz').length, 2); // pas répétés par le préambule de relais
+});
+
 test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
@@ -737,7 +781,6 @@ test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision,
     await appel(`${url}/scores`, 'POST', { page: '0001-volcans.html', ...corps });
     return (await appel(`${url}/retours`, 'POST', { page: '0001-volcans.html', ...corps })).data;
   };
-  const args = path.join(dossier, `args-${lecon.id}`);
 
   assert.deepEqual(lecon.etoiles, { quiz: false, bonus: false, defi: false });
   assert.deepEqual((await resume()).etoiles, { quiz: false, bonus: false, defi: false });
@@ -746,12 +789,12 @@ test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision,
   const bonus = await quiz({ score: 60, bonus: { reussies: 2, total: 3 } });
   assert.deepEqual(bonus.etoiles, { quiz: false, bonus: true, defi: false });
   assert.deepEqual(bonus.messages.at(-1).retourQuiz.nouvellesEtoiles, ['bonus']);
-  assert.match(await fs.readFile(args, 'utf8'), /Nouvelle étoile/);
+  assert.match(bonus.messages.at(-1).texte, /Nouvelle Étoile : questions bonus réussies/);
 
   // Un quiz qui ne gagne rien n'annonce aucune Étoile.
   const rien = await quiz({ score: 50, bonus: { reussies: 2, total: 3 } });
   assert.equal(rien.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
-  assert.doesNotMatch(await fs.readFile(args, 'utf8'), /Nouvelle étoile/);
+  assert.doesNotMatch(rien.messages.at(-1).texte, /Étoile/);
 
   // Quiz ordinaire réussi : Étoile « quiz ».
   const reussi = await quiz({ score: 85 });
@@ -812,18 +855,17 @@ test('Dépassement : le Retour de quiz accepte le résultat bonus, le Rebond et 
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
   const retour = (corps) => appel(`${url}/retours`, 'POST', { page: '0001-volcans.html', ...corps });
-  const args = path.join(dossier, `args-${lecon.id}`);
 
   // Toutes les questions bonus réussies ne rattrapent pas un quiz raté.
   const rate = await retour({ score: 70, bonus: { reussies: 3, total: 3 } });
   assert.equal(rate.status, 200);
   assert.deepEqual(rate.data.messages.at(-1).retourQuiz, { score: 70, action: 'revoir', bonus: { reussies: 3, total: 3 } });
-  assert.match(await fs.readFile(args, 'utf8'), /bonus : 3 sur 3/);
+  assert.match(rate.data.messages.at(-1).texte, /Dépassement réussi : 3 questions bonus sur 3/);
   // Un résultat invalide est ignoré sans erreur.
   const invalide = await retour({ score: 90, bonus: { reussies: 5, total: 3 } });
   assert.equal(invalide.status, 200);
   assert.deepEqual(invalide.data.messages.at(-1).retourQuiz, { score: 90, action: 'defi' });
-  assert.doesNotMatch(await fs.readFile(args, 'utf8'), /bonus : \d/);
+  assert.doesNotMatch(invalide.data.messages.at(-1).texte, /🚀/);
   // Aucune question bonus réussie n'empêche le Défi, ni sa réussite de terminer la Leçon.
   assert.equal((await retour({ score: 90, bonus: { reussies: 0, total: 2 } })).data.messages.at(-1).retourQuiz.action, 'defi');
   assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'defi' })).status, 200);
@@ -1214,19 +1256,20 @@ test('Coût mesuré : chaque tour du prof s\'ajoute au coût cumulé de la Leço
   const lecon = (await appel(lecons, 'POST', { sujet: 'les volcans' })).data;
   assert.deepEqual(lecon.cout, { coutUsd: 0.25, tours: 1, entree: 10, sortie: 100, cacheLu: 1000, cacheEcrit: 200, dureeMs: 1000 });
 
-  await appel(`${lecons}/${lecon.id}/retours`, 'POST', { score: 90 });
+  // Le Retour de quiz ne fait pas travailler le prof : il ne coûte rien.
+  assert.equal((await appel(`${lecons}/${lecon.id}/retours`, 'POST', { score: 90 })).data.cout.tours, 1);
   const apresRebond = (await appel(`${lecons}/${lecon.id}/rebonds`, 'POST', { action: 'suivante' })).data;
-  assert.equal(apresRebond.cout.coutUsd, 0.75);
-  assert.equal(apresRebond.cout.tours, 3);
+  assert.equal(apresRebond.cout.coutUsd, 0.5);
+  assert.equal(apresRebond.cout.tours, 2);
 
   // Un tour sans coût ni usage compte comme un tour gratuit, sans rien casser.
   const sansCout = await avecFichier('sans-cout', () => appel(`${lecons}/${lecon.id}/messages`, 'POST', { texte: 'ok' }));
   assert.equal(sansCout.status, 200);
-  assert.equal(sansCout.data.cout.coutUsd, 0.75);
-  assert.equal(sansCout.data.cout.tours, 4);
+  assert.equal(sansCout.data.cout.coutUsd, 0.5);
+  assert.equal(sansCout.data.cout.tours, 3);
 
-  assert.equal((await appel(`${lecons}/${lecon.id}`)).data.cout.coutUsd, 0.75);
-  assert.equal((await appel(lecons)).data.find((l) => l.id === lecon.id).cout.coutUsd, 0.75);
+  assert.equal((await appel(`${lecons}/${lecon.id}`)).data.cout.coutUsd, 0.5);
+  assert.equal((await appel(lecons)).data.find((l) => l.id === lecon.id).cout.coutUsd, 0.5);
   await attendrePropositions('cout-lecon');
 });
 
@@ -1238,7 +1281,7 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   const lecons = '/api/eleves/cout-eleve/lecons';
   const a = (await appel(lecons, 'POST', { sujet: 'les volcans' })).data;
   await appel(`${lecons}/${a.id}/messages`, 'POST', { texte: 'ok' }); // la Leçon a déjà sa page : tour de page
-  await appel(`${lecons}/${a.id}/retours`, 'POST', { score: 90 }); // Retour de quiz : tour de page
+  await appel(`${lecons}/${a.id}/retours`, 'POST', { score: 90 }); // Retour de quiz : aucun tour du prof
   await appel(`${lecons}/${a.id}/rebonds`, 'POST', { action: 'suivante' });
   const b = await avecFichier('refuser', async () => (await appel(lecons, 'POST', { sujet: 'un sujet bizarre' })).data);
   await avecFichier('refuser', () => appel(`${lecons}/${b.id}/messages`, 'POST', { texte: 'Je ne sais pas' })); // toujours sans page
@@ -1248,9 +1291,9 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.equal(status, 200);
   const parId = Object.fromEntries(data.lecons.map((l) => [l.id, l]));
   assert.equal(parId[a.id].titre, 'Les volcans');
-  assert.equal(parId[a.id].total.coutUsd, 1);
+  assert.equal(parId[a.id].total.coutUsd, 0.75);
   assert.deepEqual(Object.fromEntries(Object.entries(parId[a.id].parTache).map(([t, c]) => [t, c.tours])),
-    { premiereSeance: 1, page: 2, rebond: 1, propositions: 0 });
+    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0 });
   assert.equal(parId[b.id].total.coutUsd, 0.5);
   assert.equal(parId[b.id].parTache.premiereSeance.tours, 2);
 
@@ -1258,10 +1301,10 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.ok(propositions.tours >= 2); // à la création, puis après les tours de séance
   assert.equal(propositions.coutUsd, propositions.tours * 0.0625);
   assert.equal(data.parTache.premiereSeance.coutUsd, 0.75);
-  assert.equal(data.parTache.page.coutUsd, 0.5);
+  assert.equal(data.parTache.page.coutUsd, 0.25);
   assert.equal(data.parTache.rebond.coutUsd, 0.25);
-  assert.equal(data.total.coutUsd, 1.5 + propositions.coutUsd);
-  assert.equal(data.total.tours, 6 + propositions.tours);
+  assert.equal(data.total.coutUsd, 1.25 + propositions.coutUsd);
+  assert.equal(data.total.tours, 5 + propositions.tours);
 
   assert.equal((await appel('/api/eleves/inconnu/couts')).status, 404);
 });

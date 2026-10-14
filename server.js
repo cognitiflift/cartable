@@ -2,9 +2,11 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, validerScore, validerBonus, etoilesGagnees } from './lib/store.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, extraireEnsuite, actionRetourQuiz, promptRetourQuiz, promptDemarrageLibre, consigneRebond, REBONDS } from './lib/agent.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
+import { resultatQuiz } from './lib/resultats.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
+import { texteRetourQuiz } from './lib/retour.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -14,7 +16,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const store = createStore(ELEVES);
 const SUJET_MAX = 80; // sujet libre, après trim
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.md': 'text/markdown; charset=utf-8' };
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
@@ -50,15 +52,17 @@ async function envoyerFichier(res, base, relatif) {
   }
 }
 
-// À chaque tour après le premier (quand l'Élève Continue sa Leçon), l'agent reçoit les scores récents pour cibler les
-// erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a pas encore (Leçons d'avant les Objectifs),
-// la demande de fixer ses Objectifs.
-function preambule(prompt, lecon) {
+// Tour repris dans la session en cours (première Séance, ou CARTABLE_RELAIS=0) : l'agent reçoit les scores récents et
+// les résultats du dernier quiz pour cibler les erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a
+// pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs. `resultatsQuiz: false` : comme pour le
+// préambule de relais.
+function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   const lignes = [];
   if (lecon.scores.length) {
     const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
     const m = lecon.maitrise;
     lignes.push(`[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]`);
+    if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1)));
   }
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
@@ -67,25 +71,28 @@ function preambule(prompt, lecon) {
 }
 
 // `prompt` part vers l'agent ; `affiche` est ce que l'élève voit de son propre message.
-// La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées et les `details` éventuels.
-// Un Retour de quiz garde en plus le titre annoncé par sa ligne ENSUITE (retirée du texte).
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, details, etatLecon }) {
+// La réponse du prof est stockée sans sa ligne CHOIX, avec ses Réponses proposées.
+// `tache` : type de tâche du tour, gardé avec son coût ; par défaut, première Séance tant que la Leçon n'a aucune
+// Page de leçon, page ensuite. `resultatsQuiz: false` : le prompt porte déjà les résultats du dernier quiz (Rebond),
+// le préambule de relais ne les répète pas.
+async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
-    const { reponse, sessionId } = await lancerAgent({
+    // Session neuve dès que la Leçon a sa première page : le prof relance le skill teach et reçoit le préambule de relais.
+    const neuve = RELAIS && lecon.pages.length > 0;
+    const { reponse, sessionId, cout } = await lancerAgent({
       cwd: store.leconDir(slug, id),
-      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : preambule(prompt, lecon),
-      sessionId: lecon.sessionId,
+      prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz })}\n\n${prompt}` : preambule(prompt, lecon, { resultatsQuiz }),
+      sessionId: neuve ? null : lecon.sessionId,
       consignes: consignesLecon(profil),
       modele: profil.modele,
+      tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    const annonce = details?.retourQuiz ? extraireEnsuite(reponse) : { texte: reponse };
-    const { texte, choix } = extraireChoix(annonce.texte);
-    if (annonce.ensuite) details = { ...details, retourQuiz: { ...details.retourQuiz, ensuite: annonce.ensuite } };
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: details ?? (choix && { choix }), etatLecon });
+    const { texte, choix } = extraireChoix(reponse);
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon, cout: cout && { ...cout, relais: neuve } });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {
@@ -106,13 +113,15 @@ function genererPropositions(slug, anciennes = [], { varier = false } = {}) {
     const profil = await store.lireEleve(slug);
     const lecons = await store.listerLecons(slug);
     const dejaProposes = varier ? await store.lireHistoriquePropositions(slug) : [];
-    await lancerAgent({
+    const { cout } = await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
       prompt: `Prépare ${profil.nombrePropositions} Propositions de nouvelles Leçons pour cet élève.`,
       consignes: consignesPropositions(profil, lecons, dejaProposes),
       modele: profil.modele,
+      tache: 'propositions',
       teach: false,
     });
+    await store.enregistrerCoutPropositions(slug, cout);
   })()
     .catch((e) => console.error(`Propositions de ${slug} : ${e.message}`))
     .then(async () => {
@@ -172,34 +181,40 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
   return tourDeParole({ slug, id: lecon.id, prompt, affiche, premier: true });
 }
 
-// Fin de quiz : le prof commente le score ; son message porte l'action que l'appli propose ensuite.
-// Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision (date de fin posée une
-// seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de quiz, et un Défi réussi
-// met aussi fin à la phase Réviser.
-// Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le prof peut seulement le commenter.
-async function retourQuiz(slug, id, { score, page, bonus }) {
-  const arrondi = validerScore(score);
-  const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
-  const resultatBonus = validerBonus(bonus);
-  const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
-  const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
-  const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
-  const retour = {
-    score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
-  };
-  return tourDeParole({
-    slug, id,
-    prompt: promptRetourQuiz({ ...retour, page: typeof page === 'string' ? page : '', mode }),
-    affiche: `📝 Quiz terminé : ${retour.score} %`,
-    premier: false,
-    details: { retourQuiz: retour },
-    etatLecon: {
-      defiEnCours: false,
-      scoresCommentes: scores.length,
-      ...(defiEnCours && arrondi >= QUIZ_REUSSI && { reviserEnCours: false }),
-      ...(action === 'terminee' && { terminee: termineeApres }),
-    },
-  });
+// Fin de quiz : Retour de quiz instantané (ADR 0002), composé par l'appli sans tour du prof ; il porte l'action que
+// l'appli propose ensuite. Le score lui-même s'enregistre par /scores. Un Défi réussi termine la Leçon de révision
+// (date de fin posée une seule fois, jamais retirée) ; dans tous les cas, le Défi en cours prend fin avec ce Retour de
+// quiz, et un Défi réussi met aussi fin à la phase Réviser.
+// Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le Retour le salue seulement.
+// Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
+async function retourQuiz(slug, id, { score, bonus, questions }) {
+  const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
+  // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
+  if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
+  enCours.add(id);
+  try {
+    const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
+    const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
+    const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
+    const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
+    const retour = {
+      score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
+    };
+    await store.enregistrerTour(slug, id, {
+      question: `📝 Quiz terminé : ${retour.score} %`,
+      reponse: texteRetourQuiz({ ...retour, questions: resultats, rang: scores.length }),
+      details: { retourQuiz: retour },
+      etatLecon: {
+        defiEnCours: false,
+        scoresCommentes: scores.length,
+        ...(defiEnCours && arrondi >= QUIZ_REUSSI && { reviserEnCours: false }),
+        ...(action === 'terminee' && { terminee: termineeApres }),
+      },
+    });
+    return await store.lireLecon(slug, id);
+  } finally {
+    enCours.delete(id);
+  }
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -211,7 +226,7 @@ async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
   const lecon = await store.lireLecon(slug, id);
   if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
-  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, etatLecon: ETAT_APRES_REBOND[action] });
+  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
@@ -238,6 +253,8 @@ async function api(req, res, segments) {
   } else if (!r2) {
     if (m === 'GET') return json(res, 200, await store.lireEleve(slug));
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
+  } else if (r2 === 'couts' && !id) {
+    if (m === 'GET') return json(res, 200, await store.lireCouts(slug));
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));

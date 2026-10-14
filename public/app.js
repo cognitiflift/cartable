@@ -81,10 +81,20 @@ async function ecranNouvelEleve() {
 }
 
 async function ecranProfil(profil) {
+  // Pour le parent : Coût d'un tour cumulé (CONTEXT.md), un indicateur relatif du quota partagé de l'abonnement, pas de
+  // l'argent dépensé : affiché en tokens, avec son équivalent indicatif au tarif de l'API. Jamais pendant la Séance.
+  const cout = h('p', { className: 'cout' });
   montrer(...formulaireProfil({ profil, titre: 'Mon profil', envoyer: async (champs) => {
     await api(`eleves/${profil.slug}`, { method: 'PUT', body: champs });
     location.hash = '#/';
-  } }));
+  } }), cout);
+  const couts = await api(`eleves/${profil.slug}/couts`).catch(() => null);
+  if (couts) {
+    const { coutUsd, tours, entree, sortie, cacheLu, cacheEcrit } = couts.total;
+    const tokens = (entree + sortie + cacheLu + cacheEcrit).toLocaleString('fr-BE', { notation: 'compact', maximumFractionDigits: 1 });
+    const equivalent = coutUsd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+    cout.textContent = `Quota utilisé (indicatif) : ${tokens} tokens en ${tours} appel${tours > 1 ? 's' : ''} au prof, l'équivalent de ${equivalent} au tarif de l'API. Ce n'est pas une dépense : l'abonnement se mesure en quota partagé.`;
+  }
 }
 
 const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };
@@ -241,9 +251,9 @@ async function ecranSession(profil, id) {
     if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
-      const { action, score, ensuite, nouvellesEtoiles } = prof.retourQuiz;
+      const { action, score } = prof.retourQuiz;
+      const { ensuite } = lecon; // titre prévu par le prof (lesson.json), ou annoncé par un ancien Retour de quiz
       contenu = h('div', { className: 'apres-quiz' },
-        nouvellesEtoiles?.length > 0 && h('div', { className: 'nouvelle-etoile' }, '⭐ Nouvelle étoile !'),
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
@@ -288,7 +298,7 @@ async function ecranSession(profil, id) {
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();
     } catch (e) { return (erreur.textContent = e.message); }
-    tour({ texte: '⏳ Ton prof regarde ton quiz…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
+    tour({ texte: '⏳ Un instant…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
   };
   window.addEventListener('message', recevoirScore);
   quitterEcran = () => window.removeEventListener('message', recevoirScore);

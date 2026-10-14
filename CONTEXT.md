@@ -15,7 +15,7 @@ Nom choisi par l'Élève pour se reconnaître au démarrage.
 Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut) et **Modèle** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
 
 **Modèle**:
-Modèle de langage avec lequel l'agent travaille pour un Élève (Séances comme Propositions), choisi dans une liste fermée ; Haiku par défaut. Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.
+Modèle de langage avec lequel l'agent écrit les Pages de leçon d'un Élève, choisi dans une liste fermée ; Sonnet par défaut pour un nouveau Profil (un Profil existant garde le sien). Les Propositions utilisent toujours Haiku, et un **Modèle de secours** prend le relais quand le Modèle choisi n'est pas disponible. Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.
 _Avoid_: IA (trop vague : désigne aussi bien l'agent)
 
 **Niveau de scolarité**:
@@ -67,7 +67,15 @@ Réponse que l'agent soumet à l'Élève quand il lui pose une question (2 à 4 
 _Avoid_: suggestion (confusion avec Proposition)
 
 **Retour de quiz**:
-Court commentaire de l'agent sur le score d'un quiz de page, affiché avec le **Rebond**.
+Court message affiché aussitôt après un quiz de page, avec le **Rebond** : l'appli le compose elle-même à partir de phrases préparées (score, Étoiles gagnées, ce qui est réussi), sans attendre l'agent. L'agent commente les questions ratées en tête de la Page de leçon suivante.
+
+**Kit**:
+Composants servis par l'appli elle-même à toute nouvelle Page de leçon : le quiz et le style de base (lisibilité, couleur de la Catégorie, mode sombre). L'agent n'y écrit que les questions, sous forme de données ; il garde la liberté d'ajouter à sa Leçon des composants propres au sujet.
+_Avoid_: composants (seul : ambigu avec ceux de la Leçon), bibliothèque
+
+**Coût d'un tour**:
+Ce que consomme un appel à l'agent (tokens et coût indicatif), avec le type de tâche qui l'a demandé ; cumulé par Leçon et par Élève. Indicateur relatif : avec l'abonnement Pro, il se mesure en quota partagé, pas en argent dépensé.
+_Avoid_: prix, facture
 
 **Rebond**:
 Ce que l'appli propose à l'Élève après un quiz, d'après le score de ce quiz (pas la Maîtrise) : pour une Leçon de révision (ou une Leçon qu'on Révise), **Revoir** sous 80 % (une page qui reprend autrement ce qui est raté), sinon **Défi** (une page plus difficile, dont la réussite termine la Leçon de révision) ; pour une Leçon libre, toujours **Étape suivante** (la page nouvelle que l'agent choisit selon la zone proximale de l'Élève, dans la même Leçon).

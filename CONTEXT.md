@@ -89,9 +89,6 @@ _Avoid_: suggestion (confusion avec Proposition)
 **Retour de quiz**:
 Court message affiché aussitôt après un quiz de page, avec le **Rebond** : l'appli le compose elle-même à partir de phrases préparées (score, Étoiles gagnées, ce qui est réussi), sans attendre l'agent. L'agent commente les questions ratées en tête de la Page de leçon suivante.
 
-**Confiance**:
-Ce que l'Élève indique après avoir choisi une réponse d'un quiz, avant la correction : « sûr » ou « pas sûr ». Elle accompagne chaque résultat par question mais ne change jamais le score. Les erreurs commises « sûr » sont signalées à l'agent, qui les retravaille en priorité.
-
 **Kit**:
 Composants servis par l'appli elle-même à toute nouvelle Page de leçon : le quiz et le style de base (lisibilité, couleur de la Catégorie, mode sombre). L'agent n'y écrit que les questions, sous forme de données ; il garde la liberté d'ajouter à sa Leçon des composants propres au sujet.
 _Avoid_: composants (seul : ambigu avec ceux de la Leçon), bibliothèque

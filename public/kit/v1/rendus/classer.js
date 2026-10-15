@@ -1,7 +1,8 @@
 // Kit v1 — rendu de « classer » (spec #48, ticket #71) : les éléments mélangés, à ranger, puis une case par catégorie.
 // L'élément sélectionné (au départ, le premier à ranger) se range en touchant le bouton de sa catégorie ; la sélection
-// passe alors au suivant. Toucher un élément, rangé ou non, le sélectionne pour le (re)ranger. « Valider » quand tout
-// est rangé.
+// passe alors au suivant. Toucher un élément, rangé ou non, le sélectionne pour le (re)ranger ; toucher l'élément déjà
+// sélectionné le laisse sélectionné (l'élève qui suit « touche un élément, puis la catégorie » ne le désélectionne pas).
+// « Valider » quand tout est rangé.
 import { el } from '../dom.js';
 import { melanger, reponseAttendue } from '../quiz-logique.js';
 import { elementsDe } from '../types/classer.js';
@@ -19,7 +20,7 @@ export function rendreClasser(q, { quandPrete }) {
     const bouton = el('button', { type: 'button', className: 'kit-quiz-reponse kit-classer-element' }, texte);
     bouton.addEventListener('click', () => {
       if (valider.fige) return;
-      selection = selection === i ? null : i;
+      selection = i;
       rafraichir();
     });
     return bouton;

@@ -149,8 +149,19 @@ const JOUR = 86_400_000;
 
 test('Maîtrise : avec des Questions, moyenne de leur probabilité de se souvenir aujourd’hui, pas des scores', () => {
   const t = '2026-10-01T10:00:00.000Z';
-  // Juste après les réponses : l'Élève s'en souvient à coup sûr, même si le quiz était raté.
-  assert.deepEqual(maitriseAvec([score(40)], Date.parse(t), [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 100, palier: 'acquis' });
+  // Juste après les réponses : la Question sue compte 100 %, la Question ratée 0 %.
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t), [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 50, palier: 'à consolider' });
+});
+
+test('Maîtrise : une Question dont la dernière réponse est ratée compte 0, jusqu’à une réponse juste', () => {
+  const t = '2026-10-01T10:00:00.000Z';
+  const lendemain = new Date(Date.parse(t) + JOUR).toISOString();
+  const ratee = { date: t, juste: false, jeNeSaisPas: true, origine: 'quiz' };
+  // « Je ne sais pas » compte comme raté, même trois jours plus tard.
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], ratee)]), { pourcentage: 0, palier: 'non acquis' });
+  // Réussie le lendemain (Révision du jour) : elle compte de nouveau, 100 % ; la Question sue la veille ≈ 96 %.
+  const questions = [qBanque([1], juste(t)), qBanque([2], faux(t), juste(lendemain, { origine: 'revision' }))];
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(lendemain), questions), { pourcentage: 98, palier: 'acquis' });
 });
 
 test('Maîtrise : avec des Questions, elle baisse avec l’oubli, paliers 80 % et 50 % inchangés', () => {
@@ -164,10 +175,10 @@ test('Maîtrise : avec des Questions, elle baisse avec l’oubli, paliers 80 % e
   assert.equal(maitriseAvec([score(100)], Date.parse(t) + 365 * JOUR, questions).palier, 'non acquis');
 });
 
-test('Maîtrise : une Question ratée s’oublie plus vite qu’une Question sue', () => {
+test('Maîtrise : une Question ratée et pas encore réussie ne remonte pas avec le temps', () => {
   const t = '2026-10-01T10:00:00.000Z';
-  // Trois jours plus tard : sue (S = 3,173) ≈ 90 %, ratée (S = 0,40255) ≈ 60 % ; moyenne ≈ 75 %.
-  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 75, palier: 'à consolider' });
+  // Trois jours plus tard : sue (S = 3,173) ≈ 90 %, ratée 0 % ; moyenne ≈ 45 %.
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 45, palier: 'non acquis' });
 });
 
 test('Maîtrise : sans Questions (anciennes Leçons), même calcul qu’avant', () => {

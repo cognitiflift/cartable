@@ -13,6 +13,7 @@ import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } fro
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
+import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu } from './lib/jour.js';
 
@@ -358,6 +359,18 @@ async function api(req, res, segments) {
       const reponse = await store.repondreEnRevision(slug, corps, { maintenant });
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
+    }
+  } else if (r2 === 'rythme' && !id) {
+    // Rythme (#75) : Objectif du jour, série avec jokers et récapitulatif de la semaine, pour cet Élève seul.
+    if (m === 'GET') {
+      const maintenant = maintenantDe(req.headers);
+      const lecons = await store.historiqueDuRythme(slug, { maintenant });
+      const activite = activiteParJour(lecons);
+      return json(res, 200, {
+        objectifDuJour: objectifDuJour(activite, maintenant),
+        serie: serieDeJours(activite, maintenant),
+        recapitulatif: recapitulatifSemaine(lecons, maintenant),
+      });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));

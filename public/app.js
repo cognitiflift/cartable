@@ -135,10 +135,12 @@ function badgeMaitrise(maitrise) {
 }
 
 async function ecranAccueil(profil) {
-  const [lecons, revisions] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`)]);
+  const [lecons, revisions, rythme] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`)]);
   const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
   montrer(
     h('h2', {}, `Salut ${profil.pseudo} !`),
+    recapitulatifSemaine(profil, rythme.recapitulatif),
+    carteRythme(rythme),
     carteRevisions(revisions.dues),
     comptesARebours(lecons),
     h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
@@ -153,6 +155,44 @@ async function ecranAccueil(profil) {
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
+}
+
+// Rythme (#75) : l'Objectif du jour et la série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
+// de l'effort et de ce qui a été fait, jamais de l'Élève lui-même ni des autres Élèves ; aucun reproche.
+function carteRythme({ objectifDuJour: o, serie }) {
+  const objectif = o.atteint
+    ? '🎯 Objectif du jour atteint : ton travail d’aujourd’hui compte !'
+    : `🎯 Objectif du jour : ${o.revisionsVisees} révisions (${o.revisions}/${o.revisionsVisees}) ou ${pluriel(o.pagesVisees, 'page')} de leçon`;
+  const jours = serie.jours
+    ? `🔥 ${pluriel(serie.jours, 'jour')} de suite à travailler${serie.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
+    : '🌱 Chaque jour un peu, c’est comme ça qu’on retient';
+  return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
+    h('strong', {}, objectif),
+    h('small', {}, jours,
+      serie.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serie.jokers, 'joker')}`)),
+    serie.jokersUtilises > 0 && h('small', {}, `🛡️ ${serie.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série pendant ta pause.`));
+}
+
+// Récapitulatif de la semaine passée (#75), montré au premier retour de la semaine jusqu'à ce que l'Élève le ferme
+// (mémorisé dans ce navigateur : simple confort, il réapparaît si le stockage est indisponible).
+const cleRecapitulatif = (profil, recap) => `recapitulatif-${profil.slug}-${recap.du}`;
+function recapitulatifSemaine(profil, recap) {
+  if (!recap) return null;
+  try { if (localStorage.getItem(cleRecapitulatif(profil, recap))) return null; } catch { /* stockage indisponible */ }
+  const retenus = recap.objectifsRetenus;
+  const titre = retenus
+    ? `Cette semaine, tu as retenu ${retenus} ${retenus > 1 ? 'nouveaux Objectifs' : 'nouvel Objectif'} 🌟`
+    : 'Ta semaine, en résumé';
+  const faits = [recap.revisions && pluriel(recap.revisions, 'révision'), recap.pages && pluriel(recap.pages, 'page') + ' de leçon',
+    recap.joursAtteints && `objectif atteint ${recap.joursAtteints === 1 ? 'un jour' : `${recap.joursAtteints} jours`}`].filter(Boolean).join(' · ');
+  const carte = h('div', { className: 'carte recapitulatif' },
+    h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => {
+      try { localStorage.setItem(cleRecapitulatif(profil, recap), '1'); } catch { /* stockage indisponible */ }
+      carte.remove();
+    } }, '✕'),
+    h('strong', {}, `📅 ${titre}`),
+    faits && h('small', {}, `Tes efforts : ${faits}. C’est la régularité qui fait retenir.`));
+  return carte;
 }
 
 // Carte « Mes révisions du jour » (#66) : le nombre de Questions dues, d'un geste vers l'écran de révision.

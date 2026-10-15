@@ -2451,14 +2451,14 @@ test('Formats de rappel actif : en Révision du jour, le serveur corrige chaque 
   const partiel = await repondre('o1', [0, 2, 1]);
   assert.equal(partiel.status, 200);
   assert.equal(partiel.data.juste, false);
-  assert.equal(partiel.data.points, 2 / 3);
+  assert.equal(partiel.data.points, 1 / 3); // seul « Le magma monte » est à sa place
   assert.equal(partiel.data.bonne, 'Le magma monte → La lave sort → La lave refroidit');
   const juste = await repondre('t1', [0, 1]);
   assert.equal(juste.data.juste, true);
   for (const choisie of [0, [0, 0], [0, 1, 2], 'cratère']) assert.equal((await repondre('t1', choisie)).status, 400, JSON.stringify(choisie));
 
   const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
-  assert.deepEqual(questions.find((q) => q.id === 'o1').journal.at(-1), { date: LENDEMAIN, juste: false, points: 2 / 3, sur: true, origine: 'revision' });
+  assert.deepEqual(questions.find((q) => q.id === 'o1').journal.at(-1), { date: LENDEMAIN, juste: false, points: 1 / 3, sur: true, origine: 'revision' });
   assert.deepEqual(questions.find((q) => q.id === 't1').journal.at(-1), { date: LENDEMAIN, juste: true, sur: true, origine: 'revision' });
 });
 

@@ -8,20 +8,21 @@ import { texte, textes, estIndex } from './commun.js';
 
 export const CATEGORIES_MIN = 2;
 export const CATEGORIES_MAX = 4;
-export const ELEMENTS_MIN = 3;
-export const ELEMENTS_MAX = 12;
+export const CATEGORIES_NON_VIDES_MIN = 2; // une catégorie vide est un piège permis, pas toutes
+export const ELEMENTS_A_CLASSER_MIN = 3;
+export const ELEMENTS_A_CLASSER_MAX = 12;
 
-// Catégories lisibles [{ nom, elements }…] (au plus CATEGORIES_MAX, ELEMENTS_MAX éléments en tout, sans doublon de nom
-// ni d'élément), ou null.
+// Catégories lisibles [{ nom, elements }…] (au plus CATEGORIES_MAX, ELEMENTS_A_CLASSER_MAX éléments en tout, sans
+// doublon de nom ni d'élément), ou null.
 function lireCategories(v) {
   if (!Array.isArray(v) || v.length > CATEGORIES_MAX) return null;
   const categories = v.map((c) => {
-    const [nom, elements] = [texte(c?.nom), textes(c?.elements, { nombreMax: ELEMENTS_MAX })];
+    const [nom, elements] = [texte(c?.nom), textes(c?.elements, { nombreMax: ELEMENTS_A_CLASSER_MAX })];
     return nom && elements ? { nom, elements } : null;
   });
   if (!categories.every(Boolean)) return null;
   const tous = categories.flatMap((c) => c.elements);
-  if (tous.length > ELEMENTS_MAX || new Set(tous).size !== tous.length) return null;
+  if (tous.length > ELEMENTS_A_CLASSER_MAX || new Set(tous).size !== tous.length) return null;
   if (new Set(categories.map((c) => c.nom)).size !== categories.length) return null;
   return categories;
 }
@@ -36,8 +37,8 @@ export const classer = {
   valider(q) {
     const categories = lireCategories(q.categories);
     if (!categories || categories.length < CATEGORIES_MIN) return null;
-    if (categories.filter((c) => c.elements.length).length < 2) return null;
-    if (categories.flatMap((c) => c.elements).length < ELEMENTS_MIN) return null;
+    if (categories.filter((c) => c.elements.length).length < CATEGORIES_NON_VIDES_MIN) return null;
+    if (categories.flatMap((c) => c.elements).length < ELEMENTS_A_CLASSER_MIN) return null;
     return { categories };
   },
   corriger(q, reponse) {

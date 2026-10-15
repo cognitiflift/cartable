@@ -9,7 +9,7 @@ import { texte, textes, estIndex } from './commun.js';
 
 export const ETAPES_MIN = 2;
 export const ETAPES_MAX = 10;
-export const INTRUS_MAX = 4;
+export const INTRUS_PAR_ETAPE_MAX = 4;
 
 // Propositions d'une étape à compléter, avant mélange : la bonne d'abord, puis ses intrus.
 export const propositionsDe = (etape) => [etape.texte, ...etape.intrus];
@@ -17,11 +17,13 @@ export const propositionsDe = (etape) => [etape.texte, ...etape.intrus];
 // Étapes à compléter, avec leur numéro (à partir de 1) dans l'exemple.
 export const aCompleter = (q) => q.etapes.flatMap((e, i) => (e.intrus ? [{ ...e, numero: i + 1 }] : []));
 
+// Une étape écrite par le prof : { texte } à montrer telle quelle, ou { texte, intrus } à compléter (1 à
+// INTRUS_PAR_ETAPE_MAX intrus, tous différents de `texte` et entre eux) ; null si elle est mal formée.
 function validerEtape(brut) {
   const t = texte(brut?.texte);
   if (!t) return null;
   if (brut.intrus === undefined) return { texte: t };
-  const intrus = textes(brut.intrus, { nombreMax: INTRUS_MAX });
+  const intrus = textes(brut.intrus, { nombreMax: INTRUS_PAR_ETAPE_MAX });
   if (!intrus?.length || new Set([t, ...intrus]).size !== intrus.length + 1) return null;
   return { texte: t, intrus };
 }

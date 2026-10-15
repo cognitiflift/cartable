@@ -8,7 +8,7 @@
 import { texte, textes, indexDistincts, TEXTE_MAX } from './commun.js';
 
 export const TROUS_MAX = 10;
-export const INTRUS_MAX = 10;
+export const MOTS_INTRUS_MAX = 10;
 export const MOT_MAX = 100;
 
 // Banque de mots avant mélange : les mots attendus, dans l'ordre des trous, puis les intrus.
@@ -25,7 +25,7 @@ export const trous = {
     const attendus = parties.filter((_, i) => i % 2 === 1).map((m) => texte(m, MOT_MAX));
     if (!attendus.length || attendus.length > TROUS_MAX || !attendus.every(Boolean)) return null;
     if (segments.some((s) => /[[\]]/.test(s))) return null; // crochet mal fermé
-    const intrus = [...new Set(textes(q.intrus, { max: MOT_MAX }) ?? [])].filter((m) => !attendus.includes(m)).slice(0, INTRUS_MAX);
+    const intrus = [...new Set(textes(q.intrus, { max: MOT_MAX }) ?? [])].filter((m) => !attendus.includes(m)).slice(0, MOTS_INTRUS_MAX);
     if (!intrus.length) return null;
     return { segments: segments.map((s) => s.slice(0, TEXTE_MAX)), trous: attendus, intrus };
   },

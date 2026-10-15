@@ -121,7 +121,7 @@ Pour les étapes d'un processus, les événements d'une histoire ou les mots d'u
 ```
 
 - `elements` : 3 à 10 éléments, tous différents, **dans le bon ordre**.
-- Crédit partiel : les éléments déjà dans le bon ordre entre eux (il suffirait de déplacer les autres).
+- Crédit partiel : la part des éléments à leur place exacte (un ordre mélangé au hasard en place très peu).
 
 ### Exemple à étapes (mathématiques) : `"type": "etapes"`
 

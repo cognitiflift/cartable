@@ -184,7 +184,7 @@ test('Kit : remettre dans l\'ordre demande de 3 à 10 éléments différents ; m
   for (const m of malformes) assert.equal(lireQuiz({ questions: [quiz.questions[0], m] }).questions.length, 1, JSON.stringify(m));
 });
 
-test('Kit : corriger un ordre compte les éléments déjà dans le bon ordre entre eux (il suffit de déplacer les autres)', () => {
+test('Kit : corriger un ordre compte les éléments à leur place exacte (un ordre mélangé au hasard rapporte peu)', () => {
   const [q] = lireQuiz({ objectifs: [1], questions: [ordre] }).questions;
   // Réponse : les index des éléments dans l'ordre proposé par l'Élève.
   const juste = corriger(q, [0, 1, 2, 3]);
@@ -192,20 +192,22 @@ test('Kit : corriger un ordre compte les éléments déjà dans le bon ordre ent
   assert.equal(juste.points, 1);
   assert.equal(juste.bonne, 'Le magma monte → La pression augmente → La lave sort → La lave refroidit');
   assert.deepEqual(juste.detail, { ordre: ordre.elements });
-  // Une seule étape mal placée : 3 sur 4.
-  const partiel = corriger(q, [1, 2, 3, 0]);
+  // Deux étapes échangées : les deux autres sont à leur place, 2 sur 4.
+  const partiel = corriger(q, [0, 1, 3, 2]);
   assert.equal(partiel.juste, false);
-  assert.equal(partiel.points, 0.75);
-  assert.equal(partiel.choisie, 'La pression augmente → La lave sort → La lave refroidit → Le magma monte');
-  assert.equal(corriger(q, [1, 0, 3, 2]).points, 0.5);
+  assert.equal(partiel.points, 0.5);
+  assert.equal(partiel.choisie, 'Le magma monte → La pression augmente → La lave refroidit → La lave sort');
+  // Tout décalé d'un cran : dans le bon ordre entre eux, mais aucun à sa place (US20 : 80 % dur à obtenir par hasard).
+  assert.equal(corriger(q, [1, 2, 3, 0]).points, 0);
+  assert.equal(corriger(q, [1, 0, 3, 2]).points, 0);
   for (const r of [[0, 1, 2], [0, 1, 2, 2], [0, 1, 2, 4], null]) assert.equal(corriger(q, r).choisie, null, JSON.stringify(r));
 });
 
 test('Kit : le score compte le crédit partiel ; une question n\'est « juste » qu\'entièrement, et son détail passe la validation de l\'appli', () => {
   const lu = lireQuiz({ objectifs: [1], questions: [quiz.questions[0], trous, ordre] });
-  const message = messageScore(lu, { q1: 0, t1: [0, 2], o1: [1, 2, 3, 0] }, 'p.html', { t1: true, o1: false });
-  // (1 + 0,5 + 0,75) / 3 = 75 %.
-  assert.equal(message.score, 75);
+  const message = messageScore(lu, { q1: 0, t1: [0, 2], o1: [0, 1, 3, 2] }, 'p.html', { t1: true, o1: false });
+  // (1 + 0,5 + 0,5) / 3 = 67 %.
+  assert.equal(message.score, 67);
   const [, t1, o1] = message.questions;
   assert.deepEqual(t1, {
     id: 't1', type: 'trous', enonce: 'Complète la phrase.', choisie: 'La lave sort par le [cratère] du [nuage].',

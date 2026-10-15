@@ -64,6 +64,7 @@ Dans la page (`lessons/NNNN-titre.html`), avec des chemins absolus :
 Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">`. Le Kit l'affiche à cet endroit.
 
 - `objectifs` : numéros des Objectifs (de lesson.json) que couvre le quiz par défaut.
+- `pretest` (facultatif) : `true` pour le quiz du Pré-test (la page « Devine ! » de trois questions, au début d'une Leçon). Le Kit le signale à l'appli, qui le garde hors score. Indique pour chaque question les Objectifs qu'elle couvre : ceux réussis au Pré-test seront « à confirmer ».
 - `questions` : la liste, dans l'ordre d'affichage (questions bonus à la fin). Pour chaque question :
   - `id` : identifiant court, unique dans la page et stable (`q1`, `q2`, `b1`…).
   - `type` : `"qcm"` (seul format de cette version).

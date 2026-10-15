@@ -67,7 +67,7 @@ test('consigne de Réviser en Leçon libre : une page de révision des pages dé
 });
 
 test('Rebonds : une phrase lisible de l\'Élève et une consigne au prof par action fermée', () => {
-  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante', 'reviser']);
+  assert.deepEqual(Object.keys(REBONDS), ['revoir', 'defi', 'suivante', 'commencer', 'reviser']);
   assert.match(REBONDS.revoir.consigne, /Rebond : Revoir/);
   assert.match(REBONDS.revoir.consigne, /raté/);
   assert.match(REBONDS.defi.consigne, /Rebond : Défi/);
@@ -279,4 +279,20 @@ test('Préambule de relais : après un quiz raté en partie, toute nouvelle page
   assert.doesNotMatch(preambuleRelais(lecon, { resultatsQuiz: false }), /court encart/); // la consigne du Rebond le porte
   const parfait = { ...lecon, scores: [{ score: 100, page: 'p.html', date: '2026-10-01T10:00:00.000Z', questions: [{ id: 'q1', enonce: 'A ?', choisie: 'a', bonne: 'a', juste: true, bonus: false, objectifs: [] }] }] };
   assert.doesNotMatch(preambuleRelais(parfait), /court encart/);
+});
+
+test('Préambule de relais : après un Pré-test, ses résultats par question et les Objectifs « à confirmer », sans encart sur ce qui a été raté', () => {
+  const pretest = { score: 50, page: '0001-devine.html', date: '2026-10-01T10:00:00.000Z', pretest: true, questions: [
+    { id: 'q1', enonce: 'A ?', choisie: 'a', bonne: 'a', juste: true, bonus: false, objectifs: [1] },
+    { id: 'q2', enonce: 'B ?', choisie: 'x', bonne: 'b', juste: false, bonus: false, objectifs: [2], sur: true },
+  ] };
+  const objectifs = [{ texte: 'Un', atteint: false, aConfirmer: true }, { texte: 'Deux', atteint: false, aConfirmer: false }];
+  const texte = preambuleRelais({ objectifs, scores: [pretest], maitrise: null, pages: ['0001-devine.html'], messages: [] });
+  assert.match(texte, /1\. Un : à confirmer \(réussi au Pré-test\)/);
+  assert.match(texte, /2\. Deux : pas encore atteint/);
+  assert.match(texte, /50 % \(0001-devine\.html\) \(Pré-test, hors score\)/);
+  assert.match(texte, /- « A \? » \(Objectif 1\) : juste\./);
+  assert.match(texte, /- « B \? » \(Objectif 2\) : il a choisi « x », la bonne réponse était « b », il était sûr\./);
+  assert.match(texte, /À confirmer : 1 /);
+  assert.doesNotMatch(texte, /court encart|Maîtrise/);
 });

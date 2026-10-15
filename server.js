@@ -4,9 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consigneImagesRetirees, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
-import { texteRetourQuiz } from './lib/retour.js';
+import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
+import { ecartPretest } from './lib/pretest.js';
+import { compterJustes } from './public/kit/v1/quiz-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE } from './lib/cadrage.js';
 import { rapatrierImages } from './lib/images.js';
 
@@ -61,10 +63,9 @@ async function envoyerFichier(res, base, relatif) {
 function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   const lignes = [];
   if (lecon.scores.length) {
-    const recents = lecon.scores.slice(-5).map((s) => `${s.score} %${s.page ? ` (${s.page})` : ''} le ${s.date.slice(0, 10)}`);
-    const m = lecon.maitrise;
-    lignes.push(`[Scores aux quiz : ${recents.join(' ; ')}. Maîtrise : ${m.pourcentage} %, ${m.palier}.]`);
-    if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1)));
+    const m = lecon.maitrise; // null après un Pré-test seul
+    lignes.push(`[Scores aux quiz : ${lecon.scores.slice(-5).map(resumeScore).join(' ; ')}.${m ? ` Maîtrise : ${m.pourcentage} %, ${m.palier}.` : ''}]`);
+    if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1), null, lecon));
   }
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   if (!lecon.objectifs.length) {
@@ -184,7 +185,8 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
     `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle} (organise la révision espacée jusqu'à cette date)` : ''}.`,
-    `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document) avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
+    `Lis le document. Après le Pré-test viendra une révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document), avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
+    consignePremierTour('revision', cadrage),
   ].join('\n');
   const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
   return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(prompt, cadrage), affiche, premier: true });
@@ -196,13 +198,24 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
 // quiz, et un Défi réussi met aussi fin à la phase Réviser.
 // Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le Retour le salue seulement.
 // Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
-async function retourQuiz(slug, id, { score, bonus, questions }) {
+// Pré-test (`pretest: true`) : hors Étoiles et hors Rebond ordinaire, l'appli propose seulement « Commencer », et le
+// Retour montre l'écart avec « Tu en sais déjà… ».
+async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
   try {
-    const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes } = await store.lireLecon(slug, id);
+    const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
+    if (pretest === true) {
+      await store.enregistrerTour(slug, id, {
+        question: '🔮 Pré-test terminé',
+        reponse: texteRetourPretest(ecartPretest({ deja: cadrage?.deja, ...compterJustes(resultats) })),
+        details: { retourQuiz: { score: arrondi, action: 'commencer', pretest: true } },
+        etatLecon: { defiEnCours: false, scoresCommentes: scores.length },
+      });
+      return await store.lireLecon(slug, id);
+    }
     const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
     const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
     const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
@@ -244,7 +257,8 @@ async function nouvelleDepuisProposition(slug, titre, brut) {
   const proposition = (await store.lirePropositions(slug))?.find((p) => p.titre === titre);
   if (!proposition) throw new HttpError(400, "Cette idée n'est plus proposée");
   const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre', cadrage });
-  return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(proposition.titre, cadrage), affiche: proposition.titre, premier: true });
+  const prompt = `${promptCadrage(proposition.titre, cadrage)}\n${consignePremierTour('libre', cadrage)}`;
+  return tourDeParole({ slug, id: lecon.id, prompt, affiche: proposition.titre, premier: true });
 }
 
 async function api(req, res, segments) {
@@ -280,7 +294,8 @@ async function api(req, res, segments) {
         if (sujet.length > SUJET_MAX) throw new HttpError(400, `Ton sujet est trop long (${SUJET_MAX} caractères au plus)`);
         const cadrage = validerCadrage(corps.cadrage, 'libre');
         const lecon = await store.creerLecon(slug, { sujet, mode: 'libre', cadrage });
-        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(promptDemarrageLibre(sujet), cadrage), affiche: sujet, premier: true }));
+        const prompt = `${promptCadrage(promptDemarrageLibre(sujet), cadrage)}\n${consignePremierTour('libre', cadrage)}`;
+        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt, affiche: sujet, premier: true }));
       }
     } else if (!r3) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));

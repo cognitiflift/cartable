@@ -91,3 +91,13 @@ test('Kit : la Confiance (« sûr / pas sûr ») est portée par chaque résulta
   // Sans Confiance donnée pour une question, le résultat n'a pas de champ `sur`.
   assert.equal(Object.hasOwn(messageScore(lu, choix, 'p.html', { q1: false }).questions[1], 'sur'), false);
 });
+
+test('Kit : un quiz en mode Pré-test porte le marqueur dans son message ; un quiz ordinaire non', () => {
+  const choix = { q1: 0, q2: 1, q3: 0 };
+  const pretest = lireQuiz({ ...quiz, pretest: true });
+  assert.equal(pretest.pretest, true);
+  assert.equal(messageScore(pretest, choix, '0001-devine.html').pretest, true);
+  assert.equal(messageScore(pretest, choix, '0001-devine.html').score, 100); // même score qu'un quiz ordinaire
+  assert.equal(Object.hasOwn(messageScore(lireQuiz(quiz), choix, 'p.html'), 'pretest'), false);
+  assert.equal(Object.hasOwn(messageScore(lireQuiz({ ...quiz, pretest: 'oui' }), choix, 'p.html'), 'pretest'), false);
+});

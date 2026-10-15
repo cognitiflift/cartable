@@ -567,9 +567,9 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
   };
   assert.equal(lecon.niveauLecon, 1);
   assert.deepEqual(lecon.objectifs, [
-    { texte: 'Nommer les parties d’un volcan', atteint: false, retenu: false },
-    { texte: 'Expliquer une éruption', atteint: false, retenu: false },
-    { texte: 'Situer trois volcans', atteint: false, retenu: false },
+    { texte: 'Nommer les parties d’un volcan', atteint: false, retenu: false, aConfirmer: false },
+    { texte: 'Expliquer une éruption', atteint: false, retenu: false, aConfirmer: false },
+    { texte: 'Situer trois volcans', atteint: false, retenu: false, aConfirmer: false },
   ]);
   assert.equal((await resume()).niveauLecon, 1);
 
@@ -1611,4 +1611,139 @@ test('Ma fiche : la Leçon lue expose ses documents de référence (reference/*.
   const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data;
   assert.deepEqual(lue.references, ['fiche.html', 'glossaire.html']);
   assert.equal((await fetch(`${base}/fichiers/zoe-test/${lecon.id}/reference/fiche.html`)).status, 200);
+});
+
+test('Pré-test : la consigne du premier tour d\'une Leçon libre fait poser deux questions au prof, puis mission, Objectifs et Pré-test', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'curiosite', deja: 'un-peu' } })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /« À la fin, tu voudrais pouvoir… »/);
+  assert.match(args, /« Où as-tu croisé ce sujet \? »/);
+  assert.match(args, /une à la fois/);
+  assert.match(args, /Pré-test/);
+  assert.match(args, /trois questions/);
+  assert.match(args, /"pretest": true/);
+  assert.match(args, /niveau annoncé \(Tu en sais déjà… Un peu\)/);
+  assert.doesNotMatch(args, /le plus dur/);
+  // Les tours suivants de la première Séance (réponses aux questions du prof) ne la répètent pas.
+  assert.equal((await message(lecon, 'Le reconnaître dans le ciel')).status, 200);
+  assert.doesNotMatch(await argsDe(lecon), /Où as-tu croisé ce sujet/);
+});
+
+test('Pré-test : une Leçon de révision demande « Qu\'est-ce qui te semble le plus dur ? » et un Pré-test tiré du Document source', async () => {
+  const fichiers = [{ nom: 'page1.pdf', data: Buffer.from('%PDF-1.4 faux').toString('base64') }];
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { deja: 'beaucoup' } })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /« Qu'est-ce qui te semble le plus dur \? »/);
+  assert.match(args, /Pré-test/);
+  assert.match(args, /tiré du Document source/);
+  assert.match(args, /niveau annoncé \(Tu en sais déjà… Beaucoup\)/);
+  assert.doesNotMatch(args, /À la fin, tu voudrais pouvoir/);
+  assert.doesNotMatch(args, /Où as-tu croisé/);
+});
+
+test('Pré-test : sans Cadrage, la consigne du premier tour vise le niveau de l\'élève', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les marées' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /« À la fin, tu voudrais pouvoir… »/);
+  assert.match(args, /Pré-test/);
+  assert.doesNotMatch(args, /niveau annoncé/);
+});
+
+// Résultats d'un Pré-test de trois questions, tels qu'envoyés par le Kit : q1 (Objectif 1) et q2 (Objectif 2) justes, q3 (Objectif 3) ratée.
+const corpsPretest = () => ({
+  score: 67, page: '0001-volcans.html', objectifs: [1, 2, 3], pretest: true,
+  questions: [
+    { id: 'q1', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false, objectifs: [1], sur: false },
+    { id: 'q2', enonce: 'Le magma, c’est…', choisie: 'De la roche fondue', bonne: 'De la roche fondue', juste: true, bonus: false, objectifs: [2] },
+    { id: 'q3', enonce: 'Où est l’Etna ?', choisie: 'En Islande', bonne: 'En Sicile', juste: false, bonus: false, objectifs: [3], sur: true },
+  ],
+});
+
+test('Pré-test : son score est enregistré à part, hors Maîtrise, Objectifs et Étoiles ; Objectifs réussis « à confirmer »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }], cadrage: { deja: 'rien' } })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const r = await appel(`${url}/scores`, 'POST', { ...corpsPretest(), questions: corpsPretest().questions.map((q) => ({ ...q, juste: true, choisie: q.bonne })) });
+  assert.equal(r.status, 201);
+  const lue = r.data;
+  assert.equal(lue.scores.at(-1).pretest, true);
+  assert.equal(lue.scores.at(-1).score, 100);
+  assert.equal(lue.maitrise, null);
+  assert.deepEqual(lue.objectifs.map((o) => o.atteint), [false, false, false]);
+  assert.deepEqual(lue.etoiles, { quiz: false, bonus: false, defi: false });
+  assert.deepEqual(lue.objectifs.map((o) => o.aConfirmer), [true, true, true]);
+  // Un vrai quiz réussi ensuite atteint l'Objectif 1 : il n'est plus « à confirmer ».
+  const vrai = (await appel(`${url}/scores`, 'POST', { score: 100, page: '0002-volcans.html', objectifs: [1] })).data;
+  assert.deepEqual(vrai.objectifs.map((o) => [o.atteint, o.aConfirmer]), [[true, false], [false, true], [false, true]]);
+  assert.equal(vrai.maitrise.pourcentage, 100);
+  assert.equal(vrai.etoiles.quiz, true);
+  assert.equal(vrai.scores.at(-1).pretest, undefined);
+  const resume = (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  assert.deepEqual(resume.objectifs.map((o) => o.aConfirmer), [false, true, true]);
+});
+
+test('Pré-test : l\'écart avec « Tu en sais déjà… » est exposé par la Leçon', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans', cadrage: { pourquoi: 'curiosite', deja: 'rien' } })).data);
+  assert.equal(lecon.pretest, null);
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', corpsPretest())).data;
+  assert.equal(lue.pretest.ecart, 'plus');
+  assert.deepEqual([lue.pretest.deja, lue.pretest.justes, lue.pretest.total], ['rien', 2, 3]);
+  assert.match(lue.pretest.texte, /^Tu pensais découvrir ce sujet, et tu as trouvé 2 réponses sur 3 : tu en sais plus/);
+  assert.equal(lue.maitrise, null);
+});
+
+test('Pré-test : le Retour montre l\'écart, seul « Commencer » est proposé, et sa consigne porte les résultats par question', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans', cadrage: { pourquoi: 'curiosite', deja: 'beaucoup' } })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  assert.equal((await appel(`${url}/scores`, 'POST', corpsPretest())).status, 201);
+  const retour = (await appel(`${url}/retours`, 'POST', corpsPretest())).data;
+  const prof = retour.messages.at(-1);
+  assert.deepEqual(prof.retourQuiz, { score: 67, action: 'commencer', pretest: true });
+  assert.equal(retour.messages.at(-2).texte, '🔮 Pré-test terminé');
+  assert.match(prof.texte, /Tu pensais en savoir beaucoup, et tu as trouvé 2 réponses sur 3 : tu te connais bien/);
+  assert.doesNotMatch(prof.texte, /Bravo|Étoile|%/);
+  assert.deepEqual(retour.rebondsProposes, ['commencer']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 400);
+
+  const suite = await appel(`${url}/rebonds`, 'POST', { action: 'commencer' });
+  assert.equal(suite.status, 200);
+  assert.equal(suite.data.messages.at(-2).texte, '🚀 On commence !');
+  const consigne = await argsDe(lecon);
+  assert.match(consigne, /Rebond : Commencer/);
+  assert.match(consigne, /première vraie page de leçon/);
+  assert.match(consigne, /Résultats du Pré-test/);
+  assert.match(consigne, /« Où sort la lave \? » \(Objectif 1\) : juste/);
+  assert.match(consigne, /« Le magma, c’est… » \(Objectif 2\) : juste/);
+  assert.match(consigne, /« Où est l’Etna \? » \(Objectif 3\) : il a choisi « En Islande », la bonne réponse était « En Sicile »/);
+  assert.match(consigne, /À confirmer : 1, 2/);
+  assert.match(consigne, /Tu en sais déjà… Beaucoup/);
+  assert.doesNotMatch(consigne, /Résultats du dernier quiz/);
+  // Un quiz ordinaire après le Pré-test retrouve les Rebonds habituels.
+  const ordinaire = { score: 50, page: '0002-volcans.html' };
+  await appel(`${url}/scores`, 'POST', ordinaire);
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', ordinaire)).data.rebondsProposes, ['suivante']);
+});
+
+test('Pré-test : un Retour de Pré-test en Leçon de révision ne fait gagner aucune Étoile et ne propose que « Commencer »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const parfait = { ...corpsPretest(), questions: corpsPretest().questions.map((q) => ({ ...q, juste: true, choisie: q.bonne })) };
+  await appel(`${url}/scores`, 'POST', parfait);
+  const retour = (await appel(`${url}/retours`, 'POST', parfait)).data;
+  assert.equal(retour.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
+  assert.deepEqual(retour.rebondsProposes, ['commencer']);
+  assert.match(retour.messages.at(-1).texte, /Tu as trouvé 3 réponses sur 3 avant même la leçon/);
+  // Le score suivant (vrai quiz) gagne bien son Étoile, annoncée par son propre Retour.
+  await appel(`${url}/rebonds`, 'POST', { action: 'commencer' });
+  await appel(`${url}/scores`, 'POST', { score: 90 });
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 90 })).data.messages.at(-1).retourQuiz.nouvellesEtoiles, ['quiz']);
+});
+
+test('Pré-test : un marqueur invalide est ignoré, le score compte comme un quiz ordinaire', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { ...corpsPretest(), pretest: 'oui' })).data;
+  assert.equal(Object.hasOwn(lue.scores.at(-1), 'pretest'), false);
+  assert.equal(lue.maitrise.pourcentage, 67);
+  assert.equal(lue.pretest, null);
 });

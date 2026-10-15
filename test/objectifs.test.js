@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { objectifsAtteints, objectifsRetenus, niveauLecon } from '../lib/store.js';
+import { objectifsAtteints, objectifsRetenus, objectifsAConfirmer, niveauLecon, calculerMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
 
 const objectifs = ['Nommer les parties d’un volcan', 'Expliquer une éruption', 'Situer trois volcans'];
 const score = (valeur, couverts) => ({ score: valeur, date: '2026-10-01T10:00:00.000Z', ...(couverts && { objectifs: couverts }) });
@@ -88,4 +88,39 @@ test('Retenu : les quiz faits en Révisant comptent, le Pré-test non', () => {
 
 test('Retenu : scores anciens sans Objectifs ignorés', () => {
   assert.deepEqual(retenus([{ score: 100, date: '2026-10-01T09:00:00.000Z' }, { score: 100, date: '2026-10-05T09:00:00.000Z' }]), [false, false, false]);
+});
+
+// Pré-test : résultats par question, chacune couvrant ses Objectifs.
+const question = (juste, couverts, autres = {}) => ({ id: `q${couverts.join('-')}`, enonce: 'Q ?', choisie: 'a', bonne: 'a', juste, bonus: false, objectifs: couverts, ...autres });
+const pretest = (...questions) => ({ score: 50, date: '2026-10-01T09:00:00.000Z', pretest: true, questions });
+const aConfirmer = (scores, mode = 'libre') => objectifsAConfirmer(objectifs, scores, mode);
+
+test('Pré-test : son score n’atteint aucun Objectif, même à 100 %', () => {
+  assert.deepEqual(atteints([{ ...score(100, [1, 2]), pretest: true }]), [false, false, false]);
+});
+
+test('Pré-test : hors Maîtrise, hors Étoiles et hors Dépassement', () => {
+  assert.equal(calculerMaitrise([{ ...score(100), pretest: true }]), null);
+  assert.equal(calculerMaitrise([score(60), { ...score(100), pretest: true }], Date.parse('2026-10-02')).pourcentage, 60);
+  assert.equal(etoilesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], null, 'revision').quiz, false);
+  assert.equal(etoilesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], null, 'revision').bonus, false);
+  assert.equal(depassementLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], 'libre'), false);
+});
+
+test('À confirmer : les Objectifs couverts par une question réussie au Pré-test', () => {
+  assert.deepEqual(aConfirmer([pretest(question(true, [2]), question(false, [1]), question(false, [3]))]), [false, true, false]);
+});
+
+test('À confirmer : rien sans Pré-test, ni pour une question réussie dans un quiz ordinaire', () => {
+  assert.deepEqual(aConfirmer([]), [false, false, false]);
+  assert.deepEqual(aConfirmer([{ ...score(50), questions: [question(true, [1])] }]), [false, false, false]);
+});
+
+test('À confirmer : plus dès qu’un vrai quiz a atteint l’Objectif', () => {
+  assert.deepEqual(aConfirmer([pretest(question(true, [1]), question(true, [2])), score(90, [1])]), [false, true, false]);
+});
+
+test('À confirmer : une question bonus réussie ou un Pré-test sans résultats par question ne confirme rien', () => {
+  assert.deepEqual(aConfirmer([pretest(question(true, [1], { bonus: true }))]), [false, false, false]);
+  assert.deepEqual(aConfirmer([{ ...score(100, [1, 2]), pretest: true }]), [false, false, false]);
 });

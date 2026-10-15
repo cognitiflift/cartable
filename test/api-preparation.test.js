@@ -16,7 +16,7 @@ before(async () => {
   // Faux `claude` : chaque tour écrit la page suivante de lessons/ (la première est un Pré-test, les autres ont un quiz
   // ordinaire du Kit) et note son début et sa fin dans `journal` (« debut preparation <élève>/<leçon> », « fin lecon <élève>/<leçon> »).
   // Dans le dossier d'une page préparée (pages-preparees/<leçon>), il écrit « préparée » dans la page ; le fichier
-  // `attendre-preparation` l'y fait patienter.
+  // `attendre-preparation` l'y fait patienter, et `echouer-preparation` l'y fait échouer après un tour payé.
   // Les Propositions, hors sujet ici, restent vides.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
@@ -40,6 +40,10 @@ cat > lessons/000$N-page.html <<FIN
 <script type="application/json" id="cartable-quiz">{"objectifs":[1]$PRETEST,"questions":[{"id":"q1","type":"qcm","enonce":"Où sort la lave ?","reponses":["Par le cratère","Par les racines"],"bonne":0,"explication":"Le cratère."}]}</script>
 FIN
 echo "fin $QUI $LECON" >> '${dossier}/journal'
+if [ $QUI = preparation ] && [ -e '${dossier}/echouer-preparation' ]; then
+  echo '{"result":"Erreur","is_error":true,"total_cost_usd":0.25,"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}}'
+  exit 0
+fi
 echo '{"result":"Page '$N' ('$QUI')","session_id":"s-'$N'","is_error":false,"total_cost_usd":0.25,"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}}'
 `, { mode: 0o755 });
   const port = 3700 + Math.floor(Math.random() * 300);
@@ -230,5 +234,18 @@ test('Attente du prof : une page préparée retenue après avoir attendu la fin 
     assert.ok(attente.maxSecondes >= 1, JSON.stringify(attente));
   } finally {
     await fs.rm(path.join(dossier, 'attendre-preparation'), { force: true });
+  }
+});
+
+test('Une préparation ratée compte quand même son coût avec la Leçon', async () => {
+  const slug = await nouvelEleve();
+  await fs.writeFile(path.join(dossier, 'echouer-preparation'), '');
+  try {
+    const { cle } = await leconCommencee(slug);
+    await preparationFinie(cle);
+    // Commencer, puis la préparation ratée.
+    await attendreQue(async () => (await appel(`/api/eleves/${slug}/couts`)).data.parTache.rebond?.tours === 2);
+  } finally {
+    await fs.rm(path.join(dossier, 'echouer-preparation'), { force: true });
   }
 });

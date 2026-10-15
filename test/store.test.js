@@ -252,3 +252,29 @@ test('Coût de l\'Élève : une Leçon illisible est écartée sans faire échou
   assert.deepEqual(couts.lecons.map((l) => l.id), [lisible.id]);
   assert.equal(couts.total.coutUsd, 0.25);
 });
+
+test('Page préparée retenue : seuls les fichiers que le prof a écrits rejoignent la Leçon, jamais une copie périmée', async () => {
+  const { id } = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
+  const lecon = store.leconDir('zoe', id);
+  await fs.mkdir(path.join(lecon, 'lessons'), { recursive: true });
+  await fs.mkdir(path.join(lecon, 'sources'), { recursive: true });
+  await fs.writeFile(path.join(lecon, 'lessons', '0001-page.html'), 'page 1');
+  await fs.writeFile(path.join(lecon, 'notes.md'), 'notes du prof');
+  await fs.writeFile(path.join(lecon, 'lesson.json'), '{"titre":"Les volcans"}');
+  await fs.writeFile(path.join(lecon, 'sources', 'lecon.pdf'), 'PDF');
+
+  const travail = await store.preparerDossierPreparation('zoe', id);
+  // Le prof lit la Leçon dans son dossier de travail, Document source compris, et y écrit sa page.
+  assert.equal(await fs.readFile(path.join(travail, 'sources', 'lecon.pdf'), 'utf8'), 'PDF');
+  await fs.writeFile(path.join(travail, 'lessons', '0002-page.html'), 'page 2');
+  await fs.writeFile(path.join(travail, 'lesson.json'), '{"titre":"Les volcans","ensuite":"Les geysers"}');
+  // Pendant ce temps, la Leçon change : la copie de notes.md du dossier de travail est périmée.
+  await fs.writeFile(path.join(lecon, 'notes.md'), 'notes plus récentes');
+
+  await store.adopterPreparation('zoe', id);
+  assert.equal(await fs.readFile(path.join(lecon, 'lessons', '0002-page.html'), 'utf8'), 'page 2');
+  assert.equal(await fs.readFile(path.join(lecon, 'lesson.json'), 'utf8'), '{"titre":"Les volcans","ensuite":"Les geysers"}');
+  assert.equal(await fs.readFile(path.join(lecon, 'notes.md'), 'utf8'), 'notes plus récentes');
+  assert.equal(await fs.readFile(path.join(lecon, 'sources', 'lecon.pdf'), 'utf8'), 'PDF');
+  await assert.rejects(fs.access(travail), { code: 'ENOENT' });
+});

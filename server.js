@@ -218,8 +218,10 @@ function preparerPageSuivante(slug, id) {
       });
       return { reponse, sessionId, cout: cout && { ...cout, relais: true, preparee: true } };
     })().catch(async (e) => {
+      // Préparation ratée : écartée, mais son coût, s'il est connu, compte avec la Leçon.
       console.error(`Page préparée de ${id} : ${e.message}`);
       await store.ecarterPreparation(slug, id).catch(() => {});
+      if (e.cout) await store.ajouterCoutLecon(slug, id, { ...e.cout, relais: true, preparee: true, inutilisee: true }).catch(() => {});
       return null;
     });
     preparations.set(cle, { prevision, fin });

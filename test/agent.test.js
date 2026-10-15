@@ -186,6 +186,16 @@ test('consignes : Étape suivante est une page nouvelle choisie selon la zone pr
   assert.match(REBONDS.suivante.consigne, /raté/);
 });
 
+test('consignes : en mathématiques, exemple résolu, puis étapes retirées une à une, puis exercices mélangés, sans clavier', () => {
+  const consignes = consignesLecon(profil);
+  const maths = consignes.split('\n').find((l) => l.startsWith('En mathématiques'));
+  assert.ok(maths, consignes);
+  assert.match(maths, /exemple entièrement résolu[^.]*puis[^.]*étape[^.]*une[^.]*puis[^.]*mélang/);
+  assert.match(maths, /"etapes"/);
+  assert.match(maths, /erreurs fréquentes/);
+  assert.match(maths, /jamais au clavier/);
+});
+
 test('Préambule de relais : la session neuve reçoit l\'état de la Leçon et la consigne de relire les fichiers de teach', () => {
   const texte = preambuleRelais({
     objectifs: [{ texte: 'Nommer les parties d’un volcan', atteint: true }, { texte: 'Expliquer une éruption', atteint: false }],

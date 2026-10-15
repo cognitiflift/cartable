@@ -67,22 +67,163 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
 - `pretest` (facultatif) : `true` pour le quiz du Pré-test (la page « Devine ! » de trois questions, au début d'une Leçon). Le Kit le signale à l'appli, qui le garde hors score. Indique pour chaque question les Objectifs qu'elle couvre : ceux réussis au Pré-test seront « à confirmer ».
 - `questions` : la liste, dans l'ordre d'affichage (questions bonus à la fin). Pour chaque question :
   - `id` : identifiant court, unique dans la page et stable (`q1`, `q2`, `b1`…).
-  - `type` : `"qcm"` (seul format de cette version).
-  - `enonce` : la question.
-  - `reponses` : 2 à 5 réponses en texte. Le Kit les mélange : n'écris pas « toutes les réponses ci-dessus ».
-  - `bonne` : index (à partir de 0) de la bonne réponse dans `reponses`.
+  - `type` : le format de la question, `"qcm"` par défaut ; les autres formats sont décrits plus bas (« Formats de rappel actif »).
+  - `enonce` : la question (ou la consigne : « Complète la phrase. », « Remets les étapes dans l'ordre. »).
+  - Pour un `qcm` :
+    - `reponses` : 2 à 5 réponses en texte. Le Kit les mélange : n'écris pas « toutes les réponses ci-dessus ».
+    - `bonne` : index (à partir de 0) de la bonne réponse dans `reponses`.
+  - Pour les autres formats : leurs champs propres, décrits plus bas.
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
   - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score. Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
   - `image` (facultatif) : `{ "src": "…", "alt": "…" }`, une image propre à la question, affichée sous l'énoncé, et aussi quand l'élève la retrouve en révision. Même règle que pour une figure : photo distante déclarée dans `images.json` (l'appli la rapatrie et réécrit `src` en `../images/…`), `alt` qui dit ce qu'on voit. Une image mal formée est ignorée, la question reste. Pour un schéma en SVG, utilise plutôt la figure de la page.
 
-Une question mal formée est ignorée. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
+Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
-Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`) et l'`image` d'une question. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur. Une évolution incompatible passerait par une version 2 (ADR 0004).
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question et les formats de rappel actif (résultats `type`, `points` et `detail`). Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
+
+## Formats de rappel actif
+
+Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM (sauf « réfléchis puis dévoile », voir plus bas). Après « Je ne sais pas », le Kit montre la bonne réponse en place (mots dans les trous, éléments dans l'ordre…).
+
+Crédit partiel : une question à plusieurs éléments rapporte la part juste (3 trous sur 4 = 0,75 question dans le score), mais elle ne compte comme « juste » (Objectifs, Banque de Questions, Révisions) que si elle est entièrement juste.
+
+### Texte à trous : `"type": "trous"`
+
+Pour le vocabulaire et les définitions. L'élève complète la phrase en touchant des mots d'une banque, qui contient toujours plus de mots que de trous.
+
+```json
+{
+  "id": "q3",
+  "type": "trous",
+  "enonce": "Complète la phrase.",
+  "texte": "La lave sort par le [cratère] et coule sur les [flancs] du volcan.",
+  "intrus": ["racines", "nuages"],
+  "explication": "Le cratère est l'ouverture au sommet ; les flancs sont ses pentes."
+}
+```
+
+- `texte` : la phrase, chaque mot attendu entre crochets (1 à 10 trous, un mot ou un groupe de mots court par trou, sans crochet dedans).
+- `intrus` : au moins un mot de plus (au plus 10), plausible, différent des mots attendus. La banque mélange mots attendus et intrus.
+
+### Remettre dans l'ordre : `"type": "ordre"`
+
+Pour les étapes d'un processus, les événements d'une histoire ou les mots d'une phrase. Le Kit mélange les éléments ; l'élève les remet dans l'ordre en les déplaçant.
+
+```json
+{
+  "id": "q4",
+  "type": "ordre",
+  "enonce": "Remets les étapes de l'éruption dans l'ordre.",
+  "elements": ["Le magma monte", "La pression augmente", "La lave sort par le cratère", "La lave refroidit"],
+  "explication": "Le magma monte, la pression augmente jusqu'à l'éruption, puis la lave refroidit."
+}
+```
+
+- `elements` : 3 à 10 éléments, tous différents, **dans le bon ordre**.
+- Crédit partiel : la part des éléments à leur place exacte (un ordre mélangé au hasard en place très peu).
+
+### Exemple à étapes (mathématiques) : `"type": "etapes"`
+
+Pour une méthode de mathématiques. Le Kit montre la résolution étape par étape ; à chaque étape à compléter, l'élève touche la bonne parmi des propositions mélangées.
+
+```json
+{
+  "id": "q5",
+  "type": "etapes",
+  "enonce": "Complète le calcul de 3/4 + 1/6.",
+  "etapes": [
+    { "texte": "Dénominateur commun : 12" },
+    { "texte": "3/4 = 9/12", "intrus": ["3/4 = 3/12", "3/4 = 7/12"] },
+    { "texte": "1/6 = 2/12" },
+    { "texte": "9/12 + 2/12 = 11/12", "intrus": ["9/12 + 2/12 = 11/24"] }
+  ],
+  "explication": "On met les fractions au même dénominateur, puis on additionne les numérateurs seulement."
+}
+```
+
+- `etapes` : 2 à 10 étapes, **dans l'ordre de la résolution**. Une étape sans `intrus` est montrée telle quelle ; une étape avec `intrus` est à compléter (au moins une par question).
+- `intrus` : 1 à 4 propositions fausses pour cette étape, différentes de la bonne, tirées des **erreurs fréquentes** (dénominateurs additionnés, retenue oubliée, signe perdu…) : un distracteur absurde n'apprend rien.
+- Crédit partiel : la part des étapes à compléter bien choisies.
+- Enchaînement : l'exemple **entièrement résolu** va dans le contenu de la page (pas dans le quiz) ; ensuite des questions `etapes` où l'on retire les étapes une à une (une étape à compléter, puis deux…) ; puis des exercices de types mélangés.
+
+### Réfléchis puis dévoile : `"type": "devoile"`
+
+L'élève essaie de se rappeler la réponse **dans sa tête**, la dévoile, puis dit lui-même s'il l'avait. Pour une réponse courte qu'aucun autre format ne peut vérifier sans clavier : une définition, un fait, un « pourquoi » en une phrase.
+
+```json
+{
+  "id": "q6",
+  "type": "devoile",
+  "enonce": "Qu'est-ce que le magma ?",
+  "reponse": "De la roche fondue, sous la terre.",
+  "explication": "Quand le magma sort du volcan, on l'appelle la lave."
+}
+```
+
+- `reponse` : la réponse attendue, courte, montrée quand l'élève la dévoile.
+- Points : « je l'avais » = juste (1), « à moitié » = 0,5, « je ne l'avais pas » = faux (0).
+- Pas de Confiance ni de « Je ne sais pas » : ce que l'élève dit de son souvenir les remplace. Notes de mémoire (FSRS) qui en découlent : « je l'avais » → « bien » (comme juste et sûr), « à moitié » → « difficile » (comme un crédit partiel ou un juste pas sûr), « je ne l'avais pas » → « à revoir ».
+- Rien ne vérifie la réponse : ces questions restent **moins nombreuses que les autres questions comptées dans le score** (2 sur 5, 3 sur 7…). Celles en trop (les dernières du quiz) sont ignorées et te sont signalées. Les questions bonus ne sont pas limitées.
+
+### Choisis la meilleure explication : `"type": "explication"`
+
+Pour un « pourquoi ? » : plusieurs explications d'un phénomène, une seule juste. L'élève s'explique les choses sans écrire. C'est un QCM (mêmes champs, même correction, le Kit ajoute la consigne « Choisis la meilleure explication ») : il ne compte pas comme question de rappel actif.
+
+```json
+{
+  "id": "q7",
+  "type": "explication",
+  "enonce": "Pourquoi la lave devient-elle noire en refroidissant ?",
+  "reponses": ["Elle se solidifie en roche", "Elle brûle", "La pluie la salit"],
+  "bonne": 0,
+  "explication": "En refroidissant, la lave durcit : elle devient une roche sombre, le basalte."
+}
+```
+
+- `reponses` et `bonne` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne.
+
+### Associer : `"type": "associer"`
+
+Pour des paires : dieu et domaine, mot et définition, pays et capitale. Le Kit mélange chaque colonne ; l'élève touche un élément de gauche, puis celui de droite qui va avec.
+
+```json
+{
+  "id": "q8",
+  "type": "associer",
+  "enonce": "Relie chaque dieu à son domaine.",
+  "paires": [["Zeus", "le ciel"], ["Poséidon", "la mer"], ["Hadès", "les Enfers"]],
+  "explication": "Les trois frères se partagent le monde."
+}
+```
+
+- `paires` : 3 à 8 paires `["gauche", "droite"]`, sans le même texte deux fois dans une colonne.
+- Crédit partiel : les paires justes (2 sur 3 = 0,67).
+
+### Classer : `"type": "classer"`
+
+Pour apprendre ce qui distingue des catégories. Le Kit mélange les éléments ; l'élève touche un élément, puis la catégorie où il le range.
+
+```json
+{
+  "id": "q9",
+  "type": "classer",
+  "enonce": "Range chaque animal dans sa classe.",
+  "categories": [
+    { "nom": "Mammifères", "elements": ["la baleine", "la chauve-souris"] },
+    { "nom": "Oiseaux", "elements": ["le manchot", "l'autruche"] }
+  ],
+  "explication": "La baleine allaite ses petits ; le manchot a des plumes."
+}
+```
+
+- `categories` : 2 à 4 catégories aux noms différents, chacune avec ses `elements` (au moins deux catégories non vides ; une catégorie vide est permise, comme piège).
+- 3 à 12 éléments en tout, tous différents. Choisis des éléments qui trompent (la baleine n'est pas un poisson).
+- Crédit partiel : les éléments bien rangés.
 
 ## Ce que fait le Kit
 
-Il affiche les questions, mélange les réponses, propose aussi « Je ne sais pas » (compté comme faux), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
+Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
 
 ## Figure
 

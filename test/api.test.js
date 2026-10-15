@@ -1362,3 +1362,16 @@ test('Prompt système allégé : sections dynamiques exclues, réglages utilisat
   assert.ok(recus.includes('--strict-mcp-config'));
   assert.equal(recus[recus.indexOf('--setting-sources') + 1], 'user');
 });
+
+test('Ma fiche : la Leçon lue expose ses documents de référence (reference/*.html), liste vide sinon', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les glaciers' })).data;
+  assert.deepEqual(lecon.references, []);
+  const dossierReference = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'reference');
+  await fs.mkdir(dossierReference);
+  await fs.writeFile(path.join(dossierReference, 'glossaire.html'), '<h1>Glossaire</h1>');
+  await fs.writeFile(path.join(dossierReference, 'fiche.html'), '<h1>Fiche</h1>');
+  await fs.writeFile(path.join(dossierReference, 'notes.txt'), 'pas un document');
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data;
+  assert.deepEqual(lue.references, ['fiche.html', 'glossaire.html']);
+  assert.equal((await fetch(`${base}/fichiers/zoe-test/${lecon.id}/reference/fiche.html`)).status, 200);
+});

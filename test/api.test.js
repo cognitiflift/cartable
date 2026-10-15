@@ -1915,3 +1915,75 @@ test('Mémoire des Questions : un quiz répondu à la date du serveur est daté 
   assert.equal(q1.prochaineRevision, '2026-11-03T08:00:00.000Z');
   assert.equal(q2.prochaineRevision, '2026-11-03T08:00:00.000Z');
 });
+
+// Maîtrise et Retenu appuyés sur la mémoire des Questions (#67).
+test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souvenir ; Retenu suit leur stabilité', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  // Deux quiz réussis couvrant l'Objectif 1, à un jour d'écart.
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, { 'X-Cartable-Maintenant': '2026-10-01T10:00:00.000Z' });
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, { 'X-Cartable-Maintenant': '2026-10-02T10:00:00.000Z' });
+  const question = (id, journal) => ({ id, page: '0002-volcans.html', contenu: { enonce: `${id} ?`, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] }, journal });
+  const ecrire = (banque) => fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), JSON.stringify(banque));
+  const lire = async (maintenant) => (await appel(url, 'GET', undefined, { 'X-Cartable-Maintenant': maintenant })).data;
+
+  // Une Question répondue juste une seule fois : stabilité 3,173 jours, donc 90 % au bout de 3,173 jours.
+  await ecrire({ '0002-volcans.html#q1': question('q1', [{ date: '2026-10-02T10:00:00.000Z', juste: true, origine: 'quiz' }]) });
+  const t = Date.parse('2026-10-02T10:00:00.000Z');
+  assert.deepEqual((await lire(new Date(t + 3.173 * 86_400_000).toISOString())).maitrise, { pourcentage: 90, palier: 'acquis' });
+  assert.deepEqual((await lire(new Date(t + 30 * 86_400_000).toISOString())).maitrise, { pourcentage: 56, palier: 'à consolider' });
+  // Stabilité de quelques jours seulement : pas Retenu, même avec deux quiz réussis espacés.
+  assert.equal((await lire('2026-10-03T10:00:00.000Z')).objectifs[0].retenu, false);
+
+  // Répondue juste deux jours de suite : stabilité d'environ 6 jours, Retenu.
+  await ecrire({ '0002-volcans.html#q1': question('q1', [
+    { date: '2026-10-01T10:00:00.000Z', juste: true, origine: 'quiz' }, { date: '2026-10-02T10:00:00.000Z', juste: true, origine: 'quiz' },
+  ]) });
+  const lue = await lire('2026-10-03T10:00:00.000Z');
+  assert.equal(lue.objectifs[0].retenu, true);
+  assert.equal(lue.objectifs[1].retenu, false);
+  // La liste des Leçons montre la même Maîtrise, à la même date.
+  const resume = (await appel('/api/eleves/zoe-test/lecons', 'GET', undefined, { 'X-Cartable-Maintenant': '2026-10-03T10:00:00.000Z' })).data.find((l) => l.id === lecon.id);
+  assert.deepEqual(resume.maitrise, lue.maitrise);
+});
+
+// Consignes du prof (spec #47) : au début d'une nouvelle page, le préambule cite les Questions les plus fragiles.
+const banqueFragile = () => {
+  const question = (id, enonce, journal) => [`0002-volcans.html#${id}`, { id, page: '0002-volcans.html', contenu: { enonce, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] }, journal }];
+  const le = (jour, juste, autres = {}) => ({ date: `2026-10-0${jour}T10:00:00.000Z`, juste, origine: 'quiz', ...autres });
+  return Object.fromEntries([
+    question('solide', 'Question bien sue ?', [le(1, true), le(3, true), le(7, true)]),
+    question('ratee', 'Question ratée ?', [le(7, false)]),
+    question('hesitante', 'Question hésitante ?', [le(7, true, { sur: false })]),
+    question('sue', 'Question sue une fois ?', [le(7, true)]),
+  ]);
+};
+const fragilesDans = (prompt) => ['Question bien sue', 'Question ratée', 'Question hésitante', 'Question sue une fois'].filter((e) => prompt.includes(`« ${e} ? »`));
+
+test('Consignes du prof : le préambule de relais cite les trois Questions les plus fragiles, de la plus fragile à la moins fragile', async () => {
+  const lecon = await leconBanque();
+  await fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueFragile()));
+  assert.equal((await message(lecon, 'Page suivante')).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Questions les plus fragiles/);
+  assert.deepEqual(fragilesDans(prompt), ['Question ratée', 'Question hésitante', 'Question sue une fois']);
+  assert.ok(prompt.indexOf('Question ratée') < prompt.indexOf('Question hésitante') && prompt.indexOf('Question hésitante') < prompt.indexOf('Question sue une fois'));
+  assert.match(prompt, /« Question ratée \? » \(0002-volcans\.html\)/);
+});
+
+test('Consignes du prof : le préambule d\'une session reprise cite aussi les Questions les plus fragiles ; rien sans Questions', async () => {
+  const lecon = await leconBanque();
+  const dir = path.join(eleves, 'zoe-test', 'lecons', lecon.id);
+  // Pas encore de page : la session est reprise, avec le préambule court.
+  await fs.rm(path.join(dir, 'lessons'), { recursive: true });
+  await fs.writeFile(path.join(dir, 'questions.json'), JSON.stringify(banqueFragile()));
+  assert.equal((await message(lecon, 'On continue')).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.doesNotMatch(prompt, /Passage de relais/);
+  assert.deepEqual(fragilesDans(prompt), ['Question ratée', 'Question hésitante', 'Question sue une fois']);
+
+  const sans = await leconBanque();
+  assert.equal((await message(sans, 'Page suivante')).status, 200);
+  assert.doesNotMatch(await argsDe(sans), /Questions les plus fragiles/);
+});

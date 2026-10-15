@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -59,8 +59,8 @@ async function envoyerFichier(res, base, relatif) {
 
 // Tour repris dans la session en cours (première Séance, ou CARTABLE_RELAIS=0) : l'agent reçoit les scores récents et
 // les résultats du dernier quiz pour cibler les erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a
-// pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs. `resultatsQuiz: false` : comme pour le
-// préambule de relais.
+// pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs. Les Questions les plus fragiles y sont
+// citées comme dans le préambule de relais. `resultatsQuiz: false` : comme pour le préambule de relais.
 function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   const lignes = [];
   if (lecon.scores.length) {
@@ -68,6 +68,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
     lignes.push(`[Scores aux quiz : ${lecon.scores.slice(-5).map(resumeScore).join(' ; ')}.${m ? ` Maîtrise : ${m.pourcentage} %, ${m.palier}.` : ''}]`);
     if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1), null, lecon));
   }
+  lignes.push(...consigneQuestionsFragiles(lecon.questions));
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
@@ -290,7 +291,7 @@ async function api(req, res, segments) {
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
-      if (m === 'GET') return json(res, 200, await store.listerLecons(slug));
+      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant: maintenantDe(req.headers) }));
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));

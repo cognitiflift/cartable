@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { objectifsAtteints, objectifsRetenus, objectifsAConfirmer, niveauLecon, calculerMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
+import { objectifsAtteints, etatObjectifs, niveauLecon, calculerMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
 
 const objectifs = ['Nommer les parties d’un volcan', 'Expliquer une éruption', 'Situer trois volcans'];
 const score = (valeur, couverts) => ({ score: valeur, date: '2026-10-01T10:00:00.000Z', ...(couverts && { objectifs: couverts }) });
@@ -56,7 +56,7 @@ test('Objectifs atteints : en Leçon libre, un quiz fait en Révisant n’attein
 
 // Retenu : deux quiz réussis qui couvrent l'Objectif, à au moins 24 heures d'intervalle.
 const le = (date, valeur, couverts, marques = {}) => ({ score: valeur, date, objectifs: couverts, ...marques });
-const retenus = (scores) => objectifsRetenus(objectifs, scores);
+const retenus = (scores, mode) => etatObjectifs(objectifs, scores, mode).map((o) => o.retenu);
 
 test('Retenu : deux succès le même jour ne suffisent pas', () => {
   assert.deepEqual(retenus([le('2026-10-01T09:00:00.000Z', 90, [1]), le('2026-10-01T20:00:00.000Z', 100, [1])]), [false, false, false]);
@@ -86,6 +86,17 @@ test('Retenu : les quiz faits en Révisant comptent, le Pré-test non', () => {
   assert.deepEqual(retenus([le('2026-10-01T09:00:00.000Z', 100, [2], { pretest: true }), le('2026-10-03T09:00:00.000Z', 90, [2])]), [false, false, false]);
 });
 
+test('Retenu : jamais sans être atteint (deux quiz faits en Révisant une Leçon libre n’atteignent rien)', () => {
+  const revises = [le('2026-10-01T09:00:00.000Z', 90, [1], { reviser: true }), le('2026-10-03T09:00:00.000Z', 90, [1], { reviser: true })];
+  assert.deepEqual(retenus(revises, 'libre'), [false, false, false]);
+  assert.deepEqual(retenus(revises, 'revision'), [true, false, false]);
+});
+
+test('Objectifs : l’état de chaque Objectif réunit texte, atteint, Retenu et « à confirmer »', () => {
+  assert.deepEqual(etatObjectifs(objectifs, [le('2026-10-01T09:00:00.000Z', 90, [1]), le('2026-10-03T09:00:00.000Z', 90, [1, 2])], 'libre')[0],
+    { texte: 'Nommer les parties d’un volcan', atteint: true, retenu: true, aConfirmer: false });
+});
+
 test('Retenu : scores anciens sans Objectifs ignorés', () => {
   assert.deepEqual(retenus([{ score: 100, date: '2026-10-01T09:00:00.000Z' }, { score: 100, date: '2026-10-05T09:00:00.000Z' }]), [false, false, false]);
 });
@@ -93,7 +104,7 @@ test('Retenu : scores anciens sans Objectifs ignorés', () => {
 // Pré-test : résultats par question, chacune couvrant ses Objectifs.
 const question = (juste, couverts, autres = {}) => ({ id: `q${couverts.join('-')}`, enonce: 'Q ?', choisie: 'a', bonne: 'a', juste, bonus: false, objectifs: couverts, ...autres });
 const pretest = (...questions) => ({ score: 50, date: '2026-10-01T09:00:00.000Z', pretest: true, questions });
-const aConfirmer = (scores, mode = 'libre') => objectifsAConfirmer(objectifs, scores, mode);
+const aConfirmer = (scores, mode = 'libre') => etatObjectifs(objectifs, scores, mode).map((o) => o.aConfirmer);
 
 test('Pré-test : son score n’atteint aucun Objectif, même à 100 %', () => {
   assert.deepEqual(atteints([{ ...score(100, [1, 2]), pretest: true }]), [false, false, false]);

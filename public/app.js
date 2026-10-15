@@ -104,13 +104,25 @@ const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies
 const etoiles = (e) => h('span', { className: 'etoiles' },
   Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
 
-// Objectifs de la Leçon et combien sont Retenus, par exemple « 3 Objectifs · 1 Retenu ». Rien sans Objectifs.
+// Objectifs de la Leçon : combien sont atteints et Retenus, par exemple « 3 Objectifs · 2 atteints · 1 Retenu », puis
+// chaque Objectif avec son état. Rien sans Objectifs.
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+const ETATS_OBJECTIF = [
+  { cle: 'retenu', icone: '🧠', libelle: 'Retenu : réussi de nouveau un autre jour' },
+  { cle: 'atteint', icone: '✅', libelle: 'atteint' },
+  { cle: 'aConfirmer', icone: '🔮', libelle: 'à confirmer : réussi au Pré-test' },
+];
+const PAS_ENCORE = { icone: '⚪', libelle: 'pas encore atteint' };
 function objectifsRetenus(objectifs = []) {
   if (!objectifs.length) return null;
-  const retenus = objectifs.filter((o) => o.retenu).length;
-  return h('span', { className: 'objectifs-retenus', title: 'Retenu : réussi de nouveau un autre jour' },
-    `${pluriel(objectifs.length, 'Objectif')} · ${pluriel(retenus, 'Retenu')}`);
+  const compte = (cle) => objectifs.filter((o) => o[cle]).length;
+  const aConfirmer = compte('aConfirmer');
+  return h('span', { className: 'objectifs-retenus' },
+    [pluriel(objectifs.length, 'Objectif'), pluriel(compte('atteint'), 'atteint'), pluriel(compte('retenu'), 'Retenu'), aConfirmer && `${aConfirmer} à confirmer`].filter(Boolean).join(' · '),
+    h('span', { className: 'objectifs' }, objectifs.map((o) => {
+      const etat = ETATS_OBJECTIF.find((e) => o[e.cle]) ?? PAS_ENCORE;
+      return h('span', { title: etat.libelle }, `${etat.icone} ${o.texte}`);
+    })));
 }
 
 function badgeMaitrise(maitrise) {
@@ -147,11 +159,11 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
 });
 
 // Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, par-dessus l'écran.
-// L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés.
-const QUESTIONS_DU_MODE = { libre: ['pourquoi', 'deja'], revision: ['deja'] };
+// L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions
+// posées selon le mode viennent de la configuration.
 async function cadrer(mode) {
   const cadrage = {};
-  for (const cle of QUESTIONS_DU_MODE[mode]) {
+  for (const cle of config.questionsCadrage[mode]) {
     const { question, reponses } = config.cadrage[cle];
     cadrage[cle] = await new Promise((choisir) => {
       const calque = h('div', { className: 'cadrage' },
@@ -170,10 +182,13 @@ function ecranNouvelleLecon(profil) {
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
   // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
-  const demarrer = async (corps, mode = 'libre') => {
+  // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
+  const cadrages = new Map();
+  const demarrer = async (corps, mode, cle) => {
     activer(false);
     erreur.textContent = '';
-    const cadrage = await cadrer(mode);
+    if (!cadrages.has(cle)) cadrages.set(cle, await cadrer(mode));
+    const cadrage = cadrages.get(cle);
     erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
     try {
       const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage } });
@@ -184,7 +199,7 @@ function ecranNouvelleLecon(profil) {
     }
   };
 
-  const sujet = h('input', { required: true, maxLength: 80, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
+  const sujet = h('input', { required: true, maxLength: config.sujetMax, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
   const fichiers = h('input', { type: 'file', required: true, multiple: true, accept: '.pdf,image/*' });
   const dateControle = h('input', { type: 'date' });
   boutons.push(h('button', {}, 'Commencer'), h('button', {}, 'Réviser'));
@@ -200,7 +215,7 @@ function ecranNouvelleLecon(profil) {
     if (!actif) return;
     const enPreparation = etat === 'en préparation';
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
-    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre })) },
+    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
       h('span', { className: 'type' }, p.type === 'suite' ? '➡️ Pour aller plus loin' : '✨ Nouveau sujet'),
       p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme'),
       p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
@@ -229,7 +244,7 @@ function ecranNouvelleLecon(profil) {
       demarrer(async () => ({
         dateControle: dateControle.value || undefined,
         fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-      }), 'revision');
+      }), 'revision', 'revision');
     } },
       h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
       h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
@@ -237,7 +252,11 @@ function ecranNouvelleLecon(profil) {
     h('h2', {}, '💡 Apprendre ce que tu veux'),
     h('form', { className: 'colonne', onsubmit: (ev) => {
       ev.preventDefault();
-      demarrer(async () => ({ sujet: sujet.value }));
+      // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+      const texte = sujet.value.trim();
+      if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
+      if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
+      demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
     } }, sujet, boutons[0]),
     erreur);
 }

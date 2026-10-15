@@ -2,15 +2,15 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
-import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE } from './lib/cadrage.js';
-import { rapatrierImages } from './lib/images.js';
+import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
+import { rapatrierImages, imagesASignaler } from './lib/images.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -97,10 +97,12 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
     });
     const { texte, choix } = extraireChoix(reponse);
     // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
-    const imagesRetirees = await rapatrierImages(store.leconDir(slug, id)).catch((e) => {
+    // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
+    const nouvelles = await rapatrierImages(store.leconDir(slug, id)).catch((e) => {
       console.error(`Images de ${id} : ${e.message}`);
       return [];
     });
+    const imagesRetirees = imagesASignaler(premier ? lecon.imagesRetirees : [], nouvelles);
     await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees }, cout: cout && { ...cout, relais: neuve } });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
@@ -198,8 +200,8 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
 // quiz, et un Défi réussi met aussi fin à la phase Réviser.
 // Le résultat bonus du Dépassement (hors score) n'entre pas dans l'action : le Retour le salue seulement.
 // Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
-// Pré-test (`pretest: true`) : hors Étoiles et hors Rebond ordinaire, l'appli propose seulement « Commencer », et le
-// Retour montre l'écart avec « Tu en sais déjà… ».
+// Pré-test (`pretest: true`) : hors Étoiles et hors Rebond ordinaire, l'appli propose seulement « Commencer » (tant que
+// la Leçon n'a aucun vrai score), et le Retour montre l'écart avec « Tu en sais déjà… ».
 async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
@@ -208,11 +210,14 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   try {
     const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
     if (pretest === true) {
+      // Pré-test refait en cours de Leçon (après un vrai score) : toujours hors score, mais sans « Commencer », et le
+      // Défi en cours continue.
+      const debut = horsPretest(scores).length === 0;
       await store.enregistrerTour(slug, id, {
         question: '🔮 Pré-test terminé',
         reponse: texteRetourPretest(ecartPretest({ deja: cadrage?.deja, ...compterJustes(resultats) })),
-        details: { retourQuiz: { score: arrondi, action: 'commencer', pretest: true } },
-        etatLecon: { defiEnCours: false, scoresCommentes: scores.length },
+        details: { retourQuiz: { score: arrondi, ...(debut && { action: 'commencer' }), pretest: true } },
+        etatLecon: { ...(debut && { defiEnCours: false }), scoresCommentes: scores.length },
       });
       return await store.lireLecon(slug, id);
     }
@@ -264,7 +269,7 @@ async function nouvelleDepuisProposition(slug, titre, brut) {
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
-  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT, cadrage: QUESTIONS_CADRAGE });
+  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT, cadrage: QUESTIONS_CADRAGE, questionsCadrage: { libre: questionsDuMode('libre'), revision: questionsDuMode('revision') }, sujetMax: SUJET_MAX });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
   if (!slug) {

@@ -25,6 +25,7 @@ before(async () => {
   // Les fichiers `images-page` et `images-manifeste` sont recopiés tels quels en lessons/0002-images.html et images.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
+  // CARTABLE_IMAGES_LOCALES=1 : le serveur accepte les images du petit serveur local lancé par les tests de Visuels.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
@@ -94,7 +95,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -1455,9 +1456,11 @@ test('Cadrage : une Leçon libre l\'enregistre et le premier prompt du prof en p
   assert.deepEqual((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.data.id).cadrage, { pourquoi: 'expose', deja: 'un-peu' });
 });
 
-test('Cadrage : questions et réponses fermées servies par la configuration, avec « Je ne sais pas »', async () => {
-  const { cadrage } = (await appel('/api/config')).data;
+test('Cadrage : questions et réponses fermées servies par la configuration, avec « Je ne sais pas », et les questions posées selon le mode', async () => {
+  const { cadrage, questionsCadrage } = (await appel('/api/config')).data;
   assert.equal(cadrage.pourquoi.question, 'Pourquoi ?');
+  assert.deepEqual(questionsCadrage, { libre: ['pourquoi', 'deja'], revision: ['deja'] });
+  assert.equal((await appel('/api/config')).data.sujetMax, 80);
   assert.equal(cadrage.deja.reponses['je-ne-sais-pas'], 'Je ne sais pas');
   assert.equal(cadrage.pourquoi.reponses.controle, 'Pour un contrôle');
 });
@@ -1738,6 +1741,25 @@ test('Pré-test : un Retour de Pré-test en Leçon de révision ne fait gagner a
   await appel(`${url}/rebonds`, 'POST', { action: 'commencer' });
   await appel(`${url}/scores`, 'POST', { score: 90 });
   assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 90 })).data.messages.at(-1).retourQuiz.nouvellesEtoiles, ['quiz']);
+});
+
+test('Pré-test : refait en cours de Leçon, il reste hors score mais ne propose pas « Commencer » et n\'annule pas le Défi en cours', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', { score: 90 });
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 90 })).data.rebondsProposes, ['defi']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'defi' })).data.defiEnCours, true);
+
+  await appel(`${url}/scores`, 'POST', corpsPretest());
+  const retour = (await appel(`${url}/retours`, 'POST', corpsPretest())).data;
+  assert.equal(retour.defiEnCours, true);
+  assert.deepEqual(retour.rebondsProposes, []);
+  assert.equal(retour.messages.at(-1).retourQuiz.pretest, true);
+  assert.equal(retour.maitrise.pourcentage, 90);
+  // Le Défi suivant, réussi, termine bien la Leçon.
+  await appel(`${url}/scores`, 'POST', { score: 85 });
+  assert.equal((await appel(`${url}/retours`, 'POST', { score: 85 })).data.messages.at(-1).retourQuiz.action, 'terminee');
 });
 
 test('Pré-test : un marqueur invalide est ignoré, le score compte comme un quiz ordinaire', async () => {

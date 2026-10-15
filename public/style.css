@@ -45,6 +45,8 @@ p .maitrise { display:inline-flex; }
 .ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
 .niveau-lecon { font-size:.85rem; font-weight:600; white-space:nowrap; }
 .objectifs-retenus { display:block; font-size:.85rem; color:var(--doux); }
+.objectifs-retenus .objectifs { display:block; margin-top:.2rem; text-align:left; font-size:.8rem; }
+.objectifs-retenus .objectifs > span { display:block; }
 .etoiles { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }

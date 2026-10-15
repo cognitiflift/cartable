@@ -813,6 +813,43 @@ test('Résultats par question : la consigne du Rebond suivant porte les question
   assert.equal(page.split('court encart sur ce qu\'il a raté').length, 2);
 });
 
+test('Confiance : gardée dans les résultats par question, sans effet sur le score ; les erreurs commises « sûr » sont listées à part dans la consigne du Rebond', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const args = path.join(dossier, `args-${lecon.id}`);
+  const q = (id, juste, sur) => ({ id, enonce: `Question ${id} ?`, choisie: juste ? 'oui' : 'non', bonne: 'oui', juste, bonus: false, ...(sur !== undefined && { sur }) });
+  const corps = { score: 0, page: '0001-volcans.html', questions: [q('q1', false, true), q('q2', false, false), q('q3', true, true), q('q4', false, 'oui'), q('q5', true)] };
+  const r = await appel(`${url}/scores`, 'POST', corps);
+  assert.equal(r.status, 201);
+  const entree = r.data.scores.at(-1);
+  assert.equal(entree.score, 40);
+  assert.deepEqual(entree.questions.map((x) => x.sur), [true, false, true, undefined, undefined]);
+  assert.equal(Object.hasOwn(entree.questions[3], 'sur'), false, 'une Confiance invalide est ignorée');
+
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', corps)).data.rebondsProposes, ['revoir']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(args, 'utf8');
+  const [, sures] = consigne.split('Erreurs commises en étant « sûr »');
+  assert.ok(sures, 'la consigne porte une liste des erreurs commises « sûr »');
+  assert.match(sures, /^[^]*?- « Question q1 \? »/);
+  assert.doesNotMatch(sures.split('\n\n')[0], /Question q2|Question q3|Question q4/);
+  assert.match(consigne, /retravaille-les d'abord/);
+});
+
+test('Confiance : un quiz sans Confiance (anciens scores) ne porte aucune liste d\'erreurs « sûr »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const corps = { score: 50, page: 'p.html', questions: [{ id: 'q1', enonce: 'A ?', choisie: 'non', bonne: 'oui', juste: false, bonus: false }, { id: 'q2', enonce: 'B ?', choisie: 'oui', bonne: 'oui', juste: true, bonus: false }] };
+  assert.equal((await appel(`${url}/scores`, 'POST', corps)).status, 201);
+  await appel(`${url}/retours`, 'POST', corps);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.doesNotMatch(consigne, /« sûr »/);
+  assert.match(consigne, /il a choisi « non »/);
+});
+
 test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
@@ -1395,4 +1432,17 @@ test('Prompt système allégé : sections dynamiques exclues, réglages utilisat
   assert.ok(recus.includes('--exclude-dynamic-system-prompt-sections'));
   assert.ok(recus.includes('--strict-mcp-config'));
   assert.equal(recus[recus.indexOf('--setting-sources') + 1], 'user');
+});
+
+test('Ma fiche : la Leçon lue expose ses documents de référence (reference/*.html), liste vide sinon', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les glaciers' })).data;
+  assert.deepEqual(lecon.references, []);
+  const dossierReference = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'reference');
+  await fs.mkdir(dossierReference);
+  await fs.writeFile(path.join(dossierReference, 'glossaire.html'), '<h1>Glossaire</h1>');
+  await fs.writeFile(path.join(dossierReference, 'fiche.html'), '<h1>Fiche</h1>');
+  await fs.writeFile(path.join(dossierReference, 'notes.txt'), 'pas un document');
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data;
+  assert.deepEqual(lue.references, ['fiche.html', 'glossaire.html']);
+  assert.equal((await fetch(`${base}/fichiers/zoe-test/${lecon.id}/reference/fiche.html`)).status, 200);
 });

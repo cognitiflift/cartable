@@ -136,16 +136,37 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
   lecteur.readAsDataURL(fichier);
 });
 
+// Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, par-dessus l'écran.
+// L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés.
+const QUESTIONS_DU_MODE = { libre: ['pourquoi', 'deja'], revision: ['deja'] };
+async function cadrer(mode) {
+  const cadrage = {};
+  for (const cle of QUESTIONS_DU_MODE[mode]) {
+    const { question, reponses } = config.cadrage[cle];
+    cadrage[cle] = await new Promise((choisir) => {
+      const calque = h('div', { className: 'cadrage' },
+        h('div', { className: 'bulle-prof' }, question),
+        h('div', { className: 'choix' }, Object.entries(reponses).map(([valeur, libelle]) =>
+          h('button', { onclick: () => { calque.remove(); choisir(valeur); } }, libelle))));
+      app.append(calque);
+    });
+  }
+  return cadrage;
+}
+
 function ecranNouvelleLecon(profil) {
   const erreur = h('p', { className: 'erreur' });
   const boutons = [];
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
-  const demarrer = async (corps) => {
+  // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
+  const demarrer = async (corps, mode = 'libre') => {
     activer(false);
+    erreur.textContent = '';
+    const cadrage = await cadrer(mode);
     erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
     try {
-      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: await corps() });
+      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage } });
       location.hash = `#/lecon/${lecon.id}`;
     } catch (e) {
       erreur.textContent = e.message;
@@ -198,7 +219,7 @@ function ecranNouvelleLecon(profil) {
       demarrer(async () => ({
         dateControle: dateControle.value || undefined,
         fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-      }));
+      }), 'revision');
     } },
       h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
       h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),

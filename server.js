@@ -7,6 +7,7 @@ import { resultatQuiz } from './lib/resultats.js';
 import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, REBONDS, preambuleRelais, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz } from './lib/retour.js';
+import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE } from './lib/cadrage.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -168,8 +169,9 @@ async function regenererPropositions(slug) {
   return lirePropositions(slug);
 }
 
-async function nouvelleRevision(slug, { fichiers, dateControle }) {
-  const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision' });
+async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
+  const cadrage = validerCadrage(brut, 'revision');
+  const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage });
   const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
   const controle = typeof dateControle === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateControle) ? dateControle : null;
   const prompt = [
@@ -178,7 +180,7 @@ async function nouvelleRevision(slug, { fichiers, dateControle }) {
     `Lis le document, écris MISSION.md, puis crée une page de révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document) avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
   ].join('\n');
   const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
-  return tourDeParole({ slug, id: lecon.id, prompt, affiche, premier: true });
+  return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(prompt, cadrage), affiche, premier: true });
 }
 
 // Fin de quiz : Retour de quiz instantané (ADR 0002), composé par l'appli sans tour du prof ; il porte l'action que
@@ -230,17 +232,18 @@ async function rebond(slug, id, { action }) {
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
-async function nouvelleDepuisProposition(slug, titre) {
+async function nouvelleDepuisProposition(slug, titre, brut) {
+  const cadrage = validerCadrage(brut, 'libre');
   const proposition = (await store.lirePropositions(slug))?.find((p) => p.titre === titre);
   if (!proposition) throw new HttpError(400, "Cette idée n'est plus proposée");
-  const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre' });
-  return tourDeParole({ slug, id: lecon.id, prompt: proposition.titre, premier: true });
+  const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre', cadrage });
+  return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(proposition.titre, cadrage), affiche: proposition.titre, premier: true });
 }
 
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
-  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT });
+  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT, cadrage: QUESTIONS_CADRAGE });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
   if (!slug) {
@@ -264,12 +267,13 @@ async function api(req, res, segments) {
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));
-        if (corps.proposition !== undefined) return json(res, 201, await nouvelleDepuisProposition(slug, corps.proposition));
+        if (corps.proposition !== undefined) return json(res, 201, await nouvelleDepuisProposition(slug, corps.proposition, corps.cadrage));
         const sujet = typeof corps.sujet === 'string' ? corps.sujet.trim() : '';
         if (!sujet) throw new HttpError(400, 'Dis-moi ce que tu veux apprendre');
         if (sujet.length > SUJET_MAX) throw new HttpError(400, `Ton sujet est trop long (${SUJET_MAX} caractères au plus)`);
-        const lecon = await store.creerLecon(slug, { sujet, mode: 'libre' });
-        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: promptDemarrageLibre(sujet), affiche: sujet, premier: true }));
+        const cadrage = validerCadrage(corps.cadrage, 'libre');
+        const lecon = await store.creerLecon(slug, { sujet, mode: 'libre', cadrage });
+        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(promptDemarrageLibre(sujet), cadrage), affiche: sujet, premier: true }));
       }
     } else if (!r3) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));

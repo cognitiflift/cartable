@@ -1362,3 +1362,78 @@ test('Prompt système allégé : sections dynamiques exclues, réglages utilisat
   assert.ok(recus.includes('--strict-mcp-config'));
   assert.equal(recus[recus.indexOf('--setting-sources') + 1], 'user');
 });
+
+const argsDe = (lecon) => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+const nombreDeLecons = async (slug) => (await appel(`/api/eleves/${slug}/lecons`)).data.length;
+
+test('Cadrage : une Leçon libre l\'enregistre et le premier prompt du prof en porte les libellés', async () => {
+  const lecon = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'expose', deja: 'un-peu' } });
+  assert.equal(lecon.status, 201);
+  assert.deepEqual(lecon.data.cadrage, { pourquoi: 'expose', deja: 'un-peu' });
+  assert.equal(lecon.data.messages[0].texte, 'les comètes'); // l'Élève voit son sujet, pas le Cadrage
+  assert.equal(lecon.data.messages.length, 2); // un seul tour du prof : le Cadrage ne coûte aucun token
+  assert.equal(lecon.data.cout.tours, 1);
+  const args = await argsDe(lecon.data);
+  assert.match(args, /Pourquoi \? Pour un exposé ou un projet/);
+  assert.match(args, /Tu en sais déjà… Un peu/);
+  assert.deepEqual((await appel(`/api/eleves/zoe-test/lecons/${lecon.data.id}`)).data.cadrage, { pourquoi: 'expose', deja: 'un-peu' });
+  assert.deepEqual((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.data.id).cadrage, { pourquoi: 'expose', deja: 'un-peu' });
+});
+
+test('Cadrage : questions et réponses fermées servies par la configuration, avec « Je ne sais pas »', async () => {
+  const { cadrage } = (await appel('/api/config')).data;
+  assert.equal(cadrage.pourquoi.question, 'Pourquoi ?');
+  assert.equal(cadrage.deja.reponses['je-ne-sais-pas'], 'Je ne sais pas');
+  assert.equal(cadrage.pourquoi.reponses.controle, 'Pour un contrôle');
+});
+
+test('Cadrage : valeurs inconnues refusées (400) sans créer de Leçon ; Cadrage absent accepté', async () => {
+  const avant = await nombreDeLecons('zoe-test');
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'pour rire' } })).status, 400);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { deja: 'rien', envie: 'x' } })).status, 400);
+  assert.equal(await nombreDeLecons('zoe-test'), avant);
+  const sans = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes' });
+  assert.equal(sans.status, 201);
+  assert.equal(sans.data.cadrage, null);
+  assert.doesNotMatch(await argsDe(sans.data), /Tu en sais déjà/);
+});
+
+test('Cadrage : une Leçon depuis une Proposition l\'enregistre et le transmet au prof, valeurs inconnues refusées', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cadre-Prop', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const { propositions } = await attendrePropositions('cadre-prop');
+  const refus = await appel('/api/eleves/cadre-prop/lecons', 'POST', { proposition: propositions[0].titre, cadrage: { deja: 'tout' } });
+  assert.equal(refus.status, 400);
+  assert.equal(await nombreDeLecons('cadre-prop'), 0);
+  const lecon = await appel('/api/eleves/cadre-prop/lecons', 'POST', { proposition: propositions[0].titre, cadrage: { pourquoi: 'curiosite', deja: 'je-ne-sais-pas' } });
+  assert.equal(lecon.status, 201);
+  assert.deepEqual(lecon.data.cadrage, { pourquoi: 'curiosite', deja: 'je-ne-sais-pas' });
+  const args = await argsDe(lecon.data);
+  assert.match(args, /Pourquoi \? Par curiosité ; Tu en sais déjà… Je ne sais pas/);
+});
+
+test('Cadrage : une Leçon de révision ne garde que « Tu en sais déjà… », « Pourquoi ? » refusé', async () => {
+  const fichiers = [{ nom: 'page1.pdf', data: Buffer.from('%PDF-1.4 faux').toString('base64') }];
+  const avant = await nombreDeLecons('zoe-test');
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { pourquoi: 'controle', deja: 'rien' } })).status, 400);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { deja: 'tout' } })).status, 400);
+  assert.equal(await nombreDeLecons('zoe-test'), avant);
+  const lecon = await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { deja: 'beaucoup' } });
+  assert.equal(lecon.status, 201);
+  assert.deepEqual(lecon.data.cadrage, { deja: 'beaucoup' });
+  const args = await argsDe(lecon.data);
+  assert.match(args, /Tu en sais déjà… Beaucoup/);
+  assert.doesNotMatch(args, /Pourquoi \?/);
+});
+
+test('Cadrage : les Propositions reçoivent un résumé des Cadrages récents', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cadre-Idees', age: 10, niveau: 'Primaire 5' })).status, 201);
+  await attendrePropositions('cadre-idees');
+  const args = path.join(dossier, 'args-propositions');
+  await fs.rm(args, { force: true });
+  await appel('/api/eleves/cadre-idees/lecons', 'POST', { sujet: 'les requins', cadrage: { pourquoi: 'en-parler', deja: 'beaucoup' } });
+  await sonderJusqua(() => fs.readFile(args, 'utf8').catch(() => ''), (a) => a.includes('Les volcans (Sciences)'), 'Pas de régénération après le tour');
+  await attendrePropositions('cadre-idees');
+  const consignes = await fs.readFile(args, 'utf8');
+  assert.match(consignes, /Cadrage/);
+  assert.match(consignes, /Pourquoi \? Pour en parler avec quelqu'un ; Tu en sais déjà… Beaucoup/);
+});

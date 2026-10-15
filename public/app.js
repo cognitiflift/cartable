@@ -146,7 +146,7 @@ async function ecranAccueil(profil) {
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
             l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
           objectifsRetenus(l.objectifs),
-          h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
+          h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
 }

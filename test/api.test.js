@@ -285,6 +285,12 @@ test('Continuer : en Leçon libre, le prof écrit la suite prévue dans lesson.j
   const page = await avecFichier('ensuite', () => message(lecon, 'ok'));
   assert.equal(page.data.ensuite, 'Les volcans endormis');
   assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).ensuite, 'Les volcans endormis');
+  // Tant que le quiz de la dernière page n'est pas fait, « Continuer » ramène à cette page : la carte n'annonce pas la suite.
+  assert.equal(page.data.quizEnAttente, true);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).quizEnAttente, true);
+  await appel(`${url}/scores`, 'POST', { score: 40, page: '0001-volcans.html' });
+  assert.equal((await appel(url)).data.quizEnAttente, false);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).quizEnAttente, false);
 
   // Le Retour de quiz, instantané, garde le titre annoncé ; l'Étape suivante le rappelle au prof.
   const retour = (await appel(`${url}/retours`, 'POST', { score: 40 })).data;

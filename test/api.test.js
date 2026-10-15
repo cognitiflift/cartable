@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { slugify } from '../lib/store.js';
+import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
 const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
@@ -2391,4 +2392,103 @@ test('Révisions du jour : une Question avec une image la garde dans la Leçon e
   await fs.writeFile(fichier, JSON.stringify(banque));
   const [variante] = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions.find((q) => q.id === 'q1').variantes;
   assert.deepEqual(variante.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
+});
+
+// Formats de rappel actif (spec #48, ticket #70) : texte à trous et remettre dans l'ordre, dans la Banque et les
+// Révisions du jour, avec crédit partiel. Le corps envoyé est celui que le Kit lui-même construit.
+const quizRappel = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.' },
+    { id: 't1', type: 'trous', enonce: 'Complète.', texte: 'La lave sort par le [cratère] du [volcan].', intrus: ['nuage'], explication: 'En haut.' },
+    { id: 'o1', type: 'ordre', enonce: 'Dans l’ordre ?', elements: ['Le magma monte', 'La lave sort', 'La lave refroidit'], explication: 'Dans cet ordre.' },
+  ],
+};
+const corpsRappel = (page, choix, confiance = {}) => {
+  const { type, ...corps } = messageScore(lireQuiz(quizRappel), choix, page, confiance);
+  return corps;
+};
+
+test('Formats de rappel actif : le score compte le crédit partiel, la Banque garde le contenu de chaque format, et un partiel revient vite', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0002-rappel.html', quizRappel);
+  // q1 juste sûr ; t1 à moitié (un trou sur deux), sûr ; o1 juste sûr.
+  const corps = corpsRappel('0002-rappel.html', { q1: 0, t1: [0, 2], o1: [0, 1, 2] }, { q1: true, t1: true, o1: true });
+  const r = await appel(`${url}/scores`, 'POST', { ...corps, score: 0 }, le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).score, 83); // (1 + 0,5 + 1) / 3, recalculé par le serveur
+  const t1Resultat = r.data.scores.at(-1).questions.find((q) => q.id === 't1');
+  assert.deepEqual(t1Resultat, {
+    id: 't1', type: 'trous', enonce: 'Complète.', choisie: 'La lave sort par le [cratère] du [nuage].', bonne: 'La lave sort par le [cratère] du [volcan].',
+    juste: false, points: 0.5, detail: { places: ['cratère', 'nuage'] }, bonus: false, objectifs: [1], sur: true,
+  });
+
+  const [, t1, o1] = r.data.questions;
+  assert.deepEqual(t1.contenu, { type: 'trous', enonce: 'Complète.', segments: ['La lave sort par le ', ' du ', '.'], trous: ['cratère', 'volcan'], intrus: ['nuage'], explication: 'En haut.', objectifs: [1] });
+  assert.deepEqual(o1.contenu, { type: 'ordre', enonce: 'Dans l’ordre ?', elements: ['Le magma monte', 'La lave sort', 'La lave refroidit'], explication: 'Dans cet ordre.', objectifs: [1] });
+  // Partiel : pas juste au journal, avec ses points ; noté « difficile » (revu le lendemain), le juste et sûr plus tard.
+  assert.deepEqual(t1.journal[0], { date: BANQUE_DATE, juste: false, points: 0.5, sur: true, origine: 'quiz' });
+  assert.equal(t1.prochaineRevision, LENDEMAIN);
+  assert.ok(Date.parse(o1.prochaineRevision) > Date.parse(LENDEMAIN), o1.prochaineRevision);
+});
+
+test('Formats de rappel actif : en Révision du jour, le serveur corrige chaque format lui-même, crédit partiel compris', async () => {
+  const slug = slugify('Revis-Rappel');
+  await appel('/api/eleves', 'POST', { pseudo: 'Revis-Rappel', age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'rappel' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-rappel.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizRappel)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsRappel('0002-rappel.html', { q1: 0, t1: [1, 0], o1: [2, 1, 0] }), le(BANQUE_DATE));
+  await attendrePropositions(slug);
+
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  const servie = data.questions.find((q) => q.id === 't1');
+  assert.equal(servie.type, 'trous');
+  assert.deepEqual(servie.trous, ['cratère', 'volcan']);
+
+  const url = `/api/eleves/${slug}/revisions`;
+  const repondre = (id, choisie) => appel(url, 'POST', { lecon: lecon.id, page: '0002-rappel.html', id, choisie, sur: true, juste: true }, le(LENDEMAIN));
+  const partiel = await repondre('o1', [0, 2, 1]);
+  assert.equal(partiel.status, 200);
+  assert.equal(partiel.data.juste, false);
+  assert.equal(partiel.data.points, 2 / 3);
+  assert.equal(partiel.data.bonne, 'Le magma monte → La lave sort → La lave refroidit');
+  const juste = await repondre('t1', [0, 1]);
+  assert.equal(juste.data.juste, true);
+  for (const choisie of [0, [0, 0], [0, 1, 2], 'cratère']) assert.equal((await repondre('t1', choisie)).status, 400, JSON.stringify(choisie));
+
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(questions.find((q) => q.id === 'o1').journal.at(-1), { date: LENDEMAIN, juste: false, points: 2 / 3, sur: true, origine: 'revision' });
+  assert.deepEqual(questions.find((q) => q.id === 't1').journal.at(-1), { date: LENDEMAIN, juste: true, sur: true, origine: 'revision' });
+});
+
+test('Formats de rappel actif : la consigne demande au moins une question de rappel actif par quiz, et le Kit documente ses formats', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les saisons' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /au moins une question de rappel actif \(pas un QCM\)/);
+  assert.match(args, /"trous"/);
+  assert.match(args, /"ordre"/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /"type": "trous"/);
+  assert.match(doc, /"intrus"/);
+  assert.match(doc, /"type": "ordre"/);
+  assert.match(doc, /"elements"/);
+  for (const fichier of ['types/index.js', 'types/trous.js', 'types/ordre.js', 'rendus/index.js', 'rendus/trous.js', 'rendus/ordre.js']) {
+    assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
+  }
+});
+
+test('Formats de rappel actif : une question mal formée ou d\'un type inconnu est signalée au prof au tour suivant seulement', async () => {
+  const quiz = { objectifs: [1], questions: [quizRappel.questions[0], { id: 'x1', type: 'mystere', enonce: '?' }, { ...quizRappel.questions[1], intrus: [] }] };
+  const lecon = await avecPageImages({ page: `<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`, manifeste: [] },
+    async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'quiz bancal' })).data);
+  assert.doesNotMatch(await argsDe(lecon), /Questions ignorées/);
+  await message(lecon, 'ok');
+  const signale = await argsDe(lecon);
+  assert.match(signale, /Questions ignorées/);
+  assert.ok(signale.includes('- 0002-images.html, x1 : type inconnu « mystere »'), signale);
+  assert.ok(signale.includes('- 0002-images.html, t1 : question « trous » mal formée'), signale);
+  assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'questionsIgnorees'), false);
+  await message(lecon, 'ok');
+  assert.doesNotMatch(await argsDe(lecon), /Questions ignorées/);
 });

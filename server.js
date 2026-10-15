@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -75,6 +75,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   }
   lignes.push(...consigneQuestionsFragiles(lecon.questions));
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
+  lignes.push(...consigneQuestionsIgnorees(lecon.questionsIgnorees));
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
   }
@@ -94,6 +95,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
     const lecon = await store.lireLecon(slug, id);
     // Session neuve dès que la Leçon a sa première page : le prof relance le skill teach et reçoit le préambule de relais.
     const neuve = RELAIS && lecon.pages.length > 0;
+    const pagesAvant = await store.instantanePages(slug, id);
     const { reponse, sessionId, cout } = await lancerAgent({
       cwd: store.leconDir(slug, id),
       prompt: premier ? `/mattpocock-skills:teach ${prompt}` : neuve ? `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz })}\n\n${prompt}` : preambule(prompt, lecon, { resultatsQuiz }),
@@ -110,7 +112,14 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
       return [];
     });
     const imagesRetirees = imagesASignaler(premier ? lecon.imagesRetirees : [], nouvelles);
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees }, cout: cout && { ...cout, relais: neuve } });
+    // Questions de quiz ignorées par le Kit dans les pages écrites par ce tour (spec #48) : signalées au tour suivant,
+    // une fois, comme les images retirées.
+    const ignorees = await store.questionsIgnoreesDepuis(slug, id, pagesAvant).catch((e) => {
+      console.error(`Quiz de ${id} : ${e.message}`);
+      return [];
+    });
+    const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
+    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout: cout && { ...cout, relais: neuve } });
     relancerPropositions(slug);
     return store.lireLecon(slug, id);
   } catch (e) {

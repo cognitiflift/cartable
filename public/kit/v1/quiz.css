@@ -61,6 +61,35 @@
 .kit-quiz-retour p { margin: .3rem 0 0; }
 .kit-quiz-retour.kit-juste { background: var(--kit-juste-fond); }
 .kit-quiz-retour.kit-faux { background: var(--kit-faux-fond); }
+/* Juste en partie (crédit partiel des formats à plusieurs éléments, spec #48) : entre juste et faux. */
+.kit-quiz-retour.kit-partiel { background: color-mix(in srgb, var(--kit-juste-fond) 50%, var(--kit-faux-fond)); }
+.kit-quiz-valider {
+  font: inherit; font-weight: 600; align-self: flex-start; padding: .5rem 1.1rem; border-radius: 999px; cursor: pointer;
+  border: 2px solid var(--kit-accent); background: var(--kit-accent-doux); color: var(--kit-texte);
+}
+.kit-quiz-valider:disabled { opacity: .5; cursor: default; }
+.kit-quiz-valider[hidden] { display: none; }
+
+/* Texte à trous : la phrase avec ses trous, puis la banque de mots. */
+.kit-trous-phrase { line-height: 2.4; margin: .2rem 0; }
+.kit-trou {
+  font: inherit; min-width: 4.5em; padding: .15rem .6rem; margin: 0 .15rem; border-radius: 8px; cursor: pointer;
+  border: 2px dashed var(--kit-bord); background: var(--kit-fond); color: var(--kit-texte);
+}
+.kit-trou:disabled { cursor: default; }
+.kit-trou.kit-trou-actif { border-color: var(--kit-accent); }
+.kit-trou.kit-bonne { border-style: solid; border-color: var(--kit-juste); background: var(--kit-juste-fond); }
+.kit-trou.kit-fausse { border-style: solid; border-color: var(--kit-faux); background: var(--kit-faux-fond); }
+.kit-trous-banque { display: flex; flex-wrap: wrap; gap: .5rem; }
+.kit-quiz-reponse.kit-mot:disabled { opacity: .45; }
+
+/* Remettre dans l'ordre : une liste d'éléments, chacun avec ses flèches. */
+.kit-ordre { list-style: decimal; margin: 0; padding-left: 1.6rem; display: flex; flex-direction: column; gap: .5rem; }
+.kit-ordre-element { display: flex; gap: .4rem; align-items: center; }
+.kit-ordre-element .kit-ordre-texte { flex: 1; }
+.kit-ordre-fleche { font: inherit; padding: .4rem .5rem; border-radius: 8px; border: 1px solid var(--kit-bord); background: var(--kit-carte); cursor: pointer; }
+.kit-ordre-fleche:disabled { opacity: .35; cursor: default; }
+
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font-size: 1.4rem; font-weight: 700; color: var(--kit-accent); }

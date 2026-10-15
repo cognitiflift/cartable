@@ -84,7 +84,7 @@ Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPa
 
 ## Formats de rappel actif
 
-Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM (sauf « réfléchis puis dévoile », voir plus bas).
+Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM (sauf « réfléchis puis dévoile », voir plus bas). Après « Je ne sais pas », le Kit montre la bonne réponse en place (mots dans les trous, éléments dans l'ordre…).
 
 Crédit partiel : une question à plusieurs éléments rapporte la part juste (3 trous sur 4 = 0,75 question dans le score), mais elle ne compte comme « juste » (Objectifs, Banque de Questions, Révisions) que si elle est entièrement juste.
 

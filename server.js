@@ -14,9 +14,10 @@ import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
 import { vueParent } from './lib/parent.js';
+import { indicateurs } from './lib/indicateurs.js';
 import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
-import { jourValide, minuitDu } from './lib/jour.js';
+import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -37,6 +38,19 @@ const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
 };
+
+// Indicateurs (#78) : un événement daté de l'Élève, enregistré sans jamais faire échouer la requête qui l'a produit.
+const noterEvenement = (slug, evenement) =>
+  store.enregistrerEvenement(slug, evenement).catch((e) => console.error(`Événement de ${slug} : ${e.message}`));
+
+// Période des indicateurs lue dans la requête (?du=AAAA-MM-JJ&au=AAAA-MM-JJ, bornes comprises) : `au` vaut aujourd'hui
+// par défaut, `du` est laissé à lib/indicateurs.js. 400 pour une date invalide ou une période à l'envers.
+function periodeDe(url, maintenant) {
+  const du = url.searchParams.get('du') ?? undefined;
+  const au = url.searchParams.get('au') ?? jourLocal(maintenant);
+  if ((du !== undefined && !jourValide(du)) || !jourValide(au) || (du !== undefined && du > au)) throw new HttpError(400, 'Période invalide');
+  return { du, au };
+}
 
 async function lireCorps(req, max = 100_000) {
   let body = '';
@@ -92,6 +106,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
 async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
+  const debut = new Date().toISOString(); // attente de l'Élève (#78), du début à la fin du tour
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -129,6 +144,7 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
   } finally {
     enCours.delete(id);
+    await noterEvenement(slug, { type: 'tour', lecon: id, debut, fin: new Date().toISOString() });
   }
 }
 
@@ -358,6 +374,7 @@ async function api(req, res, segments) {
       await store.lireEleve(slug);
       const corps = await lireCorps(req);
       const reponse = await store.repondreEnRevision(slug, corps, { maintenant });
+      await noterEvenement(slug, { type: 'revision', date: new Date(maintenant).toISOString(), lecon: corps.lecon, juste: reponse.juste });
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
     }
@@ -365,8 +382,15 @@ async function api(req, res, segments) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
     if (m === 'GET') {
       const maintenant = maintenantDe(req.headers);
-      const [lecons, couts] = await Promise.all([store.leconsDuParent(slug, { maintenant }), store.lireCouts(slug)]);
-      return json(res, 200, vueParent(lecons, { couts, maintenant }));
+      const [lecons, couts, evenements] = await Promise.all([store.leconsDuParent(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
+      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements }));
+    }
+  } else if (r2 === 'indicateurs' && !id) {
+    // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
+    if (m === 'GET') {
+      const maintenant = maintenantDe(req.headers);
+      const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
+      return json(res, 200, indicateurs(await store.lireEvenements(slug), { maintenant, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
     // Rythme (#75) : Objectif du jour, série avec jokers et récapitulatif de la semaine, pour cet Élève seul.
@@ -399,7 +423,12 @@ async function api(req, res, segments) {
         return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt, affiche: sujet, premier: true }));
       }
     } else if (!r3) {
-      if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id, { maintenant: maintenantDe(req.headers) }));
+      if (m === 'GET') {
+        const maintenant = maintenantDe(req.headers);
+        const lecon = await store.lireLecon(slug, id, { maintenant });
+        await noterEvenement(slug, { type: 'ouverture', date: new Date(maintenant).toISOString(), lecon: id }); // #78
+        return json(res, 200, lecon);
+      }
     } else if (r3 === 'scores' && m === 'POST') {
       const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenantDe(req.headers) });
       varierQuestions(slug, id);

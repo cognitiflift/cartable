@@ -29,13 +29,16 @@ const store = createStore(ELEVES);
 const SUJET_MAX = 80; // sujet libre, après trim
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.md': 'text/markdown; charset=utf-8' };
-const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
+const enCours = new Set(); // Leçons (cleLecon) dont l'agent travaille : un seul agent par Leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
 const variantesEnCours = new Set(); // élèves dont un tour de Variantes travaille : un seul à la fois par Élève
 const variantesARelancer = new Map(); // élève → Leçons dont des Questions ont pu devenir à varier pendant ce tour
-const preparations = new Map(); // « élève/leçon » → page préparée pendant le quiz (#74) : { prevision, fin }, une seule par Leçon
+const preparations = new Map(); // cleLecon → page préparée pendant le quiz (#74) : { prevision, fin }, une seule par Leçon
 const PREPARATION = process.env.CARTABLE_PREPARATION !== '0'; // CARTABLE_PREPARATION=0 coupe les pages préparées
+
+// Clé d'une Leçon dans les verrous et les pages préparées : deux Élèves peuvent avoir une Leçon du même identifiant.
+const cleLecon = (slug, id) => `${slug}/${id}`;
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -109,7 +112,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
 // Le tour attend d'abord la page préparée en cours, s'il y en a une, et l'écarte : un seul agent par Leçon à la fois.
 // Puis la page qu'il laisse affichée fait préparer la suivante (voir preparerPageSuivante).
 async function tourDeParole(tour) {
-  const lecon = await occuper(tour.id, () => chronometrer(tour.slug, tour.id, async () => {
+  const lecon = await occuper(tour.slug, tour.id, () => chronometrer(tour.slug, tour.id, async () => {
     await ecarterPreparation(tour.slug, tour.id, await prendrePreparation(tour.slug, tour.id));
     return tourDuProf(tour);
   }));
@@ -117,14 +120,16 @@ async function tourDeParole(tour) {
   return lecon;
 }
 
-// La Leçon `id` est occupée le temps de `operation()` (tour du prof, Retour de quiz) : une seule à la fois.
-async function occuper(id, operation) {
-  if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
-  enCours.add(id);
+// La Leçon `id` de l'Élève `slug` est occupée le temps de `operation()` (tour du prof, Retour de quiz) : une seule
+// opération à la fois.
+async function occuper(slug, id, operation) {
+  const cle = cleLecon(slug, id);
+  if (enCours.has(cle)) throw new HttpError(409, "L'agent est déjà en train de répondre");
+  enCours.add(cle);
   try {
     return await operation();
   } finally {
-    enCours.delete(id);
+    enCours.delete(cle);
   }
 }
 
@@ -190,13 +195,14 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
 // par le Profil ou quand trop de pages préparées restent inutilisées.
 function preparerPageSuivante(slug, id) {
   (async () => {
-    if (enCours.has(id) || preparations.has(`${slug}/${id}`)) return;
+    const cle = cleLecon(slug, id);
+    if (enCours.has(cle) || preparations.has(cle)) return;
     const profil = await store.lireEleve(slug);
     const { active, suspendue } = await etatPreparations(slug, profil);
     if (!active || suspendue) return;
     const lecon = await store.lireLecon(slug, id);
     const prevision = pagePrevue(lecon, await store.quizDeLaPage(slug, id, lecon.pages.at(-1)));
-    if (!prevision || enCours.has(id) || preparations.has(`${slug}/${id}`)) return;
+    if (!prevision || enCours.has(cle) || preparations.has(cle)) return;
     const fin = (async () => {
       const cwd = await store.preparerDossierPreparation(slug, id);
       const { reponse, sessionId, cout } = await lancerAgent({
@@ -212,7 +218,7 @@ function preparerPageSuivante(slug, id) {
       await store.ecarterPreparation(slug, id).catch(() => {});
       return null;
     });
-    preparations.set(`${slug}/${id}`, { prevision, fin });
+    preparations.set(cle, { prevision, fin });
   })().catch((e) => console.error(`Page préparée de ${id} : ${e.message}`));
 }
 
@@ -225,10 +231,10 @@ async function etatPreparations(slug, profil) {
 // Page préparée de la Leçon, attendue si elle est en cours, et retirée : { prevision, reponse, sessionId, cout },
 // ou null (aucune, ou tour raté).
 async function prendrePreparation(slug, id) {
-  const preparation = preparations.get(`${slug}/${id}`);
+  const preparation = preparations.get(cleLecon(slug, id));
   if (!preparation) return null;
   const resultat = await preparation.fin;
-  preparations.delete(`${slug}/${id}`);
+  preparations.delete(cleLecon(slug, id));
   return resultat && { ...preparation, ...resultat };
 }
 
@@ -385,9 +391,7 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
 async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
-  if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
-  enCours.add(id);
-  try {
+  return occuper(slug, id, async () => {
     const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
     if (pretest === true) {
       // Pré-test refait en cours de Leçon (après un vrai score) : toujours hors score, mais sans « Commencer », et le
@@ -418,10 +422,8 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
         ...(action === 'terminee' && { terminee: termineeApres }),
       },
     });
-    return await store.lireLecon(slug, id);
-  } finally {
-    enCours.delete(id);
-  }
+    return store.lireLecon(slug, id);
+  });
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -434,7 +436,7 @@ async function rebond(slug, id, { action }) {
   const lecon = await store.lireLecon(slug, id);
   if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
   // La page préparée pendant le quiz s'affiche aussitôt si elle correspond ; sinon, tour normal.
-  const apres = await occuper(id, async () => {
+  const apres = await occuper(slug, id, async () => {
     const debut = new Date().toISOString(); // l'attente de la page préparée compte si elle n'est pas retenue
     const preparation = await prendrePreparation(slug, id);
     if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action);

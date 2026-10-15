@@ -1404,6 +1404,32 @@ test('Concurrence : deux Leçons différentes reçoivent des messages en même t
   assert.deepEqual((await reponses).map((r) => r.status), [200, 200]);
 });
 
+test('Concurrence : deux Élèves dont les Leçons ont le même identifiant ne se bloquent pas l\'un l\'autre', async () => {
+  const slugs = ['meme-id-a', 'meme-id-b'];
+  for (const pseudo of slugs) await appel('/api/eleves', 'POST', { pseudo, age: 10, niveau: 'Primaire 5' });
+  const creer = async (slug) => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les orages' })).data;
+  const a = await creer(slugs[0]);
+  const b = await creer(slugs[1]);
+  assert.equal(a.id, b.id); // même sujet, même jour : même identifiant de Leçon
+  await fs.rm(path.join(dossier, `demarre-${a.id}`), { force: true });
+  const ecrire = (slug) => appel(`/api/eleves/${slug}/lecons/${a.id}/messages`, 'POST', { texte: 'ok' });
+  const { reponses } = await avecFichier('lent', async () => {
+    const premiere = ecrire(slugs[0]);
+    premiere.catch(() => {});
+    await sonderJusqua(() => existe(path.join(dossier, `demarre-${a.id}`)), Boolean, "L'agent n'a jamais démarré");
+    // La Leçon de l'autre Élève n'est pas occupée : sa requête attend l'agent lent au lieu d'être refusée.
+    let minuteur;
+    const seconde = ecrire(slugs[1]);
+    seconde.catch(() => {});
+    const refusee = await Promise.race([seconde.then((r) => r.status === 409), new Promise((r) => (minuteur = setTimeout(() => r(false), 1000)))]);
+    clearTimeout(minuteur);
+    assert.equal(refusee, false);
+    return { reponses: Promise.all([premiere, seconde]) };
+  });
+  assert.deepEqual((await reponses).map((r) => r.status), [200, 200]);
+  for (const slug of slugs) await attendrePropositions(slug);
+});
+
 test('Coût mesuré : chaque tour du prof s\'ajoute au coût cumulé de la Leçon, exposé par la Leçon lue et par la liste', async () => {
   assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cout-Lecon', age: 10, niveau: 'Primaire 5' })).status, 201);
   const lecons = '/api/eleves/cout-lecon/lecons';

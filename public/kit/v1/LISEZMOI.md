@@ -123,6 +123,30 @@ Pour les étapes d'un processus, les événements d'une histoire ou les mots d'u
 - `elements` : 3 à 10 éléments, tous différents, **dans le bon ordre**.
 - Crédit partiel : les éléments déjà dans le bon ordre entre eux (il suffirait de déplacer les autres).
 
+### Exemple à étapes (mathématiques) : `"type": "etapes"`
+
+Pour une méthode de mathématiques. Le Kit montre la résolution étape par étape ; à chaque étape à compléter, l'élève touche la bonne parmi des propositions mélangées.
+
+```json
+{
+  "id": "q5",
+  "type": "etapes",
+  "enonce": "Complète le calcul de 3/4 + 1/6.",
+  "etapes": [
+    { "texte": "Dénominateur commun : 12" },
+    { "texte": "3/4 = 9/12", "intrus": ["3/4 = 3/12", "3/4 = 7/12"] },
+    { "texte": "1/6 = 2/12" },
+    { "texte": "9/12 + 2/12 = 11/12", "intrus": ["9/12 + 2/12 = 11/24"] }
+  ],
+  "explication": "On met les fractions au même dénominateur, puis on additionne les numérateurs seulement."
+}
+```
+
+- `etapes` : 2 à 10 étapes, **dans l'ordre de la résolution**. Une étape sans `intrus` est montrée telle quelle ; une étape avec `intrus` est à compléter (au moins une par question).
+- `intrus` : 1 à 4 propositions fausses pour cette étape, différentes de la bonne, tirées des **erreurs fréquentes** (dénominateurs additionnés, retenue oubliée, signe perdu…) : un distracteur absurde n'apprend rien.
+- Crédit partiel : la part des étapes à compléter bien choisies.
+- Enchaînement : l'exemple **entièrement résolu** va dans le contenu de la page (pas dans le quiz) ; ensuite des questions `etapes` où l'on retire les étapes une à une (une étape à compléter, puis deux…) ; puis des exercices de types mélangés.
+
 ## Ce que fait le Kit
 
 Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.

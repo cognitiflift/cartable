@@ -14,9 +14,11 @@
 import { qcm } from './qcm.js';
 import { trous } from './trous.js';
 import { ordre } from './ordre.js';
+import { etapes } from './etapes.js';
 
 export const TYPES = {
   qcm,
   trous,
   ordre,
+  etapes,
 };

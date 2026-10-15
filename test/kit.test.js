@@ -239,3 +239,66 @@ test('Kit : une question d\'un type inconnu ou mal formée est ignorée, le quiz
   assert.deepEqual(questionsIgnorees(quiz), []);
   assert.equal(questionsIgnorees({ questions: [{ id: 'x', type: 'mystere', enonce: '?' }] }).length, 2, 'le quiz qui ne s\'affiche plus est signalé aussi');
 });
+
+// Mathématiques (spec #48, ticket #73) : exemple travaillé dont une ou plusieurs étapes sont à compléter en choisissant
+// parmi des propositions (les erreurs fréquentes comme distracteurs).
+const etapes = {
+  id: 'e1', type: 'etapes', enonce: 'Calcule 3/4 + 1/6.',
+  etapes: [
+    { texte: 'Dénominateur commun : 12' },
+    { texte: '3/4 = 9/12', intrus: ['3/4 = 3/12', '3/4 = 7/12'] },
+    { texte: '1/6 = 2/12' },
+    { texte: '9/12 + 2/12 = 11/12', intrus: ['9/12 + 2/12 = 11/24'] },
+  ],
+  explication: 'On met les fractions au même dénominateur, puis on additionne les numérateurs seulement.',
+};
+
+test('Kit : un exemple à étapes a de 2 à 10 étapes, dont au moins une à compléter parmi des propositions ; mal formé, il est écarté', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [etapes] }).questions;
+  assert.equal(q.type, 'etapes');
+  assert.deepEqual(q.etapes, etapes.etapes);
+  const malformes = [
+    { ...etapes, etapes: etapes.etapes.map(({ texte }) => ({ texte })) }, // aucune étape à compléter
+    { ...etapes, etapes: [etapes.etapes[1]] }, // une seule étape : ce n'est pas un exemple travaillé
+    { ...etapes, etapes: Array.from({ length: 11 }, (_, i) => ({ texte: `e${i}`, intrus: ['x'] })) },
+    { ...etapes, etapes: [etapes.etapes[0], { texte: '3/4 = 9/12', intrus: [] }] }, // rien à choisir
+    { ...etapes, etapes: [etapes.etapes[0], { texte: '3/4 = 9/12', intrus: ['3/4 = 9/12'] }] }, // l'intrus est la bonne
+    { ...etapes, etapes: [etapes.etapes[0], { texte: '3/4 = 9/12', intrus: ['a', 'b', 'c', 'd', 'e'] }] }, // trop de propositions
+    { ...etapes, etapes: [{ texte: '' }, etapes.etapes[1]] },
+    { ...etapes, etapes: [null, etapes.etapes[1]] },
+    { ...etapes, etapes: 'Dénominateur commun, puis…' },
+  ];
+  for (const m of malformes) assert.equal(lireQuiz({ questions: [quiz.questions[0], m] }).questions.length, 1, JSON.stringify(m));
+});
+
+test('Kit : corriger un exemple à étapes donne juste, faux ou un crédit partiel par étape à compléter', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [etapes] }).questions;
+  // Réponse : pour chaque étape à compléter, dans l'ordre, l'index choisi parmi ses propositions avant mélange
+  // (la bonne d'abord, puis ses intrus).
+  assert.deepEqual(corriger(q, [0, 0]), {
+    juste: true, points: 1, choisie: 'étape 2 : 3/4 = 9/12 ; étape 4 : 9/12 + 2/12 = 11/12',
+    bonne: 'étape 2 : 3/4 = 9/12 ; étape 4 : 9/12 + 2/12 = 11/12', explication: etapes.explication,
+    detail: { choix: ['3/4 = 9/12', '9/12 + 2/12 = 11/12'] },
+  });
+  const partiel = corriger(q, [0, 1]);
+  assert.equal(partiel.juste, false);
+  assert.equal(partiel.points, 0.5);
+  assert.equal(partiel.choisie, 'étape 2 : 3/4 = 9/12 ; étape 4 : 9/12 + 2/12 = 11/24');
+  assert.deepEqual(partiel.detail, { choix: ['3/4 = 9/12', '9/12 + 2/12 = 11/24'] });
+  assert.equal(corriger(q, [2, 1]).points, 0);
+  // Réponse impossible (étape oubliée, proposition hors liste) : pas de réponse choisie.
+  for (const r of [[0], [0, 2], [0, 0, 0], [-1, 0], [0.5, 0], 'x', null]) assert.equal(corriger(q, r).choisie, null, JSON.stringify(r));
+});
+
+test('Kit : un exemple à étapes compte dans le score avec son crédit partiel, et son détail passe la validation de l\'appli', () => {
+  const lu = lireQuiz({ objectifs: [1], questions: [quiz.questions[0], etapes] });
+  const message = messageScore(lu, { q1: 0, e1: [1, 0] }, 'p.html', { e1: false });
+  assert.equal(message.score, 75);
+  const [, e1] = message.questions;
+  assert.equal(e1.type, 'etapes');
+  assert.equal(e1.juste, false);
+  assert.equal(e1.points, 0.5);
+  assert.deepEqual(e1.detail, { choix: ['3/4 = 3/12', '9/12 + 2/12 = 11/12'] });
+  assert.deepEqual(lireResultats(message.questions), message.questions);
+  for (const detail of [{ choix: 'x' }, { choix: [] }, {}]) assert.equal(Object.hasOwn(lireResultats([{ ...e1, detail }])[0], 'detail'), false, JSON.stringify(detail));
+});

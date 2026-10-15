@@ -12,9 +12,11 @@
 import { rendreQcm } from './qcm.js';
 import { rendreTrous } from './trous.js';
 import { rendreOrdre } from './ordre.js';
+import { rendreEtapes } from './etapes.js';
 
 export const RENDUS = {
   qcm: rendreQcm,
   trous: rendreTrous,
   ordre: rendreOrdre,
+  etapes: rendreEtapes,
 };

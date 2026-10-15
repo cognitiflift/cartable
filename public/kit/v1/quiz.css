@@ -90,6 +90,14 @@
 .kit-ordre-fleche { font: inherit; padding: .4rem .5rem; border-radius: 8px; border: 1px solid var(--kit-bord); background: var(--kit-carte); cursor: pointer; }
 .kit-ordre-fleche:disabled { opacity: .35; cursor: default; }
 
+/* Exemple à étapes (mathématiques) : les étapes numérotées ; une étape à compléter, puis ses propositions. */
+.kit-etapes { list-style: decimal; margin: 0; padding-left: 1.6rem; display: flex; flex-direction: column; gap: .6rem; }
+.kit-etape-texte { display: inline-block; padding: .15rem .6rem; border-radius: 8px; border: 2px solid transparent; }
+.kit-etape-texte.kit-etape-vide { min-width: 4.5em; border: 2px dashed var(--kit-bord); }
+.kit-etape-texte.kit-bonne { border-style: solid; border-color: var(--kit-juste); background: var(--kit-juste-fond); }
+.kit-etape-texte.kit-fausse { border-style: solid; border-color: var(--kit-faux); background: var(--kit-faux-fond); }
+.kit-etape-propositions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .4rem; }
+
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font-size: 1.4rem; font-weight: 700; color: var(--kit-accent); }

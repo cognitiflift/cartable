@@ -122,6 +122,14 @@ Ensemble des Questions d'une Leçon. Les questions bonus du Dépassement et cell
 Série courte (10 Questions au plus) de Questions dont la révision est due ou en retard, tirées de toutes les Leçons de l'Élève et mélangées, proposée sur l'accueil par la carte « Mes révisions du jour ». Servie tout de suite par l'appli, sans tour du prof ni token ; la correction et l'explication s'affichent après chaque réponse, avec la Confiance et « Je ne sais pas » comme dans un quiz de page. Les Questions d'une Leçon de révision dont le contrôle approche passent en premier.
 _Avoid_: Réviser (retravailler une Leçon avec le prof), séance de révision, répétition
 
+**Objectif du jour**:
+Petit but quotidien montré sur l'accueil : 5 réponses en Révision du jour ou une Page de leçon terminée (quiz fait, hors Pré-test), en jour local. Calculé par l'appli à partir de l'historique de l'Élève.
+_Avoid_: Objectif tout court (un Objectif appartient à une Leçon), quota, devoir
+
+**Série de jours**:
+Nombre de jours où l'Objectif du jour a été atteint, de suite. Aujourd'hui, pas encore atteint, ne la casse pas. Chaque semaine complète de série (7 jours atteints) rapporte un **Joker**, deux au plus en réserve ; un Joker couvre tout seul un jour manqué. Une pause plus longue que la réserve fait repartir la série, sans gaspiller les Jokers. Un **récapitulatif de la semaine** passée (Objectifs devenus Retenus, révisions, pages) s'affiche au premier retour de la semaine. Jamais de comparaison entre Élèves.
+_Avoid_: série tout court (une Révision du jour est aussi une série de Questions), streak, classement
+
 **Niveau de Leçon**:
 Avancée de l'Élève dans une Leçon libre : nombre d'Objectifs atteints plus un (on commence au niveau 1). Sans maximum : quand tous les Objectifs actuels sont atteints, l'agent propose à l'Élève d'élargir la mission, ce qui ajoute des Objectifs. Ne mesure pas ce que l'Élève sait (c'est la Maîtrise) mais jusqu'où il est allé.
 _Avoid_: niveau tout court (confusion avec Niveau de scolarité), étape

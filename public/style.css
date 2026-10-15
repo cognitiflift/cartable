@@ -62,6 +62,12 @@ p .maitrise { display:inline-flex; }
 /* Révisions du jour (#66) : le quiz du Kit (kit/v1/quiz.css) dans l'appli, une question à la fois. */
 .carte-revisions { display:block; width:100%; max-width:420px; margin:.6rem 0 1rem; }
 .carte-revisions strong { display:block; font-size:1.1rem; }
+/* Rythme (#75) : Objectif du jour, série et jokers ; récapitulatif de la semaine. */
+.carte-rythme, .recapitulatif { display:block; max-width:420px; margin:.6rem 0; }
+.carte-rythme strong, .recapitulatif strong { display:block; }
+.carte-rythme.atteint { border-left:4px solid var(--accent); }
+.recapitulatif { position:relative; padding-right:2.6rem; }
+.recapitulatif .fermer { position:absolute; top:.4rem; right:.4rem; padding:.1rem .5rem; }
 .comptes-a-rebours { list-style:none; padding:0; margin:0 0 1rem; }
 .comptes-a-rebours li { margin:.2rem 0; font-weight:600; }
 .carte-revisions:not(.secondaire) small { color:inherit; opacity:.9; }

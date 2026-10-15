@@ -2722,3 +2722,35 @@ test('Vue parent : le coût des Leçons, total de l\'Élève (Propositions compr
   assert.deepEqual(data.cout.total, (await appel(`/api/eleves/${slug}/couts`)).data.total);
   assert.deepEqual(data.cout.lecons.map((l) => [l.id, l.titre, l.coutUsd, l.tours]), [[b.id, 'Les volcans', 0.5, 2], [a.id, 'Les volcans', 0.25, 1]]);
 });
+
+// Rythme (#75) : Objectif du jour, série avec jokers et récapitulatif de la semaine, calculés par l'appli à partir de
+// l'historique de l'Élève (quiz de page et Révisions du jour), à la date de la requête.
+test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine passée, d\'après l\'historique', async () => {
+  // Lundi 2 novembre : une page terminée (le quiz de `quizBanque`).
+  const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Api', 1);
+  const url = `/api/eleves/${slug}/rythme`;
+  const lundi = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(lundi.status, 200);
+  assert.deepEqual(lundi.data, {
+    objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
+    serie: { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true },
+    recapitulatif: null,
+  });
+  // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
+  const reviser = (i) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 }, le(LENDEMAIN));
+  for (let i = 0; i < 4; i++) assert.equal((await reviser(i)).status, 200);
+  const mardi = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(mardi.objectifDuJour, { revisions: 4, revisionsVisees: 5, pages: 0, pagesVisees: 1, atteint: false });
+  assert.deepEqual(mardi.serie, { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: false });
+  // La cinquième : objectif atteint, deux jours de suite.
+  await reviser(4);
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serie, { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 : le récapitulatif de la semaine passée ; la série, sans joker, est à refaire.
+  const suivant = (await appel(url, 'GET', undefined, le('2026-11-09T12:00:00.000Z'))).data;
+  assert.deepEqual(suivant.recapitulatif, { du: '2026-11-02', au: '2026-11-08', objectifsRetenus: 0, revisions: 5, pages: 1, joursAtteints: 2 });
+  assert.equal(suivant.serie.jours, 0);
+});
+
+test('Rythme : Élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
+});

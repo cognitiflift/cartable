@@ -104,6 +104,15 @@ const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies
 const etoiles = (e) => h('span', { className: 'etoiles' },
   Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
 
+// Objectifs de la Leçon et combien sont Retenus, par exemple « 3 Objectifs · 1 Retenu ». Rien sans Objectifs.
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+function objectifsRetenus(objectifs = []) {
+  if (!objectifs.length) return null;
+  const retenus = objectifs.filter((o) => o.retenu).length;
+  return h('span', { className: 'objectifs-retenus', title: 'Retenu : réussi de nouveau un autre jour' },
+    `${pluriel(objectifs.length, 'Objectif')} · ${pluriel(retenus, 'Retenu')}`);
+}
+
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
   return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: maitrise.palier },
@@ -124,6 +133,7 @@ async function ecranAccueil(profil) {
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
             l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
+          objectifsRetenus(l.objectifs),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));

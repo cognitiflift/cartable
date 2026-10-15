@@ -164,6 +164,13 @@ test('Maîtrise : une Question dont la dernière réponse est ratée compte 0, j
   assert.deepEqual(maitriseAvec([score(100)], Date.parse(lendemain), questions), { pourcentage: 98, palier: 'acquis' });
 });
 
+test('Maîtrise : une réponse juste en partie n’est pas ratée, elle suit l’oubli', () => {
+  const t = '2026-10-01T10:00:00.000Z';
+  // Juste en partie → « difficile » (S = 1,18385) : trois jours plus tard, (1 + 19/81 × 3 / 1,18385)^-0,5 ≈ 79 %.
+  const partielle = { date: t, juste: false, points: 0.5, origine: 'quiz' };
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], partielle)]), { pourcentage: 79, palier: 'à consolider' });
+});
+
 test('Maîtrise : avec des Questions, elle baisse avec l’oubli, paliers 80 % et 50 % inchangés', () => {
   const t = '2026-10-01T10:00:00.000Z';
   const questions = [qBanque([1], juste(t))]; // une réponse juste : stabilité FSRS-5 de 3,173 jours

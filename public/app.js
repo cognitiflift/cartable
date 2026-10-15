@@ -111,7 +111,8 @@ async function ecranProfil(profil) {
 // des agrégats : SECTIONS_PARENT en ajoute une sans toucher aux autres (indicateurs, #78).
 const equivalentUsd = (usd) => usd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
 const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements) : h('p', { className: 'doux' }, vide));
-const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/lecon/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
+// Le parent ouvre la Leçon en aperçu (#/apercu/…) : ce n'est pas un retour de l'Élève pour les indicateurs (#78).
+const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/apercu/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
 const SECTIONS_PARENT = [
   { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
     h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
@@ -433,9 +434,10 @@ const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
 // Tout se déduit du dernier message du prof.
-// `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière.
-async function ecranSession(profil, id, pageDemandee = null) {
-  let lecon = await api(`eleves/${profil.slug}/lecons/${id}`);
+// `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière. `apercu` : ouverte
+// depuis la vue parent, elle n'est pas notée comme une ouverture par l'Élève (indicateurs, #78).
+async function ecranSession(profil, id, pageDemandee = null, { apercu = false } = {}) {
+  let lecon = await api(`eleves/${profil.slug}/lecons/${id}${apercu ? '' : '?ouverture=1'}`);
   let attente = null; // { texte, centre } pendant que le prof travaille
   let retourFerme = false;
   const erreur = h('span', { className: 'erreur' });
@@ -560,6 +562,7 @@ async function route() {
     if (page === 'parent') return await ecranParent(profil);
     if (page === 'nouvelle-lecon') return ecranNouvelleLecon(profil);
     if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
+    if (page === 'apercu') return await ecranSession(profil, id, null, { apercu: true });
     if (page === 'revisions') return await ecranRevisions(profil);
     return await ecranAccueil(profil);
   } catch (e) {

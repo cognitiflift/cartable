@@ -2796,13 +2796,22 @@ test('Indicateurs : les réponses aux Révisions du jour donnent le taux de souv
 
 test('Indicateurs : ouvrir une Leçon puis revenir la semaine d\'après compte dans le retour à 7 jours', async () => {
   const { slug, lecons: [a, b] } = await eleveRevisions('Indic-Retour', 2);
-  const ouvrir = (lecon, date) => appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(date));
+  // L'Élève ouvre une Leçon dans sa Séance (?ouverture=1).
+  const ouvrir = (lecon, date) => appel(`/api/eleves/${slug}/lecons/${lecon.id}?ouverture=1`, 'GET', undefined, le(date));
   await ouvrir(a, '2026-11-02T12:00:00.000Z');
   await ouvrir(b, '2026-11-03T12:00:00.000Z');
   await ouvrir(a, '2026-11-10T12:00:00.000Z'); // a : J+8, b : J+7
   const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-30`, 'GET', undefined, le('2026-11-30T12:00:00.000Z'));
   assert.deepEqual(data.retour, { lecons: 2, revenus: 2, enAttente: 0, pourcentage: 100 });
   await aucunClaudeLance([a, b]);
+});
+
+test('Indicateurs : une Leçon lue sans être ouverte par l\'Élève (vue parent, autre écran) ne compte pas comme un retour', async () => {
+  const { slug, lecons: [a] } = await eleveRevisions('Indic-Lue', 1);
+  await appel(`/api/eleves/${slug}/lecons/${a.id}?ouverture=1`, 'GET', undefined, le('2026-11-02T12:00:00.000Z'));
+  await appel(`/api/eleves/${slug}/lecons/${a.id}`, 'GET', undefined, le('2026-11-10T12:00:00.000Z')); // le parent la lit
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-30`, 'GET', undefined, le('2026-11-30T12:00:00.000Z'));
+  assert.deepEqual(data.retour, { lecons: 1, revenus: 0, enAttente: 0, pourcentage: 0 });
 });
 
 test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le temps d\'attente', async () => {

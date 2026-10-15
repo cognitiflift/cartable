@@ -45,7 +45,7 @@ echo '{"result":"Page '$N' ('$QUI')","session_id":"s-'$N'","is_error":false,"tot
   const port = 3700 + Math.floor(Math.random() * 300);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_PREPARATION: '1' },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_PREPARATION: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -57,8 +57,9 @@ after(async () => {
   await fs.rm(dossier, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
-const appel = async (url, method = 'GET', body) => {
-  const res = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+// `entetes` : en-têtes en plus, comme X-Cartable-Maintenant pour fixer la date du serveur (voir `le`).
+const appel = async (url, method = 'GET', body, entetes = {}) => {
+  const res = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json', ...entetes }, body: body && JSON.stringify(body) });
   return { status: res.status, data: await res.json().catch(() => null) };
 };
 
@@ -83,22 +84,29 @@ async function nouvelEleve() {
   return pseudo.toLowerCase();
 }
 
-// Leçon libre arrivée à sa première vraie page (0002-page.html), Pré-test fait et « Commencer » choisi.
-async function leconCommencee(slug, corps = { sujet: 'les volcans' }) {
-  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', corps)).data;
+const le = (date) => ({ 'X-Cartable-Maintenant': date });
+
+// Leçon libre arrivée à sa première vraie page (0002-page.html), Pré-test fait et « Commencer » choisi, à la date
+// `entetes` (voir `le`) si elle est donnée.
+async function leconCommencee(slug, corps = { sujet: 'les volcans' }, entetes = {}) {
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', corps, entetes)).data;
   const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
-  await appel(`${url}/scores`, 'POST', { score: 50, page: '0001-page.html', pretest: true });
-  await appel(`${url}/retours`, 'POST', { score: 50, pretest: true });
-  const commencee = await appel(`${url}/rebonds`, 'POST', { action: 'commencer' });
+  await appel(`${url}/scores`, 'POST', { score: 50, page: '0001-page.html', pretest: true }, entetes);
+  await appel(`${url}/retours`, 'POST', { score: 50, pretest: true }, entetes);
+  const commencee = await appel(`${url}/rebonds`, 'POST', { action: 'commencer' }, entetes);
   assert.deepEqual(commencee.data.pages, ['0001-page.html', '0002-page.html']);
   return { id: lecon.id, cle: `${slug}/${lecon.id}`, url };
 }
 
 // Quiz de la page `page` fait avec `score`, puis son Retour de quiz.
-async function quiz(url, page, score) {
-  await appel(`${url}/scores`, 'POST', { score, page });
-  return (await appel(`${url}/retours`, 'POST', { score })).data;
+async function quiz(url, page, score, entetes = {}) {
+  await appel(`${url}/scores`, 'POST', { score, page }, entetes);
+  return (await appel(`${url}/retours`, 'POST', { score }, entetes)).data;
 }
+
+// Attente du prof (#78) le jour `jour` (AAAA-MM-JJ), vue ce jour-là.
+const attenteDuJour = async (slug, jour) =>
+  (await appel(`/api/eleves/${slug}/indicateurs?du=${jour}&au=${jour}`, 'GET', undefined, le(`${jour}T18:00:00.000Z`))).data.attente;
 
 test('Rebond qui correspond : la page préparée pendant le quiz s\'affiche sans nouveau tour', async () => {
   const slug = await nouvelEleve();
@@ -188,4 +196,39 @@ test('Taux de pages préparées inutilisées exposé par Élève ; la préparati
   await new Promise((r) => setTimeout(r, 300));
   assert.equal((await lignes(cle)).filter((l) => l === `debut preparation ${cle}`).length, 4);
   assert.equal((await appel(`/api/eleves/${slug}`)).data.preparerPages, false);
+});
+
+// Attente du prof (#78) : ce que l'Élève attend vraiment, daté par l'horloge de la requête comme les autres événements.
+test('Attente du prof : une page préparée retenue aussitôt compte pour une attente nulle ; la préparation en arrière-plan n\'est pas un tour attendu', async () => {
+  const slug = await nouvelEleve();
+  const { cle, url } = await leconCommencee(slug, undefined, le('2026-11-02T10:00:00.000Z'));
+  await preparationFinie(cle);
+  // Le 2 : la création de la Leçon et « Commencer », pas la page préparée ensuite.
+  assert.equal((await attenteDuJour(slug, '2026-11-02')).tours, 2);
+
+  await quiz(url, '0002-page.html', 90, le('2026-11-03T10:00:00.000Z'));
+  const suite = await appel(`${url}/rebonds`, 'POST', { action: 'suivante' }, le('2026-11-03T10:00:00.000Z'));
+  assert.match(suite.data.messages.at(-1).texte, /preparation/);
+  assert.deepEqual(await attenteDuJour(slug, '2026-11-03'), { tours: 1, moyenneSecondes: 0, medianeSecondes: 0, maxSecondes: 0 });
+  await preparationFinie(cle, 2);
+  assert.equal((await attenteDuJour(slug, '2026-11-02')).tours, 2);
+});
+
+test('Attente du prof : une page préparée retenue après avoir attendu la fin de sa préparation compte cette attente', async () => {
+  const slug = await nouvelEleve();
+  await fs.writeFile(path.join(dossier, 'attendre-preparation'), '');
+  try {
+    const { cle, url } = await leconCommencee(slug, undefined, le('2026-11-02T10:00:00.000Z'));
+    await attendreQue(async () => (await lignes(cle)).includes(`debut preparation ${cle}`));
+    await quiz(url, '0002-page.html', 90, le('2026-11-03T10:00:00.000Z'));
+    const rebond = appel(`${url}/rebonds`, 'POST', { action: 'suivante' }, le('2026-11-03T10:00:00.000Z'));
+    await new Promise((r) => setTimeout(r, 1200));
+    await fs.rm(path.join(dossier, 'attendre-preparation'));
+    assert.match((await rebond).data.messages.at(-1).texte, /preparation/);
+    const attente = await attenteDuJour(slug, '2026-11-03');
+    assert.equal(attente.tours, 1);
+    assert.ok(attente.maxSecondes >= 1, JSON.stringify(attente));
+  } finally {
+    await fs.rm(path.join(dossier, 'attendre-preparation'), { force: true });
+  }
 });

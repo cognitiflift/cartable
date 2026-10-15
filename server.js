@@ -11,6 +11,7 @@ import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
+import { maintenantDe } from './lib/horloge.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -303,9 +304,9 @@ async function api(req, res, segments) {
         return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt, affiche: sujet, premier: true }));
       }
     } else if (!r3) {
-      if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));
+      if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id, { maintenant: maintenantDe(req.headers) }));
     } else if (r3 === 'scores' && m === 'POST') {
-      return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req)));
+      return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenantDe(req.headers) }));
     } else if (r3 === 'retours' && m === 'POST') {
       return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
     } else if (r3 === 'rebonds' && m === 'POST') {

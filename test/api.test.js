@@ -26,6 +26,7 @@ before(async () => {
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
   // CARTABLE_IMAGES_LOCALES=1 : le serveur accepte les images du petit serveur local lancé par les tests de Visuels.
+  // CARTABLE_HORLOGE_INJECTABLE=1 : le serveur prend « maintenant » dans l'en-tête X-Cartable-Maintenant (révisions datées).
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
@@ -95,7 +96,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1' },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -108,8 +109,9 @@ after(async () => {
   await fs.rm(dossier, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
-const appel = async (url, method = 'GET', body) => {
-  const res = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+// `entetes` : en-têtes en plus, comme X-Cartable-Maintenant pour fixer la date du serveur.
+const appel = async (url, method = 'GET', body, entetes = {}) => {
+  const res = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json', ...entetes }, body: body && JSON.stringify(body) });
   return { status: res.status, data: await res.json().catch(() => null), res };
 };
 
@@ -1868,4 +1870,48 @@ test('Banque de Questions : sans quiz du Kit (anciennes Leçons et pages), pas d
   assert.equal(lue.status, 200);
   assert.deepEqual(lue.data.questions, []);
   assert.ok((await appel('/api/eleves/zoe-test/lecons')).data.some((l) => l.id === lecon.id));
+});
+
+// Planificateur FSRS (#65) : la Leçon expose, pour chaque Question, sa probabilité de se souvenir à la date du serveur
+// et sa prochaine révision, recalculées depuis le journal.
+test('Mémoire des Questions : la Leçon expose probabilité de se souvenir et prochaine révision, à la date du serveur', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const banque = {
+    '0002-volcans.html#q1': { id: 'q1', page: '0002-volcans.html', contenu: { enonce: 'Où sort la lave ?', reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] },
+      journal: [{ date: '2026-10-01T10:00:00.000Z', juste: true, origine: 'quiz' }] },
+    '0002-volcans.html#q2': { id: 'q2', page: '0002-volcans.html', contenu: { enonce: 'Le magma ?', reponses: ['a', 'b'], bonne: 1, explication: '', objectifs: [1] },
+      journal: [{ date: '2026-10-01T10:00:00.000Z', juste: false, jeNeSaisPas: true, origine: 'quiz' }] },
+  };
+  await fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), JSON.stringify(banque));
+  const lire = async (maintenant) => (await appel(url, 'GET', undefined, { 'X-Cartable-Maintenant': maintenant })).data.questions;
+
+  const [q1, q2] = await lire('2026-10-01T10:00:00.000Z');
+  // Juste et sûr → revue 3 jours plus tard ; « Je ne sais pas » → dès le lendemain.
+  assert.equal(q1.prochaineRevision, '2026-10-04T10:00:00.000Z');
+  assert.equal(q2.prochaineRevision, '2026-10-02T10:00:00.000Z');
+  assert.equal(q1.rappel, 1);
+  // La probabilité baisse avec la date du serveur ; le journal n'a pas bougé (rien n'est rangé en double).
+  const [plusTard] = await lire('2026-10-20T10:00:00.000Z');
+  assert.ok(plusTard.rappel < 0.9 && plusTard.rappel > 0, `${plusTard.rappel}`);
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), 'utf8')), banque);
+  // Sans en-tête : la date réelle, après la dernière réponse.
+  const [reel] = (await appel(url)).data.questions;
+  assert.ok(reel.rappel > 0 && reel.rappel < 1);
+});
+
+test('Mémoire des Questions : un quiz répondu à la date du serveur est daté de ce jour-là', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0002-volcans.html', quizBanque);
+  const jour = { 'X-Cartable-Maintenant': '2026-11-02T08:00:00.000Z' };
+  const r = await appel(`${url}/scores`, 'POST', corpsBanque('0002-volcans.html'), jour);
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).date, '2026-11-02T08:00:00.000Z');
+  const [q1, q2] = r.data.questions;
+  assert.equal(q1.journal[0].date, '2026-11-02T08:00:00.000Z');
+  assert.equal(q1.rappel, 1);
+  // Juste mais pas sûr → difficile (1,18 jour : le lendemain) ; « Je ne sais pas » → à revoir, le lendemain aussi.
+  assert.equal(q1.prochaineRevision, '2026-11-03T08:00:00.000Z');
+  assert.equal(q2.prochaineRevision, '2026-11-03T08:00:00.000Z');
 });

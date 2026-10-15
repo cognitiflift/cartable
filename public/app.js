@@ -267,20 +267,26 @@ function comptesARebours(lecons) {
 // le rendu du quiz du Kit, sans le prof. Chaque réponse part au serveur, qui la corrige lui-même et la journalise.
 // À la fin des Questions dues, un message le dit, et l'Élève peut continuer avec des Questions pas encore dues.
 async function ecranRevisions(profil) {
+  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'),
+    revisionsDuJour(profil, { fin: h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons') }));
+}
+
+// Zone des Révisions du jour, sur leur écran ou pendant que le prof prépare une page (#49, US4). `fin` : bouton
+// ajouté au message de fin.
+function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
   const url = `eleves/${profil.slug}/revisions`;
   const zone = h('section', { className: 'kit-quiz revisions' });
   const erreur = h('p', { className: 'erreur' });
-  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'), zone, erreur);
 
   const fin = (suite) => [
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
-    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ',
-      h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons')),
+    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ', boutonFin),
   ];
   // Une série : les Questions l'une après l'autre ; à la fin, la série suivante ou le message de fin.
   const serie = async (suite = false) => {
     erreur.textContent = '';
-    const { questions } = await api(`${url}${suite ? '?suite=1' : ''}`);
+    let questions;
+    try { ({ questions } = await api(`${url}${suite ? '?suite=1' : ''}`)); } catch (e) { return (erreur.textContent = e.message); }
     if (!questions.length) return zone.replaceChildren(...fin(suite));
     let i = 0;
     const suivante = () => {
@@ -304,7 +310,8 @@ async function ecranRevisions(profil) {
     };
     suivante();
   };
-  await serie();
+  serie();
+  return [zone, erreur];
 }
 
 const enBase64 = (fichier) => new Promise((resolve, reject) => {
@@ -445,6 +452,24 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   const panneau = h('div', { className: 'panneau' });
   const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
   const fiche = h('div', { className: 'fiche', style: 'display:none' }); // Ma fiche, par-dessus tout le reste
+  // Révisions du jour faites pendant que le prof prépare la suite (#49, US4), dans leur propre calque, comme Ma fiche :
+  // elles ne bougent pas quand la page arrive, une barre le signale et ramène à la Leçon.
+  const revisions = h('div', { className: 'fiche revisions-en-attente', style: 'display:none' });
+  const barreRevisions = h('div', { className: 'fiche-barre' });
+  const fermerRevisions = () => {
+    arreterLecture();
+    revisions.style.display = 'none';
+    revisions.replaceChildren();
+  };
+  const afficherBarreRevisions = () => barreRevisions.replaceChildren(attente
+    ? h('strong', {}, '🧠 Mes révisions du jour · ⏳ ton prof prépare la suite…')
+    : h('strong', {}, erreur.textContent ? `⚠️ ${erreur.textContent}` : '✅ Ta page est prête !'),
+  h('button', { className: attente ? 'secondaire' : '', onclick: fermerRevisions }, attente ? '↩️ Retour à la leçon' : '▶️ Retourner à la leçon'));
+  const ouvrirRevisions = () => {
+    afficherBarreRevisions();
+    revisions.replaceChildren(barreRevisions, h('div', { className: 'revisions-defilement' }, revisionsDuJour(profil)));
+    revisions.style.display = '';
+  };
   let pagesAffichees, iframe;
 
   // Ma fiche : les documents de référence de la Leçon, dans leur propre calque. La Page de leçon n'est jamais
@@ -484,7 +509,10 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     const voile = lecon.pages.length ? 'voile' : '';
     const bulle = (...enfants) => h('div', { className: 'bulle-prof' }, ...enfants);
     let contenu = null;
-    if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
+    if (attente?.centre) {
+      contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte),
+        h('button', { className: 'secondaire', onclick: ouvrirRevisions }, '🧠 Faire mes révisions du jour en attendant'));
+    }
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
       const { action, score } = prof.retourQuiz;
@@ -519,6 +547,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     attente = null;
     afficherEntete();
     afficher();
+    afficherBarreRevisions();
   };
   const repondre = (texte) => tour({ texte: '⏳ Ton prof prépare la suite…', centre: true },
     () => api(`eleves/${profil.slug}/lecons/${id}/messages`, { method: 'POST', body: { texte } }));
@@ -543,7 +572,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   afficher();
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
-    h('div', { className: 'seance' }, panneau, calque, fiche));
+    h('div', { className: 'seance' }, panneau, calque, fiche, revisions));
 }
 
 async function route() {

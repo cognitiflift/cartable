@@ -26,10 +26,10 @@ Classe de l'Élève dans le système scolaire belge francophone, choisie dans un
 _Avoid_: niveau tout court (confusion avec Niveau de Leçon)
 
 **Espace personnel**:
-Dossier propre à un Élève, qui contient son Profil et toutes ses Leçons. Cloisonné : l'agent n'accède jamais à l'Espace personnel d'un autre Élève.
+Dossier propre à un Élève, qui contient son Profil, toutes ses Leçons et ses Badges. Cloisonné : l'agent n'accède jamais à l'Espace personnel d'un autre Élève.
 
 **Vue parent**:
-Écran d'un Élève destiné au parent, ouvert depuis le Profil (jamais depuis l'accueil de l'Élève, sans mot de passe) : Révisions du jour et quiz faits ces 7 derniers jours, Objectifs Retenus, Objectifs fragiles (atteints mais pas encore Retenus), Questions fragiles (moins de 80 % de chances de s'en souvenir aujourd'hui), contrôles à venir avec leur préparation (Maîtrise, Questions dues), Coût des Leçons. Agrégée par l'appli à partir des données existantes, sans tour de l'agent.
+Écran d'un Élève destiné au parent, ouvert depuis le Profil (jamais depuis l'accueil de l'Élève, sans mot de passe) : Révisions du jour et quiz faits ces 7 derniers jours, Objectifs Retenus, Objectifs fragiles (atteints mais pas encore Retenus), Questions fragiles (moins de 80 % de chances de s'en souvenir aujourd'hui), contrôles à venir avec leur préparation (Maîtrise, Questions dues), Badges récents et total d'Étoiles et de Fusées, Coût des Leçons. Agrégée par l'appli à partir des données existantes, sans tour de l'agent.
 
 **Leçon**:
 Unité d'apprentissage d'un Élève sur un sujet précis. Correspond à un workspace du skill `teach` (mission, leçons HTML, fiches, traces d'apprentissage). Appartient à une seule **Catégorie**.
@@ -86,14 +86,14 @@ Ce que l'Élève indique après chaque réponse d'un quiz, avant de voir la corr
 _Avoid_: certitude, assurance, auto-évaluation (réservé à « Tu en sais déjà… » du Cadrage)
 
 **Dépassement**:
-Ce qui va un tout petit peu au-delà du contenu d'une Leçon pour éveiller la curiosité de l'Élève : un encart « Pour aller plus loin » dans la Page de leçon et 2 ou 3 questions bonus dans son quiz. Pour une Leçon de révision, il est signalé comme hors du Document source. Distinct du **Défi**, qui reste sur le même contenu, en plus difficile.
+Ce qui va un tout petit peu au-delà du contenu d'une Leçon pour éveiller la curiosité de l'Élève : un encart « Pour aller plus loin » dans la Page de leçon et 2 ou 3 questions bonus dans son quiz. Pour une Leçon de révision, il est signalé comme hors du Document source. Distinct du **Défi**, qui reste sur le même contenu, en plus difficile. Il est **réussi** quand l'Élève réussit au moins 2 questions bonus sur 3 dans un même quiz ; il rapporte alors une Fusée.
 
 **Réponse proposée**:
 Réponse que l'agent soumet à l'Élève quand il lui pose une question (2 à 4 ; l'Élève choisit la plus proche), toujours complétée par « Je ne sais pas ». N'entre pas dans la Maîtrise.
 _Avoid_: suggestion (confusion avec Proposition)
 
 **Retour de quiz**:
-Court message affiché aussitôt après un quiz de page, avec le **Rebond** : l'appli le compose elle-même à partir de phrases préparées (score, Étoiles gagnées, ce qui est réussi), sans attendre l'agent. L'agent commente les questions ratées en tête de la Page de leçon suivante.
+Court message affiché aussitôt après un quiz de page, avec le **Rebond** : l'appli le compose elle-même à partir de phrases préparées (score, Étoiles, Fusées et Badges gagnés, ce qui est réussi), sans attendre l'agent. L'agent commente les questions ratées en tête de la Page de leçon suivante.
 
 **Kit**:
 Composants servis par l'appli elle-même à toute nouvelle Page de leçon : le quiz et le style de base (lisibilité, couleur de la Catégorie, mode sombre). L'agent n'y écrit que les questions, sous forme de données ; il garde la liberté d'ajouter à sa Leçon des composants propres au sujet.
@@ -125,23 +125,41 @@ _Avoid_: carte, flashcard, item
 Ensemble des Questions d'une Leçon. Les questions bonus du Dépassement et celles du Pré-test n'y entrent pas ; les anciennes Leçons (quiz d'avant le Kit) n'en ont pas.
 
 **Révision du jour**:
-Série courte (10 Questions au plus) de Questions dont la révision est due ou en retard, tirées de toutes les Leçons de l'Élève et mélangées, proposée sur l'accueil par la carte « Mes révisions du jour ». Servie tout de suite par l'appli, sans tour du prof ni token ; la correction et l'explication s'affichent après chaque réponse, avec la Confiance et « Je ne sais pas » comme dans un quiz de page. Les Questions d'une Leçon de révision dont le contrôle approche passent en premier.
+Série courte (10 Questions au plus) de Questions dont la révision est due ou en retard, tirées de toutes les Leçons de l'Élève et mélangées, proposée sur l'accueil par la carte « Mes révisions du jour ». Servie tout de suite par l'appli, sans tour du prof ni token ; la correction et l'explication s'affichent après chaque réponse, avec la Confiance et « Je ne sais pas » comme dans un quiz de page. Les Questions d'une Leçon de révision dont le contrôle approche passent en premier. Menée jusqu'au bout (une réponse à chaque Question servie), elle rapporte une Étoile, quel que soit le score, au plus une par jour.
 _Avoid_: Réviser (retravailler une Leçon avec le prof), séance de révision, répétition
 
 **Objectif du jour**:
 Petit but quotidien montré sur l'accueil : 5 réponses en Révision du jour ou une Page de leçon terminée (quiz fait, hors Pré-test), en jour local. Calculé par l'appli à partir de l'historique de l'Élève.
 _Avoid_: Objectif tout court (un Objectif appartient à une Leçon), quota, devoir
 
+**Jour travaillé**:
+Jour local où l'Élève a enregistré au moins une réponse : quiz de page, Pré-test ou Révision du jour. Lire une page sans faire son quiz ne compte pas. Le calendrier de Mes badges le montre pâle, plein quand l'Objectif du jour est atteint, avec 🛡️ quand un Joker l'a couvert.
+
 **Série de jours**:
-Nombre de jours où l'Objectif du jour a été atteint, de suite. Aujourd'hui, pas encore atteint, ne la casse pas. Chaque semaine complète de série (7 jours atteints) rapporte un **Joker**, deux au plus en réserve ; un Joker couvre tout seul un jour manqué. Une pause plus longue que la réserve fait repartir la série, sans gaspiller les Jokers. Un **récapitulatif de la semaine** passée (Objectifs devenus Retenus, révisions, pages) s'affiche au premier retour de la semaine. Jamais de comparaison entre Élèves.
+Nombre de jours où l'Objectif du jour a été atteint, de suite. Aujourd'hui, pas encore atteint, ne la casse pas. Chaque semaine (du lundi au dimanche), l'Élève reçoit sans condition trois **Jokers**, qui ne se reportent pas sur la semaine suivante ; un Joker couvre tout seul un jour manqué. Une pause plus longue que les Jokers de la semaine fait repartir la série. Un **récapitulatif de la semaine** passée (Objectifs devenus Retenus, révisions, pages) s'affiche au premier retour de la semaine. Jamais de comparaison entre Élèves.
 _Avoid_: série tout court (une Révision du jour est aussi une série de Questions), streak, classement
+
+**Badge**:
+Récompense au niveau de l'Élève (et non d'une Leçon), qui salue l'effort, les bonnes habitudes et ce qui reste en mémoire, presque jamais la performance. Chaque badge compte quelque chose dans tout l'historique de l'Élève (jours où l'Objectif du jour est atteint, Révisions du jour menées jusqu'au bout, Objectifs devenus Retenus, Questions ratées puis réussies un autre jour, Fusées, Étoiles, Leçons terminées, Catégories explorées) et monte de **Palier** en Palier ; quelques **badges surprise**, uniques, restent cachés jusqu'à leur obtention. Calculé par l'appli seule, après chaque quiz et chaque Révision du jour, et enregistré dans l'Espace personnel : acquis pour toujours, même si la Leçon qui l'a déclenché est supprimée ou l'Objectif oublié.
+_Avoid_: trophée, succès, médaille
+
+**Palier**:
+Seuil d'un Badge : bronze, argent, or puis diamant. Un Palier atteint ne redescend jamais, même si le compte qui l'a fait atteindre baisse (un Objectif Retenu oublié).
+_Avoid_: niveau (confusion avec Niveau de Leçon et Niveau de scolarité)
+
+**Mes badges**:
+Écran de l'Élève, ouvert depuis la carte de l'Objectif du jour sur l'accueil : un calendrier des Jours travaillés (toucher un jour montre ce qui a été fait et gagné, sans les scores) et la collection des Badges (obtenus avec leur date, à venir en grisé avec leur progression, surprise cachés). Un Badge reste marqué « Nouveau » tant que l'Élève n'a pas ouvert Mes badges depuis qu'il l'a gagné.
 
 **Niveau de Leçon**:
 Avancée de l'Élève dans une Leçon libre : nombre d'Objectifs atteints plus un (on commence au niveau 1). Sans maximum : quand tous les Objectifs actuels sont atteints, l'agent propose à l'Élève d'élargir la mission, ce qui ajoute des Objectifs. Ne mesure pas ce que l'Élève sait (c'est la Maîtrise) mais jusqu'où il est allé.
 _Avoid_: niveau tout court (confusion avec Niveau de scolarité), étape
 
 **Étoiles**:
-Récompenses d'une Leçon de révision, au nombre de trois, acquises pour toujours : une pour un quiz ordinaire réussi (80 % ou plus), une pour 2 questions bonus du Dépassement réussies sur 3 dans un même quiz, une pour un Défi réussi (la Leçon terminée). Ne dépendent pas de la Maîtrise. Une Leçon libre n'a pas d'Étoiles : sa récompense est son Niveau de Leçon.
+Récompenses de l'effort, acquises pour toujours et indépendantes de la Maîtrise, gagnées de trois façons. Une Leçon de révision en a trois : une pour un quiz ordinaire réussi (80 % ou plus), une pour son premier Dépassement réussi, une pour un Défi réussi (la Leçon terminée). Une Leçon libre en rapporte une par Page de leçon dont le quiz est réussi (80 % ou plus), sans maximum. Une Révision du jour menée jusqu'au bout en rapporte une, au plus une par jour ; celle-ci appartient à l'Élève, pas à une Leçon. Jamais pour le Pré-test, ni pour Réviser une Leçon libre.
+
+**Fusée**:
+Récompense d'un Dépassement réussi (🚀), une au plus par Page de leçon, en Leçon libre comme en Leçon de révision, acquise pour toujours. Refaire le quiz d'une même page n'en rapporte pas une deuxième. Jamais pour le Pré-test, ni pour Réviser une Leçon libre (les nouvelles pages créées en Révisant une Leçon de révision en rapportent).
+_Avoid_: rocket, bonus (désigne les questions du Dépassement)
 
 **Réviser**:
 Retravailler une Leçon comme une Leçon de révision (Revoir ou Défi selon le score), dans la même Leçon, avec le prof (à distinguer d'une Révision du jour, servie par l'appli seule). Sur une Leçon de révision terminée, c'est la seule suite proposée : elle repart du Document source et permet de gagner les Étoiles manquantes, ou de s'entraîner encore avant un contrôle. Sur une Leçon libre, elle n'est proposée que si la dernière Page de leçon date de plus d'une semaine : elle repart des pages déjà vues, ne rapporte rien et ne change ni les Objectifs ni le Niveau de Leçon (seulement la Maîtrise) ; après le Défi, l'Élève retrouve l'Étape suivante.

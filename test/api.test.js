@@ -124,7 +124,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1', CARTABLE_HORLOGE_INJECTABLE: '1', CARTABLE_PREPARATION: '0' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });

@@ -59,11 +59,13 @@ function formulaireProfil({ profil, titre, envoyer }) {
   const age = h('input', { name: 'age', type: 'number', min: 3, max: 99, required: true, value: profil?.age ?? '' });
   const niveau = h('select', { name: 'niveau' }, config.niveaux.map((n) => h('option', { value: n, selected: n === profil?.niveau }, n)));
   const nombrePropositions = h('input', { name: 'nombrePropositions', type: 'number', min: 2, max: 10, required: true, value: profil?.nombrePropositions ?? config.nombrePropositionsDefaut });
+  // Page suivante préparée pendant le quiz (#74) : active par défaut, à couper si elle coûte trop.
+  const preparerPages = h('input', { name: 'preparerPages', type: 'checkbox', checked: profil?.preparerPages ?? true });
   const modele = h('select', { name: 'modele' }, config.modeles.map((m) => h('option', { value: m.id, selected: m.id === (profil?.modele ?? config.modeleDefaut) }, `${m.libelle} — ${m.description}`)));
   const lectureVoixHaute = h('input', { name: 'lectureVoixHaute', type: 'checkbox', checked: profil?.lectureVoixHaute ?? false });
   const form = h('form', { className: 'colonne', onsubmit: async (ev) => {
     ev.preventDefault();
-    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked }); } catch (e) { erreur.textContent = e.message; }
+    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked, preparerPages: preparerPages.checked }); } catch (e) { erreur.textContent = e.message; }
   } },
     !profil && h('label', {}, 'Pseudo', h('br'), pseudo),
     h('label', {}, 'Âge', h('br'), age),
@@ -71,6 +73,7 @@ function formulaireProfil({ profil, titre, envoyer }) {
     h('label', {}, "Nombre d'idées de leçons proposées (2 à 10)", h('br'), nombrePropositions),
     h('label', {}, 'Modèle', h('br'), modele),
     h('label', {}, lectureVoixHaute, ' 🔊 Lecture à voix haute des pages et des questions (avec la voix de cet appareil)'),
+    h('label', {}, preparerPages, ' Préparer la page suivante pendant le quiz (plus rapide, coûte parfois un tour de plus)'),
     h('button', {}, profil ? 'Enregistrer' : 'Créer'),
     erreur);
   return [h('h2', {}, titre), form];

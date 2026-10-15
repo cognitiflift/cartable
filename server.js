@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -18,6 +18,7 @@ import { indicateurs } from './lib/indicateurs.js';
 import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
+import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -33,6 +34,8 @@ const propositionsEnCours = new Map(); // élève → Propositions précédentes
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
 const variantesEnCours = new Set(); // élèves dont un tour de Variantes travaille : un seul à la fois par Élève
 const variantesARelancer = new Map(); // élève → Leçons dont des Questions ont pu devenir à varier pendant ce tour
+const preparations = new Map(); // « élève/leçon » → page préparée pendant le quiz (#74) : { prevision, fin }, une seule par Leçon
+const PREPARATION = process.env.CARTABLE_PREPARATION !== '0'; // CARTABLE_PREPARATION=0 coupe les pages préparées
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -103,10 +106,39 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
 // `tache` : type de tâche du tour, gardé avec son coût ; par défaut, première Séance tant que la Leçon n'a aucune
 // Page de leçon, page ensuite. `resultatsQuiz: false` : le prompt porte déjà les résultats du dernier quiz (Rebond),
 // le préambule de relais ne les répète pas.
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
+// Le tour attend d'abord la page préparée en cours, s'il y en a une, et l'écarte : un seul agent par Leçon à la fois.
+// Puis la page qu'il laisse affichée fait préparer la suivante (voir preparerPageSuivante).
+async function tourDeParole(tour) {
+  const lecon = await occuper(tour.id, () => chronometrer(tour.slug, tour.id, async () => {
+    await ecarterPreparation(tour.slug, tour.id, await prendrePreparation(tour.slug, tour.id));
+    return tourDuProf(tour);
+  }));
+  preparerPageSuivante(tour.slug, tour.id);
+  return lecon;
+}
+
+// La Leçon `id` est occupée le temps de `operation()` (tour du prof, Retour de quiz) : une seule à la fois.
+async function occuper(id, operation) {
   if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
   enCours.add(id);
-  const debut = new Date().toISOString(); // attente de l'Élève (#78), du début à la fin du tour
+  try {
+    return await operation();
+  } finally {
+    enCours.delete(id);
+  }
+}
+
+// Attente de l'Élève pendant un tour du prof (#78), de `debut` à la fin de `operation()`, notée en événement `tour`.
+// Ni la page préparée retenue (aucun tour), ni la préparation en arrière-plan ne sont des tours du prof.
+async function chronometrer(slug, id, operation, debut = new Date().toISOString()) {
+  try {
+    return await operation();
+  } finally {
+    await noterEvenement(slug, { type: 'tour', lecon: id, debut, fin: new Date().toISOString() });
+  }
+}
+
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -121,31 +153,101 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    const { texte, choix } = extraireChoix(reponse);
-    // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
-    // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
-    const nouvelles = await rapatrierImages(store.leconDir(slug, id)).catch((e) => {
-      console.error(`Images de ${id} : ${e.message}`);
-      return [];
-    });
-    const imagesRetirees = imagesASignaler(premier ? lecon.imagesRetirees : [], nouvelles);
-    // Questions de quiz ignorées par le Kit dans les pages écrites par ce tour (spec #48) : signalées au tour suivant,
-    // une fois, comme les images retirées.
-    const ignorees = await store.questionsIgnoreesDepuis(slug, id, pagesAvant).catch((e) => {
-      console.error(`Quiz de ${id} : ${e.message}`);
-      return [];
-    });
-    const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout: cout && { ...cout, relais: neuve } });
-    relancerPropositions(slug);
-    return store.lireLecon(slug, id);
+    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve } });
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
-  } finally {
-    enCours.delete(id);
-    await noterEvenement(slug, { type: 'tour', lecon: id, debut, fin: new Date().toISOString() });
   }
+}
+
+// Fin d'un tour du prof, dont les fichiers sont déjà dans la Leçon (`pagesAvant` : ses pages avant le tour) : images,
+// questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout }) {
+  const { texte, choix } = extraireChoix(reponse);
+  // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
+  // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
+  const nouvelles = await rapatrierImages(store.leconDir(slug, id)).catch((e) => {
+    console.error(`Images de ${id} : ${e.message}`);
+    return [];
+  });
+  const imagesRetirees = imagesASignaler(premier ? lecon.imagesRetirees : [], nouvelles);
+  // Questions de quiz ignorées par le Kit dans les pages écrites par ce tour (spec #48) : signalées au tour suivant,
+  // une fois, comme les images retirées.
+  const ignorees = await store.questionsIgnoreesDepuis(slug, id, pagesAvant).catch((e) => {
+    console.error(`Quiz de ${id} : ${e.message}`);
+    return [];
+  });
+  const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
+  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout });
+  relancerPropositions(slug);
+  return store.lireLecon(slug, id);
+}
+
+// Page suivante préparée pendant le quiz (#74) : quand un tour laisse une Page de leçon affichée, un seul tour du prof
+// en arrière-plan prépare la page du Rebond le plus probable (lib/preparation.js), dans un dossier à part. Jamais en
+// même temps qu'un autre tour de la Leçon : il ne démarre pas si la Leçon est occupée, et tout tour suivant l'attend.
+// Coupée sans relais (la session du prof ne se reprend pas ailleurs que dans la Leçon), par CARTABLE_PREPARATION=0,
+// par le Profil ou quand trop de pages préparées restent inutilisées.
+function preparerPageSuivante(slug, id) {
+  (async () => {
+    if (enCours.has(id) || preparations.has(`${slug}/${id}`)) return;
+    const profil = await store.lireEleve(slug);
+    const { active, suspendue } = await etatPreparations(slug, profil);
+    if (!active || suspendue) return;
+    const lecon = await store.lireLecon(slug, id);
+    const prevision = pagePrevue(lecon, await store.quizDeLaPage(slug, id, lecon.pages.at(-1)));
+    if (!prevision || enCours.has(id) || preparations.has(`${slug}/${id}`)) return;
+    const fin = (async () => {
+      const cwd = await store.preparerDossierPreparation(slug, id);
+      const { reponse, sessionId, cout } = await lancerAgent({
+        cwd,
+        prompt: `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz: false })}\n\n${consignePreparation(prevision, lecon)}`,
+        consignes: consignesLecon(profil),
+        modele: profil.modele,
+        tache: 'rebond',
+      });
+      return { reponse, sessionId, cout: cout && { ...cout, relais: true, preparee: true } };
+    })().catch(async (e) => {
+      console.error(`Page préparée de ${id} : ${e.message}`);
+      await store.ecarterPreparation(slug, id).catch(() => {});
+      return null;
+    });
+    preparations.set(`${slug}/${id}`, { prevision, fin });
+  })().catch((e) => console.error(`Page préparée de ${id} : ${e.message}`));
+}
+
+// Pages préparées de l'Élève : `active` (ni coupée par CARTABLE_PREPARATION=0 ou par le Profil, ni sans relais), et le
+// bilan de leurs issues (taux d'inutilisation, suspension, voir lib/preparation.js).
+async function etatPreparations(slug, profil) {
+  return { active: RELAIS && PREPARATION && profil.preparerPages, ...bilanPreparations(await store.lirePreparations(slug)) };
+}
+
+// Page préparée de la Leçon, attendue si elle est en cours, et retirée : { prevision, reponse, sessionId, cout },
+// ou null (aucune, ou tour raté).
+async function prendrePreparation(slug, id) {
+  const preparation = preparations.get(`${slug}/${id}`);
+  if (!preparation) return null;
+  const resultat = await preparation.fin;
+  preparations.delete(`${slug}/${id}`);
+  return resultat && { ...preparation, ...resultat };
+}
+
+// Page préparée inutilisée : écartée, son coût compté avec la Leçon, son issue notée.
+async function ecarterPreparation(slug, id, preparation) {
+  if (!preparation) return;
+  await store.ecarterPreparation(slug, id);
+  if (preparation.cout) await store.ajouterCoutLecon(slug, id, { ...preparation.cout, inutilisee: true });
+  await store.noterPreparation(slug, { lecon: id, action: preparation.prevision.action, utilisee: false });
+}
+
+// Page préparée retenue pour le Rebond `action` : elle devient la Page de leçon, sans nouveau tour.
+async function adopterPreparation(slug, id, preparation, action) {
+  const lecon = await store.lireLecon(slug, id);
+  const pagesAvant = await store.instantanePages(slug, id);
+  await store.adopterPreparation(slug, id);
+  await store.noterPreparation(slug, { lecon: id, action, utilisee: true });
+  const { reponse, sessionId, cout } = preparation;
+  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout });
 }
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
@@ -331,7 +433,18 @@ async function rebond(slug, id, { action }) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
   const lecon = await store.lireLecon(slug, id);
   if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
-  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
+  // La page préparée pendant le quiz s'affiche aussitôt si elle correspond ; sinon, tour normal.
+  const apres = await occuper(id, async () => {
+    const debut = new Date().toISOString(); // l'attente de la page préparée compte si elle n'est pas retenue
+    const preparation = await prendrePreparation(slug, id);
+    if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action);
+    return chronometrer(slug, id, async () => {
+      await ecarterPreparation(slug, id, preparation);
+      return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
+    }, debut);
+  });
+  preparerPageSuivante(slug, id);
+  return apres;
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
@@ -362,6 +475,8 @@ async function api(req, res, segments) {
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
   } else if (r2 === 'couts' && !id) {
     if (m === 'GET') return json(res, 200, await store.lireCouts(slug));
+  } else if (r2 === 'preparations' && !id) {
+    if (m === 'GET') return json(res, 200, await etatPreparations(slug, await store.lireEleve(slug)));
   } else if (r2 === 'revisions' && !id) {
     // Révisions du jour (#66) : servies et corrigées par l'appli, jamais de tour du prof.
     const maintenant = maintenantDe(req.headers);

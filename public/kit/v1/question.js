@@ -3,16 +3,17 @@
 // L'Élève répond (selon le format de la question, voir rendus/), dit s'il est sûr (Confiance), puis voit la correction
 // et l'explication ; « Je ne sais pas » est corrigé tout de suite, sans Confiance. Ce fichier ne contient que ce qui
 // est commun à tous les formats ; ce qui est propre à chacun est dans rendus/<type>.js (registre : rendus/index.js).
-import { corriger, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
+import { corriger, estPartiel, typeDe, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
 import { el } from './dom.js';
 import { RENDUS } from './rendus/index.js';
 
 export { el };
 
 // Message de correction : juste, juste en partie (crédit partiel, spec #48) ou faux.
-const messageCorrection = ({ juste, points, bonne }) => {
+const messageCorrection = (correction) => {
+  const { juste, bonne } = correction;
   if (juste) return '✅ Bravo !';
-  if (points > 0) return `🟡 Juste en partie. La bonne réponse : ${bonne}`;
+  if (estPartiel(correction)) return `🟡 Juste en partie. La bonne réponse : ${bonne}`;
   return `❌ La bonne réponse : ${bonne}`;
 };
 
@@ -26,7 +27,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   // Confiance : après la réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
   const demande = el('div', { className: 'kit-quiz-confiance', hidden: true }, el('span', {}, 'Tu es sûr ?'));
   // Format où l'Élève évalue lui-même sa réponse (« réfléchis puis dévoile ») : ni Confiance ni « Je ne sais pas ».
-  const autoEvaluation = TYPES[q.type ?? 'qcm']?.autoEvaluation === true;
+  const autoEvaluation = TYPES[typeDe(q)]?.autoEvaluation === true;
   let reponse = null;
   let repondu = false;
   // Une seule réponse : le format la donne quand l'Élève a fini (ou « Je ne sais pas »), puis tout est figé.
@@ -38,7 +39,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
     neSaisPas.disabled = true;
     return true;
   };
-  const rendu = (RENDUS[q.type ?? 'qcm'] ?? RENDUS.qcm)(q, {
+  const rendu = (RENDUS[typeDe(q)] ?? RENDUS.qcm)(q, {
     quandPrete: (r) => {
       if (!repondre(r)) return;
       if (autoEvaluation) corrigerQuestion();
@@ -50,7 +51,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
     const correction = corriger(q, reponse);
     rendu.montrerCorrection(correction);
     if (correction.jeNeSaisPas) neSaisPas.classList.add('kit-fausse');
-    const partiel = !correction.juste && correction.points > 0;
+    const partiel = estPartiel(correction);
     retour.hidden = false;
     retour.classList.add(correction.juste ? 'kit-juste' : partiel ? 'kit-partiel' : 'kit-faux');
     retour.append(
@@ -74,7 +75,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   if (!autoEvaluation) rendu.zone.append(neSaisPas);
   const image = q.image && el('img', { className: 'kit-quiz-image', src: q.image.src, alt: q.image.alt });
   image?.addEventListener('error', () => image.remove(), { once: true });
-  return el('fieldset', { className: `kit-quiz-question kit-quiz-${q.type ?? 'qcm'}${q.bonus ? ' kit-bonus' : ''}` },
+  return el('fieldset', { className: `kit-quiz-question kit-quiz-${typeDe(q)}${q.bonus ? ' kit-bonus' : ''}` },
     el('legend', {}, legende, q.enonce),
     image,
     rendu.zone,

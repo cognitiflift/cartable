@@ -48,6 +48,12 @@ function trierQuestions(brut, examiner) {
 }
 const questionsValides = (brut, valider) => trierQuestions(brut, (q) => ({ question: valider(q) })).questions;
 
+// Type d'une question (écrite par le prof, validée ou gardée dans la Banque) : `qcm` quand il est absent.
+export const typeDe = (q) => q?.type ?? 'qcm';
+
+// Résultat ou correction juste en partie (crédit partiel) : pas entièrement juste, mais des points entre 0 et 1 exclus.
+export const estPartiel = (r) => !r.juste && Number.isFinite(r.points) && r.points > 0 && r.points < 1;
+
 // Points d'une question : son crédit partiel (0 à 1), ou 1 si juste, 0 sinon.
 export const pointsDe = (q) => (q.juste ? 1 : Number.isFinite(q.points) ? q.points : 0);
 
@@ -88,7 +94,7 @@ function examinerQuestion(q) {
   if (!q || typeof q !== 'object') return { raison: 'ce n’est pas une question' };
   const [id, enonce] = [texte(q.id, ID_MAX), texte(q.enonce)];
   if (!id) return { raison: 'identifiant manquant' };
-  const type = q.type ?? 'qcm';
+  const type = typeDe(q);
   if (typeof type !== 'string' || !Object.hasOwn(TYPES, type)) return { id, raison: `type inconnu « ${String(type).slice(0, ID_MAX)} »` };
   if (!enonce) return { id, raison: 'énoncé manquant' };
   const champs = TYPES[type].valider(q);
@@ -155,7 +161,7 @@ export function lireResultats(brut, nombreObjectifs = Infinity) {
     const jeNeSaisPas = q.jeNeSaisPas === true;
     const juste = q.juste && !jeNeSaisPas;
     const type = typeof q.type === 'string' && q.type !== 'qcm' && Object.hasOwn(TYPES, q.type) ? q.type : null;
-    const partiel = !juste && !jeNeSaisPas && Number.isFinite(q.points) && q.points > 0 && q.points < 1;
+    const partiel = !jeNeSaisPas && estPartiel({ juste, points: q.points });
     const detail = type && !jeNeSaisPas ? TYPES[type].lireDetail?.(q.detail) ?? null : null;
     return {
       id, ...(type && { type }), enonce, choisie, bonne, juste, ...(partiel && { points: q.points }),
@@ -171,7 +177,7 @@ export function lireResultats(brut, nombreObjectifs = Infinity) {
 // si la question est entièrement juste ; `choisie` null si `reponse` n'est pas une réponse possible (0 point).
 export function corriger(question, reponse) {
   const jeNeSaisPas = reponse === JE_NE_SAIS_PAS;
-  const r = (TYPES[question.type ?? 'qcm'] ?? TYPES.qcm).corriger(question, jeNeSaisPas ? null : reponse);
+  const r = (TYPES[typeDe(question)] ?? TYPES.qcm).corriger(question, jeNeSaisPas ? null : reponse);
   const points = jeNeSaisPas || r.choisie === null ? 0 : Math.min(1, Math.max(0, Number(r.points) || 0));
   return {
     juste: points === 1, points, bonne: r.bonne, choisie: jeNeSaisPas ? TEXTE_JE_NE_SAIS_PAS : r.choisie,
@@ -194,13 +200,13 @@ export function melanger(nombre, aleatoire = Math.random) {
 // Résultat d'une question pour le message de fin de quiz (voir l'en-tête) ; `objectifs` : ceux par défaut du quiz.
 function resultatQuestion(q, reponse, sur, objectifs) {
   const c = corriger(q, reponse);
-  const partiel = !c.juste && c.points > 0;
+  const partiel = estPartiel(c);
   return {
     id: q.id, ...(q.type && q.type !== 'qcm' && { type: q.type }), enonce: q.enonce, choisie: c.choisie, bonne: c.bonne,
     juste: c.juste, ...(partiel && { points: c.points }), ...(c.detail && { detail: c.detail }),
     ...(c.jeNeSaisPas && { jeNeSaisPas: true }),
     bonus: q.bonus, objectifs: q.objectifs ?? objectifs,
-    ...(typeof sur === 'boolean' && !c.jeNeSaisPas && !TYPES[q.type ?? 'qcm']?.autoEvaluation && { sur }),
+    ...(typeof sur === 'boolean' && !c.jeNeSaisPas && !TYPES[typeDe(q)]?.autoEvaluation && { sur }),
   };
 }
 

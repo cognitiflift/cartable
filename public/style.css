@@ -67,3 +67,5 @@ p .maitrise { display:inline-flex; }
 .carte-revisions:not(.secondaire) small { color:inherit; opacity:.9; }
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
+.vue-parent { max-width:46rem; margin:1rem 0; }
+.vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }

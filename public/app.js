@@ -97,6 +97,41 @@ async function ecranProfil(profil) {
     const equivalent = coutUsd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
     cout.textContent = `Quota utilisé (indicatif) : ${tokens} tokens en ${tours} appel${tours > 1 ? 's' : ''} au prof, l'équivalent de ${equivalent} au tarif de l'API. Ce n'est pas une dépense : l'abonnement se mesure en quota partagé.`;
   }
+  // Vue parent (#77) : accessible d'ici seulement, jamais depuis l'accueil de l'Élève.
+  app.append(h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/parent') }, '👪 Vue parent')));
+}
+
+// Vue parent (#77) : un écran par Élève, pour le parent, agrégé par le serveur (GET …/parent). Une section par clé
+// des agrégats : SECTIONS_PARENT en ajoute une sans toucher aux autres (indicateurs, #78).
+const equivalentUsd = (usd) => usd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements) : h('p', { className: 'doux' }, vide));
+const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/lecon/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
+const SECTIONS_PARENT = [
+  { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
+    h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
+    jours.map((j) => h('tr', {},
+      h('td', {}, new Date(`${j.jour}T12:00`).toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'short' })),
+      h('td', {}, j.revisions ? `${j.revisions} (${j.justes} juste${j.justes > 1 ? 's' : ''})` : '–'),
+      h('td', {}, j.quiz || '–')))) },
+  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
+  { titre: '🌱 Objectifs fragiles', rendu: ({ objectifs }) => [
+    h('p', { className: 'doux' }, 'Atteints, mais pas encore Retenus : à retravailler un autre jour.'),
+    listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
+  { titre: '❓ Questions fragiles', rendu: ({ questionsFragiles }) => listeOuVide(
+    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
+  { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
+    avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise ${c.maitrise ? `${c.maitrise.pourcentage} %, ${c.maitrise.palier}` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
+  { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
+    h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
+    listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
+];
+
+async function ecranParent(profil) {
+  const agregats = await api(`eleves/${profil.slug}/parent`);
+  montrer(
+    h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
+    h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
+    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
 
 const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };
@@ -461,6 +496,7 @@ async function route() {
     if (!profil) return await ecranChoix();
     barreNav(profil);
     if (page === 'profil') return await ecranProfil(profil);
+    if (page === 'parent') return await ecranParent(profil);
     if (page === 'nouvelle-lecon') return ecranNouvelleLecon(profil);
     if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
     if (page === 'revisions') return await ecranRevisions(profil);

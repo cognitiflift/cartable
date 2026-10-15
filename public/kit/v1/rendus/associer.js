@@ -2,13 +2,14 @@
 // colonne le sélectionne, puis toucher un élément de l'autre colonne les relie : les deux portent alors le même numéro.
 // Toucher un élément déjà relié défait son lien (et le sélectionne). « Valider » quand tous sont reliés.
 import { el } from '../dom.js';
-import { melanger } from '../quiz-logique.js';
+import { melanger, reponseAttendue } from '../quiz-logique.js';
+import { validation } from './commun.js';
 
 export function rendreAssocier(q, { quandPrete }) {
   const n = q.paires.length;
-  const liens = q.paires.map(() => null); // pour chaque élément de gauche (index dans paires), l'index de droite relié
+  let liens = q.paires.map(() => null); // pour chaque élément de gauche (index dans paires), l'index de droite relié
   let selection = null; // { cote: 0 (gauche) ou 1 (droite), index }
-  let fige = false;
+  const valider = validation({ quandPrete, reponse: () => (liens.includes(null) ? null : [...liens]), rafraichir });
   const ordres = [melanger(n), melanger(n)];
   // Numéro affiché d'un lien : la place (à partir de 1) de son élément de gauche dans la colonne affichée.
   const numero = (gauche) => ordres[0].indexOf(gauche) + 1;
@@ -31,7 +32,7 @@ export function rendreAssocier(q, { quandPrete }) {
   const colonnes = ordres.map((ordre, cote) => ordre.map((index) => {
     const bouton = el('button', { type: 'button', className: 'kit-quiz-reponse kit-associer-element' });
     bouton.addEventListener('click', () => {
-      if (!fige) choisir(cote, index);
+      if (!valider.fige) choisir(cote, index);
     });
     return { bouton, index };
   }));
@@ -47,29 +48,26 @@ export function rendreAssocier(q, { quandPrete }) {
       bouton.setAttribute('aria-label', relie ? `${texte}, relié à « ${q.paires[cote === 0 ? liens[gauche] : gauche][1 - cote]} »` : texte);
       bouton.classList.toggle('kit-choisie', choisi);
       bouton.classList.toggle('kit-associer-relie', relie);
-      bouton.disabled = fige;
+      bouton.disabled = valider.fige;
     }));
-    valider.disabled = fige || liens.includes(null);
+    valider.actualiser();
   }
-
-  const valider = el('button', { type: 'button', className: 'kit-quiz-valider' }, '✔️ Valider');
-  valider.addEventListener('click', () => {
-    if (!liens.includes(null)) quandPrete([...liens]);
-  });
   rafraichir();
 
   const grille = el('div', { className: 'kit-associer' },
     ...colonnes.map((colonne) => el('div', { className: 'kit-associer-colonne' }, ...colonne.map((c) => c.bouton))));
   return {
-    zone: el('div', { className: 'kit-quiz-reponses' }, grille, valider),
+    zone: el('div', { className: 'kit-quiz-reponses' }, grille, valider.bouton),
     figer: () => {
-      fige = true;
       selection = null;
-      rafraichir();
-      valider.hidden = true;
+      valider.figer();
     },
     montrerCorrection: ({ detail }) => {
-      if (!detail) return;
+      // Sans réponse (« Je ne sais pas ») : les bonnes paires reliées.
+      if (!detail) {
+        liens = reponseAttendue(q);
+        rafraichir();
+      }
       colonnes.forEach((colonne, cote) => colonne.forEach(({ bouton, index }) => {
         const gauche = gaucheDe(cote, index);
         bouton.classList.add(liens[gauche] === gauche ? 'kit-bonne' : 'kit-fausse');

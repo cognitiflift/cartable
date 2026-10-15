@@ -19,6 +19,7 @@ export const ordre = {
     if (!elements || elements.length < ELEMENTS_A_ORDONNER_MIN || new Set(elements).size !== elements.length) return null;
     return { elements };
   },
+  reponseAttendue: (q) => q.elements.map((_, i) => i),
   corriger(q, reponse) {
     const bonne = q.elements.join(SEPARATEUR);
     if (!indexDistincts(reponse, q.elements.length, q.elements.length)) return { points: 0, bonne, choisie: null };

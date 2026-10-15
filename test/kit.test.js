@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lireQuiz, corriger, messageScore, melanger, lireResultats, questionsIgnorees, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
 
 const quiz = {
   objectifs: [1],
@@ -373,7 +373,7 @@ test('Kit : « choisis la meilleure explication » se valide et se corrige comme
 test('Kit : dévoile et meilleure explication passent dans le message et la validation de l\'appli, sans Confiance pour dévoile', () => {
   const lu = lireQuiz({ objectifs: [1], questions: [explication, devoile, quiz.questions[0]] });
   const message = messageScore(lu, { e1: 0, d1: 'moitie', q1: 1 }, 'p.html', { e1: true, d1: true, q1: false });
-  // L'auto-évaluation remplace la Confiance : une Confiance reçue pour dévoile est ignorée.
+  // Le souvenir dit par l'Élève remplace la Confiance : une Confiance reçue pour dévoile est ignorée.
   // (1 + 0,5 + 0) / 3 = 50 %.
   assert.equal(message.score, 50);
   const [e1, d1] = message.questions;
@@ -499,4 +499,12 @@ test('Kit : associer et classer comptent leur crédit partiel dans le score, et 
     { ...c1, detail: { categories: [{ elements: ['la baleine'] }] } },
   ].map((r, i) => ({ ...r, id: `m${i}` }));
   for (const r of lireResultats(malformes)) assert.equal(Object.hasOwn(r, 'detail'), false, r.id);
+});
+
+test('Kit : chaque format connaît la réponse entièrement juste, que le rendu montre après « Je ne sais pas »', () => {
+  const lu = lireQuiz({ objectifs: [1], questions: [quiz.questions[0], trous, ordre, etapes, devoile, { ...explication, id: 'x1' }, associer, classer] });
+  assert.equal(lu.questions.length, 8);
+  for (const q of lu.questions) assert.equal(corriger(q, reponseAttendue(q)).juste, true, q.type);
+  // Pour un format à plusieurs éléments, c'est la réponse que l'Élève aurait donnée en touchant les bons éléments.
+  assert.deepEqual(reponseAttendue(lu.questions.find((q) => q.type === 'ordre')), [0, 1, 2, 3]);
 });

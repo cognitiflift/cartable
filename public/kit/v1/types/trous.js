@@ -29,6 +29,7 @@ export const trous = {
     if (!intrus.length) return null;
     return { segments: segments.map((s) => s.slice(0, TEXTE_MAX)), trous: attendus, intrus };
   },
+  reponseAttendue: (q) => q.trous.map((_, i) => i),
   corriger(q, reponse) {
     const mots = motsDe(q);
     const bonne = phrase(q, q.trous);

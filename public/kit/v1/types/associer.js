@@ -26,6 +26,7 @@ export const associer = {
     const paires = lirePaires(q.paires);
     return paires && paires.length >= PAIRES_MIN ? { paires } : null;
   },
+  reponseAttendue: (q) => q.paires.map((_, i) => i),
   corriger(q, reponse) {
     const bonne = texteDes(q.paires);
     if (!indexDistincts(reponse, q.paires.length, q.paires.length)) return { points: 0, bonne, choisie: null };

@@ -187,6 +187,10 @@ export function corriger(question, reponse) {
   };
 }
 
+// Réponse entièrement juste à une question, propre à son type (comme `reponse` de corriger) : ce que le rendu montre
+// quand l'Élève n'a pas donné de réponse (« Je ne sais pas »).
+export const reponseAttendue = (question) => (TYPES[typeDe(question)] ?? TYPES.qcm).reponseAttendue(question);
+
 // Ordre d'affichage des réponses : une permutation des index, au hasard (`aleatoire` remplaçable pour les tests).
 export function melanger(nombre, aleatoire = Math.random) {
   const ordre = [...Array(nombre).keys()];
@@ -206,7 +210,7 @@ function resultatQuestion(q, reponse, sur, objectifs) {
     juste: c.juste, ...(partiel && { points: c.points }), ...(c.detail && { detail: c.detail }),
     ...(c.jeNeSaisPas && { jeNeSaisPas: true }),
     bonus: q.bonus, objectifs: q.objectifs ?? objectifs,
-    ...(typeof sur === 'boolean' && !c.jeNeSaisPas && !TYPES[typeDe(q)]?.autoEvaluation && { sur }),
+    ...(typeof sur === 'boolean' && !c.jeNeSaisPas && !TYPES[typeDe(q)]?.souvenirDeclare && { sur }),
   };
 }
 

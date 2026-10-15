@@ -10,6 +10,7 @@ export const qcm = {
     if (!reponses.every(Boolean) || !estIndex(q.bonne, reponses.length)) return null;
     return { reponses, bonne: q.bonne };
   },
+  reponseAttendue: (q) => q.bonne,
   corriger(q, reponse) {
     const bonne = q.reponses[q.bonne];
     if (!estIndex(reponse, q.reponses.length)) return { points: 0, bonne, choisie: null };

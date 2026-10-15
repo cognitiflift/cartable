@@ -149,7 +149,7 @@ Pour une méthode de mathématiques. Le Kit montre la résolution étape par ét
 
 ### Réfléchis puis dévoile : `"type": "devoile"`
 
-Comme une carte de révision : l'élève essaie de se rappeler la réponse **dans sa tête**, la dévoile, puis dit lui-même s'il l'avait. Pour une réponse courte qu'aucun autre format ne peut vérifier sans clavier : une définition, un fait, un « pourquoi » en une phrase.
+L'élève essaie de se rappeler la réponse **dans sa tête**, la dévoile, puis dit lui-même s'il l'avait. Pour une réponse courte qu'aucun autre format ne peut vérifier sans clavier : une définition, un fait, un « pourquoi » en une phrase.
 
 ```json
 {
@@ -163,7 +163,7 @@ Comme une carte de révision : l'élève essaie de se rappeler la réponse **dan
 
 - `reponse` : la réponse attendue, courte, montrée quand l'élève la dévoile.
 - Points : « je l'avais » = juste (1), « à moitié » = 0,5, « je ne l'avais pas » = faux (0).
-- Pas de Confiance ni de « Je ne sais pas » : l'auto-évaluation les remplace. Notes de mémoire (FSRS) qui en découlent : « je l'avais » → « bien » (comme juste et sûr), « à moitié » → « difficile » (comme un crédit partiel ou un juste pas sûr), « je ne l'avais pas » → « à revoir ».
+- Pas de Confiance ni de « Je ne sais pas » : ce que l'élève dit de son souvenir les remplace. Notes de mémoire (FSRS) qui en découlent : « je l'avais » → « bien » (comme juste et sûr), « à moitié » → « difficile » (comme un crédit partiel ou un juste pas sûr), « je ne l'avais pas » → « à revoir ».
 - Rien ne vérifie la réponse : ces questions restent **moins nombreuses que les autres questions comptées dans le score** (2 sur 5, 3 sur 7…). Celles en trop (les dernières du quiz) sont ignorées et te sont signalées. Les questions bonus ne sont pas limitées.
 
 ### Choisis la meilleure explication : `"type": "explication"`

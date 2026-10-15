@@ -26,8 +26,8 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
   // Confiance : après la réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
   const demande = el('div', { className: 'kit-quiz-confiance', hidden: true }, el('span', {}, 'Tu es sûr ?'));
-  // Format où l'Élève évalue lui-même sa réponse (« réfléchis puis dévoile ») : ni Confiance ni « Je ne sais pas ».
-  const autoEvaluation = TYPES[typeDe(q)]?.autoEvaluation === true;
+  // Format où l'Élève dit lui-même s'il avait la réponse (« réfléchis puis dévoile ») : ni Confiance ni « Je ne sais pas ».
+  const souvenirDeclare = TYPES[typeDe(q)]?.souvenirDeclare === true;
   let reponse = null;
   let repondu = false;
   // Une seule réponse : le format la donne quand l'Élève a fini (ou « Je ne sais pas »), puis tout est figé.
@@ -42,7 +42,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   const rendu = (RENDUS[typeDe(q)] ?? RENDUS.qcm)(q, {
     quandPrete: (r) => {
       if (!repondre(r)) return;
-      if (autoEvaluation) corrigerQuestion();
+      if (souvenirDeclare) corrigerQuestion();
       else demande.hidden = false;
     },
   });
@@ -72,7 +72,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
     neSaisPas.classList.add('kit-choisie');
     corrigerQuestion();
   });
-  if (!autoEvaluation) rendu.zone.append(neSaisPas);
+  if (!souvenirDeclare) rendu.zone.append(neSaisPas);
   const image = q.image && el('img', { className: 'kit-quiz-image', src: q.image.src, alt: q.image.alt });
   image?.addEventListener('error', () => image.remove(), { once: true });
   return el('fieldset', { className: `kit-quiz-question kit-quiz-${typeDe(q)}${q.bonus ? ' kit-bonus' : ''}` },

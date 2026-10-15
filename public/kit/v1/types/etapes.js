@@ -38,6 +38,7 @@ export const etapes = {
     if (!lues.every(Boolean) || !lues.some((e) => e.intrus)) return null;
     return { etapes: lues };
   },
+  reponseAttendue: (q) => aCompleter(q).map(() => 0),
   corriger(q, reponse) {
     const trous = aCompleter(q);
     const bonne = resume(trous, trous.map((e) => e.texte));

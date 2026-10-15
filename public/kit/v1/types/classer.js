@@ -41,6 +41,7 @@ export const classer = {
     if (categories.flatMap((c) => c.elements).length < ELEMENTS_A_CLASSER_MIN) return null;
     return { categories };
   },
+  reponseAttendue: (q) => elementsDe(q).map((e) => e.categorie),
   corriger(q, reponse) {
     const elements = elementsDe(q);
     const bonne = texteDe(q.categories);

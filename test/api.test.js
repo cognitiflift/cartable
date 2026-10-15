@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import http from 'node:http';
 import { slugify } from '../lib/store.js';
 
 let serveur, base, dossier, eleves;
@@ -21,6 +22,7 @@ before(async () => {
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait écrire dans lesson.json
   // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
+  // Les fichiers `images-page` et `images-manifeste` sont recopiés tels quels en lessons/0002-images.html et images.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
   const faux = path.join(dossier, 'faux-claude.sh');
@@ -81,6 +83,8 @@ else
 fi
 [ -e '${dossier}/ensuite' ] && echo '{"titre":"Les volcans","categorie":"Sciences","ensuite":"Les volcans endormis"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
+[ -e '${dossier}/images-page' ] && cp '${dossier}/images-page' lessons/0002-images.html
+[ -e '${dossier}/images-manifeste' ] && cp '${dossier}/images-manifeste' images.json
 if [ -e '${dossier}/choix' ]; then
   printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false'"$COUT"'}'
   exit 0
@@ -1362,3 +1366,90 @@ test('Prompt système allégé : sections dynamiques exclues, réglages utilisat
   assert.ok(recus.includes('--strict-mcp-config'));
   assert.equal(recus[recus.indexOf('--setting-sources') + 1], 'user');
 });
+
+// Visuels : petit serveur d'images local, lancé par le test (aucun accès réseau extérieur).
+// PNG de 1 pixel sous /tableau.png ; /page.png sert du HTML sous un type d'image ; /texte.txt du texte ; le reste, 404.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+const avecServeurImages = async (fn) => {
+  const serveurImages = http.createServer((req, res) => {
+    if (req.url === '/tableau.png') return res.writeHead(200, { 'Content-Type': 'image/png' }).end(PNG);
+    if (req.url === '/page.png') return res.writeHead(200, { 'Content-Type': 'image/png' }).end('<html>pas une image</html>');
+    if (req.url === '/texte.txt') return res.writeHead(200, { 'Content-Type': 'text/plain' }).end('bonjour');
+    res.writeHead(404).end();
+  });
+  await new Promise((r) => serveurImages.listen(0, '127.0.0.1', r));
+  try {
+    return await fn(`http://127.0.0.1:${serveurImages.address().port}`);
+  } finally {
+    serveurImages.close();
+  }
+};
+
+// Le prof écrit une page avec des figures et le manifeste d'images, le temps de `fn`.
+const avecPageImages = async ({ page, manifeste }, fn) => {
+  await fs.writeFile(path.join(dossier, 'images-page'), page);
+  await fs.writeFile(path.join(dossier, 'images-manifeste'), JSON.stringify(manifeste));
+  try {
+    return await fn();
+  } finally {
+    await fs.rm(path.join(dossier, 'images-page'), { force: true });
+    await fs.rm(path.join(dossier, 'images-manifeste'), { force: true });
+  }
+};
+
+const figure = (src, legende) => `<figure class="kit-figure"><img src="${src}" alt="${legende}"><figcaption>${legende}</figcaption></figure>`;
+const lirePage = async (lecon, page) => (await fetch(`${base}/fichiers/zoe-test/${lecon.id}/lessons/${page}`)).text();
+
+test('Visuels : consigne du prof (visuel qui explique, légende, source et licence, question du quiz, manifeste) et figure du Kit documentée', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les tableaux' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  for (const attendu of [/au moins un visuel/, /légende/, /licence/, /au moins une question du quiz/, /décorati/, /Wikimedia Commons/, /SVG/, /images\.json/, /kit-figure/]) {
+    assert.match(args, attendu);
+  }
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /class="kit-figure"/);
+  assert.match(doc, /images\.json/);
+  assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure/);
+});
+
+test('Visuels : une image déclarée est rapatriée dans la Leçon et son adresse réécrite dans la page', () => avecServeurImages(async (serveurImages) => {
+  const distante = `${serveurImages}/tableau.png`;
+  const lecon = await avecPageImages({
+    page: `<h1>Magritte</h1>${figure(distante, 'Le tableau')}`,
+    manifeste: [{ url: distante, source: 'Musée test', licence: 'CC BY-SA 4.0', alt: 'Le tableau', page: '0002-images.html' }],
+  }, async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Magritte' })).data);
+
+  const html = await lirePage(lecon, '0002-images.html');
+  assert.ok(!html.includes(distante));
+  const locale = html.match(/<img src="([^"]+)"/)[1];
+  assert.match(locale, /^\.\.\/images\/[^/]+\.png$/);
+  const image = await fetch(new URL(locale, `${base}/fichiers/zoe-test/${lecon.id}/lessons/0002-images.html`));
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), PNG);
+  assert.match(html, /<figcaption>Le tableau<\/figcaption>/);
+}));
+
+test('Visuels : une adresse morte, un fichier qui n\'est pas une image ou une adresse hors HTTP(S) est retiré de la page, légende gardée, et signalé au tour suivant seulement', () => avecServeurImages(async (serveurImages) => {
+  const mortes = [`${serveurImages}/disparue.png`, `${serveurImages}/page.png`, `${serveurImages}/texte.txt`, 'file:///etc/passwd'];
+  const lecon = await avecPageImages({
+    page: `<h1>Magritte</h1>${mortes.map((url, i) => figure(url, `Légende ${i}`)).join('')}`,
+    manifeste: mortes.map((url) => ({ url, source: 'Musée test', licence: 'CC0', alt: 'x', page: '0002-images.html' })),
+  }, async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Magritte encore' })).data);
+
+  const html = await lirePage(lecon, '0002-images.html');
+  assert.doesNotMatch(html, /<img/);
+  for (let i = 0; i < mortes.length; i++) assert.match(html, new RegExp(`<figcaption>Légende ${i}</figcaption>`));
+
+  const args = async () => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.doesNotMatch(await args(), /Images retirées/);
+  await message(lecon, 'ok');
+  const signale = await args();
+  assert.match(signale, /Images retirées/);
+  assert.ok(signale.includes(`${serveurImages}/disparue.png (0002-images.html) : adresse morte (erreur 404)`));
+  assert.ok(signale.includes(`${serveurImages}/page.png (0002-images.html) : fichier qui n'est pas une image`));
+  assert.ok(signale.includes(`${serveurImages}/texte.txt (0002-images.html) : fichier qui n'est pas une image`));
+  assert.ok(signale.includes('file:///etc/passwd (0002-images.html) : adresse qui n\'est pas en HTTP(S)'));
+  await message(lecon, 'ok');
+  assert.doesNotMatch(await args(), /Images retirées/);
+}));

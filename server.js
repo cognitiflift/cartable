@@ -184,12 +184,13 @@ async function regenererPropositions(slug) {
 
 async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
   const cadrage = validerCadrage(brut, 'revision');
-  const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage });
-  const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
+  // Date de contrôle (#68) : gardée dans la Leçon, c'est l'appli qui resserre les révisions jusqu'à elle (lib/memoire.js).
   const controle = typeof dateControle === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateControle) ? dateControle : null;
+  const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage, dateControle: controle });
+  const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
-    `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle} (organise la révision espacée jusqu'à cette date)` : ''}.`,
+    `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle}` : ''}.`,
     `Lis le document. Après le Pré-test viendra une révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document), avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
     consignePremierTour('revision', cadrage),
   ].join('\n');

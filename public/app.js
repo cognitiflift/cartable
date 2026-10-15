@@ -140,6 +140,7 @@ async function ecranAccueil(profil) {
   montrer(
     h('h2', {}, `Salut ${profil.pseudo} !`),
     carteRevisions(revisions.dues),
+    comptesARebours(lecons),
     h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
     lecons.length === 0 && h('p', {}, "Tu n'as pas encore de leçon."),
     config.categories.filter((c) => parCategorie[c]).map((c) => [
@@ -158,6 +159,21 @@ async function ecranAccueil(profil) {
 const carteRevisions = (dues) => h('button', { className: `carte carte-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
   h('strong', {}, '🧠 Mes révisions du jour'),
   h('small', {}, dues ? `${pluriel(dues, 'question')} à revoir` : 'Rien à revoir aujourd’hui 🎉'));
+
+// Compte à rebours des contrôles (#68) : pour chaque Leçon de révision dont le contrôle est aujourd'hui ou à venir,
+// le nombre de jours restants, le plus proche d'abord. Jours calendaires locaux, comme le planificateur.
+function joursAvant(dateControle) {
+  const [a, m, j] = dateControle.split('-').map(Number);
+  const aujourdhui = new Date();
+  return Math.round((new Date(a, m - 1, j) - new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), aujourdhui.getDate())) / 86_400_000);
+}
+const texteControle = (jours) => (jours === 0 ? "aujourd'hui" : jours === 1 ? 'demain' : `dans ${jours} jours`);
+function comptesARebours(lecons) {
+  const aVenir = lecons.filter((l) => l.dateControle).map((l) => ({ l, jours: joursAvant(l.dateControle) }))
+    .filter(({ jours }) => jours >= 0).sort((a, b) => a.jours - b.jours);
+  return aVenir.length > 0 && h('ul', { className: 'comptes-a-rebours' }, aVenir.map(({ l, jours }) =>
+    h('li', {}, h('a', { href: `#/lecon/${l.id}` }, `📅 ${l.titre} : contrôle ${texteControle(jours)}`))));
+}
 
 // Révisions du jour (#66) : des séries courtes de Questions dues, toutes Leçons mélangées, affichées tout de suite avec
 // le rendu du quiz du Kit, sans le prof. Chaque réponse part au serveur, qui la corrige lui-même et la journalise.

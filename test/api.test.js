@@ -2081,6 +2081,60 @@ test('Révisions du jour : réponses de révision et score de quiz simultanés, 
   assert.deepEqual(questions.map((q) => q.journal.length), [5, 5]);
 });
 
+// Date de contrôle (#68) : une Leçon de révision de l'Élève `slug`, avec le quiz de `quizBanque` répondu à BANQUE_DATE.
+const PDF = Buffer.from('%PDF-1.4 faux').toString('base64');
+const leconControle = async (slug, dateControle) => {
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle })).data;
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizBanque)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  await fs.rm(path.join(dossier, `demarre-${lecon.id}`), { force: true });
+  return lecon;
+};
+// Minuit local du jour J de novembre 2026, en ISO : le planificateur compte en jours de l'Élève (heure du serveur).
+const minuitNovembre = (jour) => new Date(2026, 10, jour).toISOString();
+
+test('Date de contrôle : gardée et exposée par la Leçon de révision, sans consigne d\'espacement au prof', async () => {
+  const { slug } = await eleveRevisions('Controle-Date', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-11-20' })).data;
+  assert.equal(lecon.dateControle, '2026-11-20');
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.dateControle, '2026-11-20');
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`)).data.find((l) => l.id === lecon.id).dateControle, '2026-11-20');
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /contrôle le 2026-11-20/);
+  assert.doesNotMatch(prompt, /révision espacée/);
+  // Sans date, ou illisible : null.
+  const sans = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: 'bientôt' })).data;
+  assert.equal(sans.dateControle, null);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${sans.id}`)).data.dateControle, null);
+  const libre = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${libre.id}`)).data.dateControle, null);
+});
+
+test('Date de contrôle : les Questions de la Leçon passent en premier dans les Révisions du jour', async () => {
+  const { slug, lecons: [libre] } = await eleveRevisions('Controle-Priorite', 1);
+  const controle = await leconControle(slug, '2026-11-20');
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.dues, 4);
+  assert.deepEqual(data.questions.map((q) => q.lecon), [controle.id, controle.id, libre.id, libre.id]);
+  // Le contrôle passé, plus de priorité : de nouveau mélangées entre Leçons.
+  const apres = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le('2026-11-21T12:00:00.000Z'))).data.questions;
+  for (let i = 1; i < apres.length; i++) assert.notEqual(apres[i].lecon, apres[i - 1].lecon);
+});
+
+test('Date de contrôle : une révision qui tomberait après la date est avancée à la veille, puis le planificateur reprend son cours', async () => {
+  const { slug } = await eleveRevisions('Controle-Avance', 0);
+  const lecon = await leconControle(slug, '2026-11-06');
+  // q1 sue et sûre le 3 : sans contrôle, revue le 6 ou plus tard ; avec un contrôle le 6, la veille.
+  const reponse = await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0, sur: true }, le(LENDEMAIN));
+  assert.equal(reponse.data.prochaineRevision, minuitNovembre(5));
+  const lue = async (date) => (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(date))).data.questions.find((q) => q.id === 'q1');
+  assert.equal((await lue('2026-11-04T12:00:00.000Z')).prochaineRevision, minuitNovembre(5));
+  const dues = async (date) => (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(date))).data.questions.map((q) => q.id);
+  assert.ok((await dues('2026-11-05T12:00:00.000Z')).includes('q1'));
+  // Après le contrôle : la date normale, plus tard que la veille.
+  assert.ok(Date.parse((await lue('2026-11-07T12:00:00.000Z')).prochaineRevision) >= Date.parse('2026-11-06T12:00:00.000Z'));
+});
+
 // Maîtrise et Retenu appuyés sur la mémoire des Questions (#67).
 test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souvenir ; Retenu suit leur stabilité', async () => {
   const lecon = await leconBanque();

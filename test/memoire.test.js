@@ -100,3 +100,69 @@ test('Mémoire : « maintenant » accepte une date ISO', () => {
   const journal = [le(0, true)];
   assert.deepEqual(memoireDeQuestion(journal, { maintenant: new Date(a(2)).toISOString() }), memoireDeQuestion(journal, { maintenant: a(2) }));
 });
+
+// Date de contrôle (#68). Dates locales (sans « Z ») : la veille et l'avant-veille sont des jours de l'Élève.
+const enNovembre = (jour, extra = {}) => ({ date: `2026-11-${String(jour).padStart(2, '0')}T10:00:00`, juste: true, sur: true, origine: 'quiz', ...extra });
+const jourLocal = (iso) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+test('Date de contrôle : une révision prévue après la date est avancée à la veille', () => {
+  // Deux succès espacés : sans contrôle, la révision suivante tombe bien après le 10 novembre.
+  const journal = [enNovembre(1), enNovembre(4)];
+  const sans = memoireDeQuestion(journal, { maintenant: '2026-11-04T12:00:00' });
+  assert.ok(jourLocal(sans.prochaineRevision) > '2026-11-10', sans.prochaineRevision);
+  const avec = memoireDeQuestion(journal, { maintenant: '2026-11-04T12:00:00', dateControle: '2026-11-10' });
+  assert.equal(jourLocal(avec.prochaineRevision), '2026-11-09');
+  assert.equal(avec.stabilite, sans.stabilite);
+  assert.equal(avec.rappel, sans.rappel);
+});
+
+test('Date de contrôle : une révision prévue avant la veille n\'est pas déplacée', () => {
+  const journal = [enNovembre(1)]; // première réponse : revue 3 jours plus tard, le 4
+  const sans = memoireDeQuestion(journal, { maintenant: '2026-11-01T12:00:00' });
+  const avec = memoireDeQuestion(journal, { maintenant: '2026-11-01T12:00:00', dateControle: '2026-11-20' });
+  assert.equal(avec.prochaineRevision, sans.prochaineRevision);
+  assert.equal(jourLocal(avec.prochaineRevision), '2026-11-04');
+});
+
+test('Date de contrôle : en révisant chaque fois le jour prévu, une révision tombe la veille ou l\'avant-veille', () => {
+  for (const dateControle of ['2026-11-08', '2026-11-12', '2026-11-25']) {
+    const journal = [enNovembre(1)];
+    const jours = ['2026-11-01'];
+    for (;;) {
+      const { prochaineRevision } = memoireDeQuestion(journal, { maintenant: journal.at(-1).date, dateControle });
+      const jour = jourLocal(prochaineRevision);
+      if (jour >= dateControle) break;
+      jours.push(jour);
+      journal.push(enNovembre(Number(jour.slice(8))));
+    }
+    const veille = jourLocal(new Date(2026, 10, Number(dateControle.slice(8)) - 1));
+    const avantVeille = jourLocal(new Date(2026, 10, Number(dateControle.slice(8)) - 2));
+    assert.ok([veille, avantVeille].includes(jours.at(-1)), `${dateControle} : ${jours}`);
+  }
+});
+
+test('Date de contrôle : une fois la révision de la veille faite, le planificateur reprend son cours', () => {
+  const journal = [enNovembre(1), enNovembre(4), enNovembre(9)];
+  const options = { maintenant: '2026-11-09T12:00:00' };
+  assert.deepEqual(memoireDeQuestion(journal, { ...options, dateControle: '2026-11-10' }), memoireDeQuestion(journal, options));
+});
+
+test('Date de contrôle : après la date, le planificateur reprend son cours normal', () => {
+  const journal = [enNovembre(1), enNovembre(4)]; // pas révisée la veille du contrôle du 10
+  const options = { maintenant: '2026-11-11T08:00:00' };
+  assert.deepEqual(memoireDeQuestion(journal, { ...options, dateControle: '2026-11-10' }), memoireDeQuestion(journal, options));
+  // Le jour même du contrôle, la révision avancée reste due.
+  const leJour = memoireDeQuestion(journal, { maintenant: '2026-11-10T08:00:00', dateControle: '2026-11-10' });
+  assert.equal(jourLocal(leJour.prochaineRevision), '2026-11-09');
+});
+
+test('Date de contrôle : une date illisible ne change rien', () => {
+  const journal = [enNovembre(1), enNovembre(4)];
+  const options = { maintenant: '2026-11-04T12:00:00' };
+  for (const dateControle of ['demain', '2026-13-45x', 42]) {
+    assert.deepEqual(memoireDeQuestion(journal, { ...options, dateControle }), memoireDeQuestion(journal, options));
+  }
+});

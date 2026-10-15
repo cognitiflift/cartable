@@ -740,8 +740,8 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   assert.equal((await resume()).depassement, true);
 });
 
-test('Kit : servi sous son chemin versionné (quiz, logique, style de base, documentation)', async () => {
-  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
+test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
+  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
     const res = await fetch(`${base}/kit/v1/${fichier}`);
     assert.equal(res.status, 200, fichier);
     assert.match(res.headers.get('content-type'), new RegExp(type));
@@ -1914,4 +1914,142 @@ test('Mémoire des Questions : un quiz répondu à la date du serveur est daté 
   // Juste mais pas sûr → difficile (1,18 jour : le lendemain) ; « Je ne sais pas » → à revoir, le lendemain aussi.
   assert.equal(q1.prochaineRevision, '2026-11-03T08:00:00.000Z');
   assert.equal(q2.prochaineRevision, '2026-11-03T08:00:00.000Z');
+});
+
+// Révisions du jour (#66) : les Questions dues de toutes les Leçons d'un Élève, servies et corrigées par l'appli,
+// sans tour du prof. Chaque test a son propre Élève : la route couvre toutes ses Leçons.
+const BANQUE_DATE = '2026-11-02T12:00:00.000Z'; // quiz du Kit répondu ce jour-là : q1 juste pas sûr, q2 « Je ne sais pas »
+const LENDEMAIN = '2026-11-03T12:00:00.000Z'; // leur prochaine révision (voir « Mémoire des Questions »)
+const le = (date) => ({ 'X-Cartable-Maintenant': date });
+// Élève neuf avec `nombre` Leçons, chacune avec les Questions de `quizBanque` répondues à BANQUE_DATE. Attend ses
+// Propositions et efface les traces de lancement du faux `claude`, pour vérifier ensuite qu'aucun n'est lancé.
+const eleveRevisions = async (pseudo, nombre = 2) => {
+  const slug = slugify(pseudo);
+  await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecons = [];
+  for (let i = 0; i < nombre; i++) {
+    const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: `sujet ${i}` })).data);
+    const dir = path.join(eleves, slug, 'lecons', lecon.id, 'lessons');
+    await fs.writeFile(path.join(dir, '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizBanque)}</script>`);
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+    lecons.push(lecon);
+  }
+  await attendrePropositions(slug);
+  await fs.rm(path.join(dossier, 'lancements-propositions'), { force: true });
+  for (const l of lecons) await fs.rm(path.join(dossier, `demarre-${l.id}`), { force: true });
+  return { slug, lecons };
+};
+const aucunClaudeLance = async (lecons) => {
+  assert.equal(await existe(path.join(dossier, 'lancements-propositions')), false);
+  for (const l of lecons) assert.equal(await demarre(l), false);
+};
+
+test('Révisions du jour : les Questions dues de toutes les Leçons, mélangées entre Leçons, sans lancer le prof', async () => {
+  const { slug, lecons } = await eleveRevisions('Revis-Due');
+  const url = `/api/eleves/${slug}/revisions`;
+  // Le jour du quiz : rien n'est dû.
+  const avant = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(avant.status, 200);
+  assert.deepEqual(avant.data, { dues: 0, questions: [] });
+  // Le lendemain : les quatre Questions, deux par Leçon, jamais deux de suite de la même Leçon.
+  const { data } = await appel(url, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.dues, 4);
+  assert.equal(data.questions.length, 4);
+  assert.deepEqual(new Set(data.questions.map((q) => q.lecon)), new Set(lecons.map((l) => l.id)));
+  for (let i = 1; i < data.questions.length; i++) assert.notEqual(data.questions[i].lecon, data.questions[i - 1].lecon);
+  // Tout ce qu'il faut pour l'afficher avec le rendu du Kit, et ouvrir la Page de leçon d'origine.
+  const q1 = data.questions.find((q) => q.id === 'q1');
+  assert.equal(q1.page, '0002-volcans.html');
+  assert.equal(q1.titreLecon, 'Les volcans');
+  assert.equal(q1.enonce, 'Où sort la lave ?');
+  assert.deepEqual(q1.reponses, ['Par le cratère', 'Par les racines']);
+  assert.equal(q1.explication, 'Le cratère.');
+  // Dû le jour même, dès le matin : la date compte, pas l'heure.
+  assert.equal((await appel(url, 'GET', undefined, le('2026-11-03T11:00:00.000Z'))).data.dues, 4);
+  await aucunClaudeLance(lecons);
+});
+
+test('Révisions du jour : une série de 10 Questions au plus, les plus en retard d\'abord', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Serie', 1);
+  // Douze Questions de plus, répondues justes et sûres trois jours avant les deux premières : plus en retard.
+  const questions = Array.from({ length: 12 }, (_, i) => ({ id: `r${i}`, type: 'qcm', enonce: `Question ${i} ?`, reponses: ['oui', 'non'], bonne: 0, explication: '' }));
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0003-serie.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify({ objectifs: [1], questions })}</script>`);
+  const corps = { score: 100, page: '0003-serie.html', objectifs: [1], questions: questions.map((q) => ({ id: q.id, enonce: q.enonce, choisie: 'oui', bonne: 'oui', juste: true, bonus: false, objectifs: [1], sur: true })) };
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le('2026-10-30T12:00:00.000Z'))).status, 201);
+
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.dues, 14);
+  assert.equal(data.questions.length, 10);
+  assert.ok(data.questions.every((q) => q.page === '0003-serie.html'));
+});
+
+test('Révisions du jour : une réponse est corrigée par le serveur et journalisée ; ratée, la Question revient bientôt, sue, elle s\'éloigne', async () => {
+  const { slug, lecons } = await eleveRevisions('Revis-Reponse', 1);
+  const [lecon] = lecons;
+  const url = `/api/eleves/${slug}/revisions`;
+  const repondre = (corps, date = LENDEMAIN) => appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', ...corps }, le(date));
+
+  // q1 : bonne réponse (index 0 avant mélange), sûr. Le `juste` envoyé par le client est ignoré.
+  const sue = await repondre({ id: 'q1', choisie: 0, sur: true, juste: false });
+  assert.equal(sue.status, 200);
+  assert.equal(sue.data.juste, true);
+  assert.equal(sue.data.bonne, 'Par le cratère');
+  assert.equal(sue.data.explication, 'Le cratère.');
+  // q2 : mauvaise réponse, pourtant annoncée juste par le client.
+  const ratee = await repondre({ id: 'q2', choisie: 0, sur: true, juste: true });
+  assert.equal(ratee.data.juste, false);
+  assert.equal(ratee.data.bonne, 'De la roche fondue');
+
+  // Journal : origine « revision », date du serveur, Confiance.
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  const [q1, q2] = questions;
+  assert.deepEqual(q1.journal.at(-1), { date: LENDEMAIN, juste: true, sur: true, origine: 'revision' });
+  assert.deepEqual(q2.journal.at(-1), { date: LENDEMAIN, juste: false, sur: true, origine: 'revision' });
+  // Ratée : de nouveau due le lendemain. Sue : plusieurs jours plus tard.
+  assert.equal(q2.prochaineRevision, '2026-11-04T12:00:00.000Z');
+  assert.ok(Date.parse(q1.prochaineRevision) >= Date.parse('2026-11-06T12:00:00.000Z'), q1.prochaineRevision);
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data, { dues: 0, questions: [] });
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-04T12:00:00.000Z'))).data.questions.map((q) => q.id), ['q2']);
+
+  // « Je ne sais pas » : faux, sans Confiance, comme dans le Kit.
+  const jnsp = await repondre({ id: 'q2', choisie: 'je-ne-sais-pas', sur: true }, '2026-11-04T12:00:00.000Z');
+  assert.equal(jnsp.data.juste, false);
+  const relu = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions[1];
+  assert.deepEqual(relu.journal.at(-1), { date: '2026-11-04T12:00:00.000Z', juste: false, jeNeSaisPas: true, origine: 'revision' });
+  await aucunClaudeLance(lecons);
+});
+
+test('Révisions du jour : après les Questions dues, « continuer » propose celles qui ne le sont pas encore, sauf celles déjà répondues aujourd\'hui', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Suite', 1);
+  const url = `/api/eleves/${slug}/revisions`;
+  await appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0, sur: true }, le(LENDEMAIN));
+  // q2 reste due : « continuer » ne la sert pas (elle est dans la série du jour), ni q1, répondue aujourd'hui.
+  assert.deepEqual((await appel(`${url}?suite=1`, 'GET', undefined, le(LENDEMAIN))).data, { dues: 1, questions: [] });
+  // Le surlendemain, q2 répondue la veille et revue aujourd'hui : q1, pas encore due, peut être revue en plus.
+  await appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q2', choisie: 1, sur: true }, le('2026-11-04T09:00:00.000Z'));
+  const suite = (await appel(`${url}?suite=1`, 'GET', undefined, le('2026-11-04T12:00:00.000Z'))).data;
+  assert.equal(suite.dues, 0);
+  assert.deepEqual(suite.questions.map((q) => q.id), ['q1']);
+});
+
+test('Révisions du jour : réponse refusée pour une Question inconnue (404) ou un choix invalide (400), sans rien journaliser', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Refus', 1);
+  const url = `/api/eleves/${slug}/revisions`;
+  const repondre = (corps) => appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0, ...corps });
+  for (const corps of [{ id: 'inconnue' }, { page: '0009-autre.html' }, { lecon: '2026-01-01-inconnue' }]) assert.equal((await repondre(corps)).status, 404, JSON.stringify(corps));
+  for (const corps of [{ choisie: 2 }, { choisie: -1 }, { choisie: '0' }, { choisie: null }, { lecon: '../x' }]) assert.equal((await repondre(corps)).status, 400, JSON.stringify(corps));
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.deepEqual(questions.map((q) => q.journal.length), [1, 1]);
+});
+
+test('Révisions du jour : réponses de révision et score de quiz simultanés, aucune réponse perdue', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Ensemble', 1);
+  const envois = [
+    ...Array.from({ length: 6 }, (_, i) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 })),
+    appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html')),
+    appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html')),
+  ];
+  assert.ok((await Promise.all(envois)).every((r) => r.status < 300));
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.deepEqual(questions.map((q) => q.journal.length), [6, 6]);
 });

@@ -12,6 +12,7 @@ import { compterJustes } from './public/kit/v1/quiz-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
+import { revisionsDuJour } from './lib/revisions.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -285,6 +286,17 @@ async function api(req, res, segments) {
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
   } else if (r2 === 'couts' && !id) {
     if (m === 'GET') return json(res, 200, await store.lireCouts(slug));
+  } else if (r2 === 'revisions' && !id) {
+    // Révisions du jour (#66) : servies et corrigées par l'appli, jamais de tour du prof.
+    const maintenant = maintenantDe(req.headers);
+    if (m === 'GET') {
+      const suite = new URL(req.url, 'http://x').searchParams.get('suite') === '1';
+      return json(res, 200, revisionsDuJour(await store.leconsAReviser(slug, { maintenant }), { maintenant, suite }));
+    }
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      return json(res, 200, await store.repondreEnRevision(slug, await lireCorps(req), { maintenant }));
+    }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));

@@ -2492,3 +2492,61 @@ test('Formats de rappel actif : une question mal formée ou d\'un type inconnu e
   await message(lecon, 'ok');
   assert.doesNotMatch(await argsDe(lecon), /Questions ignorées/);
 });
+
+// Formats « réfléchis puis dévoile » et « meilleure explication » (spec #48, ticket #72).
+const quizDevoile = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.' },
+    { id: 'e1', type: 'explication', enonce: 'Pourquoi la lave devient-elle noire ?', reponses: ['Elle se solidifie en roche', 'Elle brûle', 'La pluie la salit'], bonne: 0, explication: 'Elle refroidit.' },
+    { id: 'o1', type: 'ordre', enonce: 'Dans l’ordre ?', elements: ['Le magma monte', 'La lave sort', 'La lave refroidit'], explication: 'Dans cet ordre.' },
+    { id: 'd1', type: 'devoile', enonce: 'Qu’est-ce que le magma ?', reponse: 'De la roche fondue sous terre.', explication: 'Il devient lave en sortant.' },
+    { id: 'd2', type: 'devoile', enonce: 'Qu’est-ce qu’un cratère ?', reponse: 'L’ouverture au sommet du volcan.', explication: 'La lave en sort.' },
+  ],
+};
+
+test('Dévoile et meilleure explication : « à moitié » vaut 0,5 et revient le lendemain, « je l\'avais » plus tard, et la Révision du jour les corrige', async () => {
+  const slug = slugify('Revis-Devoile');
+  await appel('/api/eleves', 'POST', { pseudo: 'Revis-Devoile', age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'dévoile' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-devoile.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizDevoile)}</script>`);
+  const { type, ...corps } = messageScore(lireQuiz(quizDevoile), { q1: 0, e1: 0, o1: [0, 1, 2], d1: 'moitie', d2: 'avais' }, '0002-devoile.html', { q1: true, e1: true, o1: true });
+  const r = await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { ...corps, score: 0 }, le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).score, 90); // (1 + 1 + 1 + 0,5 + 1) / 5
+  await attendrePropositions(slug);
+
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const banque = (await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  const [e1, d1, d2] = ['e1', 'd1', 'd2'].map((id) => banque.find((q) => q.id === id));
+  assert.deepEqual(e1.contenu, { type: 'explication', enonce: 'Pourquoi la lave devient-elle noire ?', reponses: ['Elle se solidifie en roche', 'Elle brûle', 'La pluie la salit'], bonne: 0, explication: 'Elle refroidit.', objectifs: [1] });
+  assert.deepEqual(d1.contenu, { type: 'devoile', enonce: 'Qu’est-ce que le magma ?', reponse: 'De la roche fondue sous terre.', explication: 'Il devient lave en sortant.', objectifs: [1] });
+  // « À moitié » : juste en partie, noté « difficile » ; « je l'avais » : juste (vaut sûr), noté « bien ».
+  assert.deepEqual(d1.journal[0], { date: BANQUE_DATE, juste: false, points: 0.5, origine: 'quiz' });
+  assert.equal(d1.prochaineRevision, LENDEMAIN);
+  assert.deepEqual(d2.journal[0], { date: BANQUE_DATE, juste: true, origine: 'quiz' });
+  assert.ok(Date.parse(d2.prochaineRevision) > Date.parse(LENDEMAIN), d2.prochaineRevision);
+
+  const repondre = (id, choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-devoile.html', id, choisie }, le(LENDEMAIN));
+  const pas = await repondre('d1', 'pas');
+  assert.equal(pas.status, 200);
+  assert.equal(pas.data.juste, false);
+  assert.equal(Object.hasOwn(pas.data, 'points'), false);
+  assert.equal(pas.data.bonne, 'De la roche fondue sous terre.');
+  assert.equal((await repondre('e1', 0)).data.juste, true);
+  for (const choisie of [0, 'oui', ['avais']]) assert.equal((await repondre('d1', choisie)).status, 400, JSON.stringify(choisie));
+});
+
+test('Dévoile et meilleure explication : la consigne dit quand les utiliser, et le Kit les documente', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les orages' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /"devoile"/);
+  assert.match(args, /"explication"/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /"type": "devoile"/);
+  assert.match(doc, /"type": "explication"/);
+  assert.match(doc, /FSRS/);
+  for (const fichier of ['types/devoile.js', 'types/explication.js', 'rendus/devoile.js', 'rendus/explication.js']) {
+    assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
+  }
+});

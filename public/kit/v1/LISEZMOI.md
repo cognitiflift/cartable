@@ -84,7 +84,7 @@ Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPa
 
 ## Formats de rappel actif
 
-Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM.
+Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM (sauf « réfléchis puis dévoile », voir plus bas).
 
 Crédit partiel : une question à plusieurs éléments rapporte la part juste (3 trous sur 4 = 0,75 question dans le score), mais elle ne compte comme « juste » (Objectifs, Banque de Questions, Révisions) que si elle est entièrement juste.
 
@@ -122,6 +122,42 @@ Pour les étapes d'un processus, les événements d'une histoire ou les mots d'u
 
 - `elements` : 3 à 10 éléments, tous différents, **dans le bon ordre**.
 - Crédit partiel : les éléments déjà dans le bon ordre entre eux (il suffirait de déplacer les autres).
+
+### Réfléchis puis dévoile : `"type": "devoile"`
+
+Comme une carte de révision : l'élève essaie de se rappeler la réponse **dans sa tête**, la dévoile, puis dit lui-même s'il l'avait. Pour une réponse courte qu'aucun autre format ne peut vérifier sans clavier : une définition, un fait, un « pourquoi » en une phrase.
+
+```json
+{
+  "id": "q5",
+  "type": "devoile",
+  "enonce": "Qu'est-ce que le magma ?",
+  "reponse": "De la roche fondue, sous la terre.",
+  "explication": "Quand le magma sort du volcan, on l'appelle la lave."
+}
+```
+
+- `reponse` : la réponse attendue, courte, montrée quand l'élève la dévoile.
+- Points : « je l'avais » = juste (1), « à moitié » = 0,5, « je ne l'avais pas » = faux (0).
+- Pas de Confiance ni de « Je ne sais pas » : l'auto-évaluation les remplace. Notes de mémoire (FSRS) qui en découlent : « je l'avais » → « bien » (comme juste et sûr), « à moitié » → « difficile » (comme un crédit partiel ou un juste pas sûr), « je ne l'avais pas » → « à revoir ».
+- Rien ne vérifie la réponse : ces questions restent **moins nombreuses que les autres questions comptées dans le score** (2 sur 5, 3 sur 7…). Celles en trop (les dernières du quiz) sont ignorées et te sont signalées. Les questions bonus ne sont pas limitées.
+
+### Choisis la meilleure explication : `"type": "explication"`
+
+Pour un « pourquoi ? » : plusieurs explications d'un phénomène, une seule juste. L'élève s'explique les choses sans écrire. C'est un QCM (mêmes champs, même correction, le Kit ajoute la consigne « Choisis la meilleure explication ») : il ne compte pas comme question de rappel actif.
+
+```json
+{
+  "id": "q6",
+  "type": "explication",
+  "enonce": "Pourquoi la lave devient-elle noire en refroidissant ?",
+  "reponses": ["Elle se solidifie en roche", "Elle brûle", "La pluie la salit"],
+  "bonne": 0,
+  "explication": "En refroidissant, la lave durcit : elle devient une roche sombre, le basalte."
+}
+```
+
+- `reponses` et `bonne` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne.
 
 ## Ce que fait le Kit
 

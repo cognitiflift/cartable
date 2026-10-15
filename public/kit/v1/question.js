@@ -3,7 +3,7 @@
 // L'Élève répond (selon le format de la question, voir rendus/), dit s'il est sûr (Confiance), puis voit la correction
 // et l'explication ; « Je ne sais pas » est corrigé tout de suite, sans Confiance. Ce fichier ne contient que ce qui
 // est commun à tous les formats ; ce qui est propre à chacun est dans rendus/<type>.js (registre : rendus/index.js).
-import { corriger, JE_NE_SAIS_PAS } from './quiz-logique.js';
+import { corriger, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
 import { el } from './dom.js';
 import { RENDUS } from './rendus/index.js';
 
@@ -25,6 +25,8 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
   // Confiance : après la réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
   const demande = el('div', { className: 'kit-quiz-confiance', hidden: true }, el('span', {}, 'Tu es sûr ?'));
+  // Format où l'Élève évalue lui-même sa réponse (« réfléchis puis dévoile ») : ni Confiance ni « Je ne sais pas ».
+  const autoEvaluation = TYPES[q.type ?? 'qcm']?.autoEvaluation === true;
   let reponse = null;
   let repondu = false;
   // Une seule réponse : le format la donne quand l'Élève a fini (ou « Je ne sais pas »), puis tout est figé.
@@ -38,7 +40,9 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   };
   const rendu = (RENDUS[q.type ?? 'qcm'] ?? RENDUS.qcm)(q, {
     quandPrete: (r) => {
-      if (repondre(r)) demande.hidden = false;
+      if (!repondre(r)) return;
+      if (autoEvaluation) corrigerQuestion();
+      else demande.hidden = false;
     },
   });
   const corrigerQuestion = (sur) => {
@@ -67,7 +71,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
     neSaisPas.classList.add('kit-choisie');
     corrigerQuestion();
   });
-  rendu.zone.append(neSaisPas);
+  if (!autoEvaluation) rendu.zone.append(neSaisPas);
   const image = q.image && el('img', { className: 'kit-quiz-image', src: q.image.src, alt: q.image.alt });
   image?.addEventListener('error', () => image.remove(), { once: true });
   return el('fieldset', { className: `kit-quiz-question kit-quiz-${q.type ?? 'qcm'}${q.bonus ? ' kit-bonus' : ''}` },

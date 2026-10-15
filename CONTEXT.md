@@ -57,7 +57,27 @@ Page HTML produite par une Séance, avec son contenu et son quiz. Une Leçon en 
 _Avoid_: leçon (réservé à la Leçon entière)
 
 **Objectif**:
-Chose concrète que l'Élève saura faire au bout d'une Leçon. Les Objectifs sont fixés dès la première Séance (tirés du Document source pour une Leçon de révision), puis les pages s'enchaînent librement pour les atteindre. Ceux d'une Leçon libre suivent sa mission : ils s'allongent quand l'Élève accepte de l'élargir. Un Objectif est atteint quand l'Élève réussit (80 % ou plus) un quiz qui le couvre.
+Chose concrète que l'Élève saura faire au bout d'une Leçon. Les Objectifs sont fixés dès la première Séance (tirés du Document source pour une Leçon de révision), puis les pages s'enchaînent librement pour les atteindre. Ceux d'une Leçon libre suivent sa mission : ils s'allongent quand l'Élève accepte de l'élargir. Un Objectif est atteint quand l'Élève réussit (80 % ou plus) un quiz qui le couvre ; il fait alors monter le Niveau de Leçon. Atteint ne veut pas encore dire **Retenu**. Un Objectif couvert par une question réussie au Pré-test est **à confirmer** : il n'est pas atteint pour autant.
+
+**Retenu**:
+Objectif réussi au moins deux fois, dans des quiz réussis (80 % ou plus, hors Pré-test) passés à au moins 24 heures d'intervalle ; les quiz faits en Révisant comptent. Mesure ce qui tient dans le temps, alors qu'un Objectif atteint peut n'être qu'une réussite du moment, juste après avoir lu la page. Calculé par l'appli, acquis pour toujours, sans effet sur le Niveau de Leçon. La carte de la Leçon affiche par exemple « 3 Objectifs · 1 Retenu ».
+_Avoid_: acquis (palier de la Maîtrise), mémorisé, atteint (un Objectif atteint n'est pas forcément Retenu)
+
+**À confirmer**:
+État d'un Objectif couvert par une question réussie au Pré-test : l'Élève semble déjà le savoir, mais ce n'est ni atteint ni Retenu tant qu'un vrai quiz ne l'a pas confirmé. Sert au prof pour ne pas réenseigner ce que l'Élève sait.
+_Avoid_: acquis, déjà su
+
+**Cadrage**:
+Questions posées au tout début d'une Leçon, avant la première Page de leçon, pour situer l'Élève. En deux temps : d'abord l'appli pose elle-même deux questions fixes, à réponses fermées et sans tour de l'agent, **Pourquoi ?** (curiosité, école, exposé ou projet, contrôle, pour en parler avec quelqu'un) et **Tu en sais déjà…** (rien, je découvre ; un peu ; beaucoup ; je suis incollable) ; puis, dans la première Séance, le prof pose deux questions propres au sujet avec des Réponses proposées, **À la fin, tu voudrais pouvoir…** et **Où as-tu croisé ce sujet ?** Pour une Leçon de révision, seule « Tu en sais déjà… » reste côté appli, et la question du prof devient « Qu'est-ce qui te semble le plus dur ? ». Chaque question accepte « Je ne sais pas ». Les réponses sont enregistrées dans la Leçon et servent aussi aux Propositions.
+_Avoid_: questionnaire, diagnostic, mission (la mission est ce que le prof écrit après le Cadrage)
+
+**Pré-test**:
+Courte page « Devine ! » de trois questions que le prof crée à la fin du Cadrage, au niveau annoncé par « Tu en sais déjà… », sans contenu à enseigner (tirée du Document source pour une Leçon de révision). Son score est hors Maîtrise, hors Objectifs atteints, hors Étoiles et hors Rebond : après lui, l'appli propose un seul Rebond, « Commencer », qui transmet ses résultats au prof pour orienter la première vraie Page de leçon. Son Retour de quiz montre, avec bienveillance, l'écart entre ce que l'Élève pensait savoir et ce qu'il a trouvé.
+_Avoid_: évaluation, test de niveau, examen
+
+**Confiance**:
+Ce que l'Élève indique après chaque réponse d'un quiz, avant de voir la correction : « sûr » ou « pas sûr ». Ne change jamais le score. Les erreurs commises « sûr » sont signalées au prof, qui les retravaille en priorité.
+_Avoid_: certitude, assurance, auto-évaluation (réservé à « Tu en sais déjà… » du Cadrage)
 
 **Dépassement**:
 Ce qui va un tout petit peu au-delà du contenu d'une Leçon pour éveiller la curiosité de l'Élève : un encart « Pour aller plus loin » dans la Page de leçon et 2 ou 3 questions bonus dans son quiz. Pour une Leçon de révision, il est signalé comme hors du Document source. Distinct du **Défi**, qui reste sur le même contenu, en plus difficile.

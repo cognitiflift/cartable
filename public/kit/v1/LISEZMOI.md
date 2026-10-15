@@ -95,7 +95,7 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 </figure>
 ```
 
-- Schéma, frise ou carte : dessine un `<svg>` dans la figure, à la place de `<img>`. Rien à déclarer.
+- Schéma, frise ou carte : dessine un `<svg>` dans la figure, à la place de `<img>`. Rien à déclarer. Trace ses textes et ses traits en `currentColor` (`fill="currentColor"`, `stroke="currentColor"`) : ils prennent la couleur du texte et restent lisibles en mode sombre.
 - Photo trouvée en ligne (de préférence Wikimedia Commons ou le site d'un musée, jamais une adresse devinée) : cite dans `src` l'adresse directe du fichier image, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
 
 ```json

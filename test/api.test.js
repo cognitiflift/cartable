@@ -1552,12 +1552,13 @@ const lirePage = async (lecon, page) => (await fetch(`${base}/fichiers/zoe-test/
 test('Visuels : consigne du prof (visuel qui explique, légende, source et licence, question du quiz, manifeste) et figure du Kit documentée', async () => {
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les tableaux' })).data;
   const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
-  for (const attendu of [/au moins un visuel/, /légende/, /licence/, /au moins une question du quiz/, /décorati/, /Wikimedia Commons/, /SVG/, /images\.json/, /kit-figure/]) {
+  for (const attendu of [/au moins un visuel/, /légende/, /licence/, /au moins une question du quiz/, /décorati/, /Wikimedia Commons/, /SVG/, /currentColor/, /images\.json/, /kit-figure/]) {
     assert.match(args, attendu);
   }
   const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
   assert.match(doc, /class="kit-figure"/);
   assert.match(doc, /images\.json/);
+  assert.match(doc, /currentColor/);
   assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure/);
 });
 

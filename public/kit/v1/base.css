@@ -67,7 +67,8 @@ img, svg, video { max-width: 100%; height: auto; }
 .kit-quiz-reponse:disabled { cursor: default; }
 .kit-quiz-reponse.kit-bonne { border-color: var(--kit-juste); background: var(--kit-juste-fond); }
 .kit-quiz-reponse.kit-fausse { border-color: var(--kit-faux); background: var(--kit-faux-fond); }
-.kit-quiz-reponse.kit-choisie { border-color: var(--kit-accent); }
+/* Réponse choisie, avant la correction : un contour neutre, qui ne ressemble ni à « juste » ni à « faux ». */
+.kit-quiz-reponse.kit-choisie:not(.kit-bonne, .kit-fausse) { border-color: var(--kit-texte); box-shadow: inset 0 0 0 1px var(--kit-texte); }
 .kit-quiz-confiance { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
 .kit-quiz-confiance[hidden] { display: none; }
 .kit-quiz-sur { font: inherit; padding: .4rem .9rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }

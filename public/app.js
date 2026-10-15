@@ -160,18 +160,23 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
 
 // Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, par-dessus l'écran.
 // L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions
-// posées selon le mode viennent de la configuration.
+// posées selon le mode viennent de la configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
 async function cadrer(mode) {
   const cadrage = {};
   for (const cle of config.questionsCadrage[mode]) {
     const { question, reponses } = config.cadrage[cle];
     cadrage[cle] = await new Promise((choisir) => {
+      const fermer = (valeur) => { calque.remove(); document.removeEventListener('keydown', echap); choisir(valeur); };
+      const echap = (e) => e.key === 'Escape' && fermer(null);
       const calque = h('div', { className: 'cadrage' },
+        h('button', { className: 'secondaire annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'),
         h('div', { className: 'bulle-prof' }, question),
         h('div', { className: 'choix' }, Object.entries(reponses).map(([valeur, libelle]) =>
-          h('button', { onclick: () => { calque.remove(); choisir(valeur); } }, libelle))));
+          h('button', { onclick: () => fermer(valeur) }, libelle))));
+      document.addEventListener('keydown', echap);
       app.append(calque);
     });
+    if (cadrage[cle] === null) return null;
   }
   return cadrage;
 }
@@ -187,7 +192,11 @@ function ecranNouvelleLecon(profil) {
   const demarrer = async (corps, mode, cle) => {
     activer(false);
     erreur.textContent = '';
-    if (!cadrages.has(cle)) cadrages.set(cle, await cadrer(mode));
+    if (!cadrages.has(cle)) {
+      const reponses = await cadrer(mode);
+      if (!reponses) return activer(true); // Cadrage annulé : l'Élève revient à l'écran, rien n'est envoyé
+      cadrages.set(cle, reponses);
+    }
     const cadrage = cadrages.get(cle);
     erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
     try {

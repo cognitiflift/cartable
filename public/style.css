@@ -20,9 +20,9 @@ body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
 body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; }
 body:has(.seance) main > p { margin:0 0 .6rem; }
 .seance { position:relative; flex:1; min-height:0; border:1px solid var(--bord); border-radius:12px; overflow:hidden; background:var(--carte); }
-.panneau { display:flex; flex-direction:column; height:100%; background:#fff; }
+.panneau { display:flex; flex-direction:column; height:100%; background:var(--carte); }
 .panneau select { margin:.4rem; } .panneau iframe { flex:1; border:0; }
-.fiche { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; background:#fff; }
+.fiche { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; background:var(--carte); }
 .fiche-barre { display:flex; align-items:center; gap:.6rem; padding:.4rem .6rem; border-bottom:1px solid var(--bord); }
 .fiche-barre button { margin-left:auto; } .fiche iframe { flex:1; border:0; }
 .seance-centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; padding:1.5rem; overflow-y:auto; }
@@ -55,3 +55,5 @@ p .maitrise { display:inline-flex; }
 .carte .au-programme { display:block; width:fit-content; font-size:.75rem; font-weight:600; padding:.1rem .5rem; margin-bottom:.4rem; border-radius:999px; background:var(--accent); color:#fff; }
 .carte .continuer { display:block; font-size:.9rem; margin-top:.3rem; color:var(--accent); font-weight:600; }
 .cadrage { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; padding:1.5rem; overflow-y:auto; background:rgba(0,0,0,.45); }
+.cadrage .annuler { position:absolute; top:1rem; right:1rem; }
+@media (prefers-color-scheme: dark) { .cadrage { background:rgba(0,0,0,.75); } }

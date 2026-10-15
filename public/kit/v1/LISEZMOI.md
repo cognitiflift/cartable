@@ -84,7 +84,7 @@ Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPa
 
 ## Formats de rappel actif
 
-Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM.
+Dans un QCM, l'élève **reconnaît** la bonne réponse ; dans ces formats, il la **retrouve** lui-même, ce qui fixe mieux la mémoire. Mets **au moins une question de rappel actif (pas un QCM) par quiz**, au format qui convient au contenu. Tous se font en touchant (ou en glissant), jamais au clavier. Chaque format a son explication, la Confiance (« sûr / pas sûr ») et « Je ne sais pas », comme un QCM (sauf « réfléchis puis dévoile », voir plus bas).
 
 Crédit partiel : une question à plusieurs éléments rapporte la part juste (3 trous sur 4 = 0,75 question dans le score), mais elle ne compte comme « juste » (Objectifs, Banque de Questions, Révisions) que si elle est entièrement juste.
 
@@ -123,13 +123,73 @@ Pour les étapes d'un processus, les événements d'une histoire ou les mots d'u
 - `elements` : 3 à 10 éléments, tous différents, **dans le bon ordre**.
 - Crédit partiel : les éléments déjà dans le bon ordre entre eux (il suffirait de déplacer les autres).
 
+### Exemple à étapes (mathématiques) : `"type": "etapes"`
+
+Pour une méthode de mathématiques. Le Kit montre la résolution étape par étape ; à chaque étape à compléter, l'élève touche la bonne parmi des propositions mélangées.
+
+```json
+{
+  "id": "q5",
+  "type": "etapes",
+  "enonce": "Complète le calcul de 3/4 + 1/6.",
+  "etapes": [
+    { "texte": "Dénominateur commun : 12" },
+    { "texte": "3/4 = 9/12", "intrus": ["3/4 = 3/12", "3/4 = 7/12"] },
+    { "texte": "1/6 = 2/12" },
+    { "texte": "9/12 + 2/12 = 11/12", "intrus": ["9/12 + 2/12 = 11/24"] }
+  ],
+  "explication": "On met les fractions au même dénominateur, puis on additionne les numérateurs seulement."
+}
+```
+
+- `etapes` : 2 à 10 étapes, **dans l'ordre de la résolution**. Une étape sans `intrus` est montrée telle quelle ; une étape avec `intrus` est à compléter (au moins une par question).
+- `intrus` : 1 à 4 propositions fausses pour cette étape, différentes de la bonne, tirées des **erreurs fréquentes** (dénominateurs additionnés, retenue oubliée, signe perdu…) : un distracteur absurde n'apprend rien.
+- Crédit partiel : la part des étapes à compléter bien choisies.
+- Enchaînement : l'exemple **entièrement résolu** va dans le contenu de la page (pas dans le quiz) ; ensuite des questions `etapes` où l'on retire les étapes une à une (une étape à compléter, puis deux…) ; puis des exercices de types mélangés.
+
+### Réfléchis puis dévoile : `"type": "devoile"`
+
+Comme une carte de révision : l'élève essaie de se rappeler la réponse **dans sa tête**, la dévoile, puis dit lui-même s'il l'avait. Pour une réponse courte qu'aucun autre format ne peut vérifier sans clavier : une définition, un fait, un « pourquoi » en une phrase.
+
+```json
+{
+  "id": "q6",
+  "type": "devoile",
+  "enonce": "Qu'est-ce que le magma ?",
+  "reponse": "De la roche fondue, sous la terre.",
+  "explication": "Quand le magma sort du volcan, on l'appelle la lave."
+}
+```
+
+- `reponse` : la réponse attendue, courte, montrée quand l'élève la dévoile.
+- Points : « je l'avais » = juste (1), « à moitié » = 0,5, « je ne l'avais pas » = faux (0).
+- Pas de Confiance ni de « Je ne sais pas » : l'auto-évaluation les remplace. Notes de mémoire (FSRS) qui en découlent : « je l'avais » → « bien » (comme juste et sûr), « à moitié » → « difficile » (comme un crédit partiel ou un juste pas sûr), « je ne l'avais pas » → « à revoir ».
+- Rien ne vérifie la réponse : ces questions restent **moins nombreuses que les autres questions comptées dans le score** (2 sur 5, 3 sur 7…). Celles en trop (les dernières du quiz) sont ignorées et te sont signalées. Les questions bonus ne sont pas limitées.
+
+### Choisis la meilleure explication : `"type": "explication"`
+
+Pour un « pourquoi ? » : plusieurs explications d'un phénomène, une seule juste. L'élève s'explique les choses sans écrire. C'est un QCM (mêmes champs, même correction, le Kit ajoute la consigne « Choisis la meilleure explication ») : il ne compte pas comme question de rappel actif.
+
+```json
+{
+  "id": "q7",
+  "type": "explication",
+  "enonce": "Pourquoi la lave devient-elle noire en refroidissant ?",
+  "reponses": ["Elle se solidifie en roche", "Elle brûle", "La pluie la salit"],
+  "bonne": 0,
+  "explication": "En refroidissant, la lave durcit : elle devient une roche sombre, le basalte."
+}
+```
+
+- `reponses` et `bonne` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne.
+
 ### Associer : `"type": "associer"`
 
 Pour des paires : dieu et domaine, mot et définition, pays et capitale. Le Kit mélange chaque colonne ; l'élève touche un élément de gauche, puis celui de droite qui va avec.
 
 ```json
 {
-  "id": "q5",
+  "id": "q8",
   "type": "associer",
   "enonce": "Relie chaque dieu à son domaine.",
   "paires": [["Zeus", "le ciel"], ["Poséidon", "la mer"], ["Hadès", "les Enfers"]],
@@ -146,7 +206,7 @@ Pour apprendre ce qui distingue des catégories. Le Kit mélange les éléments 
 
 ```json
 {
-  "id": "q6",
+  "id": "q9",
   "type": "classer",
   "enonce": "Range chaque animal dans sa classe.",
   "categories": [

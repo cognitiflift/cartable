@@ -2478,6 +2478,53 @@ test('Formats de rappel actif : la consigne demande au moins une question de rap
   }
 });
 
+// Mathématiques (spec #48, ticket #73) : exemple travaillé à étapes à compléter.
+const quizEtapes = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Combien font 2 + 2 ?', reponses: ['4', '22'], bonne: 0, explication: 'Deux et deux.' },
+    {
+      id: 'e1', type: 'etapes', enonce: 'Calcule 3/4 + 1/6.', explication: 'Même dénominateur, puis on additionne les numérateurs.',
+      etapes: [{ texte: 'Dénominateur commun : 12' }, { texte: '3/4 = 9/12', intrus: ['3/4 = 3/12'] }, { texte: '9/12 + 2/12 = 11/12', intrus: ['9/12 + 2/12 = 11/24'] }],
+    },
+  ],
+};
+
+test('Exemple à étapes : son crédit partiel compte dans le score, la Banque le garde et la Révision du jour le corrige', async () => {
+  const slug = slugify('Revis-Etapes');
+  await appel('/api/eleves', 'POST', { pseudo: 'Revis-Etapes', age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'fractions' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-etapes.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizEtapes)}</script>`);
+  const { type, ...corps } = messageScore(lireQuiz(quizEtapes), { q1: 0, e1: [0, 1] }, '0002-etapes.html', { q1: true, e1: true });
+  const r = await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { ...corps, score: 0 }, le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).score, 75);
+  const e1 = r.data.questions.find((q) => q.id === 'e1');
+  assert.deepEqual(e1.contenu.etapes, quizEtapes.questions[1].etapes);
+  assert.deepEqual(e1.journal[0], { date: BANQUE_DATE, juste: false, points: 0.5, sur: true, origine: 'quiz' });
+  await attendrePropositions(slug);
+
+  const url = `/api/eleves/${slug}/revisions`;
+  const servie = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'e1');
+  assert.equal(servie.type, 'etapes');
+  const repondre = (choisie) => appel(url, 'POST', { lecon: lecon.id, page: '0002-etapes.html', id: 'e1', choisie, sur: true, juste: true }, le(LENDEMAIN));
+  const juste = await repondre([0, 0]);
+  assert.equal(juste.status, 200);
+  assert.equal(juste.data.juste, true);
+  assert.equal(juste.data.bonne, 'étape 2 : 3/4 = 9/12 ; étape 3 : 9/12 + 2/12 = 11/12');
+  for (const choisie of [0, [0], [0, 2]]) assert.equal((await repondre(choisie)).status, 400, JSON.stringify(choisie));
+});
+
+test('Exemple à étapes : la consigne de page le demande en mathématiques, et le Kit le documente et le sert', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les fractions' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /En mathématiques[^\n]*exemple entièrement résolu[^\n]*"etapes"[^\n]*mélangés/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /"type": "etapes"/);
+  assert.match(doc, /"intrus"/);
+  for (const fichier of ['types/etapes.js', 'rendus/etapes.js']) assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
+});
+
 test('Formats de rappel actif : une question mal formée ou d\'un type inconnu est signalée au prof au tour suivant seulement', async () => {
   const quiz = { objectifs: [1], questions: [quizRappel.questions[0], { id: 'x1', type: 'mystere', enonce: '?' }, { ...quizRappel.questions[1], intrus: [] }] };
   const lecon = await avecPageImages({ page: `<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`, manifeste: [] },
@@ -2491,6 +2538,64 @@ test('Formats de rappel actif : une question mal formée ou d\'un type inconnu e
   assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'questionsIgnorees'), false);
   await message(lecon, 'ok');
   assert.doesNotMatch(await argsDe(lecon), /Questions ignorées/);
+});
+
+// Formats « réfléchis puis dévoile » et « meilleure explication » (spec #48, ticket #72).
+const quizDevoile = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.' },
+    { id: 'e1', type: 'explication', enonce: 'Pourquoi la lave devient-elle noire ?', reponses: ['Elle se solidifie en roche', 'Elle brûle', 'La pluie la salit'], bonne: 0, explication: 'Elle refroidit.' },
+    { id: 'o1', type: 'ordre', enonce: 'Dans l’ordre ?', elements: ['Le magma monte', 'La lave sort', 'La lave refroidit'], explication: 'Dans cet ordre.' },
+    { id: 'd1', type: 'devoile', enonce: 'Qu’est-ce que le magma ?', reponse: 'De la roche fondue sous terre.', explication: 'Il devient lave en sortant.' },
+    { id: 'd2', type: 'devoile', enonce: 'Qu’est-ce qu’un cratère ?', reponse: 'L’ouverture au sommet du volcan.', explication: 'La lave en sort.' },
+  ],
+};
+
+test('Dévoile et meilleure explication : « à moitié » vaut 0,5 et revient le lendemain, « je l\'avais » plus tard, et la Révision du jour les corrige', async () => {
+  const slug = slugify('Revis-Devoile');
+  await appel('/api/eleves', 'POST', { pseudo: 'Revis-Devoile', age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'dévoile' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-devoile.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizDevoile)}</script>`);
+  const { type, ...corps } = messageScore(lireQuiz(quizDevoile), { q1: 0, e1: 0, o1: [0, 1, 2], d1: 'moitie', d2: 'avais' }, '0002-devoile.html', { q1: true, e1: true, o1: true });
+  const r = await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { ...corps, score: 0 }, le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).score, 90); // (1 + 1 + 1 + 0,5 + 1) / 5
+  await attendrePropositions(slug);
+
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const banque = (await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  const [e1, d1, d2] = ['e1', 'd1', 'd2'].map((id) => banque.find((q) => q.id === id));
+  assert.deepEqual(e1.contenu, { type: 'explication', enonce: 'Pourquoi la lave devient-elle noire ?', reponses: ['Elle se solidifie en roche', 'Elle brûle', 'La pluie la salit'], bonne: 0, explication: 'Elle refroidit.', objectifs: [1] });
+  assert.deepEqual(d1.contenu, { type: 'devoile', enonce: 'Qu’est-ce que le magma ?', reponse: 'De la roche fondue sous terre.', explication: 'Il devient lave en sortant.', objectifs: [1] });
+  // « À moitié » : juste en partie, noté « difficile » ; « je l'avais » : juste (vaut sûr), noté « bien ».
+  assert.deepEqual(d1.journal[0], { date: BANQUE_DATE, juste: false, points: 0.5, origine: 'quiz' });
+  assert.equal(d1.prochaineRevision, LENDEMAIN);
+  assert.deepEqual(d2.journal[0], { date: BANQUE_DATE, juste: true, origine: 'quiz' });
+  assert.ok(Date.parse(d2.prochaineRevision) > Date.parse(LENDEMAIN), d2.prochaineRevision);
+
+  const repondre = (id, choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-devoile.html', id, choisie }, le(LENDEMAIN));
+  const pas = await repondre('d1', 'pas');
+  assert.equal(pas.status, 200);
+  assert.equal(pas.data.juste, false);
+  assert.equal(Object.hasOwn(pas.data, 'points'), false);
+  assert.equal(pas.data.bonne, 'De la roche fondue sous terre.');
+  assert.equal((await repondre('e1', 0)).data.juste, true);
+  for (const choisie of [0, 'oui', ['avais']]) assert.equal((await repondre('d1', choisie)).status, 400, JSON.stringify(choisie));
+});
+
+test('Dévoile et meilleure explication : la consigne dit quand les utiliser, et le Kit les documente', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les orages' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /"devoile"/);
+  assert.match(args, /"explication"/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /"type": "devoile"/);
+  assert.match(doc, /"type": "explication"/);
+  assert.match(doc, /FSRS/);
+  for (const fichier of ['types/devoile.js', 'types/explication.js', 'rendus/devoile.js', 'rendus/explication.js']) {
+    assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
+  }
 });
 
 // Formats associer et classer (spec #48, ticket #71), dans la Banque et les Révisions du jour, avec crédit partiel.

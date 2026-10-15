@@ -110,10 +110,26 @@ function examinerQuestion(q) {
   };
 }
 
-// Quiz utilisable : questions mal formées, d'un type inconnu ou en double (même id) écartées. null s'il ne reste
-// aucune question comptée dans le score (hors bonus).
+// Questions d'un type `minoritaire` (sans bonne réponse vérifiable, comme `devoile`) comptées dans le score : elles
+// restent moins nombreuses que les autres questions comptées, pour ne pas permettre de gonfler le score. Les premières
+// du quiz sont gardées, celles en trop ignorées (à la suite des autres ignorées). Les questions bonus ne sont pas limitées.
+function limiterMinoritaires({ questions, ignorees }) {
+  const minoritaire = (q) => !q.bonus && TYPES[q.type].minoritaire === true;
+  const place = questions.filter((q) => !q.bonus && !minoritaire(q)).length - 1;
+  let gardees = 0;
+  const raison = (q) => `trop de questions « ${q.type} » : elles doivent rester moins nombreuses que les autres questions comptées dans le score`;
+  const enTrop = questions.filter((q) => minoritaire(q) && ++gardees > place);
+  return {
+    questions: questions.filter((q) => !enTrop.includes(q)),
+    ignorees: [...ignorees, ...enTrop.map((q) => ({ id: q.id, raison: raison(q) }))],
+  };
+}
+const trierQuiz = (brut) => limiterMinoritaires(trierQuestions(brut, examinerQuestion));
+
+// Quiz utilisable : questions mal formées, d'un type inconnu, en double (même id) ou d'un type minoritaire en trop
+// écartées. null s'il ne reste aucune question comptée dans le score (hors bonus).
 export function lireQuiz(donnees) {
-  const questions = questionsValides(donnees?.questions, (q) => examinerQuestion(q).question ?? null);
+  const { questions } = trierQuiz(donnees?.questions);
   if (!questions.some((q) => !q.bonus)) return null;
   return { objectifs: numeros(donnees.objectifs), ...(donnees.pretest === true && { pretest: true }), questions };
 }
@@ -122,7 +138,7 @@ export function lireQuiz(donnees) {
 // sans identifiant lisible), dans l'ordre du quiz. Sans quiz lisible, [{ raison }].
 export function questionsIgnorees(donnees) {
   if (!Array.isArray(donnees?.questions)) return [{ raison: 'quiz sans liste "questions"' }];
-  const { questions, ignorees } = trierQuestions(donnees.questions, examinerQuestion);
+  const { questions, ignorees } = trierQuiz(donnees.questions);
   return questions.some((q) => !q.bonus) ? ignorees : [...ignorees, { raison: 'aucune question comptée dans le score (hors bonus) : le quiz ne s’affiche pas' }];
 }
 
@@ -184,7 +200,7 @@ function resultatQuestion(q, reponse, sur, objectifs) {
     juste: c.juste, ...(partiel && { points: c.points }), ...(c.detail && { detail: c.detail }),
     ...(c.jeNeSaisPas && { jeNeSaisPas: true }),
     bonus: q.bonus, objectifs: q.objectifs ?? objectifs,
-    ...(typeof sur === 'boolean' && !c.jeNeSaisPas && { sur }),
+    ...(typeof sur === 'boolean' && !c.jeNeSaisPas && !TYPES[q.type ?? 'qcm']?.autoEvaluation && { sur }),
   };
 }
 

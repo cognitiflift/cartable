@@ -104,6 +104,20 @@
 .kit-classer-categorie { display: flex; flex-direction: column; gap: .5rem; min-height: 5rem; padding: .5rem; border: 2px dashed var(--kit-bord); border-radius: 12px; }
 .kit-classer-ranger { align-self: stretch; }
 
+/* Exemple à étapes (mathématiques) : les étapes numérotées ; une étape à compléter, puis ses propositions. */
+.kit-etapes { list-style: decimal; margin: 0; padding-left: 1.6rem; display: flex; flex-direction: column; gap: .6rem; }
+.kit-etape-texte { display: inline-block; padding: .15rem .6rem; border-radius: 8px; border: 2px solid transparent; }
+.kit-etape-texte.kit-etape-vide { min-width: 4.5em; border: 2px dashed var(--kit-bord); }
+.kit-etape-texte.kit-bonne { border-style: solid; border-color: var(--kit-juste); background: var(--kit-juste-fond); }
+.kit-etape-texte.kit-fausse { border-style: solid; border-color: var(--kit-faux); background: var(--kit-faux-fond); }
+.kit-etape-propositions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .4rem; }
+
+/* Réfléchis puis dévoile : la réponse dévoilée, puis l'auto-évaluation. Meilleure explication : sa consigne. */
+.kit-devoile-consigne, .kit-explication-consigne { margin: 0; color: var(--kit-doux); }
+.kit-devoile-reponse { margin: 0; padding: .6rem .9rem; border: 1px dashed var(--kit-accent); border-radius: 10px; }
+.kit-devoile-reponse[hidden], .kit-devoile-evaluation[hidden] { display: none; }
+.kit-devoile-evaluation { display: flex; flex-direction: column; gap: .5rem; }
+
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font-size: 1.4rem; font-weight: 700; color: var(--kit-accent); }

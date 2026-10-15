@@ -12,7 +12,10 @@ _Avoid_: utilisateur, compte (sauf pour parler de la création d'un Élève)
 Nom choisi par l'Élève pour se reconnaître au démarrage.
 
 **Profil**:
-Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut) et **Modèle** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
+Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut), **Modèle** et **Lecture à voix haute** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
+
+**Lecture à voix haute**:
+Réglage du Profil, coupé par défaut : un bouton « 🔊 » lit le texte d'une Page de leçon et chaque question (du quiz ou des Révisions du jour) avec une voix de l'appareil, française si elle existe ; le même bouton arrête la lecture. Aucun texte ne sort de l'appareil.
 
 **Modèle**:
 Modèle de langage avec lequel l'agent écrit les Pages de leçon d'un Élève, choisi dans une liste fermée ; Sonnet par défaut pour un nouveau Profil (un Profil existant garde le sien). Les Propositions utilisent toujours Haiku, et un **Modèle de secours** le remplace quand il est surchargé ou indisponible (pas quand le quota est épuisé). Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.

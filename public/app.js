@@ -1,4 +1,5 @@
 import { rendreQuestion } from '/kit/v1/question.js';
+import { arreterLecture } from '/kit/v1/lecture.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -59,15 +60,17 @@ function formulaireProfil({ profil, titre, envoyer }) {
   const niveau = h('select', { name: 'niveau' }, config.niveaux.map((n) => h('option', { value: n, selected: n === profil?.niveau }, n)));
   const nombrePropositions = h('input', { name: 'nombrePropositions', type: 'number', min: 2, max: 10, required: true, value: profil?.nombrePropositions ?? config.nombrePropositionsDefaut });
   const modele = h('select', { name: 'modele' }, config.modeles.map((m) => h('option', { value: m.id, selected: m.id === (profil?.modele ?? config.modeleDefaut) }, `${m.libelle} — ${m.description}`)));
+  const lectureVoixHaute = h('input', { name: 'lectureVoixHaute', type: 'checkbox', checked: profil?.lectureVoixHaute ?? false });
   const form = h('form', { className: 'colonne', onsubmit: async (ev) => {
     ev.preventDefault();
-    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value }); } catch (e) { erreur.textContent = e.message; }
+    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked }); } catch (e) { erreur.textContent = e.message; }
   } },
     !profil && h('label', {}, 'Pseudo', h('br'), pseudo),
     h('label', {}, 'Âge', h('br'), age),
     h('label', {}, 'Classe', h('br'), niveau),
     h('label', {}, "Nombre d'idées de leçons proposées (2 à 10)", h('br'), nombrePropositions),
     h('label', {}, 'Modèle', h('br'), modele),
+    h('label', {}, lectureVoixHaute, ' 🔊 Lecture à voix haute des pages et des questions (avec la voix de cet appareil)'),
     h('button', {}, profil ? 'Enregistrer' : 'Créer'),
     erreur);
   return [h('h2', {}, titre), form];
@@ -266,6 +269,7 @@ async function ecranRevisions(profil) {
     if (!questions.length) return zone.replaceChildren(...fin(suite));
     let i = 0;
     const suivante = () => {
+      arreterLecture();
       if (i >= questions.length) return serie(suite);
       const q = questions[i++];
       const lien = h('a', { href: `#/lecon/${q.lecon}/${encodeURIComponent(q.page)}`, target: '_blank' }, '📖 Relire la page');
@@ -273,6 +277,7 @@ async function ecranRevisions(profil) {
       zone.replaceChildren(
         h('p', { className: 'revision-origine' }, h('small', {}, `${q.titreLecon} · question ${i} sur ${questions.length} · `, lien)),
         rendreQuestion(q, {
+          lecture: profil.lectureVoixHaute,
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
@@ -448,7 +453,8 @@ async function ecranSession(profil, id, pageDemandee = null) {
     panneau.style.display = lecon.pages.length ? '' : 'none';
     if (!lecon.pages.length || pagesAffichees === lecon.pages.join()) return;
     pagesAffichees = lecon.pages.join();
-    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}`;
+    // Le réglage de lecture à voix haute du Profil est transmis à la page dans son adresse (Kit, lecture.js).
+    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${profil.lectureVoixHaute ? '?lecture=1' : ''}`;
     const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
     choix.value = lecon.pages.includes(pageDemandee) ? pageDemandee : lecon.pages.at(-1);
     pageDemandee = null; // seulement à l'ouverture : une nouvelle page du prof s'affiche ensuite comme d'habitude
@@ -526,6 +532,7 @@ async function ecranSession(profil, id, pageDemandee = null) {
 
 async function route() {
   quitterEcran();
+  arreterLecture(); // une lecture à voix haute des Révisions du jour s'arrête en changeant d'écran
   quitterEcran = () => {};
   try {
     config ??= await api('config');

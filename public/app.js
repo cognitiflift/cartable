@@ -1,4 +1,5 @@
 import { rendreQuestion } from '/kit/v1/question.js';
+import { arreterLecture } from '/kit/v1/lecture.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -58,16 +59,21 @@ function formulaireProfil({ profil, titre, envoyer }) {
   const age = h('input', { name: 'age', type: 'number', min: 3, max: 99, required: true, value: profil?.age ?? '' });
   const niveau = h('select', { name: 'niveau' }, config.niveaux.map((n) => h('option', { value: n, selected: n === profil?.niveau }, n)));
   const nombrePropositions = h('input', { name: 'nombrePropositions', type: 'number', min: 2, max: 10, required: true, value: profil?.nombrePropositions ?? config.nombrePropositionsDefaut });
+  // Page suivante préparée pendant le quiz (#74) : active par défaut, à couper si elle coûte trop.
+  const preparerPages = h('input', { name: 'preparerPages', type: 'checkbox', checked: profil?.preparerPages ?? true });
   const modele = h('select', { name: 'modele' }, config.modeles.map((m) => h('option', { value: m.id, selected: m.id === (profil?.modele ?? config.modeleDefaut) }, `${m.libelle} — ${m.description}`)));
+  const lectureVoixHaute = h('input', { name: 'lectureVoixHaute', type: 'checkbox', checked: profil?.lectureVoixHaute ?? false });
   const form = h('form', { className: 'colonne', onsubmit: async (ev) => {
     ev.preventDefault();
-    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value }); } catch (e) { erreur.textContent = e.message; }
+    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked, preparerPages: preparerPages.checked }); } catch (e) { erreur.textContent = e.message; }
   } },
     !profil && h('label', {}, 'Pseudo', h('br'), pseudo),
     h('label', {}, 'Âge', h('br'), age),
     h('label', {}, 'Classe', h('br'), niveau),
     h('label', {}, "Nombre d'idées de leçons proposées (2 à 10)", h('br'), nombrePropositions),
     h('label', {}, 'Modèle', h('br'), modele),
+    h('label', {}, lectureVoixHaute, ' 🔊 Lecture à voix haute des pages et des questions (avec la voix de cet appareil)'),
+    h('label', {}, preparerPages, ' Préparer la page suivante pendant le quiz (plus rapide, coûte parfois un tour de plus)'),
     h('button', {}, profil ? 'Enregistrer' : 'Créer'),
     erreur);
   return [h('h2', {}, titre), form];
@@ -97,6 +103,53 @@ async function ecranProfil(profil) {
     const equivalent = coutUsd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
     cout.textContent = `Quota utilisé (indicatif) : ${tokens} tokens en ${tours} appel${tours > 1 ? 's' : ''} au prof, l'équivalent de ${equivalent} au tarif de l'API. Ce n'est pas une dépense : l'abonnement se mesure en quota partagé.`;
   }
+  // Vue parent (#77) : accessible d'ici seulement, jamais depuis l'accueil de l'Élève.
+  app.append(h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/parent') }, '👪 Vue parent')));
+}
+
+// Vue parent (#77) : un écran par Élève, pour le parent, agrégé par le serveur (GET …/parent). Une section par clé
+// des agrégats : SECTIONS_PARENT en ajoute une sans toucher aux autres (indicateurs, #78).
+const equivalentUsd = (usd) => usd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements) : h('p', { className: 'doux' }, vide));
+// Le parent ouvre la Leçon en aperçu (#/apercu/…) : ce n'est pas un retour de l'Élève pour les indicateurs (#78).
+const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/apercu/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
+const SECTIONS_PARENT = [
+  { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
+    h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
+    jours.map((j) => h('tr', {},
+      h('td', {}, new Date(`${j.jour}T12:00`).toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'short' })),
+      h('td', {}, j.revisions ? `${j.revisions} (${j.justes} juste${j.justes > 1 ? 's' : ''})` : '–'),
+      h('td', {}, j.quiz || '–')))) },
+  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
+  { titre: '🌱 Objectifs fragiles', rendu: ({ objectifs }) => [
+    h('p', { className: 'doux' }, 'Atteints, mais pas encore Retenus : à retravailler un autre jour.'),
+    listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
+  { titre: '❓ Questions fragiles', rendu: ({ questionsFragiles }) => listeOuVide(
+    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
+  { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
+    avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise ${c.maitrise ? `${c.maitrise.pourcentage} %, ${c.maitrise.palier}` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
+  { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
+    h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
+    listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
+  // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente } }) => [
+    h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
+    h('ul', {},
+      h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
+        ? `${souvenir.pourcentage} % (${souvenir.justes} sur ${pluriel(souvenir.reponses, 'réponse')})` : 'pas encore de Révision du jour.'),
+      h('li', {}, 'Retour la semaine d’après une nouvelle Leçon : ', retour.lecons
+        ? `${retour.pourcentage} % (${retour.revenus} sur ${pluriel(retour.lecons, 'Leçon')})` : 'pas encore mesurable.',
+        retour.enAttente ? ` ${pluriel(retour.enAttente, 'Leçon')} trop récente${retour.enAttente > 1 ? 's' : ''} pour le dire.` : ''),
+      h('li', {}, 'Attente du prof : ', attente.tours
+        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'))] },
+];
+
+async function ecranParent(profil) {
+  const agregats = await api(`eleves/${profil.slug}/parent`);
+  montrer(
+    h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
+    h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
+    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
 
 const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };
@@ -135,10 +188,12 @@ function badgeMaitrise(maitrise) {
 }
 
 async function ecranAccueil(profil) {
-  const [lecons, revisions] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`)]);
+  const [lecons, revisions, rythme] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`)]);
   const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
   montrer(
     h('h2', {}, `Salut ${profil.pseudo} !`),
+    recapitulatifSemaine(profil, rythme.recapitulatif),
+    carteRythme(rythme),
     carteRevisions(revisions.dues),
     comptesARebours(lecons),
     h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
@@ -153,6 +208,44 @@ async function ecranAccueil(profil) {
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
+}
+
+// Rythme (#75) : l'Objectif du jour et la Série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
+// de l'effort et de ce qui a été fait, jamais de l'Élève lui-même ni des autres Élèves ; aucun reproche.
+function carteRythme({ objectifDuJour: o, serieDeJours }) {
+  const objectif = o.atteint
+    ? '🎯 Objectif du jour atteint : ton travail d’aujourd’hui compte !'
+    : `🎯 Objectif du jour : ${o.revisionsVisees} révisions (${o.revisions}/${o.revisionsVisees}) ou ${pluriel(o.pagesVisees, 'page')} de leçon`;
+  const jours = serieDeJours.jours
+    ? `🔥 ${pluriel(serieDeJours.jours, 'jour')} de suite à travailler${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
+    : '🌱 Chaque jour un peu, c’est comme ça qu’on retient';
+  return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
+    h('strong', {}, objectif),
+    h('small', {}, jours,
+      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série de jours si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
+    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`));
+}
+
+// Récapitulatif de la semaine passée (#75) : le serveur ne l'envoie qu'au premier retour de la semaine (le lundi, ou le
+// premier jour où l'Élève revient). Ce jour-là, l'Élève peut le fermer (mémorisé dans ce navigateur : simple confort).
+const cleRecapitulatif = (profil, recap) => `recapitulatif-${profil.slug}-${recap.du}`;
+function recapitulatifSemaine(profil, recap) {
+  if (!recap) return null;
+  try { if (localStorage.getItem(cleRecapitulatif(profil, recap))) return null; } catch { /* stockage indisponible */ }
+  const retenus = recap.objectifsRetenus;
+  const titre = retenus
+    ? `Cette semaine, tu as retenu ${retenus} ${retenus > 1 ? 'nouveaux Objectifs' : 'nouvel Objectif'} 🌟`
+    : 'Ta semaine, en résumé';
+  const faits = [recap.revisions && pluriel(recap.revisions, 'révision'), recap.pages && pluriel(recap.pages, 'page') + ' de leçon',
+    recap.joursAtteints && `Objectif du jour atteint ${recap.joursAtteints === 1 ? 'un jour' : `${recap.joursAtteints} jours`}`].filter(Boolean).join(' · ');
+  const carte = h('div', { className: 'carte recapitulatif' },
+    h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => {
+      try { localStorage.setItem(cleRecapitulatif(profil, recap), '1'); } catch { /* stockage indisponible */ }
+      carte.remove();
+    } }, '✕'),
+    h('strong', {}, `📅 ${titre}`),
+    faits && h('small', {}, `Tes efforts : ${faits}. C’est la régularité qui fait retenir.`));
+  return carte;
 }
 
 // Carte « Mes révisions du jour » (#66) : le nombre de Questions dues, d'un geste vers l'écran de révision.
@@ -174,23 +267,30 @@ function comptesARebours(lecons) {
 // le rendu du quiz du Kit, sans le prof. Chaque réponse part au serveur, qui la corrige lui-même et la journalise.
 // À la fin des Questions dues, un message le dit, et l'Élève peut continuer avec des Questions pas encore dues.
 async function ecranRevisions(profil) {
+  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'),
+    revisionsDuJour(profil, { fin: h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons') }));
+}
+
+// Zone des Révisions du jour, sur leur écran ou pendant que le prof prépare une page (#49, US4). `fin` : bouton
+// ajouté au message de fin.
+function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
   const url = `eleves/${profil.slug}/revisions`;
   const zone = h('section', { className: 'kit-quiz revisions' });
   const erreur = h('p', { className: 'erreur' });
-  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'), zone, erreur);
 
   const fin = (suite) => [
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
-    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ',
-      h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons')),
+    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ', boutonFin),
   ];
   // Une série : les Questions l'une après l'autre ; à la fin, la série suivante ou le message de fin.
   const serie = async (suite = false) => {
     erreur.textContent = '';
-    const { questions } = await api(`${url}${suite ? '?suite=1' : ''}`);
+    let questions;
+    try { ({ questions } = await api(`${url}${suite ? '?suite=1' : ''}`)); } catch (e) { return (erreur.textContent = e.message); }
     if (!questions.length) return zone.replaceChildren(...fin(suite));
     let i = 0;
     const suivante = () => {
+      arreterLecture();
       if (i >= questions.length) return serie(suite);
       const q = questions[i++];
       const lien = h('a', { href: `#/lecon/${q.lecon}/${encodeURIComponent(q.page)}`, target: '_blank' }, '📖 Relire la page');
@@ -198,6 +298,7 @@ async function ecranRevisions(profil) {
       zone.replaceChildren(
         h('p', { className: 'revision-origine' }, h('small', {}, `${q.titreLecon} · question ${i} sur ${questions.length} · `, lien)),
         rendreQuestion(q, {
+          lecture: profil.lectureVoixHaute,
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
@@ -209,7 +310,8 @@ async function ecranRevisions(profil) {
     };
     suivante();
   };
-  await serie();
+  serie();
+  return [zone, erreur];
 }
 
 const enBase64 = (fichier) => new Promise((resolve, reject) => {
@@ -339,9 +441,10 @@ const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
 // Tout se déduit du dernier message du prof.
-// `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière.
-async function ecranSession(profil, id, pageDemandee = null) {
-  let lecon = await api(`eleves/${profil.slug}/lecons/${id}`);
+// `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière. `apercu` : ouverte
+// depuis la vue parent, elle n'est pas notée comme une ouverture par l'Élève (indicateurs, #78).
+async function ecranSession(profil, id, pageDemandee = null, { apercu = false } = {}) {
+  let lecon = await api(`eleves/${profil.slug}/lecons/${id}${apercu ? '' : '?ouverture=1'}`);
   let attente = null; // { texte, centre } pendant que le prof travaille
   let retourFerme = false;
   const erreur = h('span', { className: 'erreur' });
@@ -349,6 +452,24 @@ async function ecranSession(profil, id, pageDemandee = null) {
   const panneau = h('div', { className: 'panneau' });
   const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
   const fiche = h('div', { className: 'fiche', style: 'display:none' }); // Ma fiche, par-dessus tout le reste
+  // Révisions du jour faites pendant que le prof prépare la suite (#49, US4), dans leur propre calque, comme Ma fiche :
+  // elles ne bougent pas quand la page arrive, une barre le signale et ramène à la Leçon.
+  const revisions = h('div', { className: 'fiche revisions-en-attente', style: 'display:none' });
+  const barreRevisions = h('div', { className: 'fiche-barre' });
+  const fermerRevisions = () => {
+    arreterLecture();
+    revisions.style.display = 'none';
+    revisions.replaceChildren();
+  };
+  const afficherBarreRevisions = () => barreRevisions.replaceChildren(attente
+    ? h('strong', {}, '🧠 Mes révisions du jour · ⏳ ton prof prépare la suite…')
+    : h('strong', {}, erreur.textContent ? `⚠️ ${erreur.textContent}` : '✅ Ta page est prête !'),
+  h('button', { className: attente ? 'secondaire' : '', onclick: fermerRevisions }, attente ? '↩️ Retour à la leçon' : '▶️ Retourner à la leçon'));
+  const ouvrirRevisions = () => {
+    afficherBarreRevisions();
+    revisions.replaceChildren(barreRevisions, h('div', { className: 'revisions-defilement' }, revisionsDuJour(profil)));
+    revisions.style.display = '';
+  };
   let pagesAffichees, iframe;
 
   // Ma fiche : les documents de référence de la Leçon, dans leur propre calque. La Page de leçon n'est jamais
@@ -373,7 +494,8 @@ async function ecranSession(profil, id, pageDemandee = null) {
     panneau.style.display = lecon.pages.length ? '' : 'none';
     if (!lecon.pages.length || pagesAffichees === lecon.pages.join()) return;
     pagesAffichees = lecon.pages.join();
-    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}`;
+    // Le réglage de lecture à voix haute du Profil est transmis à la page dans son adresse (Kit, lecture.js).
+    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${profil.lectureVoixHaute ? '?lecture=1' : ''}`;
     const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
     choix.value = lecon.pages.includes(pageDemandee) ? pageDemandee : lecon.pages.at(-1);
     pageDemandee = null; // seulement à l'ouverture : une nouvelle page du prof s'affiche ensuite comme d'habitude
@@ -387,7 +509,10 @@ async function ecranSession(profil, id, pageDemandee = null) {
     const voile = lecon.pages.length ? 'voile' : '';
     const bulle = (...enfants) => h('div', { className: 'bulle-prof' }, ...enfants);
     let contenu = null;
-    if (attente?.centre) contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte));
+    if (attente?.centre) {
+      contenu = h('div', { className: `seance-centre ${voile}` }, bulle(attente.texte),
+        h('button', { className: 'secondaire', onclick: ouvrirRevisions }, '🧠 Faire mes révisions du jour en attendant'));
+    }
     else if (attente) contenu = h('div', { className: 'apres-quiz' }, h('div', { className: 'retour' }, attente.texte));
     else if (prof?.retourQuiz) {
       const { action, score } = prof.retourQuiz;
@@ -422,6 +547,7 @@ async function ecranSession(profil, id, pageDemandee = null) {
     attente = null;
     afficherEntete();
     afficher();
+    afficherBarreRevisions();
   };
   const repondre = (texte) => tour({ texte: '⏳ Ton prof prépare la suite…', centre: true },
     () => api(`eleves/${profil.slug}/lecons/${id}/messages`, { method: 'POST', body: { texte } }));
@@ -446,11 +572,12 @@ async function ecranSession(profil, id, pageDemandee = null) {
   afficher();
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
-    h('div', { className: 'seance' }, panneau, calque, fiche));
+    h('div', { className: 'seance' }, panneau, calque, fiche, revisions));
 }
 
 async function route() {
   quitterEcran();
+  arreterLecture(); // une lecture à voix haute des Révisions du jour s'arrête en changeant d'écran
   quitterEcran = () => {};
   try {
     config ??= await api('config');
@@ -461,8 +588,10 @@ async function route() {
     if (!profil) return await ecranChoix();
     barreNav(profil);
     if (page === 'profil') return await ecranProfil(profil);
+    if (page === 'parent') return await ecranParent(profil);
     if (page === 'nouvelle-lecon') return ecranNouvelleLecon(profil);
     if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
+    if (page === 'apercu') return await ecranSession(profil, id, null, { apercu: true });
     if (page === 'revisions') return await ecranRevisions(profil);
     return await ecranAccueil(profil);
   } catch (e) {

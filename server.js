@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -13,8 +13,12 @@ import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } fro
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
+import { vueParent } from './lib/parent.js';
+import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
+import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu } from './lib/jour.js';
+import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -25,16 +29,34 @@ const store = createStore(ELEVES);
 const SUJET_MAX = 80; // sujet libre, après trim
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.md': 'text/markdown; charset=utf-8' };
-const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
+const enCours = new Set(); // Leçons (cleLecon) dont l'agent travaille : un seul agent par Leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
 const variantesEnCours = new Set(); // élèves dont un tour de Variantes travaille : un seul à la fois par Élève
 const variantesARelancer = new Map(); // élève → Leçons dont des Questions ont pu devenir à varier pendant ce tour
+const preparations = new Map(); // cleLecon → page préparée pendant le quiz (#74) : { prevision, fin }, une seule par Leçon
+const PREPARATION = process.env.CARTABLE_PREPARATION !== '0'; // CARTABLE_PREPARATION=0 coupe les pages préparées
+
+// Clé d'une Leçon dans les verrous et les pages préparées : deux Élèves peuvent avoir une Leçon du même identifiant.
+const cleLecon = (slug, id) => `${slug}/${id}`;
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
 };
+
+// Indicateurs (#78) : un événement daté de l'Élève, enregistré sans jamais faire échouer la requête qui l'a produit.
+const noterEvenement = (slug, evenement) =>
+  store.enregistrerEvenement(slug, evenement).catch((e) => console.error(`Événement de ${slug} : ${e.message}`));
+
+// Période des indicateurs lue dans la requête (?du=AAAA-MM-JJ&au=AAAA-MM-JJ, bornes comprises), complétée par la
+// période par défaut (lib/indicateurs.js). 400 pour une date invalide ou une période à l'envers.
+function periodeDe(url, maintenant) {
+  const [du, au] = ['du', 'au'].map((cle) => url.searchParams.get(cle) ?? undefined);
+  const periode = periodeDesIndicateurs(maintenant, { du, au });
+  if (!jourValide(periode.du) || !jourValide(periode.au) || periode.du > periode.au) throw new HttpError(400, 'Période invalide');
+  return periode;
+}
 
 async function lireCorps(req, max = 100_000) {
   let body = '';
@@ -87,9 +109,45 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
 // `tache` : type de tâche du tour, gardé avec son coût ; par défaut, première Séance tant que la Leçon n'a aucune
 // Page de leçon, page ensuite. `resultatsQuiz: false` : le prompt porte déjà les résultats du dernier quiz (Rebond),
 // le préambule de relais ne les répète pas.
-async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
-  if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
-  enCours.add(id);
+// Le tour attend d'abord la page préparée en cours, s'il y en a une, et l'écarte : un seul agent par Leçon à la fois.
+// Puis la page qu'il laisse affichée fait préparer la suivante (voir preparerPageSuivante).
+// `tour.maintenant` : l'horloge de la requête (lib/horloge.js), qui date l'attente de l'Élève.
+async function tourDeParole(tour) {
+  const lecon = await occuper(tour.slug, tour.id, () => chronometrer(tour.slug, tour.id, tour.maintenant, async () => {
+    await ecarterPreparation(tour.slug, tour.id, await prendrePreparation(tour.slug, tour.id));
+    return tourDuProf(tour);
+  }));
+  preparerPageSuivante(tour.slug, tour.id);
+  return lecon;
+}
+
+// La Leçon `id` de l'Élève `slug` est occupée le temps de `operation()` (tour du prof, Retour de quiz) : une seule
+// opération à la fois.
+async function occuper(slug, id, operation) {
+  const cle = cleLecon(slug, id);
+  if (enCours.has(cle)) throw new HttpError(409, "L'agent est déjà en train de répondre");
+  enCours.add(cle);
+  try {
+    return await operation();
+  } finally {
+    enCours.delete(cle);
+  }
+}
+
+// Attente de l'Élève (#78) le temps de `operation()` (tour du prof, ou page préparée attendue puis retenue), notée en
+// événement `tour`. Datée par l'horloge de la requête `maintenant` (ms), comme les autres événements ; sa durée est
+// celle, réelle, de `operation()`. La préparation en arrière-plan, que l'Élève n'attend pas, n'en est pas une.
+async function chronometrer(slug, id, maintenant, operation) {
+  const depuis = Date.now();
+  try {
+    return await operation();
+  } finally {
+    const [debut, fin] = [maintenant, maintenant + Date.now() - depuis].map((ms) => new Date(ms).toISOString());
+    await noterEvenement(slug, { type: 'tour', lecon: id, debut, fin });
+  }
+}
+
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -104,30 +162,105 @@ async function tourDeParole({ slug, id, prompt, affiche = prompt, premier, etatL
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    const { texte, choix } = extraireChoix(reponse);
-    // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
-    // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
-    const nouvelles = await rapatrierImages(store.leconDir(slug, id)).catch((e) => {
-      console.error(`Images de ${id} : ${e.message}`);
-      return [];
-    });
-    const imagesRetirees = imagesASignaler(premier ? lecon.imagesRetirees : [], nouvelles);
-    // Questions de quiz ignorées par le Kit dans les pages écrites par ce tour (spec #48) : signalées au tour suivant,
-    // une fois, comme les images retirées.
-    const ignorees = await store.questionsIgnoreesDepuis(slug, id, pagesAvant).catch((e) => {
-      console.error(`Quiz de ${id} : ${e.message}`);
-      return [];
-    });
-    const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
-    await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout: cout && { ...cout, relais: neuve } });
-    relancerPropositions(slug);
-    return store.lireLecon(slug, id);
+    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve } });
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
-  } finally {
-    enCours.delete(id);
   }
+}
+
+// Fin d'un tour du prof, dont les fichiers sont déjà dans la Leçon (`pagesAvant` : ses pages avant le tour) : images,
+// questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout }) {
+  const { texte, choix } = extraireChoix(reponse);
+  // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
+  // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
+  const nouvelles = await rapatrierImages(store.leconDir(slug, id)).catch((e) => {
+    console.error(`Images de ${id} : ${e.message}`);
+    return [];
+  });
+  const imagesRetirees = imagesASignaler(premier ? lecon.imagesRetirees : [], nouvelles);
+  // Questions de quiz ignorées par le Kit dans les pages écrites par ce tour (spec #48) : signalées au tour suivant,
+  // une fois, comme les images retirées.
+  const ignorees = await store.questionsIgnoreesDepuis(slug, id, pagesAvant).catch((e) => {
+    console.error(`Quiz de ${id} : ${e.message}`);
+    return [];
+  });
+  const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
+  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout });
+  relancerPropositions(slug);
+  return store.lireLecon(slug, id);
+}
+
+// Page suivante préparée pendant le quiz (#74) : quand un tour laisse une Page de leçon affichée, un seul tour du prof
+// en arrière-plan prépare la page du Rebond le plus probable (lib/preparation.js), dans un dossier à part. Sans page
+// préparée pendant le quiz, son Retour en fait préparer une, qui reçoit alors les résultats du quiz. Jamais en
+// même temps qu'un autre tour de la Leçon : il ne démarre pas si la Leçon est occupée, et tout tour suivant l'attend.
+// Coupée sans relais (la session du prof ne se reprend pas ailleurs que dans la Leçon), par CARTABLE_PREPARATION=0,
+// par le Profil ou quand trop de pages préparées restent inutilisées.
+function preparerPageSuivante(slug, id) {
+  (async () => {
+    const cle = cleLecon(slug, id);
+    if (enCours.has(cle) || preparations.has(cle)) return;
+    const profil = await store.lireEleve(slug);
+    const { active, suspendue } = await etatPreparations(slug, profil);
+    if (!active || suspendue) return;
+    const lecon = await store.lireLecon(slug, id);
+    const prevision = pagePrevue(lecon, await store.quizDeLaPage(slug, id, lecon.pages.at(-1)));
+    if (!prevision || enCours.has(cle) || preparations.has(cle)) return;
+    const fin = (async () => {
+      const cwd = await store.preparerDossierPreparation(slug, id);
+      const { reponse, sessionId, cout } = await lancerAgent({
+        cwd,
+        prompt: `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz: false })}\n\n${consignePreparation(prevision, lecon)}`,
+        consignes: consignesLecon(profil),
+        modele: profil.modele,
+        tache: 'rebond',
+      });
+      return { reponse, sessionId, cout: cout && { ...cout, relais: true, preparee: true } };
+    })().catch(async (e) => {
+      // Préparation ratée : écartée, mais son coût, s'il est connu, compte avec la Leçon.
+      console.error(`Page préparée de ${id} : ${e.message}`);
+      await store.ecarterPreparation(slug, id).catch(() => {});
+      if (e.cout) await store.ajouterCoutLecon(slug, id, { ...e.cout, relais: true, preparee: true, inutilisee: true }).catch(() => {});
+      return null;
+    });
+    preparations.set(cle, { prevision, fin });
+  })().catch((e) => console.error(`Page préparée de ${id} : ${e.message}`));
+}
+
+// Pages préparées de l'Élève : `active` (ni coupée par CARTABLE_PREPARATION=0 ou par le Profil, ni sans relais), et le
+// bilan de leurs issues (taux d'inutilisation, suspension, voir lib/preparation.js).
+async function etatPreparations(slug, profil) {
+  return { active: RELAIS && PREPARATION && profil.preparerPages, ...bilanPreparations(await store.lirePreparations(slug)) };
+}
+
+// Page préparée de la Leçon, attendue si elle est en cours, et retirée : { prevision, reponse, sessionId, cout },
+// ou null (aucune, ou tour raté).
+async function prendrePreparation(slug, id) {
+  const preparation = preparations.get(cleLecon(slug, id));
+  if (!preparation) return null;
+  const resultat = await preparation.fin;
+  preparations.delete(cleLecon(slug, id));
+  return resultat && { ...preparation, ...resultat };
+}
+
+// Page préparée inutilisée : écartée, son coût compté avec la Leçon, son issue notée.
+async function ecarterPreparation(slug, id, preparation) {
+  if (!preparation) return;
+  await store.ecarterPreparation(slug, id);
+  if (preparation.cout) await store.ajouterCoutLecon(slug, id, { ...preparation.cout, inutilisee: true });
+  await store.noterPreparation(slug, { lecon: id, action: preparation.prevision.action, utilisee: false });
+}
+
+// Page préparée retenue pour le Rebond `action` : elle devient la Page de leçon, sans nouveau tour.
+async function adopterPreparation(slug, id, preparation, action) {
+  const lecon = await store.lireLecon(slug, id);
+  const pagesAvant = await store.instantanePages(slug, id);
+  await store.adopterPreparation(slug, id);
+  await store.noterPreparation(slug, { lecon: id, action, utilisee: true });
+  const { reponse, sessionId, cout } = preparation;
+  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout });
 }
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
@@ -238,7 +371,7 @@ function varierQuestions(slug, id) {
 const avecAdresseDImage = (slug, q) =>
   q.image ? { ...q, image: { ...q.image, src: `/fichiers/${slug}/${q.lecon}/images/${path.basename(q.image.src)}` } } : q;
 
-async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
+async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }, maintenant) {
   const cadrage = validerCadrage(brut, 'revision');
   // Date de contrôle (#68) : gardée dans la Leçon, c'est l'appli qui resserre les révisions jusqu'à elle (lib/memoire.js).
   const controle = jourValide(dateControle) ? dateControle : null;
@@ -251,7 +384,7 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
     consignePremierTour('revision', cadrage),
   ].join('\n');
   const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(minuitDu(controle)).toLocaleDateString('fr-BE')})` : ''}.`;
-  return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(prompt, cadrage), affiche, premier: true });
+  return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(prompt, cadrage), affiche, premier: true, maintenant });
 }
 
 // Fin de quiz : Retour de quiz instantané (ADR 0002), composé par l'appli sans tour du prof ; il porte l'action que
@@ -265,9 +398,7 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
 async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
-  if (enCours.has(id)) throw new HttpError(409, "L'agent est déjà en train de répondre");
-  enCours.add(id);
-  try {
+  return occuper(slug, id, async () => {
     const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
     if (pretest === true) {
       // Pré-test refait en cours de Leçon (après un vrai score) : toujours hors score, mais sans « Commencer », et le
@@ -298,10 +429,8 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
         ...(action === 'terminee' && { terminee: termineeApres }),
       },
     });
-    return await store.lireLecon(slug, id);
-  } finally {
-    enCours.delete(id);
-  }
+    return store.lireLecon(slug, id);
+  });
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -309,26 +438,36 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
 // choisir Réviser ouvre la phase Réviser jusqu'au Défi réussi.
 const ETAT_APRES_REBOND = { defi: { defiEnCours: true }, reviser: { reviserEnCours: true } };
 
-async function rebond(slug, id, { action }) {
+async function rebond(slug, id, { action }, maintenant) {
   if (typeof action !== 'string' || !Object.hasOwn(REBONDS, action)) throw new HttpError(400, 'Rebond inconnu');
   const lecon = await store.lireLecon(slug, id);
   if (!lecon.rebondsProposes.includes(action)) throw new HttpError(400, "Ce Rebond n'est pas proposé");
-  return tourDeParole({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
+  // La page préparée pendant le quiz s'affiche dès qu'elle est prête si elle correspond ; sinon, tour normal. Dans les
+  // deux cas, l'attente de l'Élève compte, même nulle : celle d'une préparation qui n'avait pas fini comprise.
+  const apres = await occuper(slug, id, () => chronometrer(slug, id, maintenant, async () => {
+    const preparation = await prendrePreparation(slug, id);
+    if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action);
+    await ecarterPreparation(slug, id, preparation);
+    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
+  }));
+  preparerPageSuivante(slug, id);
+  return apres;
 }
 
 // Une Proposition n'est ni bornée ni cadrée comme un sujet libre : elle vient de l'agent, pas de l'Élève.
-async function nouvelleDepuisProposition(slug, titre, brut) {
+async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
   const cadrage = validerCadrage(brut, 'libre');
   const proposition = (await store.lirePropositions(slug))?.find((p) => p.titre === titre);
   if (!proposition) throw new HttpError(400, "Cette idée n'est plus proposée");
   const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre', cadrage });
   const prompt = `${promptCadrage(proposition.titre, cadrage)}\n${consignePremierTour('libre', cadrage)}`;
-  return tourDeParole({ slug, id: lecon.id, prompt, affiche: proposition.titre, premier: true });
+  return tourDeParole({ slug, id: lecon.id, prompt, affiche: proposition.titre, premier: true, maintenant });
 }
 
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
+  const maintenant = maintenantDe(req.headers); // lu une fois par requête (lib/horloge.js)
   if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT, cadrage: QUESTIONS_CADRAGE, questionsCadrage: { libre: questionsDuMode('libre'), revision: questionsDuMode('revision') }, sujetMax: SUJET_MAX });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
@@ -344,53 +483,90 @@ async function api(req, res, segments) {
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
   } else if (r2 === 'couts' && !id) {
     if (m === 'GET') return json(res, 200, await store.lireCouts(slug));
+  } else if (r2 === 'preparations' && !id) {
+    if (m === 'GET') return json(res, 200, await etatPreparations(slug, await store.lireEleve(slug)));
   } else if (r2 === 'revisions' && !id) {
     // Révisions du jour (#66) : servies et corrigées par l'appli, jamais de tour du prof.
-    const maintenant = maintenantDe(req.headers);
     if (m === 'GET') {
       const suite = new URL(req.url, 'http://x').searchParams.get('suite') === '1';
-      const { dues, questions } = revisionsDuJour(await store.leconsAReviser(slug, { maintenant }), { maintenant, suite });
+      const { dues, questions } = revisionsDuJour(await store.leconsLues(slug, { maintenant }), { maintenant, suite });
       return json(res, 200, { dues, questions: questions.map((q) => avecAdresseDImage(slug, q)) });
     }
     if (m === 'POST') {
       await store.lireEleve(slug);
       const corps = await lireCorps(req);
       const reponse = await store.repondreEnRevision(slug, corps, { maintenant });
+      await noterEvenement(slug, { type: 'revision', date: new Date(maintenant).toISOString(), lecon: corps.lecon, juste: reponse.juste });
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
+    }
+  } else if (r2 === 'parent' && !id) {
+    // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
+    if (m === 'GET') {
+      const [lecons, couts, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
+      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements }));
+    }
+  } else if (r2 === 'indicateurs' && !id) {
+    // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
+    if (m === 'GET') {
+      const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
+      return json(res, 200, indicateurs(await store.lireEvenements(slug), { maintenant, ...periode }));
+    }
+  } else if (r2 === 'rythme' && !id) {
+    // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.
+    // Lu par l'accueil de l'Élève : son affichage est noté (événement `accueil`), pour ne montrer le récapitulatif
+    // qu'au premier retour de la semaine.
+    if (m === 'GET') {
+      const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
+      await noterEvenement(slug, { type: 'accueil', date: new Date(maintenant).toISOString() });
+      const activite = activiteParJour(lecons);
+      return json(res, 200, {
+        objectifDuJour: objectifDuJour(activite, maintenant),
+        serieDeJours: serieDeJours(activite, maintenant),
+        recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
+      });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
-      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant: maintenantDe(req.headers) }));
+      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant }));
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
-        if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));
-        if (corps.proposition !== undefined) return json(res, 201, await nouvelleDepuisProposition(slug, corps.proposition, corps.cadrage));
+        if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps, maintenant));
+        if (corps.proposition !== undefined) return json(res, 201, await nouvelleDepuisProposition(slug, corps.proposition, corps.cadrage, maintenant));
         const sujet = typeof corps.sujet === 'string' ? corps.sujet.trim() : '';
         if (!sujet) throw new HttpError(400, 'Dis-moi ce que tu veux apprendre');
         if (sujet.length > SUJET_MAX) throw new HttpError(400, `Ton sujet est trop long (${SUJET_MAX} caractères au plus)`);
         const cadrage = validerCadrage(corps.cadrage, 'libre');
         const lecon = await store.creerLecon(slug, { sujet, mode: 'libre', cadrage });
         const prompt = `${promptCadrage(promptDemarrageLibre(sujet), cadrage)}\n${consignePremierTour('libre', cadrage)}`;
-        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt, affiche: sujet, premier: true }));
+        return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt, affiche: sujet, premier: true, maintenant }));
       }
     } else if (!r3) {
-      if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id, { maintenant: maintenantDe(req.headers) }));
+      if (m === 'GET') {
+        const lecon = await store.lireLecon(slug, id, { maintenant });
+        // Ouverture par l'Élève dans sa Séance (?ouverture=1, #78) : une Leçon lue ailleurs (vue parent…) n'en est pas une.
+        if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') {
+          await noterEvenement(slug, { type: 'ouverture', date: new Date(maintenant).toISOString(), lecon: id });
+        }
+        return json(res, 200, lecon);
+      }
     } else if (r3 === 'scores' && m === 'POST') {
-      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenantDe(req.headers) });
+      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant });
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
-      return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
+      const lecon = await retourQuiz(slug, id, await lireCorps(req));
+      preparerPageSuivante(slug, id); // aucune page préparée pendant le quiz : une, avec ses résultats (#74)
+      return json(res, 200, lecon);
     } else if (r3 === 'rebonds' && m === 'POST') {
-      return json(res, 200, await rebond(slug, id, await lireCorps(req)));
+      return json(res, 200, await rebond(slug, id, await lireCorps(req), maintenant));
     } else if (r3 === 'messages' && m === 'POST') {
       const { texte } = await lireCorps(req);
       if (typeof texte !== 'string' || !texte.trim()) throw new HttpError(400, 'Message vide');
-      return json(res, 200, await tourDeParole({ slug, id, prompt: texte.trim(), premier: false }));
+      return json(res, 200, await tourDeParole({ slug, id, prompt: texte.trim(), premier: false, maintenant }));
     }
   }
   throw new HttpError(405, 'Non supporté');

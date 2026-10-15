@@ -124,7 +124,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1', CARTABLE_HORLOGE_INJECTABLE: '1', CARTABLE_PREPARATION: '0' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -769,7 +769,7 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
 });
 
 test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
-  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
+  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['lecture.js', 'text/javascript'], ['lecture-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
     const res = await fetch(`${base}/kit/v1/${fichier}`);
     assert.equal(res.status, 200, fichier);
     assert.match(res.headers.get('content-type'), new RegExp(type));
@@ -1080,6 +1080,30 @@ test('Nombre de Propositions : réglé à la création et dans le profil, 400 ho
   assert.equal((await appel('/api/eleves/nb-test')).data.nombrePropositions, 3);
 });
 
+test('Lecture à voix haute : coupée par défaut, réglée à la création et dans le Profil, 400 si ce n\'est pas oui ou non', async () => {
+  const defaut = await appel('/api/eleves', 'POST', { pseudo: 'Voix-Defaut', age: 7, niveau: 'Primaire 2' });
+  assert.equal(defaut.data.lectureVoixHaute, false);
+  for (const invalide of ['oui', 1, null]) {
+    assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Voix-Invalide', age: 7, niveau: 'Primaire 2', lectureVoixHaute: invalide })).status, 400);
+  }
+  const cree = await appel('/api/eleves', 'POST', { pseudo: 'Voix-Test', age: 7, niveau: 'Primaire 2', lectureVoixHaute: true });
+  assert.equal(cree.status, 201);
+  assert.equal(cree.data.lectureVoixHaute, true);
+  assert.equal((await appel('/api/eleves/voix-test', 'PUT', { lectureVoixHaute: 'non' })).status, 400);
+  // Changer un autre réglage garde la lecture ; la couper vaut ensuite à chaque lecture du Profil.
+  assert.equal((await appel('/api/eleves/voix-test', 'PUT', { age: 8 })).data.lectureVoixHaute, true);
+  assert.equal((await appel('/api/eleves/voix-test', 'PUT', { lectureVoixHaute: false })).data.lectureVoixHaute, false);
+  assert.equal((await appel('/api/eleves/voix-test')).data.lectureVoixHaute, false);
+  await attendrePropositions('voix-defaut');
+  await attendrePropositions('voix-test');
+});
+
+test('Lecture à voix haute : un Élève existant sans ce réglage ne l\'a pas', async () => {
+  await fs.mkdir(path.join(eleves, 'ancien-voix', 'lecons'), { recursive: true });
+  await fs.writeFile(path.join(eleves, 'ancien-voix', 'profil.json'), JSON.stringify({ pseudo: 'Ancien-Voix', slug: 'ancien-voix', age: 10, niveau: 'Primaire 5' }));
+  assert.equal((await appel('/api/eleves/ancien-voix')).data.lectureVoixHaute, false);
+});
+
 test('Nombre de Propositions : un Élève existant sans ce champ en a 4', async () => {
   await fs.mkdir(path.join(eleves, 'ancien', 'lecons'), { recursive: true });
   await fs.writeFile(path.join(eleves, 'ancien', 'profil.json'), JSON.stringify({ pseudo: 'Ancien', slug: 'ancien', age: 10, niveau: 'Primaire 5' }));
@@ -1378,6 +1402,32 @@ test('Concurrence : deux Leçons différentes reçoivent des messages en même t
     return { reponses };
   });
   assert.deepEqual((await reponses).map((r) => r.status), [200, 200]);
+});
+
+test('Concurrence : deux Élèves dont les Leçons ont le même identifiant ne se bloquent pas l\'un l\'autre', async () => {
+  const slugs = ['meme-id-a', 'meme-id-b'];
+  for (const pseudo of slugs) await appel('/api/eleves', 'POST', { pseudo, age: 10, niveau: 'Primaire 5' });
+  const creer = async (slug) => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les orages' })).data;
+  const a = await creer(slugs[0]);
+  const b = await creer(slugs[1]);
+  assert.equal(a.id, b.id); // même sujet, même jour : même identifiant de Leçon
+  await fs.rm(path.join(dossier, `demarre-${a.id}`), { force: true });
+  const ecrire = (slug) => appel(`/api/eleves/${slug}/lecons/${a.id}/messages`, 'POST', { texte: 'ok' });
+  const { reponses } = await avecFichier('lent', async () => {
+    const premiere = ecrire(slugs[0]);
+    premiere.catch(() => {});
+    await sonderJusqua(() => existe(path.join(dossier, `demarre-${a.id}`)), Boolean, "L'agent n'a jamais démarré");
+    // La Leçon de l'autre Élève n'est pas occupée : sa requête attend l'agent lent au lieu d'être refusée.
+    let minuteur;
+    const seconde = ecrire(slugs[1]);
+    seconde.catch(() => {});
+    const refusee = await Promise.race([seconde.then((r) => r.status === 409), new Promise((r) => (minuteur = setTimeout(() => r(false), 1000)))]);
+    clearTimeout(minuteur);
+    assert.equal(refusee, false);
+    return { reponses: Promise.all([premiere, seconde]) };
+  });
+  assert.deepEqual((await reponses).map((r) => r.status), [200, 200]);
+  for (const slug of slugs) await attendrePropositions(slug);
 });
 
 test('Coût mesuré : chaque tour du prof s\'ajoute au coût cumulé de la Leçon, exposé par la Leçon lue et par la liste', async () => {
@@ -2656,4 +2706,176 @@ test('Formats associer et classer : la consigne les cite pour les paires et les 
   for (const fichier of ['types/associer.js', 'types/classer.js', 'rendus/associer.js', 'rendus/classer.js']) {
     assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
   }
+});
+
+// Vue parent (#77) : agrégats d'un Élève pour le parent, tirés des données existantes, à la date du serveur.
+test('Vue parent : les Révisions du jour et les quiz faits, jour par jour, sur les 7 derniers jours', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Jours', 1);
+  const reviser = (id, choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie }, le(LENDEMAIN));
+  await reviser('q1', 0); // juste
+  await reviser('q2', 0); // ratée
+  const { status, data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(status, 200);
+  assert.deepEqual(data.jours.map((j) => j.jour), ['2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03']);
+  assert.deepEqual(data.jours.at(-1), { jour: '2026-11-03', revisions: 2, justes: 1, quiz: 0 });
+  assert.deepEqual(data.jours.at(-2), { jour: '2026-11-02', revisions: 0, justes: 0, quiz: 1 });
+  assert.deepEqual(data.jours[0], { jour: '2026-10-28', revisions: 0, justes: 0, quiz: 0 });
+  assert.equal((await appel('/api/eleves/inconnu/parent')).status, 404);
+  await aucunClaudeLance([lecon]);
+});
+
+test('Vue parent : les Objectifs Retenus, et les Objectifs fragiles (atteints mais pas encore Retenus), avec leur Leçon', async () => {
+  const { slug } = await eleveRevisions('Parent-Objectifs', 0);
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}/scores`;
+  // Objectif 1 réussi deux jours de suite : Retenu ; Objectif 2 réussi une fois : atteint, fragile ; Objectif 3 jamais.
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, le('2026-10-01T10:00:00.000Z'));
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2] }, le('2026-10-02T10:00:00.000Z'));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'));
+  assert.deepEqual(data.objectifs, {
+    retenus: [{ lecon: lecon.id, titreLecon: 'Les volcans', texte: 'Nommer les parties d’un volcan' }],
+    fragiles: [{ lecon: lecon.id, titreLecon: 'Les volcans', texte: 'Expliquer une éruption' }],
+  });
+});
+
+test('Vue parent : les Questions fragiles (moins de 80 % de chances de s\'en souvenir aujourd\'hui), la plus fragile d\'abord', async () => {
+  const { slug } = await eleveRevisions('Parent-Questions', 0);
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueFragile()));
+  // Le 12 octobre : ratée 51 %, hésitante 71 %, sue une fois 85 %, bien sue 97 %.
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-12T10:00:00.000Z'));
+  assert.deepEqual(data.questionsFragiles, [
+    { lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'ratee', enonce: 'Question ratée ?', pourcentage: 51 },
+    { lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'hesitante', enonce: 'Question hésitante ?', pourcentage: 71 },
+  ]);
+});
+
+test('Vue parent : les contrôles à venir, le plus proche d\'abord, avec la préparation de chacun ; un contrôle passé n\'y est plus', async () => {
+  const { slug } = await eleveRevisions('Parent-Controles', 0);
+  const loin = await leconControle(slug, '2026-11-20');
+  const proche = await leconControle(slug, '2026-11-06');
+  await leconControle(slug, '2026-11-01'); // déjà passé le 3 novembre
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  const maitrise = async (lecon) => (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.maitrise;
+  assert.deepEqual(data.controles, [
+    { lecon: proche.id, titreLecon: 'Les volcans', dateControle: '2026-11-06', joursAvant: 3, maitrise: await maitrise(proche), questionsDues: 2 },
+    { lecon: loin.id, titreLecon: 'Les volcans', dateControle: '2026-11-20', joursAvant: 17, maitrise: await maitrise(loin), questionsDues: 2 },
+  ]);
+  assert.ok(data.controles[0].maitrise.pourcentage > 0);
+});
+
+test('Vue parent : le coût des Leçons, total de l\'Élève (Propositions comprises) et coût de chaque Leçon, la plus coûteuse d\'abord', async () => {
+  const { slug, lecons: [a, b] } = await eleveRevisions('Parent-Cout', 2);
+  await appel(`/api/eleves/${slug}/lecons/${b.id}/messages`, 'POST', { texte: 'ok' }); // un tour de plus pour b
+  await attendrePropositions(slug);
+  const { data } = await appel(`/api/eleves/${slug}/parent`);
+  assert.deepEqual(data.cout.total, (await appel(`/api/eleves/${slug}/couts`)).data.total);
+  assert.deepEqual(data.cout.lecons.map((l) => [l.id, l.titre, l.coutUsd, l.tours]), [[b.id, 'Les volcans', 0.5, 2], [a.id, 'Les volcans', 0.25, 1]]);
+});
+
+// Indicateurs (#78) : calculés par l'appli sur une période, à partir des événements datés qu'elle enregistre (tours du
+// prof, réponses aux Révisions du jour, ouverture d'une Leçon). Jamais de tour du prof pour les lire.
+test('Indicateurs : les réponses aux Révisions du jour donnent le taux de souvenir de la période', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Indic-Souvenir', 1);
+  const reviser = (id, choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie }, le(LENDEMAIN));
+  await reviser('q1', 0); // juste
+  await reviser('q2', 0); // ratée
+  const { status, data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-03`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(status, 200);
+  assert.deepEqual(data.periode, { du: '2026-11-01', au: '2026-11-03' });
+  assert.deepEqual(data.souvenir, { reponses: 2, justes: 1, pourcentage: 50 });
+  // Période par défaut : les 28 derniers jours.
+  assert.deepEqual((await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, le(LENDEMAIN))).data.periode, { du: '2026-10-07', au: '2026-11-03' });
+  // Une période mal formée est refusée ; un Élève inconnu n'a pas d'indicateurs.
+  for (const requete of ['du=hier', 'au=2026-02-30', 'du=2026-11-03&au=2026-11-01']) {
+    assert.equal((await appel(`/api/eleves/${slug}/indicateurs?${requete}`)).status, 400, requete);
+  }
+  assert.equal((await appel('/api/eleves/inconnu/indicateurs')).status, 404);
+  await aucunClaudeLance([lecon]);
+});
+
+test('Indicateurs : ouvrir une Leçon puis revenir la semaine d\'après compte dans le retour à 7 jours', async () => {
+  const { slug, lecons: [a, b] } = await eleveRevisions('Indic-Retour', 2);
+  // L'Élève ouvre une Leçon dans sa Séance (?ouverture=1).
+  const ouvrir = (lecon, date) => appel(`/api/eleves/${slug}/lecons/${lecon.id}?ouverture=1`, 'GET', undefined, le(date));
+  await ouvrir(a, '2026-11-02T12:00:00.000Z');
+  await ouvrir(b, '2026-11-03T12:00:00.000Z');
+  await ouvrir(a, '2026-11-10T12:00:00.000Z'); // a : J+8, b : J+7
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-30`, 'GET', undefined, le('2026-11-30T12:00:00.000Z'));
+  assert.deepEqual(data.retour, { lecons: 2, revenus: 2, enAttente: 0, pourcentage: 100 });
+  await aucunClaudeLance([a, b]);
+});
+
+test('Indicateurs : une Leçon lue sans être ouverte par l\'Élève (vue parent, autre écran) ne compte pas comme un retour', async () => {
+  const { slug, lecons: [a] } = await eleveRevisions('Indic-Lue', 1);
+  await appel(`/api/eleves/${slug}/lecons/${a.id}?ouverture=1`, 'GET', undefined, le('2026-11-02T12:00:00.000Z'));
+  await appel(`/api/eleves/${slug}/lecons/${a.id}`, 'GET', undefined, le('2026-11-10T12:00:00.000Z')); // le parent la lit
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-30`, 'GET', undefined, le('2026-11-30T12:00:00.000Z'));
+  assert.deepEqual(data.retour, { lecons: 1, revenus: 0, enAttente: 0, pourcentage: 0 });
+});
+
+test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le temps d\'attente', async () => {
+  const { slug } = await eleveRevisions('Indic-Attente', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/messages`, 'POST', { texte: 'ok' });
+  const { attente } = (await appel(`/api/eleves/${slug}/indicateurs`)).data;
+  assert.equal(attente.tours, 2);
+  assert.ok(attente.moyenneSecondes >= 0 && attente.maxSecondes >= attente.medianeSecondes);
+  await attendrePropositions(slug);
+});
+
+test('Vue parent : les indicateurs des 28 derniers jours y figurent', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Indic', 1);
+  await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0 }, le(LENDEMAIN));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.indicateurs, (await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, le(LENDEMAIN))).data);
+  assert.deepEqual(data.indicateurs.souvenir, { reponses: 1, justes: 1, pourcentage: 100 });
+});
+
+// Rythme (#75) : Objectif du jour, série avec jokers et récapitulatif de la semaine, calculés par l'appli à partir de
+// l'historique de l'Élève (quiz de page et Révisions du jour), à la date de la requête.
+test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine passée, d\'après l\'historique', async () => {
+  // Lundi 2 novembre : une page terminée (le quiz de `quizBanque`).
+  const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Api', 1);
+  const url = `/api/eleves/${slug}/rythme`;
+  const lundi = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(lundi.status, 200);
+  assert.deepEqual(lundi.data, {
+    objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
+    serieDeJours: { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true },
+    recapitulatif: null,
+  });
+  // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
+  const reviser = (i) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 }, le(LENDEMAIN));
+  for (let i = 0; i < 4; i++) assert.equal((await reviser(i)).status, 200);
+  const mardi = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(mardi.objectifDuJour, { revisions: 4, revisionsVisees: 5, pages: 0, pagesVisees: 1, atteint: false });
+  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: false });
+  // La cinquième : objectif atteint, deux jours de suite.
+  await reviser(4);
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 : le récapitulatif de la semaine passée ; la série, sans joker, est à refaire.
+  const suivant = (await appel(url, 'GET', undefined, le('2026-11-09T12:00:00.000Z'))).data;
+  assert.deepEqual(suivant.recapitulatif, { du: '2026-11-02', au: '2026-11-08', objectifsRetenus: 0, revisions: 5, pages: 1, joursAtteints: 2 });
+  assert.equal(suivant.serieDeJours.jours, 0);
+  // Revenu lundi : mardi 10, plus de récapitulatif (premier retour de la semaine seulement).
+  assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
+});
+
+test('Rythme : une semaine complète rapporte un joker, qui protège tout seul la série d\'un jour manqué', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
+  const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
+  const url = `/api/eleves/${slug}/rythme`;
+  // Dimanche 8 : sept jours de suite, un joker gagné.
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 1, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce au joker.
+  await page('10');
+  const mardi = (await appel(url, 'GET', undefined, le('2026-11-10T18:00:00.000Z'))).data;
+  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 0, jokersUtilises: 1, aujourdhui: true });
+  assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
+});
+
+test('Rythme : Élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
 });

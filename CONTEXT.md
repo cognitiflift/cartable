@@ -12,7 +12,10 @@ _Avoid_: utilisateur, compte (sauf pour parler de la création d'un Élève)
 Nom choisi par l'Élève pour se reconnaître au démarrage.
 
 **Profil**:
-Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut) et **Modèle** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
+Âge (libre), **Niveau de scolarité**, nombre de Propositions (2 à 10, 4 par défaut), **Modèle** et **Lecture à voix haute** de l'Élève, définis à sa création et modifiables ensuite, utilisés pour adapter les Propositions de l'agent.
+
+**Lecture à voix haute**:
+Réglage du Profil, coupé par défaut : un bouton « 🔊 » lit le texte d'une Page de leçon et chaque question (du quiz ou des Révisions du jour) avec une voix de l'appareil, française si elle existe ; le même bouton arrête la lecture. Aucun texte ne sort de l'appareil.
 
 **Modèle**:
 Modèle de langage avec lequel l'agent écrit les Pages de leçon d'un Élève, choisi dans une liste fermée ; Sonnet par défaut pour un nouveau Profil (un Profil existant garde le sien). Les Propositions utilisent toujours Haiku, et un **Modèle de secours** le remplace quand il est surchargé ou indisponible (pas quand le quota est épuisé). Un changement vaut dès l'appel suivant, y compris dans une Leçon commencée.
@@ -24,6 +27,9 @@ _Avoid_: niveau tout court (confusion avec Niveau de Leçon)
 
 **Espace personnel**:
 Dossier propre à un Élève, qui contient son Profil et toutes ses Leçons. Cloisonné : l'agent n'accède jamais à l'Espace personnel d'un autre Élève.
+
+**Vue parent**:
+Écran d'un Élève destiné au parent, ouvert depuis le Profil (jamais depuis l'accueil de l'Élève, sans mot de passe) : Révisions du jour et quiz faits ces 7 derniers jours, Objectifs Retenus, Objectifs fragiles (atteints mais pas encore Retenus), Questions fragiles (moins de 80 % de chances de s'en souvenir aujourd'hui), contrôles à venir avec leur préparation (Maîtrise, Questions dues), Coût des Leçons. Agrégée par l'appli à partir des données existantes, sans tour de l'agent.
 
 **Leçon**:
 Unité d'apprentissage d'un Élève sur un sujet précis. Correspond à un workspace du skill `teach` (mission, leçons HTML, fiches, traces d'apprentissage). Appartient à une seule **Catégorie**.
@@ -101,6 +107,9 @@ _Avoid_: prix, facture
 Ce que l'appli propose à l'Élève après un quiz, d'après le score de ce quiz (pas la Maîtrise) : pour une Leçon de révision (ou une Leçon qu'on Révise), **Revoir** sous 80 % (une page qui reprend autrement ce qui est raté), sinon **Défi** (une page plus difficile, dont la réussite termine la Leçon de révision) ; pour une Leçon libre, toujours **Étape suivante** (la page nouvelle que l'agent choisit selon la zone proximale de l'Élève, dans la même Leçon). Après le premier Pré-test d'une Leçon, seul **Commencer** est proposé : il transmet au prof les résultats du Pré-test pour la première vraie Page de leçon.
 _Avoid_: suite (réservé aux Propositions), leçon suivante
 
+**Page préparée**:
+Page du Rebond le plus probable, que le prof prépare en arrière-plan pendant que l'Élève fait le quiz de la Page de leçon affichée : Étape suivante en Leçon libre, supposée réussie ; en révision, Défi si le dernier quiz est réussi, sinon Revoir. Si aucune ne s'est préparée pendant le quiz, elle se prépare après son Retour de quiz, pour le Rebond proposé, avec les résultats du quiz. Une seule à la fois, dans un dossier à part, jamais en même temps qu'un autre tour de la Leçon. Elle ne devient une Page de leçon, sans attendre, que si l'Élève choisit ce Rebond et que son quiz est réussi ou raté comme prévu ; sinon elle est écartée et le prof crée la page comme d'habitude. Son coût compte avec la Leçon, même écartée ; le taux de pages préparées inutilisées est suivi, et la préparation se suspend quand plus de la moitié des pages préparées des 14 derniers jours (6 au moins) sont restées inutilisées ; elle reprend quand elles sortent de ces 14 jours. Elle se coupe dans le Profil.
+
 **Proposition**:
 Sujet de nouvelle Leçon suggéré par l'agent, affiché dès l'écran « Nouvelle leçon ». Soit une **suite** de ce que l'Élève a déjà étudié, soit un sujet **original** adapté à son âge et son Niveau de scolarité. Indépendamment de ce type, une Proposition peut être **au programme** : rattachée au programme scolaire officiel du Niveau de scolarité de l'Élève (2 par lot). Le nombre de Propositions d'un lot (2 à 10, 4 par défaut) se règle dans le profil de l'Élève. « D'autres idées » demande un lot qui s'écarte, par la matière et par l'angle, des 10 derniers titres proposés.
 
@@ -118,6 +127,14 @@ Ensemble des Questions d'une Leçon. Les questions bonus du Dépassement et cell
 **Révision du jour**:
 Série courte (10 Questions au plus) de Questions dont la révision est due ou en retard, tirées de toutes les Leçons de l'Élève et mélangées, proposée sur l'accueil par la carte « Mes révisions du jour ». Servie tout de suite par l'appli, sans tour du prof ni token ; la correction et l'explication s'affichent après chaque réponse, avec la Confiance et « Je ne sais pas » comme dans un quiz de page. Les Questions d'une Leçon de révision dont le contrôle approche passent en premier.
 _Avoid_: Réviser (retravailler une Leçon avec le prof), séance de révision, répétition
+
+**Objectif du jour**:
+Petit but quotidien montré sur l'accueil : 5 réponses en Révision du jour ou une Page de leçon terminée (quiz fait, hors Pré-test), en jour local. Calculé par l'appli à partir de l'historique de l'Élève.
+_Avoid_: Objectif tout court (un Objectif appartient à une Leçon), quota, devoir
+
+**Série de jours**:
+Nombre de jours où l'Objectif du jour a été atteint, de suite. Aujourd'hui, pas encore atteint, ne la casse pas. Chaque semaine complète de série (7 jours atteints) rapporte un **Joker**, deux au plus en réserve ; un Joker couvre tout seul un jour manqué. Une pause plus longue que la réserve fait repartir la série, sans gaspiller les Jokers. Un **récapitulatif de la semaine** passée (Objectifs devenus Retenus, révisions, pages) s'affiche au premier retour de la semaine. Jamais de comparaison entre Élèves.
+_Avoid_: série tout court (une Révision du jour est aussi une série de Questions), streak, classement
 
 **Niveau de Leçon**:
 Avancée de l'Élève dans une Leçon libre : nombre d'Objectifs atteints plus un (on commence au niveau 1). Sans maximum : quand tous les Objectifs actuels sont atteints, l'agent propose à l'Élève d'élargir la mission, ce qui ajoute des Objectifs. Ne mesure pas ce que l'Élève sait (c'est la Maîtrise) mais jusqu'où il est allé.

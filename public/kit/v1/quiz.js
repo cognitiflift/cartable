@@ -5,8 +5,13 @@
 //                            <script type="module" src="/kit/v1/quiz.js"></script>
 import { lireQuiz, messageScore } from './quiz-logique.js';
 import { el, rendreQuestion } from './question.js';
+import { lectureActivee } from './lecture-logique.js';
+import { ajouterLecturePage } from './lecture.js';
 
 function demarrer() {
+  // Lecture à voix haute (#76), si le Profil de l'Élève l'active : un bouton pour la page, un par question.
+  const lecture = lectureActivee(location.search);
+  if (lecture) ajouterLecturePage();
   const source = document.getElementById('cartable-quiz');
   if (!source) return;
   let quiz = null;
@@ -50,6 +55,7 @@ function demarrer() {
     // `sur` : Confiance donnée ; absente après « Je ne sais pas », qui est corrigé tout de suite, comme une réponse fausse.
     zone.append(rendreQuestion(q, {
       legende: q.bonus ? '🚀 Bonus · ' : `${++numero}. `,
+      lecture,
       quandCorrigee: ({ choisie, sur }) => {
         choix[q.id] = choisie;
         if (typeof sur === 'boolean') confiance[q.id] = sur;

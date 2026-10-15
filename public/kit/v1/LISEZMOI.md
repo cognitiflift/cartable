@@ -80,7 +80,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
 
 Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
-Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question et les formats de rappel actif (résultats `type`, `points` et `detail`). Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
 
 ## Formats de rappel actif
 
@@ -255,6 +255,14 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 ```
 
 Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la.
+
+## Lecture à voix haute
+
+Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
+
+Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases complètes, dans des blocs (`<p>`, titres, listes, `<figcaption>`, `<aside>`) : ce sont eux qui sont lus, dans l'ordre. Le quiz, les crédits des figures (`kit-credit`), les schémas `<svg>` et ce qui est caché ne sont pas lus ; les émojis non plus.
+
+L'appli transmet le réglage à la page dans son adresse (`…/0002-le-magma.html?lecture=1`). Ajout compatible de la version 1 : une page déjà écrite avec le Kit en profite sans changement.
 
 ## Style de base
 

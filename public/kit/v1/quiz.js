@@ -37,13 +37,14 @@ function demarrer() {
     envoye = true;
     const message = messageScore(quiz, choix, page, confiance);
     fin.hidden = false;
-    fin.append(
+    // Sans questions bonus, pas de ligne bonus : append() écrirait « null » en texte.
+    fin.append(...[
       // Pré-test : hors score, on n'affiche que le nombre de bonnes réponses devinées.
       el('p', { className: 'kit-quiz-score' }, message.pretest
         ? `🔮 Tu as deviné ${message.questions.filter((q) => q.juste && !q.bonus).length} sur ${message.questions.filter((q) => !q.bonus).length}`
         : `Ton score : ${message.score} %`),
       message.bonus ? el('p', {}, `🚀 Questions bonus : ${message.bonus.reussies} sur ${message.bonus.total}`) : null,
-    );
+    ].filter((e) => e != null));
     window.parent.postMessage(message, '*');
   };
 

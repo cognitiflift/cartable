@@ -14,9 +14,13 @@
 import { qcm } from './qcm.js';
 import { trous } from './trous.js';
 import { ordre } from './ordre.js';
+import { associer } from './associer.js';
+import { classer } from './classer.js';
 
 export const TYPES = {
   qcm,
   trous,
   ordre,
+  associer,
+  classer,
 };

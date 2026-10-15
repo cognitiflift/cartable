@@ -123,6 +123,44 @@ Pour les étapes d'un processus, les événements d'une histoire ou les mots d'u
 - `elements` : 3 à 10 éléments, tous différents, **dans le bon ordre**.
 - Crédit partiel : les éléments déjà dans le bon ordre entre eux (il suffirait de déplacer les autres).
 
+### Associer : `"type": "associer"`
+
+Pour des paires : dieu et domaine, mot et définition, pays et capitale. Le Kit mélange chaque colonne ; l'élève touche un élément de gauche, puis celui de droite qui va avec.
+
+```json
+{
+  "id": "q5",
+  "type": "associer",
+  "enonce": "Relie chaque dieu à son domaine.",
+  "paires": [["Zeus", "le ciel"], ["Poséidon", "la mer"], ["Hadès", "les Enfers"]],
+  "explication": "Les trois frères se partagent le monde."
+}
+```
+
+- `paires` : 3 à 8 paires `["gauche", "droite"]`, sans le même texte deux fois dans une colonne.
+- Crédit partiel : les paires justes (2 sur 3 = 0,67).
+
+### Classer : `"type": "classer"`
+
+Pour apprendre ce qui distingue des catégories. Le Kit mélange les éléments ; l'élève touche un élément, puis la catégorie où il le range.
+
+```json
+{
+  "id": "q6",
+  "type": "classer",
+  "enonce": "Range chaque animal dans sa classe.",
+  "categories": [
+    { "nom": "Mammifères", "elements": ["la baleine", "la chauve-souris"] },
+    { "nom": "Oiseaux", "elements": ["le manchot", "l'autruche"] }
+  ],
+  "explication": "La baleine allaite ses petits ; le manchot a des plumes."
+}
+```
+
+- `categories` : 2 à 4 catégories aux noms différents, chacune avec ses `elements` (au moins deux catégories non vides ; une catégorie vide est permise, comme piège).
+- 3 à 12 éléments en tout, tous différents. Choisis des éléments qui trompent (la baleine n'est pas un poisson).
+- Crédit partiel : les éléments bien rangés.
+
 ## Ce que fait le Kit
 
 Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.

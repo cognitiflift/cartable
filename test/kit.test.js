@@ -239,3 +239,122 @@ test('Kit : une question d\'un type inconnu ou mal formée est ignorée, le quiz
   assert.deepEqual(questionsIgnorees(quiz), []);
   assert.equal(questionsIgnorees({ questions: [{ id: 'x', type: 'mystere', enonce: '?' }] }).length, 2, 'le quiz qui ne s\'affiche plus est signalé aussi');
 });
+
+// Formats de rappel actif (spec #48, ticket #71) : associer deux colonnes, classer dans des catégories.
+const associer = {
+  id: 'a1', type: 'associer', enonce: 'Relie chaque dieu à son domaine.',
+  paires: [['Zeus', 'le ciel'], ['Poséidon', 'la mer'], ['Hadès', 'les Enfers'], ['Héphaïstos', 'la forge']],
+  explication: 'Les trois frères se partagent le monde ; Héphaïstos est le forgeron.',
+};
+
+test('Kit : associer demande de 3 à 8 paires, sans doublon dans une colonne ; mal formé, il est écarté', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [associer] }).questions;
+  assert.equal(q.type, 'associer');
+  assert.deepEqual(q.paires, associer.paires);
+  const malformes = [
+    { ...associer, paires: associer.paires.slice(0, 2) },
+    { ...associer, paires: [...associer.paires, ['Zeus', 'la foudre']] }, // même élément à gauche
+    { ...associer, paires: [...associer.paires, ['Arès', 'la mer']] }, // même élément à droite
+    { ...associer, paires: [...associer.paires, ['Arès']] },
+    { ...associer, paires: [...associer.paires, ['Arès', '']] },
+    { ...associer, paires: Array.from({ length: 9 }, (_, i) => [`g${i}`, `d${i}`]) },
+    { ...associer, paires: 'Zeus : le ciel' },
+  ];
+  for (const m of malformes) assert.equal(lireQuiz({ questions: [quiz.questions[0], m] }).questions.length, 1, JSON.stringify(m));
+});
+
+test('Kit : corriger associer compte les paires justes, avec les paires choisies et les bonnes', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [associer] }).questions;
+  // Réponse : pour chaque élément de gauche, l'index de l'élément de droite relié.
+  assert.deepEqual(corriger(q, [0, 1, 2, 3]), {
+    juste: true, points: 1,
+    choisie: 'Zeus : le ciel ; Poséidon : la mer ; Hadès : les Enfers ; Héphaïstos : la forge',
+    bonne: 'Zeus : le ciel ; Poséidon : la mer ; Hadès : les Enfers ; Héphaïstos : la forge',
+    explication: associer.explication, detail: { paires: associer.paires },
+  });
+  // Deux paires inversées : 2 sur 4.
+  const partiel = corriger(q, [1, 0, 2, 3]);
+  assert.equal(partiel.juste, false);
+  assert.equal(partiel.points, 0.5);
+  assert.equal(partiel.choisie, 'Zeus : la mer ; Poséidon : le ciel ; Hadès : les Enfers ; Héphaïstos : la forge');
+  assert.deepEqual(partiel.detail.paires[0], ['Zeus', 'la mer']);
+  assert.equal(corriger(q, [3, 2, 1, 0]).points, 0);
+  // Réponse impossible (élément de droite relié deux fois, paire oubliée, index hors colonne) : pas de réponse choisie.
+  for (const r of [[0, 0, 2, 3], [0, 1, 2], [0, 1, 2, 4], 'Zeus', null]) assert.equal(corriger(q, r).choisie, null, JSON.stringify(r));
+});
+
+const classer = {
+  id: 'c1', type: 'classer', enonce: 'Range chaque animal dans sa classe.',
+  categories: [
+    { nom: 'Mammifères', elements: ['la baleine', 'la chauve-souris'] },
+    { nom: 'Oiseaux', elements: ['le manchot', "l'autruche"] },
+    { nom: 'Poissons', elements: ['le requin'] },
+  ],
+  explication: 'La baleine allaite ses petits ; le manchot a des plumes ; le requin respire par des branchies.',
+};
+
+test('Kit : classer demande de 2 à 4 catégories et de 3 à 12 éléments tous différents ; mal formé, il est écarté', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [classer] }).questions;
+  assert.equal(q.type, 'classer');
+  assert.deepEqual(q.categories, classer.categories);
+  // Une catégorie peut rester vide (piège : rien n'y va), tant qu'il y en a au moins deux qui ne le sont pas.
+  const avecVide = { ...classer, categories: [...classer.categories, { nom: 'Reptiles', elements: [] }] };
+  assert.equal(lireQuiz({ questions: [avecVide] }).questions[0].categories.length, 4);
+  const malformes = [
+    { ...classer, categories: [classer.categories[0]] },
+    { ...classer, categories: [...avecVide.categories, { nom: 'Insectes', elements: ['la fourmi'] }] }, // 5 catégories
+    { ...classer, categories: [{ nom: 'A', elements: ['x', 'y', 'z'] }, { nom: 'B', elements: [] }] }, // une seule non vide
+    { ...classer, categories: [{ nom: 'A', elements: ['x'] }, { nom: 'B', elements: ['y'] }] }, // 2 éléments
+    { ...classer, categories: [...classer.categories, { nom: 'Mammifères', elements: ['le chat'] }] }, // même nom
+    { ...classer, categories: [...classer.categories, { nom: 'Reptiles', elements: ['le requin'] }] }, // même élément
+    { ...classer, categories: [...classer.categories, { nom: '', elements: ['le lézard'] }] },
+    { ...classer, categories: [...classer.categories, { nom: 'Reptiles', elements: 'le lézard' }] },
+    { ...classer, categories: [{ nom: 'A', elements: Array.from({ length: 7 }, (_, i) => `a${i}`) }, { nom: 'B', elements: Array.from({ length: 6 }, (_, i) => `b${i}`) }] },
+    { ...classer, categories: { Mammifères: ['la baleine'] } },
+  ];
+  for (const m of malformes) assert.equal(lireQuiz({ questions: [quiz.questions[0], m] }).questions.length, 1, JSON.stringify(m));
+});
+
+test('Kit : corriger classer compte les éléments bien rangés, avec le rangement choisi et le bon', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [classer] }).questions;
+  // Réponse : pour chaque élément, dans l'ordre où le prof les a écrits (catégorie par catégorie), l'index de la
+  // catégorie où l'Élève l'a rangé.
+  const bonne = 'Mammifères : la baleine, la chauve-souris ; Oiseaux : le manchot, l\'autruche ; Poissons : le requin';
+  assert.deepEqual(corriger(q, [0, 0, 1, 1, 2]), {
+    juste: true, points: 1, choisie: bonne, bonne, explication: classer.explication, detail: { categories: classer.categories },
+  });
+  // La chauve-souris chez les oiseaux, le requin aussi : 3 sur 5. Une catégorie laissée vide est notée « — ».
+  const partiel = corriger(q, [0, 1, 1, 1, 1]);
+  assert.equal(partiel.juste, false);
+  assert.equal(partiel.points, 0.6);
+  assert.equal(partiel.choisie, 'Mammifères : la baleine ; Oiseaux : la chauve-souris, le manchot, l\'autruche, le requin ; Poissons : —');
+  assert.deepEqual(partiel.detail.categories[2], { nom: 'Poissons', elements: [] });
+  assert.equal(corriger(q, [2, 2, 0, 0, 1]).points, 0);
+  // Réponse impossible (élément oublié, catégorie inexistante) : pas de réponse choisie.
+  for (const r of [[0, 0, 1, 1], [0, 0, 1, 1, 3], [0, 0, 1, 1, 0.5], 'Mammifères', null]) assert.equal(corriger(q, r).choisie, null, JSON.stringify(r));
+});
+
+test('Kit : associer et classer comptent leur crédit partiel dans le score, et leur détail passe la validation de l\'appli', () => {
+  const lu = lireQuiz({ objectifs: [1], questions: [quiz.questions[0], associer, classer] });
+  const message = messageScore(lu, { q1: 0, a1: [1, 0, 2, 3], c1: [0, 1, 1, 1, 1] }, 'p.html', { a1: true, c1: false });
+  // (1 + 0,5 + 0,6) / 3 = 70 %.
+  assert.equal(message.score, 70);
+  const [, a1, c1] = message.questions;
+  assert.deepEqual(a1, {
+    id: 'a1', type: 'associer', enonce: associer.enonce, choisie: 'Zeus : la mer ; Poséidon : le ciel ; Hadès : les Enfers ; Héphaïstos : la forge',
+    bonne: 'Zeus : le ciel ; Poséidon : la mer ; Hadès : les Enfers ; Héphaïstos : la forge', juste: false, points: 0.5,
+    detail: { paires: [['Zeus', 'la mer'], ['Poséidon', 'le ciel'], ['Hadès', 'les Enfers'], ['Héphaïstos', 'la forge']] },
+    bonus: false, objectifs: [1], sur: true,
+  });
+  assert.equal(c1.type, 'classer');
+  assert.equal(c1.points, 0.6);
+  assert.deepEqual(lireResultats(message.questions), message.questions);
+  // Un détail mal formé est écarté, le résultat reste.
+  const malformes = [
+    { ...a1, detail: { paires: [['Zeus']] } },
+    { ...a1, detail: { paires: 'Zeus : la mer' } },
+    { ...c1, detail: { categories: [{ nom: 'Mammifères', elements: 'la baleine' }] } },
+    { ...c1, detail: { categories: [{ elements: ['la baleine'] }] } },
+  ].map((r, i) => ({ ...r, id: `m${i}` }));
+  for (const r of lireResultats(malformes)) assert.equal(Object.hasOwn(r, 'detail'), false, r.id);
+});

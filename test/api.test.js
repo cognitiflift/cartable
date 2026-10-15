@@ -2492,3 +2492,63 @@ test('Formats de rappel actif : une question mal formée ou d\'un type inconnu e
   await message(lecon, 'ok');
   assert.doesNotMatch(await argsDe(lecon), /Questions ignorées/);
 });
+
+// Formats associer et classer (spec #48, ticket #71), dans la Banque et les Révisions du jour, avec crédit partiel.
+const quizAssocierClasser = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Qui règne sur l’Olympe ?', reponses: ['Zeus', 'Hadès'], bonne: 0, explication: 'Zeus.' },
+    { id: 'a1', type: 'associer', enonce: 'Relie.', paires: [['Zeus', 'le ciel'], ['Poséidon', 'la mer'], ['Hadès', 'les Enfers']], explication: 'Trois frères.' },
+    { id: 'c1', type: 'classer', enonce: 'Range.', categories: [{ nom: 'Dieux', elements: ['Zeus', 'Héra'] }, { nom: 'Héros', elements: ['Ulysse', 'Achille'] }], explication: 'Les héros sont mortels.' },
+  ],
+};
+const corpsAssocierClasser = (page, choix, confiance = {}) => {
+  const { type, ...corps } = messageScore(lireQuiz(quizAssocierClasser), choix, page, confiance);
+  return corps;
+};
+
+test('Formats associer et classer : la Banque garde leur contenu, et le serveur les corrige lui-même en Révision du jour', async () => {
+  const slug = slugify('Revis-Associer');
+  await appel('/api/eleves', 'POST', { pseudo: 'Revis-Associer', age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'mythes' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-mythes.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizAssocierClasser)}</script>`);
+  // q1 juste ; a1 : une paire juste sur trois ; c1 : Héra chez les héros, 3 sur 4.
+  const r = await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { ...corpsAssocierClasser('0002-mythes.html', { q1: 0, a1: [0, 2, 1], c1: [0, 1, 1, 1] }, { q1: true, a1: true, c1: true }), score: 0 }, le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).score, 69); // (1 + 1/3 + 0,75) / 3 = 69,4 %, recalculé par le serveur
+  const c1Resultat = r.data.scores.at(-1).questions.find((q) => q.id === 'c1');
+  assert.deepEqual(c1Resultat.detail, { categories: [{ nom: 'Dieux', elements: ['Zeus'] }, { nom: 'Héros', elements: ['Héra', 'Ulysse', 'Achille'] }] });
+  const [, a1, c1] = r.data.questions;
+  assert.deepEqual(a1.contenu, { type: 'associer', enonce: 'Relie.', paires: quizAssocierClasser.questions[1].paires, explication: 'Trois frères.', objectifs: [1] });
+  assert.deepEqual(c1.contenu, { type: 'classer', enonce: 'Range.', categories: quizAssocierClasser.questions[2].categories, explication: 'Les héros sont mortels.', objectifs: [1] });
+  assert.deepEqual(c1.journal[0], { date: BANQUE_DATE, juste: false, points: 0.75, sur: true, origine: 'quiz' });
+  await attendrePropositions(slug);
+
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.questions.find((q) => q.id === 'a1').paires, quizAssocierClasser.questions[1].paires);
+  const url = `/api/eleves/${slug}/revisions`;
+  const repondre = (id, choisie) => appel(url, 'POST', { lecon: lecon.id, page: '0002-mythes.html', id, choisie, sur: true, juste: true }, le(LENDEMAIN));
+  const partiel = await repondre('c1', [0, 0, 1, 0]);
+  assert.equal(partiel.status, 200);
+  assert.equal(partiel.data.juste, false);
+  assert.equal(partiel.data.points, 0.75);
+  assert.equal(partiel.data.bonne, 'Dieux : Zeus, Héra ; Héros : Ulysse, Achille');
+  assert.equal((await repondre('a1', [0, 1, 2])).data.juste, true);
+  for (const choisie of [0, [0, 0, 1], [0, 1], 'Zeus']) assert.equal((await repondre('a1', choisie)).status, 400, JSON.stringify(choisie));
+  for (const choisie of [[0, 0, 1], [0, 0, 1, 2]]) assert.equal((await repondre('c1', choisie)).status, 400, JSON.stringify(choisie));
+});
+
+test('Formats associer et classer : la consigne les cite pour les paires et les catégories, et le Kit les documente', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les animaux' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /"associer"[^\n]*paires/);
+  assert.match(args, /"classer"[^\n]*catégories/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /"type": "associer"/);
+  assert.match(doc, /"paires"/);
+  assert.match(doc, /"type": "classer"/);
+  assert.match(doc, /"categories"/);
+  for (const fichier of ['types/associer.js', 'types/classer.js', 'rendus/associer.js', 'rendus/classer.js']) {
+    assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
+  }
+});

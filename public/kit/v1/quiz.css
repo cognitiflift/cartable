@@ -90,6 +90,20 @@
 .kit-ordre-fleche { font: inherit; padding: .4rem .5rem; border-radius: 8px; border: 1px solid var(--kit-bord); background: var(--kit-carte); cursor: pointer; }
 .kit-ordre-fleche:disabled { opacity: .35; cursor: default; }
 
+/* Associer : deux colonnes ; deux éléments reliés portent le même numéro. */
+.kit-associer { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .8rem; }
+.kit-associer-colonne { display: flex; flex-direction: column; gap: .5rem; }
+.kit-associer-element { display: flex; align-items: center; gap: .5rem; }
+.kit-associer-numero { flex: none; min-width: 1.6em; height: 1.6em; border-radius: 999px; text-align: center; line-height: 1.6em; font-weight: 700; border: 1px dashed var(--kit-bord); }
+.kit-associer-relie .kit-associer-numero { border: none; background: var(--kit-accent); color: var(--kit-carte); }
+
+/* Classer : les éléments à ranger, puis une case par catégorie (son bouton, puis ce qui y est rangé). */
+.kit-classer-a-ranger, .kit-classer-contenu { display: flex; flex-wrap: wrap; gap: .5rem; }
+.kit-classer-a-ranger[hidden] { display: none; }
+.kit-classer { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .6rem; }
+.kit-classer-categorie { display: flex; flex-direction: column; gap: .5rem; min-height: 5rem; padding: .5rem; border: 2px dashed var(--kit-bord); border-radius: 12px; }
+.kit-classer-ranger { align-self: stretch; }
+
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font-size: 1.4rem; font-weight: 700; color: var(--kit-accent); }

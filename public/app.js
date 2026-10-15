@@ -181,7 +181,7 @@ async function ecranRevisions(profil) {
 
   const fin = (suite) => [
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
-    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Réviser encore'), ' ',
+    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ',
       h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons')),
   ];
   // Une série : les Questions l'une après l'autre ; à la fin, la série suivante ou le message de fin.

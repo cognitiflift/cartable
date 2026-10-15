@@ -30,3 +30,4 @@ L'appli prend donc la mémoire en charge, dans l'esprit des ADR 0002 et 0003 : l
 - La Maîtrise d'une Leçon baisse toute seule avec le temps, plus vite pour ce qui a été peu révisé ; deux calculs coexistent tant que d'anciennes Leçons sans Questions existent.
 - Le planificateur se teste en fonctions pures avec une horloge injectée, sans serveur ni temps réel.
 - La règle « deux succès espacés » de Retenu (ADR 0003) devient le cas des Leçons sans Questions.
+- L'appli ne valide des variantes que la forme (QCM bien formé, énoncé nouveau, une bonne réponse) : qu'elles testent la même chose avec la même bonne réponse en sens est seulement demandé au prof. Une variante fausse sur le fond resterait ; elle partage la mémoire de la Question et sera oubliée si le prof réécrit la question d'origine.

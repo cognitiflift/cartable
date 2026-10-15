@@ -2367,3 +2367,28 @@ test('Variantes : une Question réécrite par le prof perd ses Variantes, qui so
   const q1 = (await avecVariantes(lecon)).find((q) => q.id === 'q1');
   assert.equal(q1.variantes[0].enonce, 'D’où sort la lave ? (variante 1)');
 });
+
+test('Révisions du jour : une Question avec une image la garde dans la Leçon et dans la révision (US25)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Image', 1);
+  // Le prof ajoute une image rapatriée (images/ de la Leçon) à q1, une image distante à q2 : l'Élève refait le quiz.
+  const quiz = structuredClone(quizBanque);
+  quiz.questions[0].image = { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' };
+  quiz.questions[1].image = { src: 'https://upload.wikimedia.org/magma.png', alt: 'Du magma' };
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const questions = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  assert.deepEqual(questions.find((q) => q.id === 'q1').contenu.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
+  // Une image qui n'est pas dans la Leçon (non rapatriée) n'est pas gardée : la révision se fait hors ligne.
+  assert.equal(questions.find((q) => q.id === 'q2').contenu.image, undefined);
+  // En révision, son adresse est celle du fichier de la Leçon servi par l'appli.
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.questions.find((q) => q.id === 'q1').image, { src: `/fichiers/${slug}/${lecon.id}/images/cratere.png`, alt: 'Le cratère du Stromboli' });
+  assert.equal(data.questions.find((q) => q.id === 'q2').image, undefined);
+  // Ses Variantes gardent son image, comme ses Objectifs : elles testent la même chose.
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  banque['0002-volcans.html#q1'].variantes = [{ enonce: 'Par où la lave sort-elle ?', reponses: ['Le cratère', 'Les racines'], bonne: 0, explication: '' }];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+  const [variante] = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions.find((q) => q.id === 'q1').variantes;
+  assert.deepEqual(variante.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
+});

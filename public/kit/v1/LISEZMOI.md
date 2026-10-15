@@ -74,8 +74,11 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
   - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score. Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
+  - `image` (facultatif) : `{ "src": "…", "alt": "…" }`, une image propre à la question, affichée sous l'énoncé, et aussi quand l'élève la retrouve en révision. Même règle que pour une figure : photo distante déclarée dans `images.json` (l'appli la rapatrie et réécrit `src` en `../images/…`), `alt` qui dit ce qu'on voit. Une image mal formée est ignorée, la question reste. Pour un schéma en SVG, utilise plutôt la figure de la page.
 
 Une question mal formée est ignorée. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
+
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`) et l'`image` d'une question. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur. Une évolution incompatible passerait par une version 2 (ADR 0004).
 
 ## Ce que fait le Kit
 

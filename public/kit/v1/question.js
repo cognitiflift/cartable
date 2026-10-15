@@ -10,7 +10,8 @@ export const el = (tag, attrs = {}, ...enfants) => {
   return n;
 };
 
-// Question `q` (validée par lireQuiz : enonce, reponses, bonne, explication, bonus?) dans un fieldset. `legende` :
+// Question `q` (validée par lireQuiz : enonce, reponses, bonne, explication, bonus?, image?) dans un fieldset. Son
+// image (US25) s'affiche sous l'énoncé ; une image qui ne se charge pas est retirée, la question reste. `legende` :
 // ce qui précède l'énoncé (numéro, « 🚀 Bonus · »…). `quandCorrigee({ choisie, sur })` est appelé une fois, à la
 // correction : `choisie` = index de la réponse avant mélange, ou JE_NE_SAIS_PAS ; `sur` = Confiance (absente après
 // « Je ne sais pas »).
@@ -59,8 +60,11 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   neSaisPas.addEventListener('click', () => {
     if (choisir(JE_NE_SAIS_PAS, neSaisPas)) corrigerQuestion();
   });
+  const image = q.image && el('img', { className: 'kit-quiz-image', src: q.image.src, alt: q.image.alt });
+  image?.addEventListener('error', () => image.remove(), { once: true });
   return el('fieldset', { className: `kit-quiz-question${q.bonus ? ' kit-bonus' : ''}` },
     el('legend', {}, legende, q.enonce),
+    image,
     el('div', { className: 'kit-quiz-reponses' }, ...boutons, neSaisPas),
     demande,
     retour);

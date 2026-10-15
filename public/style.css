@@ -1,4 +1,6 @@
-:root { --fond:#fbf8f3; --texte:#222; --doux:#6b6b6b; --accent:#2f6fed; --carte:#fff; --bord:#e4ddd0; }
+/* Thème clair et sombre (contrôles natifs compris), choisi par l'appli elle-même : quiz.css du Kit, chargé pour les
+   Révisions du jour, pose le même color-scheme et n'ajoute que des variables --kit-* et des règles .kit-*. */
+:root { --fond:#fbf8f3; --texte:#222; --doux:#6b6b6b; --accent:#2f6fed; --carte:#fff; --bord:#e4ddd0; color-scheme:light dark; }
 @media (prefers-color-scheme: dark) { :root { --fond:#1a1a1d; --texte:#eee; --doux:#a0a0a8; --carte:#25252a; --bord:#3a3a42; } }
 * { box-sizing: border-box; }
 body { margin:0; font:17px/1.5 system-ui, sans-serif; background:var(--fond); color:var(--texte); }

@@ -112,3 +112,12 @@ test('Kit : « Je ne sais pas » compte comme une réponse fausse, sans Confianc
   // Une question annoncée « Je ne sais pas » mais juste est corrigée en fausse.
   assert.equal(lireResultats([{ ...message.questions[0], juste: true }])[0].juste, false);
 });
+
+test('Kit : une question peut porter une image (adresse et texte alternatif), écartée seule si elle est mal formée', () => {
+  const q = (image) => ({ id: 'q1', type: 'qcm', enonce: 'Où sort la lave ?', reponses: ['Le cratère', 'Les racines'], bonne: 0, explication: '', image });
+  const image = (brut) => lireQuiz({ questions: [q(brut)] }).questions[0].image;
+  assert.deepEqual(image({ src: '../images/cratere.png', alt: ' Le cratère ' }), { src: '../images/cratere.png', alt: 'Le cratère' });
+  assert.deepEqual(image({ src: 'https://upload.wikimedia.org/a.png', alt: 'Un volcan' }), { src: 'https://upload.wikimedia.org/a.png', alt: 'Un volcan' });
+  const malformees = [undefined, 'cratere.png', { src: '../images/a.png' }, { src: 'data:image/png;base64,AAAA', alt: 'x' }, { src: '/etc/passwd', alt: 'x' }, { src: '../images/../etat.json', alt: 'x' }];
+  for (const malformee of malformees) assert.equal(image(malformee), undefined, JSON.stringify(malformee));
+});

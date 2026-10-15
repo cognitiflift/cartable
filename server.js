@@ -203,9 +203,8 @@ function varierQuestions(slug, id) {
       const { cout } = await lancerAgent({
         cwd: store.variantesDir(slug, id),
         prompt: `Écris ${VARIANTES_PAR_QUESTION} variantes pour chacune des ${cles.length} questions de questions-a-varier.json.`,
-        consignes: consignesVariantes(profil),
-        modele: profil.modele,
-        tache: 'variantes',
+        consignes: consignesVariantes(profil), // le Profil pour présenter l'Élève (âge, niveau)
+        tache: 'variantes', // Modèle fixé par la tâche, pas par le Profil (ADR 0005)
         teach: false,
       });
       await store.enregistrerCoutVariantes(slug, cout);
@@ -224,6 +223,11 @@ function varierQuestions(slug, id) {
       for (const lecon of suivantes) varierQuestions(slug, lecon);
     });
 }
+
+// Image d'une Question servie hors de sa Page de leçon (Révisions du jour, US25) : son adresse relative à la page
+// (`../images/<fichier>`, voir lib/banque.js) devient celle du fichier de la Leçon servi sous /fichiers.
+const avecAdresseDImage = (slug, q) =>
+  q.image ? { ...q, image: { ...q.image, src: `/fichiers/${slug}/${q.lecon}/images/${path.basename(q.image.src)}` } } : q;
 
 async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
   const cadrage = validerCadrage(brut, 'revision');
@@ -336,7 +340,8 @@ async function api(req, res, segments) {
     const maintenant = maintenantDe(req.headers);
     if (m === 'GET') {
       const suite = new URL(req.url, 'http://x').searchParams.get('suite') === '1';
-      return json(res, 200, revisionsDuJour(await store.leconsAReviser(slug, { maintenant }), { maintenant, suite }));
+      const { dues, questions } = revisionsDuJour(await store.leconsAReviser(slug, { maintenant }), { maintenant, suite });
+      return json(res, 200, { dues, questions: questions.map((q) => avecAdresseDImage(slug, q)) });
     }
     if (m === 'POST') {
       await store.lireEleve(slug);

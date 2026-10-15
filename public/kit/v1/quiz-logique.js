@@ -3,7 +3,9 @@
 // validation, avec les mêmes limites, pour le quiz affiché et pour le résultat enregistré.
 //
 // Données écrites par le prof dans la Page de leçon (voir LISEZMOI.md) :
-//   { objectifs: [n…], pretest?, questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs? }] }
+//   { objectifs: [n…], pretest?, questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs?, image? }] }
+// `image` (ajout compatible de la v1, spec #47 US25) : { src, alt } d'une image propre à la question, rapatriée dans
+// images/ de la Leçon (`../images/<fichier>`, relatif à la page) ou distante (http(s), en attendant le rapatriement).
 // `pretest: true` : quiz du Pré-test (« Devine ! »), hors Maîtrise, Objectifs atteints, Étoiles et Rebond ordinaire.
 // Message envoyé à l'appli à la fin du quiz (`cartable-score`) :
 //   { type, score, page, objectifs, pretest?, bonus?, questions: [{ id, enonce, choisie, bonne, juste, jeNeSaisPas?, bonus, objectifs, sur? }] }
@@ -54,6 +56,17 @@ export function bonusDesQuestions(questions) {
 
 const ROCKET = /^🚀\s*/u;
 
+// Image d'une question : adresse rapatriée dans la Leçon (`../images/<fichier>`) ou distante en HTTP(S), et texte
+// alternatif non vide ; null sinon (la question reste, sans image).
+export const IMAGE_LOCALE_RE = /^\.\.\/images\/[\w-]+(\.[\w-]+)*$/;
+const IMAGE_DISTANTE_RE = /^https?:\/\/[^\s"'<>]+$/;
+function imageValide(v) {
+  const alt = texte(v?.alt);
+  const src = typeof v?.src === 'string' ? v.src.trim() : '';
+  if (!alt || src.length > 2000 || !(IMAGE_LOCALE_RE.test(src) || IMAGE_DISTANTE_RE.test(src))) return null;
+  return { src, alt };
+}
+
 function questionValide(q) {
   if (!q || typeof q !== 'object') return null;
   const [id, enonce] = [texte(q.id, ID_MAX), texte(q.enonce)];
@@ -74,6 +87,7 @@ function questionValide(q) {
     explication: texte(q.explication) ?? '',
     bonus: q.bonus === true || fusee,
     ...(Array.isArray(q.objectifs) && { objectifs: numeros(q.objectifs) }),
+    ...(imageValide(q.image) && { image: imageValide(q.image) }),
   };
 }
 

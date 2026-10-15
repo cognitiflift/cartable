@@ -15,6 +15,7 @@ import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs } from './lib/indicateurs.js';
+import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
 
@@ -390,6 +391,18 @@ async function api(req, res, segments) {
       const maintenant = maintenantDe(req.headers);
       const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
       return json(res, 200, indicateurs(await store.lireEvenements(slug), { maintenant, ...periode }));
+    }
+  } else if (r2 === 'rythme' && !id) {
+    // Rythme (#75) : Objectif du jour, série avec jokers et récapitulatif de la semaine, pour cet Élève seul.
+    if (m === 'GET') {
+      const maintenant = maintenantDe(req.headers);
+      const lecons = await store.historiqueDuRythme(slug, { maintenant });
+      const activite = activiteParJour(lecons);
+      return json(res, 200, {
+        objectifDuJour: objectifDuJour(activite, maintenant),
+        serie: serieDeJours(activite, maintenant),
+        recapitulatif: recapitulatifSemaine(lecons, maintenant),
+      });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));

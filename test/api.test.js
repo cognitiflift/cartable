@@ -2722,3 +2722,53 @@ test('Vue parent : le coût des Leçons, total de l\'Élève (Propositions compr
   assert.deepEqual(data.cout.total, (await appel(`/api/eleves/${slug}/couts`)).data.total);
   assert.deepEqual(data.cout.lecons.map((l) => [l.id, l.titre, l.coutUsd, l.tours]), [[b.id, 'Les volcans', 0.5, 2], [a.id, 'Les volcans', 0.25, 1]]);
 });
+
+// Indicateurs (#78) : calculés par l'appli sur une période, à partir des événements datés qu'elle enregistre (tours du
+// prof, réponses aux Révisions du jour, ouverture d'une Leçon). Jamais de tour du prof pour les lire.
+test('Indicateurs : les réponses aux Révisions du jour donnent le taux de souvenir de la période', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Indic-Souvenir', 1);
+  const reviser = (id, choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie }, le(LENDEMAIN));
+  await reviser('q1', 0); // juste
+  await reviser('q2', 0); // ratée
+  const { status, data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-03`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(status, 200);
+  assert.deepEqual(data.periode, { du: '2026-11-01', au: '2026-11-03' });
+  assert.deepEqual(data.souvenir, { reponses: 2, justes: 1, pourcentage: 50 });
+  // Période par défaut : les 28 derniers jours.
+  assert.deepEqual((await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, le(LENDEMAIN))).data.periode, { du: '2026-10-07', au: '2026-11-03' });
+  // Une période mal formée est refusée ; un Élève inconnu n'a pas d'indicateurs.
+  for (const requete of ['du=hier', 'au=2026-02-30', 'du=2026-11-03&au=2026-11-01']) {
+    assert.equal((await appel(`/api/eleves/${slug}/indicateurs?${requete}`)).status, 400, requete);
+  }
+  assert.equal((await appel('/api/eleves/inconnu/indicateurs')).status, 404);
+  await aucunClaudeLance([lecon]);
+});
+
+test('Indicateurs : ouvrir une Leçon puis revenir la semaine d\'après compte dans le retour à 7 jours', async () => {
+  const { slug, lecons: [a, b] } = await eleveRevisions('Indic-Retour', 2);
+  const ouvrir = (lecon, date) => appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(date));
+  await ouvrir(a, '2026-11-02T12:00:00.000Z');
+  await ouvrir(b, '2026-11-03T12:00:00.000Z');
+  await ouvrir(a, '2026-11-10T12:00:00.000Z'); // a : J+8, b : J+7
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-30`, 'GET', undefined, le('2026-11-30T12:00:00.000Z'));
+  assert.deepEqual(data.retour, { lecons: 2, revenus: 2, enAttente: 0, pourcentage: 100 });
+  await aucunClaudeLance([a, b]);
+});
+
+test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le temps d\'attente', async () => {
+  const { slug } = await eleveRevisions('Indic-Attente', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/messages`, 'POST', { texte: 'ok' });
+  const { attente } = (await appel(`/api/eleves/${slug}/indicateurs`)).data;
+  assert.equal(attente.tours, 2);
+  assert.ok(attente.moyenneSecondes >= 0 && attente.maxSecondes >= attente.medianeSecondes);
+  await attendrePropositions(slug);
+});
+
+test('Vue parent : les indicateurs des 28 derniers jours y figurent', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Indic', 1);
+  await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0 }, le(LENDEMAIN));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.indicateurs, (await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, le(LENDEMAIN))).data);
+  assert.deepEqual(data.indicateurs.souvenir, { reponses: 1, justes: 1, pourcentage: 100 });
+});

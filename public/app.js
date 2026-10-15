@@ -124,6 +124,17 @@ const SECTIONS_PARENT = [
   { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
+  // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente } }) => [
+    h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
+    h('ul', {},
+      h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
+        ? `${souvenir.pourcentage} % (${souvenir.justes} sur ${pluriel(souvenir.reponses, 'réponse')})` : 'pas encore de Révision du jour.'),
+      h('li', {}, 'Retour la semaine d’après une nouvelle Leçon : ', retour.lecons
+        ? `${retour.pourcentage} % (${retour.revenus} sur ${pluriel(retour.lecons, 'Leçon')})` : 'pas encore mesurable.',
+        retour.enAttente ? ` ${pluriel(retour.enAttente, 'Leçon')} trop récente${retour.enAttente > 1 ? 's' : ''} pour le dire.` : ''),
+      h('li', {}, 'Attente du prof : ', attente.tours
+        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'))] },
 ];
 
 async function ecranParent(profil) {

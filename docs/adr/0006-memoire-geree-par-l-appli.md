@@ -35,3 +35,9 @@ L'appli prend donc la mémoire en charge, dans l'esprit des ADR 0002 et 0003 : l
 ## Mise à jour du 2026-10-15 : formats de rappel actif (spec #48)
 
 Les formats où l'Élève répond en plusieurs éléments (texte à trous, ordre, associer, classer, exemple à étapes) et « réfléchis puis dévoile » (« à moitié ») donnent un crédit partiel. Une réponse juste en partie (des points, sans être entièrement juste) vaut « difficile », comme juste mais pas sûr : l'Élève en savait une part, la Question revient vite sans repartir de zéro. Faux sans aucun point ou « Je ne sais pas » vaut toujours « à revoir ». Le journal garde ces points (`points`) ; la règle de notation reste dans le module pur de la mémoire. Les variantes restent des QCM : seuls les QCM et leur cas particulier « choisis la meilleure explication » en reçoivent.
+
+## Mise à jour du 2026-10-15 : une Question ratée compte 0 dans la Maîtrise
+
+Juste après une réponse, la courbe d'oubli donne une probabilité de se souvenir de 100 %, quelle que soit la stabilité : un quiz raté à l'instant affichait une Leçon « 100 % acquis ». Une Question dont la dernière réponse est « à revoir » (fausse sans crédit partiel, ou « Je ne sais pas ») compte donc 0 dans la Maîtrise, jusqu'à une réponse juste ou juste en partie (quiz de page ou Révision du jour) ; elle suit ensuite la courbe d'oubli. La probabilité exposée par chaque Question (`rappel`) et le planificateur ne changent pas.
+
+Options écartées : calculer la probabilité au moins un jour après la dernière réponse (une Question ratée vaudrait encore 79 % le lendemain, FSRS supposant la correction lue) ; compter 0 pour les Objectifs pas encore interrogés (mélange « ce que je sais » et « jusqu'où je suis allé », rejeté par l'ADR 0003).

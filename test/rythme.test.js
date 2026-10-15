@@ -108,7 +108,7 @@ test('Récapitulatif de la semaine : les Objectifs devenus Retenus la semaine pa
   const lecons = [leconLibre([
     reussi('2026-09-30', [1]), reussi('2026-10-06', [1]), // Retenu le 6 : compte
     reussi('2026-09-20', [2]), reussi('2026-09-25', [2]), // déjà Retenu avant la semaine
-    reussi('2026-10-10', [3]), reussi('2026-10-12', [3]), // Retenu cette semaine-ci : pour le prochain récapitulatif
+    reussi('2026-10-10', [3]), reussi('2026-10-14', [3]), // Retenu cette semaine-ci : pour le prochain récapitulatif
   ])];
   assert.deepEqual(recapitulatifSemaine(lecons, MERCREDI), {
     du: '2026-10-05', au: '2026-10-11', objectifsRetenus: 1, revisions: 0, pages: 2, joursAtteints: 2,
@@ -137,4 +137,14 @@ test('Récapitulatif de la semaine : le lundi, c\'est la semaine qui vient de fi
   assert.equal(recap.du, '2026-10-05');
   assert.equal(recap.au, '2026-10-11');
   assert.equal(recap.pages, 1);
+});
+
+test('Récapitulatif de la semaine : au premier retour de la semaine seulement, pas les jours suivants', () => {
+  const lecons = [leconLibre([reussi('2026-10-06', [1])])];
+  // Premier retour le mercredi 14 : le récapitulatif s'affiche, toute la journée.
+  assert.equal(recapitulatifSemaine(lecons, MERCREDI).du, '2026-10-05');
+  assert.equal(recapitulatifSemaine(lecons, MERCREDI, { joursActifs: ['2026-10-14', '2026-10-11'] }).du, '2026-10-05');
+  // Déjà revenu le lundi 12 (accueil affiché, ou page faite) : plus de récapitulatif le mercredi.
+  assert.equal(recapitulatifSemaine(lecons, MERCREDI, { joursActifs: ['2026-10-12'] }), null);
+  assert.equal(recapitulatifSemaine([leconLibre([reussi('2026-10-06', [1]), reussi('2026-10-13', [2])])], MERCREDI), null);
 });

@@ -500,24 +500,28 @@ async function api(req, res, segments) {
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
     if (m === 'GET') {
-        const [lecons, couts, evenements] = await Promise.all([store.leconsDuParent(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
+      const [lecons, couts, evenements] = await Promise.all([store.leconsDuParent(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
       return json(res, 200, vueParent(lecons, { couts, maintenant, evenements }));
     }
   } else if (r2 === 'indicateurs' && !id) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
     if (m === 'GET') {
-        const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
+      const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
       return json(res, 200, indicateurs(await store.lireEvenements(slug), { maintenant, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
-    // Rythme (#75) : Objectif du jour, série avec jokers et récapitulatif de la semaine, pour cet Élève seul.
+    // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.
+    // Lu par l'accueil de l'Élève : son affichage est noté (événement `accueil`), pour ne montrer le récapitulatif
+    // qu'au premier retour de la semaine.
     if (m === 'GET') {
-        const lecons = await store.historiqueDuRythme(slug, { maintenant });
+      const [lecons, evenements] = await Promise.all([store.historiqueDuRythme(slug, { maintenant }), store.lireEvenements(slug)]);
+      await noterEvenement(slug, { type: 'accueil', date: new Date(maintenant).toISOString() });
       const activite = activiteParJour(lecons);
+      const joursActifs = evenements.map((e) => e.date ?? e.debut).filter((d) => !Number.isNaN(Date.parse(d))).map(jourLocal);
       return json(res, 200, {
         objectifDuJour: objectifDuJour(activite, maintenant),
-        serie: serieDeJours(activite, maintenant),
-        recapitulatif: recapitulatifSemaine(lecons, maintenant),
+        serieDeJours: serieDeJours(activite, maintenant),
+        recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs }),
       });
     }
   } else if (r2 === 'propositions' && !id) {
@@ -525,7 +529,7 @@ async function api(req, res, segments) {
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
-      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant: maintenant }));
+      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant }));
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps, maintenant));
@@ -540,7 +544,7 @@ async function api(req, res, segments) {
       }
     } else if (!r3) {
       if (m === 'GET') {
-            const lecon = await store.lireLecon(slug, id, { maintenant });
+        const lecon = await store.lireLecon(slug, id, { maintenant });
         // Ouverture par l'Élève dans sa Séance (?ouverture=1, #78) : une Leçon lue ailleurs (vue parent…) n'en est pas une.
         if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') {
           await noterEvenement(slug, { type: 'ouverture', date: new Date(maintenant).toISOString(), lecon: id });
@@ -548,7 +552,7 @@ async function api(req, res, segments) {
         return json(res, 200, lecon);
       }
     } else if (r3 === 'scores' && m === 'POST') {
-      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenant });
+      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant });
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {

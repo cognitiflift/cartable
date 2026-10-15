@@ -210,24 +210,24 @@ async function ecranAccueil(profil) {
     ]));
 }
 
-// Rythme (#75) : l'Objectif du jour et la série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
+// Rythme (#75) : l'Objectif du jour et la Série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
 // de l'effort et de ce qui a été fait, jamais de l'Élève lui-même ni des autres Élèves ; aucun reproche.
-function carteRythme({ objectifDuJour: o, serie }) {
+function carteRythme({ objectifDuJour: o, serieDeJours }) {
   const objectif = o.atteint
     ? '🎯 Objectif du jour atteint : ton travail d’aujourd’hui compte !'
     : `🎯 Objectif du jour : ${o.revisionsVisees} révisions (${o.revisions}/${o.revisionsVisees}) ou ${pluriel(o.pagesVisees, 'page')} de leçon`;
-  const jours = serie.jours
-    ? `🔥 ${pluriel(serie.jours, 'jour')} de suite à travailler${serie.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
+  const jours = serieDeJours.jours
+    ? `🔥 ${pluriel(serieDeJours.jours, 'jour')} de suite à travailler${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
     : '🌱 Chaque jour un peu, c’est comme ça qu’on retient';
   return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
     h('strong', {}, objectif),
     h('small', {}, jours,
-      serie.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serie.jokers, 'joker')}`)),
-    serie.jokersUtilises > 0 && h('small', {}, `🛡️ ${serie.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série pendant ta pause.`));
+      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série de jours si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
+    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`));
 }
 
-// Récapitulatif de la semaine passée (#75), montré au premier retour de la semaine jusqu'à ce que l'Élève le ferme
-// (mémorisé dans ce navigateur : simple confort, il réapparaît si le stockage est indisponible).
+// Récapitulatif de la semaine passée (#75) : le serveur ne l'envoie qu'au premier retour de la semaine (le lundi, ou le
+// premier jour où l'Élève revient). Ce jour-là, l'Élève peut le fermer (mémorisé dans ce navigateur : simple confort).
 const cleRecapitulatif = (profil, recap) => `recapitulatif-${profil.slug}-${recap.du}`;
 function recapitulatifSemaine(profil, recap) {
   if (!recap) return null;
@@ -237,7 +237,7 @@ function recapitulatifSemaine(profil, recap) {
     ? `Cette semaine, tu as retenu ${retenus} ${retenus > 1 ? 'nouveaux Objectifs' : 'nouvel Objectif'} 🌟`
     : 'Ta semaine, en résumé';
   const faits = [recap.revisions && pluriel(recap.revisions, 'révision'), recap.pages && pluriel(recap.pages, 'page') + ' de leçon',
-    recap.joursAtteints && `objectif atteint ${recap.joursAtteints === 1 ? 'un jour' : `${recap.joursAtteints} jours`}`].filter(Boolean).join(' · ');
+    recap.joursAtteints && `Objectif du jour atteint ${recap.joursAtteints === 1 ? 'un jour' : `${recap.joursAtteints} jours`}`].filter(Boolean).join(' · ');
   const carte = h('div', { className: 'carte recapitulatif' },
     h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => {
       try { localStorage.setItem(cleRecapitulatif(profil, recap), '1'); } catch { /* stockage indisponible */ }

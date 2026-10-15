@@ -278,3 +278,15 @@ test('Page préparée retenue : seuls les fichiers que le prof a écrits rejoign
   assert.equal(await fs.readFile(path.join(lecon, 'sources', 'lecon.pdf'), 'utf8'), 'PDF');
   await assert.rejects(fs.access(travail), { code: 'ENOENT' });
 });
+
+test('Événements des indicateurs : ajoutés un à un sans réécrire les précédents, anciens evenements.json relus', async () => {
+  const ancien = { type: 'ouverture', date: '2026-09-01T10:00:00.000Z', lecon: 'a' };
+  await fs.writeFile(path.join(dossier, 'zoe', 'evenements.json'), JSON.stringify([ancien]));
+  const nouveaux = [{ type: 'revision', date: '2026-10-01T10:00:00.000Z', lecon: 'a', juste: true }, { type: 'accueil', date: '2026-10-02T10:00:00.000Z' }];
+  await Promise.all(nouveaux.map((e) => store.enregistrerEvenement('zoe', e)));
+  assert.deepEqual(await store.lireEvenements('zoe'), [ancien, ...nouveaux]);
+  // Une ligne abîmée est ignorée, pas tout le journal.
+  await fs.appendFile(path.join(dossier, 'zoe', 'evenements.jsonl'), '{"type":"tou\n');
+  await store.enregistrerEvenement('zoe', { type: 'accueil', date: '2026-10-03T10:00:00.000Z' });
+  assert.equal((await store.lireEvenements('zoe')).length, 4);
+});

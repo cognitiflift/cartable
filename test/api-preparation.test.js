@@ -16,7 +16,8 @@ before(async () => {
   // Faux `claude` : chaque tour écrit la page suivante de lessons/ (la première est un Pré-test, les autres ont un quiz
   // ordinaire du Kit) et note son début et sa fin dans `journal` (« debut preparation <élève>/<leçon> », « fin lecon <élève>/<leçon> »).
   // Dans le dossier d'une page préparée (pages-preparees/<leçon>), il écrit « préparée » dans la page ; le fichier
-  // `attendre-preparation` l'y fait patienter, et `echouer-preparation` l'y fait échouer après un tour payé.
+  // `attendre-preparation` l'y fait patienter, et `echouer-preparation` l'y fait échouer après un tour payé. Les
+  // arguments du dernier tour sont notés dans `args-lecon` ou `args-preparation`.
   // Les Propositions, hors sujet ici, restent vides.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
@@ -28,6 +29,7 @@ fi
 LECON=$(basename "$(dirname "$(dirname "$PWD")")")/$(basename "$PWD")
 if [ "$(basename "$(dirname "$PWD")")" = pages-preparees ]; then QUI=preparation; else QUI=lecon; fi
 echo "debut $QUI $LECON" >> '${dossier}/journal'
+printf '%s\n' "$@" > '${dossier}/args-'$QUI
 if [ $QUI = preparation ]; then
   while [ -e '${dossier}/attendre-preparation' ]; do sleep 0.05; done
 fi
@@ -248,4 +250,19 @@ test('Une préparation ratée compte quand même son coût avec la Leçon', asyn
   } finally {
     await fs.rm(path.join(dossier, 'echouer-preparation'), { force: true });
   }
+});
+
+test('Résultats du quiz déjà connus quand la préparation démarre : ils sont transmis au prof, et la page sert', async () => {
+  const slug = await nouvelEleve();
+  await appel(`/api/eleves/${slug}`, 'PUT', { preparerPages: false }); // pas de page préparée pendant le quiz
+  const { cle, url } = await leconCommencee(slug);
+  await appel(`/api/eleves/${slug}`, 'PUT', { preparerPages: true });
+  await quiz(url, '0002-page.html', 40); // le Retour de quiz lance la préparation, résultats connus
+  await preparationFinie(cle);
+  const args = await fs.readFile(path.join(dossier, 'args-preparation'), 'utf8');
+  assert.match(args, /Résultats du dernier quiz : 0002-page\.html, 40 %/);
+  assert.doesNotMatch(args, /tu ne connais pas encore ses résultats/);
+
+  const suite = await appel(`${url}/rebonds`, 'POST', { action: 'suivante' });
+  assert.equal(suite.data.messages.at(-1).texte, 'Page 3 (preparation)');
 });

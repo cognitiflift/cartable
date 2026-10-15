@@ -193,7 +193,8 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
 }
 
 // Page suivante préparée pendant le quiz (#74) : quand un tour laisse une Page de leçon affichée, un seul tour du prof
-// en arrière-plan prépare la page du Rebond le plus probable (lib/preparation.js), dans un dossier à part. Jamais en
+// en arrière-plan prépare la page du Rebond le plus probable (lib/preparation.js), dans un dossier à part. Sans page
+// préparée pendant le quiz, son Retour en fait préparer une, qui reçoit alors les résultats du quiz. Jamais en
 // même temps qu'un autre tour de la Leçon : il ne démarre pas si la Leçon est occupée, et tout tour suivant l'attend.
 // Coupée sans relais (la session du prof ne se reprend pas ailleurs que dans la Leçon), par CARTABLE_PREPARATION=0,
 // par le Profil ou quand trop de pages préparées restent inutilisées.
@@ -558,7 +559,9 @@ async function api(req, res, segments) {
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
-      return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
+      const lecon = await retourQuiz(slug, id, await lireCorps(req));
+      preparerPageSuivante(slug, id); // aucune page préparée pendant le quiz : une, avec ses résultats (#74)
+      return json(res, 200, lecon);
     } else if (r3 === 'rebonds' && m === 'POST') {
       return json(res, 200, await rebond(slug, id, await lireCorps(req), maintenant));
     } else if (r3 === 'messages' && m === 'POST') {

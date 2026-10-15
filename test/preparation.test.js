@@ -12,15 +12,15 @@ const lecon = (champs = {}) => ({
 const score = (valeur, page = '0001-page.html', autres = {}) => ({ score: valeur, page, date: '2026-10-01T10:00:00Z', ...autres });
 
 test('Prévision : Étape suivante en Leçon libre, supposée réussie', () => {
-  assert.deepEqual(pagePrevue(lecon(), quiz), { action: 'suivante', reussi: true, page: '0002-page.html' });
-  assert.deepEqual(pagePrevue(lecon({ scores: [score(20)] }), quiz), { action: 'suivante', reussi: true, page: '0002-page.html' });
+  assert.deepEqual(pagePrevue(lecon(), quiz), { action: 'suivante', reussi: true, page: '0002-page.html', resultatsConnus: false });
+  assert.deepEqual(pagePrevue(lecon({ scores: [score(20)] }), quiz), { action: 'suivante', reussi: true, page: '0002-page.html', resultatsConnus: false });
 });
 
 test('Prévision en révision : Défi si le dernier vrai quiz est réussi, sinon Revoir (sans vrai quiz, Revoir)', () => {
   const revision = (scores) => pagePrevue(lecon({ mode: 'revision', scores }), quiz);
-  assert.deepEqual(revision([score(90)]), { action: 'defi', reussi: true, page: '0002-page.html' });
-  assert.deepEqual(revision([score(90), score(60)]), { action: 'revoir', reussi: false, page: '0002-page.html' });
-  assert.deepEqual(revision([score(100, '0001-devine.html', { pretest: true })]), { action: 'revoir', reussi: false, page: '0002-page.html' });
+  assert.deepEqual(revision([score(90)]), { action: 'defi', reussi: true, page: '0002-page.html', resultatsConnus: false });
+  assert.deepEqual(revision([score(90), score(60)]), { action: 'revoir', reussi: false, page: '0002-page.html', resultatsConnus: false });
+  assert.deepEqual(revision([score(100, '0001-devine.html', { pretest: true })]), { action: 'revoir', reussi: false, page: '0002-page.html', resultatsConnus: false });
   // Leçon libre qu'on Révise : comme une révision.
   assert.equal(pagePrevue(lecon({ reviserEnCours: true, scores: [score(50)] }), quiz).action, 'revoir');
 });
@@ -74,4 +74,17 @@ test('Consigne d\'une page préparée : celle du Rebond prévu, sans résultats 
   assert.match(consigne, /en rate une partie/);
   assert.doesNotMatch(consigne, /Résultats du dernier quiz/);
   assert.match(consignePreparation({ action: 'defi', reussi: true, page: '0003-page.html' }, { mode: 'revision' }), /\[Rebond : Défi\.\][\s\S]*qu'il le réussit/);
+});
+
+test('Prévision avec les résultats du quiz déjà connus (Retour de quiz fait) : le Rebond proposé, réussi ou non selon le score', () => {
+  const apres = (valeur, champs = {}) => lecon({ quizEnAttente: false, scores: [score(valeur, '0002-page.html')], ...champs });
+  assert.deepEqual(pagePrevue(apres(40, { rebondsProposes: ['suivante'] }), quiz), { action: 'suivante', reussi: false, page: '0002-page.html', resultatsConnus: true });
+  assert.deepEqual(pagePrevue(apres(90, { mode: 'revision', rebondsProposes: ['defi'] }), quiz), { action: 'defi', reussi: true, page: '0002-page.html', resultatsConnus: true });
+  // Étape suivante et Réviser proposés : l'Étape suivante, la plus probable.
+  assert.equal(pagePrevue(apres(90, { rebondsProposes: ['suivante', 'reviser'] }), quiz).action, 'suivante');
+  // Rien : Rebond pas encore proposé, Leçon terminée (Réviser seul), Pré-test, quiz d'une autre page.
+  assert.equal(pagePrevue(apres(90), quiz), null);
+  assert.equal(pagePrevue(apres(90, { mode: 'revision', rebondsProposes: ['reviser'] }), quiz), null);
+  assert.equal(pagePrevue(lecon({ quizEnAttente: false, rebondsProposes: ['commencer'], scores: [score(50, '0002-page.html', { pretest: true })] }), quiz), null);
+  assert.equal(pagePrevue(lecon({ quizEnAttente: false, rebondsProposes: ['suivante'], scores: [score(90, '0001-devine.html')] }), quiz), null);
 });

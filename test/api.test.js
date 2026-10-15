@@ -567,9 +567,9 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
   };
   assert.equal(lecon.niveauLecon, 1);
   assert.deepEqual(lecon.objectifs, [
-    { texte: 'Nommer les parties d’un volcan', atteint: false },
-    { texte: 'Expliquer une éruption', atteint: false },
-    { texte: 'Situer trois volcans', atteint: false },
+    { texte: 'Nommer les parties d’un volcan', atteint: false, retenu: false },
+    { texte: 'Expliquer une éruption', atteint: false, retenu: false },
+    { texte: 'Situer trois volcans', atteint: false, retenu: false },
   ]);
   assert.equal((await resume()).niveauLecon, 1);
 
@@ -590,6 +590,40 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
 
   // Le Retour de quiz accepte aussi les numéros.
   assert.equal((await appel(`${url}/retours`, 'POST', { score: 90, page: '0001-volcans.html', objectifs: [2] })).status, 200);
+});
+
+test('Retenu : un Objectif réussi de nouveau au moins 24 heures plus tard est Retenu, dans la Leçon et la liste', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const fichier = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'etat.json');
+  const retenus = (l) => l.objectifs.map((o) => o.retenu);
+  const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  // Dates des entrées de score fixées par le test, dans etat.json (Espace personnel lisible).
+  const dater = async (...dates) => {
+    const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+    etat.scores = etat.scores.map((s, i) => ({ ...s, date: dates[i] }));
+    await fs.writeFile(fichier, JSON.stringify(etat));
+  };
+  for (const [score, objectifs] of [[85, [1, 2]], [90, [1]], [100, [2]]]) {
+    assert.equal((await appel(`${url}/scores`, 'POST', { score, page: '0001-volcans.html', objectifs })).status, 201);
+  }
+
+  // Deux succès le même jour : atteints, pas Retenus.
+  await dater('2026-10-01T09:00:00.000Z', '2026-10-01T18:00:00.000Z', '2026-10-01T20:00:00.000Z');
+  assert.deepEqual(retenus((await appel(url)).data), [false, false, false]);
+  assert.deepEqual(retenus(await resume()), [false, false, false]);
+
+  // Objectif 1 réussi de nouveau 25 heures plus tard : Retenu ; le Niveau de Leçon ne change pas.
+  await dater('2026-10-01T09:00:00.000Z', '2026-10-02T10:00:00.000Z', '2026-10-01T20:00:00.000Z');
+  const lue = (await appel(url)).data;
+  assert.deepEqual(retenus(lue), [true, false, false]);
+  assert.deepEqual(lue.objectifs.map((o) => o.atteint), [true, true, false]);
+  assert.equal(lue.niveauLecon, 3);
+  assert.deepEqual(retenus(await resume()), [true, false, false]);
+
+  // Un quiz raté ensuite ne retire rien : Retenu pour toujours.
+  const rate = (await appel(`${url}/scores`, 'POST', { score: 10, page: '0001-volcans.html', objectifs: [1] })).data;
+  assert.deepEqual(retenus(rate), [true, false, false]);
 });
 
 test('Niveau de Leçon : pas de Niveau sans Objectifs, ni pour une Leçon de révision', async () => {
@@ -781,6 +815,43 @@ test('Résultats par question : la consigne du Rebond suivant porte les question
   assert.equal(page.split('Résultats du dernier quiz').length, 2);
   assert.match(page, /il a choisi « De la lave refroidie »/);
   assert.equal(page.split('court encart sur ce qu\'il a raté').length, 2);
+});
+
+test('Confiance : gardée dans les résultats par question, sans effet sur le score ; les erreurs commises « sûr » sont listées à part dans la consigne du Rebond', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const args = path.join(dossier, `args-${lecon.id}`);
+  const q = (id, juste, sur) => ({ id, enonce: `Question ${id} ?`, choisie: juste ? 'oui' : 'non', bonne: 'oui', juste, bonus: false, ...(sur !== undefined && { sur }) });
+  const corps = { score: 0, page: '0001-volcans.html', questions: [q('q1', false, true), q('q2', false, false), q('q3', true, true), q('q4', false, 'oui'), q('q5', true)] };
+  const r = await appel(`${url}/scores`, 'POST', corps);
+  assert.equal(r.status, 201);
+  const entree = r.data.scores.at(-1);
+  assert.equal(entree.score, 40);
+  assert.deepEqual(entree.questions.map((x) => x.sur), [true, false, true, undefined, undefined]);
+  assert.equal(Object.hasOwn(entree.questions[3], 'sur'), false, 'une Confiance invalide est ignorée');
+
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', corps)).data.rebondsProposes, ['revoir']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(args, 'utf8');
+  const [, sures] = consigne.split('Erreurs commises en étant « sûr »');
+  assert.ok(sures, 'la consigne porte une liste des erreurs commises « sûr »');
+  assert.match(sures, /^[^]*?- « Question q1 \? »/);
+  assert.doesNotMatch(sures.split('\n\n')[0], /Question q2|Question q3|Question q4/);
+  assert.match(consigne, /retravaille-les d'abord/);
+});
+
+test('Confiance : un quiz sans Confiance (anciens scores) ne porte aucune liste d\'erreurs « sûr »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const corps = { score: 50, page: 'p.html', questions: [{ id: 'q1', enonce: 'A ?', choisie: 'non', bonne: 'oui', juste: false, bonus: false }, { id: 'q2', enonce: 'B ?', choisie: 'oui', bonne: 'oui', juste: true, bonus: false }] };
+  assert.equal((await appel(`${url}/scores`, 'POST', corps)).status, 201);
+  await appel(`${url}/retours`, 'POST', corps);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.doesNotMatch(consigne, /« sûr »/);
+  assert.match(consigne, /il a choisi « non »/);
 });
 
 test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {
@@ -1453,3 +1524,16 @@ test('Visuels : une adresse morte, un fichier qui n\'est pas une image ou une ad
   await message(lecon, 'ok');
   assert.doesNotMatch(await args(), /Images retirées/);
 }));
+
+test('Ma fiche : la Leçon lue expose ses documents de référence (reference/*.html), liste vide sinon', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les glaciers' })).data;
+  assert.deepEqual(lecon.references, []);
+  const dossierReference = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'reference');
+  await fs.mkdir(dossierReference);
+  await fs.writeFile(path.join(dossierReference, 'glossaire.html'), '<h1>Glossaire</h1>');
+  await fs.writeFile(path.join(dossierReference, 'fiche.html'), '<h1>Fiche</h1>');
+  await fs.writeFile(path.join(dossierReference, 'notes.txt'), 'pas un document');
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data;
+  assert.deepEqual(lue.references, ['fiche.html', 'glossaire.html']);
+  assert.equal((await fetch(`${base}/fichiers/zoe-test/${lecon.id}/reference/fiche.html`)).status, 200);
+});

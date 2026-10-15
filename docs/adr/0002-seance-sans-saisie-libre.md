@@ -10,3 +10,14 @@ Les Élèves sont des enfants : une conversation libre avec l'agent risquait de 
 
 - Garder un tour du prof pour le Retour de quiz, avec un Modèle léger : rejeté, l'Élève attend toujours et le prof ne voit le raté qu'en pourcentage.
 - Ne plus afficher de Retour de quiz : rejeté, l'Élève perd l'encouragement immédiat et l'annonce de ses Étoiles.
+
+## Cadrage posé par l'appli (mise à jour, spec #46)
+
+Jusqu'ici, seul le prof posait des questions, et toujours dans un tour payé. Pour situer l'Élève dès le départ, l'appli pose désormais elle-même, dans l'écran « Nouvelle leçon » et avant tout tour du prof, deux questions fixes du **Cadrage** : « Pourquoi ? » et « Tu en sais déjà… » (seulement la seconde pour une Leçon de révision). Leurs réponses sont **fermées**, comme les actions de Rebond : l'écran envoie des valeurs d'une liste fixée par l'appli, jamais du texte, et le serveur refuse toute valeur inconnue. « Je ne sais pas » est toujours possible, et le Cadrage peut être absent. L'appli enregistre ces réponses dans la Leçon et les transmet au prof, sous forme de libellés, dans le premier prompt. Le prof pose ensuite, comme toute question, avec une ligne `CHOIX`, ses deux questions propres au sujet, puis crée le Pré-test. Le principe de cet ADR ne change pas : l'Élève n'écrit toujours rien, et ces questions fixes ne coûtent aucun token.
+
+Dans le même esprit, la **Confiance** (« sûr » ou « pas sûr », après chaque réponse d'un quiz et avant la correction) est un choix à deux boutons dans le quiz du Kit, sans effet sur le score.
+
+### Considered Options
+
+- Laisser le prof poser toutes les questions du Cadrage : rejeté, l'Élève attendrait un tour pour des questions qui ne dépendent pas du sujet, et le nombre de questions resterait au hasard du prof.
+- Faire écrire à l'Élève ce qu'il sait déjà : rejeté, contraire à cet ADR (aucune saisie libre).

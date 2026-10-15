@@ -5,7 +5,9 @@
 // Données écrites par le prof dans la Page de leçon (voir LISEZMOI.md) :
 //   { objectifs: [n…], questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs? }] }
 // Message envoyé à l'appli à la fin du quiz (`cartable-score`) :
-//   { type, score, page, objectifs, bonus?, questions: [{ id, enonce, choisie, bonne, juste, bonus, objectifs }] }
+//   { type, score, page, objectifs, bonus?, questions: [{ id, enonce, choisie, bonne, juste, bonus, objectifs, sur? }] }
+// `sur` : Confiance de l'Élève, donnée après le choix et avant la correction (true = « sûr », false = « pas sûr ») ;
+// absente si l'Élève ne l'a pas donnée (anciennes pages). Elle n'entre jamais dans le score.
 
 // Limites communes : au-delà, un texte est tronqué (jamais écarté) et les questions en trop sont ignorées.
 export const QUESTIONS_MAX = 50;
@@ -84,7 +86,10 @@ export function lireResultats(brut, nombreObjectifs = Infinity) {
     if (!q || typeof q !== 'object' || typeof q.juste !== 'boolean') return null;
     const [id, enonce, choisie, bonne] = [texte(q.id, ID_MAX), texte(q.enonce), texte(q.choisie), texte(q.bonne)];
     if (!id || !enonce || !choisie || !bonne) return null;
-    return { id, enonce, choisie, bonne, juste: q.juste, bonus: q.bonus === true, objectifs: numeros(q.objectifs, nombreObjectifs) };
+    return {
+      id, enonce, choisie, bonne, juste: q.juste, bonus: q.bonus === true, objectifs: numeros(q.objectifs, nombreObjectifs),
+      ...(typeof q.sur === 'boolean' && { sur: q.sur }),
+    };
   });
 }
 
@@ -103,12 +108,14 @@ export function melanger(nombre, aleatoire = Math.random) {
   return ordre;
 }
 
-// Message de fin de quiz. `choix` : id de question → index de la réponse choisie (avant mélange).
-// Score : % de questions justes hors bonus, arrondi. Objectifs : ceux du quiz et ceux propres aux questions.
-export function messageScore(quiz, choix, page) {
+// Message de fin de quiz. `choix` : id de question → index de la réponse choisie (avant mélange) ; `confiance` :
+// id de question → true (« sûr ») ou false (« pas sûr »). Score : % de questions justes hors bonus, arrondi, sans
+// effet de la Confiance. Objectifs : ceux du quiz et ceux propres aux questions.
+export function messageScore(quiz, choix, page, confiance = {}) {
   const questions = quiz.questions.map((q) => {
     const { juste, bonne } = corriger(q, choix[q.id]);
-    return { id: q.id, enonce: q.enonce, choisie: q.reponses[choix[q.id]] ?? null, bonne, juste, bonus: q.bonus, objectifs: q.objectifs ?? quiz.objectifs };
+    return { id: q.id, enonce: q.enonce, choisie: q.reponses[choix[q.id]] ?? null, bonne, juste, bonus: q.bonus, objectifs: q.objectifs ?? quiz.objectifs,
+      ...(typeof confiance[q.id] === 'boolean' && { sur: confiance[q.id] }) };
   });
   const objectifs = [...new Set(questions.filter((q) => !q.bonus).flatMap((q) => q.objectifs))].sort((a, b) => a - b);
   const bonus = bonusDesQuestions(questions);

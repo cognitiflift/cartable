@@ -14,6 +14,7 @@ import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
+import { jourValide, minuitDu } from './lib/jour.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -227,7 +228,7 @@ function varierQuestions(slug, id) {
 async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
   const cadrage = validerCadrage(brut, 'revision');
   // Date de contrôle (#68) : gardée dans la Leçon, c'est l'appli qui resserre les révisions jusqu'à elle (lib/memoire.js).
-  const controle = typeof dateControle === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateControle) ? dateControle : null;
+  const controle = jourValide(dateControle) ? dateControle : null;
   const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage, dateControle: controle });
   const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
   const prompt = [
@@ -236,7 +237,7 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut })
     `Lis le document. Après le Pré-test viendra une révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document), avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
     consignePremierTour('revision', cadrage),
   ].join('\n');
-  const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
+  const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(minuitDu(controle)).toLocaleDateString('fr-BE')})` : ''}.`;
   return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(prompt, cadrage), affiche, premier: true });
 }
 

@@ -162,7 +162,7 @@ test('Date de contrôle : après la date, le planificateur reprend son cours nor
 test('Date de contrôle : une date illisible ne change rien', () => {
   const journal = [enNovembre(1), enNovembre(4)];
   const options = { maintenant: '2026-11-04T12:00:00' };
-  for (const dateControle of ['demain', '2026-13-45x', 42]) {
+  for (const dateControle of ['demain', '2026-13-45x', '2026-13-45', '2026-11-31', 42]) {
     assert.deepEqual(memoireDeQuestion(journal, { ...options, dateControle }), memoireDeQuestion(journal, options));
   }
 });

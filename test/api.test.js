@@ -2099,6 +2099,9 @@ test('Date de contrôle : gardée et exposée par la Leçon de révision, sans c
   assert.equal(lecon.dateControle, '2026-11-20');
   assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.dateControle, '2026-11-20');
   assert.equal((await appel(`/api/eleves/${slug}/lecons`)).data.find((l) => l.id === lecon.id).dateControle, '2026-11-20');
+  // Compte à rebours de l'accueil : jours locaux restants avant le contrôle, à la date de la lecture.
+  const le18 = { 'X-Cartable-Maintenant': new Date(2026, 10, 18, 23, 30).toISOString() };
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, le18)).data.find((l) => l.id === lecon.id).joursAvantControle, 2);
   const prompt = await argsDe(lecon);
   assert.match(prompt, /contrôle le 2026-11-20/);
   assert.doesNotMatch(prompt, /révision espacée/);
@@ -2106,6 +2109,12 @@ test('Date de contrôle : gardée et exposée par la Leçon de révision, sans c
   const sans = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: 'bientôt' })).data;
   assert.equal(sans.dateControle, null);
   assert.equal((await appel(`/api/eleves/${slug}/lecons/${sans.id}`)).data.dateControle, null);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${sans.id}`)).data.joursAvantControle, null);
+  // Une date impossible (mois 13, 30 février) n'est pas gardée non plus.
+  for (const impossible of ['2026-13-45', '2027-02-30']) {
+    const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: impossible })).data;
+    assert.equal(lecon.dateControle, null, impossible);
+  }
   const libre = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;
   assert.equal((await appel(`/api/eleves/${slug}/lecons/${libre.id}`)).data.dateControle, null);
 });

@@ -16,29 +16,29 @@ const lecon = ({ revisions = [], quiz = [], pages = [] } = {}) => ({
   ] }],
 });
 
-test('Activité : Révisions du jour répondues et pages terminées, par jour local, toutes Leçons', () => {
+test('Activité : Révisions du jour répondues (dont justes), pages terminées et quiz faits, par jour local, toutes Leçons', () => {
   const activite = activiteParJour([
     lecon({ revisions: ['2026-10-12', '2026-10-12'], quiz: ['2026-10-12'], pages: [['2026-10-12', '0002-a.html']] }),
     lecon({ revisions: ['2026-10-12', '2026-10-13'], pages: [['2026-10-13', '0002-b.html'], ['2026-10-13', '0003-c.html']] }),
   ]);
   assert.deepEqual(activite, {
-    '2026-10-12': { revisions: 3, pages: 1 },
-    '2026-10-13': { revisions: 1, pages: 2 },
+    '2026-10-12': { revisions: 3, justes: 0, pages: 1, quiz: 1 },
+    '2026-10-13': { revisions: 1, justes: 0, pages: 2, quiz: 2 },
   });
 });
 
-test('Activité : une page refaite le même jour ne compte qu\'une fois ; le Pré-test ne compte pas', () => {
+test('Activité : une page refaite le même jour ne compte qu\'une fois (mais ses deux quiz comptent) ; le Pré-test ne compte pas', () => {
   const activite = activiteParJour([lecon({ pages: [
     ['2026-10-12', '0002-a.html'], ['2026-10-12', '0002-a.html'], ['2026-10-12', '0001-pretest.html', { pretest: true }],
   ] })]);
-  assert.deepEqual(activite, { '2026-10-12': { revisions: 0, pages: 1 } });
+  assert.deepEqual(activite, { '2026-10-12': { revisions: 0, justes: 0, pages: 1, quiz: 2 } });
 });
 
 test('Activité : le jour est celui de l\'heure locale, minuit compris', () => {
   const activite = activiteParJour([{ scores: [], questions: [{ journal: [
-    { date: iso('2026-10-12', 23), origine: 'revision' }, { date: iso('2026-10-13', 0), origine: 'revision' },
+    { date: iso('2026-10-12', 23), origine: 'revision', juste: true }, { date: iso('2026-10-13', 0), origine: 'revision' },
   ] }] }]);
-  assert.deepEqual(activite, { '2026-10-12': { revisions: 1, pages: 0 }, '2026-10-13': { revisions: 1, pages: 0 } });
+  assert.deepEqual(activite, { '2026-10-12': { revisions: 1, justes: 1, pages: 0, quiz: 0 }, '2026-10-13': { revisions: 1, justes: 0, pages: 0, quiz: 0 } });
 });
 
 test('Objectif du jour : 5 Révisions du jour ou une Page de leçon', () => {

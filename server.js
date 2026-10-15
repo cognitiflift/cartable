@@ -14,10 +14,10 @@ import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
 import { vueParent } from './lib/parent.js';
-import { indicateurs } from './lib/indicateurs.js';
+import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
 import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
-import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
+import { jourValide, minuitDu } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -49,13 +49,13 @@ const json = (res, status, data) => {
 const noterEvenement = (slug, evenement) =>
   store.enregistrerEvenement(slug, evenement).catch((e) => console.error(`Événement de ${slug} : ${e.message}`));
 
-// Période des indicateurs lue dans la requête (?du=AAAA-MM-JJ&au=AAAA-MM-JJ, bornes comprises) : `au` vaut aujourd'hui
-// par défaut, `du` est laissé à lib/indicateurs.js. 400 pour une date invalide ou une période à l'envers.
+// Période des indicateurs lue dans la requête (?du=AAAA-MM-JJ&au=AAAA-MM-JJ, bornes comprises), complétée par la
+// période par défaut (lib/indicateurs.js). 400 pour une date invalide ou une période à l'envers.
 function periodeDe(url, maintenant) {
-  const du = url.searchParams.get('du') ?? undefined;
-  const au = url.searchParams.get('au') ?? jourLocal(maintenant);
-  if ((du !== undefined && !jourValide(du)) || !jourValide(au) || (du !== undefined && du > au)) throw new HttpError(400, 'Période invalide');
-  return { du, au };
+  const [du, au] = ['du', 'au'].map((cle) => url.searchParams.get(cle) ?? undefined);
+  const periode = periodeDesIndicateurs(maintenant, { du, au });
+  if (!jourValide(periode.du) || !jourValide(periode.au) || periode.du > periode.au) throw new HttpError(400, 'Période invalide');
+  return periode;
 }
 
 async function lireCorps(req, max = 100_000) {
@@ -489,7 +489,7 @@ async function api(req, res, segments) {
     // Révisions du jour (#66) : servies et corrigées par l'appli, jamais de tour du prof.
     if (m === 'GET') {
       const suite = new URL(req.url, 'http://x').searchParams.get('suite') === '1';
-      const { dues, questions } = revisionsDuJour(await store.leconsAReviser(slug, { maintenant }), { maintenant, suite });
+      const { dues, questions } = revisionsDuJour(await store.leconsLues(slug, { maintenant }), { maintenant, suite });
       return json(res, 200, { dues, questions: questions.map((q) => avecAdresseDImage(slug, q)) });
     }
     if (m === 'POST') {
@@ -503,7 +503,7 @@ async function api(req, res, segments) {
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
     if (m === 'GET') {
-      const [lecons, couts, evenements] = await Promise.all([store.leconsDuParent(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
+      const [lecons, couts, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
       return json(res, 200, vueParent(lecons, { couts, maintenant, evenements }));
     }
   } else if (r2 === 'indicateurs' && !id) {
@@ -517,14 +517,13 @@ async function api(req, res, segments) {
     // Lu par l'accueil de l'Élève : son affichage est noté (événement `accueil`), pour ne montrer le récapitulatif
     // qu'au premier retour de la semaine.
     if (m === 'GET') {
-      const [lecons, evenements] = await Promise.all([store.historiqueDuRythme(slug, { maintenant }), store.lireEvenements(slug)]);
+      const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
       await noterEvenement(slug, { type: 'accueil', date: new Date(maintenant).toISOString() });
       const activite = activiteParJour(lecons);
-      const joursActifs = evenements.map((e) => e.date ?? e.debut).filter((d) => !Number.isNaN(Date.parse(d))).map(jourLocal);
       return json(res, 200, {
         objectifDuJour: objectifDuJour(activite, maintenant),
         serieDeJours: serieDeJours(activite, maintenant),
-        recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs }),
+        recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
     }
   } else if (r2 === 'propositions' && !id) {

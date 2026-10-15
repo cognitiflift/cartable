@@ -189,7 +189,7 @@ async function ecranRevisions(profil) {
         rendreQuestion(q, {
           quandCorrigee: async ({ choisie, sur }) => {
             try {
-              await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur } });
+              await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
               ensuite.hidden = false;
             } catch (e) { erreur.textContent = e.message; }
           },

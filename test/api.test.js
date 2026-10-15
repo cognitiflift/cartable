@@ -27,6 +27,21 @@ before(async () => {
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
   // CARTABLE_IMAGES_LOCALES=1 : le serveur accepte les images du petit serveur local lancé par les tests de Visuels.
   // CARTABLE_HORLOGE_INJECTABLE=1 : le serveur prend « maintenant » dans l'en-tête X-Cartable-Maintenant (révisions datées).
+  // Dans le dossier des Variantes d'une Leçon, il note chaque lancement (`lancements-variantes`) et ses arguments
+  // (`args-variantes`), puis écrit variantes.json d'après questions-a-varier.json (faux-variantes.mjs) : pour chaque
+  // Question, deux variantes valides (réponses inversées) et une mal formée. `variantes-attendre` le fait patienter,
+  // `variantes-echouer` le fait échouer, `variantes-mal-formees` ne lui fait écrire que des variantes mal formées.
+  await fs.writeFile(path.join(dossier, 'faux-variantes.mjs'), `import fs from 'node:fs';
+const demandes = JSON.parse(fs.readFileSync('questions-a-varier.json', 'utf8'));
+const malFormees = fs.existsSync(process.argv[2]);
+const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication });
+const sortie = Object.fromEntries(demandes.map((q) => [q.cle, [
+  ...(malFormees ? [] : [variante(q, 1), variante(q, 2)]),
+  { enonce: q.enonce + ' (mal formée)', reponses: q.reponses, bonne: 9, explication: '' },
+  { enonce: '', reponses: ['a'], bonne: 0 },
+]]));
+fs.writeFileSync('variantes.json', JSON.stringify(sortie));
+`);
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
@@ -36,6 +51,18 @@ else
   COUT=',"total_cost_usd":0.25,'"$USAGE"',"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}'
 fi
 [ -e '${dossier}/sans-cout' ] && COUT=''
+if [ "$(basename "$PWD")" = variantes ]; then
+  echo lancement >> '${dossier}/lancements-variantes'
+  printf '%s\n' "$@" > '${dossier}/args-variantes'
+  while [ -e '${dossier}/variantes-attendre' ]; do sleep 0.05; done
+  if [ -e '${dossier}/variantes-echouer' ]; then
+    echo '{"result":"You have hit your limit","is_error":true}'
+    exit 0
+  fi
+  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees'
+  echo '{"result":"ok","session_id":"s-var","is_error":false,"total_cost_usd":0.01,"modelUsage":{"claude-haiku-test":{"costUSD":0.01}}}'
+  exit 0
+fi
 if [ "$(basename "$PWD")" = propositions ]; then
   echo lancement >> '${dossier}/lancements-propositions'
   printf '%s\n' "$@" > '${dossier}/args-propositions'
@@ -1395,7 +1422,7 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.equal(parId[a.id].titre, 'Les volcans');
   assert.equal(parId[a.id].total.coutUsd, 0.75);
   assert.deepEqual(Object.fromEntries(Object.entries(parId[a.id].parTache).map(([t, c]) => [t, c.tours])),
-    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0 });
+    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0, variantes: 0 });
   assert.equal(parId[b.id].total.coutUsd, 0.5);
   assert.equal(parId[b.id].parTache.premiereSeance.tours, 2);
 
@@ -2124,4 +2151,156 @@ test('Consignes du prof : le préambule d\'une session reprise cite aussi les Qu
   const sans = await leconBanque();
   assert.equal((await message(sans, 'Page suivante')).status, 200);
   assert.doesNotMatch(await argsDe(sans), /Questions les plus fragiles/);
+});
+
+// Variantes des Questions (#69), écrites en arrière-plan par le faux `claude` (voir faux-variantes.mjs).
+const nbLancementsVariantes = async () => (await fs.readFile(path.join(dossier, 'lancements-variantes'), 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length;
+const pause = (ms = 200) => new Promise((r) => setTimeout(r, ms));
+// Élève neuf avec `nombre` Leçons dont la page 0002-volcans.html porte `quizBanque` ; Propositions attendues et traces
+// de lancement des Variantes effacées.
+const eleveVariantes = async (pseudo, nombre = 1) => {
+  const slug = slugify(pseudo);
+  await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecons = [];
+  for (let i = 0; i < nombre; i++) {
+    const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: `sujet ${i}` })).data);
+    await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizBanque)}</script>`);
+    lecons.push(lecon);
+  }
+  await attendrePropositions(slug);
+  await fs.rm(path.join(dossier, 'lancements-variantes'), { force: true });
+  const quiz = (lecon, date = BANQUE_DATE) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(date));
+  const lire = async (lecon) => (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  const avecVariantes = (lecon) => sonderJusqua(() => lire(lecon), (qs) => qs.length && qs.every((q) => q.variantes?.length), 'Variantes jamais rattachées');
+  // Plus aucun tour de Variantes en cours : le dossier de travail est vidé à la fin de chaque tour.
+  const finDuTour = (lecon) => sonderJusqua(() => existe(path.join(eleves, slug, 'lecons', lecon.id, 'variantes', 'questions-a-varier.json')), (e) => !e, 'Tour de Variantes jamais fini');
+  return { slug, lecons, quiz, lire, avecVariantes, finDuTour };
+};
+
+test('Variantes : demandées en arrière-plan quand une Question atteint deux réponses, au Modèle le moins cher, puis rattachées', async () => {
+  const { lecons: [lecon], quiz, lire, avecVariantes } = await eleveVariantes('Var-Lance');
+  // Une seule réponse par Question : pas de Variantes.
+  assert.equal((await quiz(lecon)).status, 201);
+  await pause();
+  assert.equal(await nbLancementsVariantes(), 0);
+
+  // Deuxième réponse : un tour en arrière-plan, que l'Élève n'attend pas.
+  await avecFichier('variantes-attendre', async () => {
+    assert.equal((await quiz(lecon)).status, 201);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 1, 'Variantes jamais demandées');
+    assert.ok((await lire(lecon)).every((q) => !q.variantes?.length));
+  });
+  const questions = await avecVariantes(lecon);
+  const args = await fs.readFile(path.join(dossier, 'args-variantes'), 'utf8');
+  assert.match(args, /--model\nhaiku\n/);
+  assert.match(args, /--effort\nlow\n/);
+  assert.doesNotMatch(args, /--add-dir/);
+  // Deux variantes valides par Question, les mal formées écartées ; Objectifs de la Question d'origine.
+  const q1 = questions.find((q) => q.id === 'q1');
+  assert.deepEqual(q1.variantes, [
+    { enonce: 'Où sort la lave ? (variante 1)', reponses: ['Par les racines', 'Par le cratère'], bonne: 1, explication: 'Le cratère.', objectifs: [1] },
+    { enonce: 'Où sort la lave ? (variante 2)', reponses: ['Par les racines', 'Par le cratère'], bonne: 1, explication: 'Le cratère.', objectifs: [1] },
+  ]);
+  // Coût du tour gardé avec son type de tâche.
+  assert.equal((await appel('/api/eleves/var-lance/couts')).data.parTache.variantes.tours, 1);
+  // Un nouveau quiz garde les Variantes et n'en redemande pas.
+  await quiz(lecon);
+  await pause();
+  assert.equal(await nbLancementsVariantes(), 1);
+  assert.equal((await lire(lecon)).find((q) => q.id === 'q1').variantes.length, 2);
+});
+
+test('Variantes : un seul tour à la fois par Élève, les Questions d\'une autre Leçon sont variées après', async () => {
+  const { lecons: [a, b], quiz, avecVariantes } = await eleveVariantes('Var-Seul', 2);
+  await quiz(a);
+  await quiz(b);
+  await avecFichier('variantes-attendre', async () => {
+    await quiz(a);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 1, 'Variantes jamais demandées');
+    // Pendant le tour de la Leçon a, b atteint deux réponses : pas de second tour simultané.
+    assert.equal((await quiz(b)).status, 201);
+    await pause();
+    assert.equal(await nbLancementsVariantes(), 1);
+  });
+  await avecVariantes(a);
+  await avecVariantes(b);
+  assert.equal(await nbLancementsVariantes(), 2);
+});
+
+test('Variantes : un tour raté ou sans variante valide ne rattache rien, et n\'est retenté qu\'une fois', async () => {
+  const { lecons: [lecon], quiz, lire, finDuTour } = await eleveVariantes('Var-Echec');
+  await quiz(lecon);
+  await avecFichier('variantes-echouer', async () => {
+    await quiz(lecon);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 1, 'Variantes jamais demandées');
+    await finDuTour(lecon);
+  });
+  assert.ok((await lire(lecon)).every((q) => !q.variantes?.length));
+  // Réponse suivante : un second essai, qui n'écrit que des variantes mal formées.
+  await avecFichier('variantes-mal-formees', async () => {
+    await quiz(lecon);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 2, 'Variantes jamais redemandées');
+    await finDuTour(lecon);
+  });
+  assert.ok((await lire(lecon)).every((q) => !q.variantes?.length));
+  // Plus d'essai ensuite : la Question reste sans Variantes.
+  await quiz(lecon);
+  await pause();
+  assert.equal(await nbLancementsVariantes(), 2);
+});
+
+test('Variantes : une Révision du jour sert la Question ou une variante ; la réponse met à jour la Question d\'origine', async () => {
+  const { slug, lecons: [lecon], quiz, avecVariantes } = await eleveVariantes('Var-Revision');
+  await quiz(lecon);
+  await quiz(lecon);
+  await avecVariantes(lecon);
+  const url = `/api/eleves/${slug}/revisions`;
+  // Tirage au hasard : sur 30 séries, la Question d'origine et ses deux variantes sont servies.
+  const servies = new Set();
+  for (let i = 0; i < 30; i++) {
+    const { data } = await appel(url, 'GET', undefined, le(LENDEMAIN));
+    const q1 = data.questions.find((q) => q.id === 'q1');
+    servies.add(q1.variante ?? 'origine');
+    if (q1.variante !== undefined) {
+      assert.equal(q1.enonce, `Où sort la lave ? (variante ${q1.variante + 1})`);
+      assert.deepEqual(q1.reponses, ['Par les racines', 'Par le cratère']);
+    } else assert.equal(q1.enonce, 'Où sort la lave ?');
+  }
+  assert.deepEqual(servies, new Set(['origine', 0, 1]));
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 2);
+
+  // Réponse à la variante 1 : corrigée avec sa propre bonne réponse, journalisée sur la Question d'origine.
+  const repondre = (corps) => appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', ...corps }, le(LENDEMAIN));
+  assert.equal((await repondre({ choisie: 0, variante: 1 })).data.juste, false);
+  assert.equal((await repondre({ choisie: 9, variante: 1 })).status, 400);
+  assert.equal((await repondre({ choisie: 1, variante: 5 })).status, 400);
+  const juste = await repondre({ choisie: 1, variante: 1, sur: true });
+  assert.equal(juste.status, 200);
+  assert.equal(juste.data.juste, true);
+  assert.equal(juste.data.bonne, 'Par le cratère');
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
+  assert.deepEqual(q1.journal.slice(-2), [
+    { date: LENDEMAIN, juste: false, origine: 'revision', variante: 1 },
+    { date: LENDEMAIN, juste: true, sur: true, origine: 'revision', variante: 1 },
+  ]);
+  // Même état de mémoire : la Question (et donc ses variantes) n'est plus due aujourd'hui.
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+});
+
+test('Variantes : une Question réécrite par le prof perd ses Variantes, qui sont redemandées', async () => {
+  const { slug, lecons: [lecon], quiz, lire, avecVariantes } = await eleveVariantes('Var-Reecrite');
+  await quiz(lecon);
+  await quiz(lecon);
+  await avecVariantes(lecon);
+  const reecrit = { ...quizBanque, questions: quizBanque.questions.map((q) => (q.id === 'q1' ? { ...q, enonce: 'D’où sort la lave ?' } : q)) };
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(reecrit)}</script>`);
+  await avecFichier('variantes-attendre', async () => {
+    await quiz(lecon);
+    const questions = await lire(lecon);
+    assert.deepEqual(questions.find((q) => q.id === 'q1').variantes, []);
+    assert.equal(questions.find((q) => q.id === 'q2').variantes.length, 2);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 2, 'Variantes jamais redemandées');
+  });
+  const q1 = (await avecVariantes(lecon)).find((q) => q.id === 'q1');
+  assert.equal(q1.variantes[0].enonce, 'D’où sort la lave ? (variante 1)');
 });

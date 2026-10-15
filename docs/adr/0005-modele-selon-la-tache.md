@@ -9,12 +9,13 @@ Une table fermée, tenue par l'appli, associe donc à chaque type de tâche un M
 | Première Séance (Cadrage, mission, Objectifs) | Modèle du Profil | `medium` |
 | Page de leçon : Étape suivante, Revoir, Défi, Réviser | Modèle du Profil | `medium` |
 | Propositions | Haiku | `low` |
+| Variantes des Questions (en arrière-plan) | Haiku | `low` |
 
 Le Retour de quiz n'est plus une tâche du prof (ADR 0002) : il ne figure pas dans la table. Les nouveaux Profils ont Sonnet par défaut ; les Profils existants gardent leur Modèle, rien ne change sans l'accord du parent. Chaque appel passe aussi un **Modèle de secours** (`--fallback-model`) qui prend le relais quand le Modèle principal est surchargé ou indisponible ; le Modèle réellement utilisé est relevé avec le coût d'un tour.
 
 `--fallback-model` ne couvre que la surcharge ou l'indisponibilité du Modèle principal, pas l'épuisement du quota de l'abonnement : `claude` n'a aucune option pour basculer sur un autre Modèle dans ce cas, et l'appel échoue (l'appli dit alors à l'Élève de réessayer plus tard).
 
-Le Modèle de secours fait partie de la même table : il n'est jamais le Modèle principal (`claude` refuse un secours identique au Modèle principal) et c'est le Modèle juste moins cher quand il existe, pour ménager le quota déjà sous tension : Opus → Sonnet, Sonnet → Haiku. Haiku, le moins cher, n'a pas de Modèle moins cher que lui ; un secours Haiku serait refusé, c'est donc Sonnet qui le relaie, ce qui concerne les Propositions et les Profils réglés sur Haiku.
+Le Modèle de secours fait partie de la même table : il n'est jamais le Modèle principal (`claude` refuse un secours identique au Modèle principal) et c'est le Modèle juste moins cher quand il existe, pour ménager le quota déjà sous tension : Opus → Sonnet, Sonnet → Haiku. Haiku, le moins cher, n'a pas de Modèle moins cher que lui ; un secours Haiku serait refusé, c'est donc Sonnet qui le relaie, ce qui concerne les Propositions, les Variantes et les Profils réglés sur Haiku.
 
 | Modèle principal | Modèle de secours |
 | --- | --- |
@@ -33,5 +34,5 @@ Le Modèle de secours fait partie de la même table : il n'est jamais le Modèle
 
 ## Consequences
 
-- Le choix du Modèle dans le Profil ne règle plus que les Pages de leçon ; les Propositions l'ignorent.
+- Le choix du Modèle dans le Profil ne règle plus que les Pages de leçon ; les Propositions et les Variantes l'ignorent.
 - La table se révise au vu du coût d'un tour mesuré, pas à l'intuition.

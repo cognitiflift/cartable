@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -13,6 +13,7 @@ import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } fro
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
+import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -26,6 +27,8 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
+const variantesEnCours = new Set(); // élèves dont un tour de Variantes travaille : un seul à la fois par Élève
+const variantesARelancer = new Map(); // élève → Leçons dont des Questions ont pu devenir à varier pendant ce tour
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -182,6 +185,45 @@ async function regenererPropositions(slug) {
   return lirePropositions(slug);
 }
 
+// Variantes des Questions (#69) : après une réponse à une Question (quiz de page ou Révision du jour), un tour du prof
+// en arrière-plan, que l'Élève n'attend jamais, écrit des Variantes pour les Questions de la Leçon à varier (voir
+// lib/variantes.js). Un seul tour à la fois par Élève : une Leçon arrivée pendant ce tour est reprise juste après.
+function varierQuestions(slug, id) {
+  if (variantesEnCours.has(slug)) {
+    variantesARelancer.set(slug, new Set([...(variantesARelancer.get(slug) ?? []), id]));
+    return;
+  }
+  variantesEnCours.add(slug);
+  (async () => {
+    const cles = await store.demanderVariantes(slug, id);
+    if (!cles.length) return;
+    try {
+      const profil = await store.lireEleve(slug);
+      const { cout } = await lancerAgent({
+        cwd: store.variantesDir(slug, id),
+        prompt: `Écris ${VARIANTES_PAR_QUESTION} variantes pour chacune des ${cles.length} questions de questions-a-varier.json.`,
+        consignes: consignesVariantes(profil),
+        modele: profil.modele,
+        tache: 'variantes',
+        teach: false,
+      });
+      await store.enregistrerCoutVariantes(slug, cout);
+    } catch (e) {
+      console.error(`Variantes de ${slug}/${id} : ${e.message}`);
+    } finally {
+      await store.rattacherVariantes(slug, id, cles);
+    }
+  })()
+    .catch((e) => console.error(`Variantes de ${slug}/${id} : ${e.message}`))
+    .finally(() => {
+      variantesEnCours.delete(slug);
+      // La Leçon de ce tour n'est pas reprise tout de suite (un tour raté n'est pas retenté sans nouvelle réponse).
+      const suivantes = [...(variantesARelancer.get(slug) ?? [])].filter((lecon) => lecon !== id);
+      variantesARelancer.delete(slug);
+      for (const lecon of suivantes) varierQuestions(slug, lecon);
+    });
+}
+
 async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
   const cadrage = validerCadrage(brut, 'revision');
   const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage });
@@ -296,7 +338,10 @@ async function api(req, res, segments) {
     }
     if (m === 'POST') {
       await store.lireEleve(slug);
-      return json(res, 200, await store.repondreEnRevision(slug, await lireCorps(req), { maintenant }));
+      const corps = await lireCorps(req);
+      const reponse = await store.repondreEnRevision(slug, corps, { maintenant });
+      varierQuestions(slug, corps.lecon);
+      return json(res, 200, reponse);
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
@@ -319,7 +364,9 @@ async function api(req, res, segments) {
     } else if (!r3) {
       if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id, { maintenant: maintenantDe(req.headers) }));
     } else if (r3 === 'scores' && m === 'POST') {
-      return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenantDe(req.headers) }));
+      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenantDe(req.headers) });
+      varierQuestions(slug, id);
+      return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
       return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
     } else if (r3 === 'rebonds' && m === 'POST') {

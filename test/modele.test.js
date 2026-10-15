@@ -11,9 +11,10 @@ test('Modèle selon la tâche : les Pages de leçon prennent le Modèle du Profi
   }
 });
 
-test('Modèle selon la tâche : les Propositions passent toujours par Haiku avec l\'effort low, quel que soit le Profil', () => {
+test('Modèle selon la tâche : les Propositions et les Variantes passent toujours par Haiku avec l\'effort low, quel que soit le Profil', () => {
   for (const profil of ['haiku', 'sonnet', 'opus']) {
     assert.deepEqual(modeleDeLaTache('propositions', profil), { modele: 'haiku', effort: 'low', secours: 'sonnet' });
+    assert.deepEqual(modeleDeLaTache('variantes', profil), { modele: 'haiku', effort: 'low', secours: 'sonnet' });
   }
 });
 

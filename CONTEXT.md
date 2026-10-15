@@ -28,6 +28,9 @@ _Avoid_: niveau tout court (confusion avec Niveau de Leçon)
 **Espace personnel**:
 Dossier propre à un Élève, qui contient son Profil et toutes ses Leçons. Cloisonné : l'agent n'accède jamais à l'Espace personnel d'un autre Élève.
 
+**Vue parent**:
+Écran d'un Élève destiné au parent, ouvert depuis le Profil (jamais depuis l'accueil de l'Élève, sans mot de passe) : Révisions du jour et quiz faits ces 7 derniers jours, Objectifs Retenus, Objectifs fragiles (atteints mais pas encore Retenus), Questions fragiles (moins de 80 % de chances de s'en souvenir aujourd'hui), contrôles à venir avec leur préparation (Maîtrise, Questions dues), Coût des Leçons. Agrégée par l'appli à partir des données existantes, sans tour de l'agent.
+
 **Leçon**:
 Unité d'apprentissage d'un Élève sur un sujet précis. Correspond à un workspace du skill `teach` (mission, leçons HTML, fiches, traces d'apprentissage). Appartient à une seule **Catégorie**.
 _Avoid_: cours, chapitre

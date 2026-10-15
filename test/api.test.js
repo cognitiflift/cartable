@@ -2681,3 +2681,68 @@ test('Formats associer et classer : la consigne les cite pour les paires et les 
     assert.equal((await fetch(`${base}/kit/v1/${fichier}`)).status, 200, fichier);
   }
 });
+
+// Vue parent (#77) : agrégats d'un Élève pour le parent, tirés des données existantes, à la date du serveur.
+test('Vue parent : les Révisions du jour et les quiz faits, jour par jour, sur les 7 derniers jours', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Jours', 1);
+  const reviser = (id, choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie }, le(LENDEMAIN));
+  await reviser('q1', 0); // juste
+  await reviser('q2', 0); // ratée
+  const { status, data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(status, 200);
+  assert.deepEqual(data.jours.map((j) => j.jour), ['2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03']);
+  assert.deepEqual(data.jours.at(-1), { jour: '2026-11-03', revisions: 2, justes: 1, quiz: 0 });
+  assert.deepEqual(data.jours.at(-2), { jour: '2026-11-02', revisions: 0, justes: 0, quiz: 1 });
+  assert.deepEqual(data.jours[0], { jour: '2026-10-28', revisions: 0, justes: 0, quiz: 0 });
+  assert.equal((await appel('/api/eleves/inconnu/parent')).status, 404);
+  await aucunClaudeLance([lecon]);
+});
+
+test('Vue parent : les Objectifs Retenus, et les Objectifs fragiles (atteints mais pas encore Retenus), avec leur Leçon', async () => {
+  const { slug } = await eleveRevisions('Parent-Objectifs', 0);
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}/scores`;
+  // Objectif 1 réussi deux jours de suite : Retenu ; Objectif 2 réussi une fois : atteint, fragile ; Objectif 3 jamais.
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, le('2026-10-01T10:00:00.000Z'));
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2] }, le('2026-10-02T10:00:00.000Z'));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'));
+  assert.deepEqual(data.objectifs, {
+    retenus: [{ lecon: lecon.id, titreLecon: 'Les volcans', texte: 'Nommer les parties d’un volcan' }],
+    fragiles: [{ lecon: lecon.id, titreLecon: 'Les volcans', texte: 'Expliquer une éruption' }],
+  });
+});
+
+test('Vue parent : les Questions fragiles (moins de 80 % de chances de s\'en souvenir aujourd\'hui), la plus fragile d\'abord', async () => {
+  const { slug } = await eleveRevisions('Parent-Questions', 0);
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueFragile()));
+  // Le 12 octobre : ratée 51 %, hésitante 71 %, sue une fois 85 %, bien sue 97 %.
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-12T10:00:00.000Z'));
+  assert.deepEqual(data.questionsFragiles, [
+    { lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'ratee', enonce: 'Question ratée ?', pourcentage: 51 },
+    { lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'hesitante', enonce: 'Question hésitante ?', pourcentage: 71 },
+  ]);
+});
+
+test('Vue parent : les contrôles à venir, le plus proche d\'abord, avec la préparation de chacun ; un contrôle passé n\'y est plus', async () => {
+  const { slug } = await eleveRevisions('Parent-Controles', 0);
+  const loin = await leconControle(slug, '2026-11-20');
+  const proche = await leconControle(slug, '2026-11-06');
+  await leconControle(slug, '2026-11-01'); // déjà passé le 3 novembre
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  const maitrise = async (lecon) => (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.maitrise;
+  assert.deepEqual(data.controles, [
+    { lecon: proche.id, titreLecon: 'Les volcans', dateControle: '2026-11-06', joursAvant: 3, maitrise: await maitrise(proche), questionsDues: 2 },
+    { lecon: loin.id, titreLecon: 'Les volcans', dateControle: '2026-11-20', joursAvant: 17, maitrise: await maitrise(loin), questionsDues: 2 },
+  ]);
+  assert.ok(data.controles[0].maitrise.pourcentage > 0);
+});
+
+test('Vue parent : le coût des Leçons, total de l\'Élève (Propositions comprises) et coût de chaque Leçon, la plus coûteuse d\'abord', async () => {
+  const { slug, lecons: [a, b] } = await eleveRevisions('Parent-Cout', 2);
+  await appel(`/api/eleves/${slug}/lecons/${b.id}/messages`, 'POST', { texte: 'ok' }); // un tour de plus pour b
+  await attendrePropositions(slug);
+  const { data } = await appel(`/api/eleves/${slug}/parent`);
+  assert.deepEqual(data.cout.total, (await appel(`/api/eleves/${slug}/couts`)).data.total);
+  assert.deepEqual(data.cout.lecons.map((l) => [l.id, l.titre, l.coutUsd, l.tours]), [[b.id, 'Les volcans', 0.5, 2], [a.id, 'Les volcans', 0.25, 1]]);
+});

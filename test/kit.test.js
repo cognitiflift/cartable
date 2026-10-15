@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lireQuiz, corriger, messageScore, melanger } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, corriger, messageScore, melanger, lireResultats, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
 
 const quiz = {
   objectifs: [1],
@@ -100,4 +100,15 @@ test('Kit : un quiz en mode Pré-test porte le marqueur dans son message ; un qu
   assert.equal(messageScore(pretest, choix, '0001-devine.html').score, 100); // même score qu'un quiz ordinaire
   assert.equal(Object.hasOwn(messageScore(lireQuiz(quiz), choix, 'p.html'), 'pretest'), false);
   assert.equal(Object.hasOwn(messageScore(lireQuiz({ ...quiz, pretest: 'oui' }), choix, 'p.html'), 'pretest'), false);
+});
+
+test('Kit : « Je ne sais pas » compte comme une réponse fausse, sans Confiance, et passe la validation de l\'appli', () => {
+  const lu = lireQuiz(quiz);
+  const message = messageScore(lu, { q1: JE_NE_SAIS_PAS, q2: 1, q3: 0 }, 'p.html', { q2: true });
+  assert.equal(message.score, 50);
+  assert.deepEqual(message.questions[0], { id: 'q1', enonce: 'Où sort la lave ?', choisie: 'Je ne sais pas', bonne: 'Le cratère', juste: false, jeNeSaisPas: true, bonus: false, objectifs: [1] });
+  assert.equal(Object.hasOwn(message.questions[1], 'jeNeSaisPas'), false);
+  assert.deepEqual(lireResultats(message.questions)[0], message.questions[0]);
+  // Une question annoncée « Je ne sais pas » mais juste est corrigée en fausse.
+  assert.equal(lireResultats([{ ...message.questions[0], juste: true }])[0].juste, false);
 });

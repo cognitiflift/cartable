@@ -1776,3 +1776,96 @@ test('Pré-test : un marqueur invalide est ignoré, le score compte comme un qui
   assert.equal(lue.maitrise.pourcentage, 67);
   assert.equal(lue.pretest, null);
 });
+
+// Banque de Questions (#64) : le prof écrit une page avec le quiz du Kit, l'Élève y répond.
+const quizBanque = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.' },
+    { id: 'q2', type: 'qcm', enonce: 'Le magma, c’est…', reponses: ['De la glace', 'De la roche fondue'], bonne: 1, explication: 'Roche fondue.', objectifs: [2] },
+    { id: 'b1', type: 'qcm', enonce: '🚀 Le plus grand volcan ?', reponses: ['Olympus Mons', 'Etna'], bonne: 0, explication: 'Sur Mars.' },
+  ],
+};
+// Leçon de zoe-test (créée si besoin : ces tests peuvent tourner seuls), avec trois Objectifs.
+const leconBanque = async (corps = { sujet: 'les volcans' }) => {
+  await appel('/api/eleves', 'POST', { pseudo: 'Zoé-Test', age: 11, niveau: 'Primaire 6' });
+  return avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', corps)).data);
+};
+const ecrirePageQuiz = async (lecon, page, quiz) => {
+  const dir = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'lessons');
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, page), `<!doctype html><html><body><h1>Volcans</h1>
+<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>
+<script type="module" src="/kit/v1/quiz.js"></script></body></html>`);
+};
+// Résultats envoyés par le Kit pour `quizBanque` : q1 juste « pas sûr », q2 « Je ne sais pas », b1 (bonus) juste.
+const corpsBanque = (page, autres = {}) => ({
+  score: 50, page, objectifs: [1, 2],
+  questions: [
+    { id: 'q1', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false, objectifs: [1], sur: false },
+    { id: 'q2', enonce: 'Le magma, c’est…', choisie: 'Je ne sais pas', bonne: 'De la roche fondue', juste: false, jeNeSaisPas: true, bonus: false, objectifs: [2] },
+    { id: 'b1', enonce: 'Le plus grand volcan ?', choisie: 'Olympus Mons', bonne: 'Olympus Mons', juste: true, bonus: true, objectifs: [1] },
+  ],
+  ...autres,
+});
+
+test('Banque de Questions : un quiz crée les Questions de la Leçon, le même quiz refait ajoute des réponses sans les dupliquer', async () => {
+  const lecon = await leconBanque();
+  assert.deepEqual(lecon.questions, []);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0002-volcans.html', quizBanque);
+
+  const premiere = await appel(`${url}/scores`, 'POST', corpsBanque('0002-volcans.html'));
+  assert.equal(premiere.status, 201);
+  // Le bonus n'entre pas dans la Banque.
+  assert.deepEqual(premiere.data.questions.map((q) => q.id), ['q1', 'q2']);
+  const [q1, q2] = premiere.data.questions;
+  assert.equal(q1.page, '0002-volcans.html');
+  assert.deepEqual(q1.contenu, { enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.', objectifs: [1] });
+  assert.deepEqual(q2.contenu.objectifs, [2]);
+  // Journal : date, juste, Confiance si présente, « Je ne sais pas », origine.
+  assert.equal(q1.journal.length, 1);
+  assert.ok(!Number.isNaN(Date.parse(q1.journal[0].date)));
+  assert.deepEqual({ ...q1.journal[0], date: 'd' }, { date: 'd', juste: true, sur: false, origine: 'quiz' });
+  assert.deepEqual({ ...q2.journal[0], date: 'd' }, { date: 'd', juste: false, jeNeSaisPas: true, origine: 'quiz' });
+
+  // Le même quiz refait : mêmes Questions, une réponse de plus chacune.
+  const corps = corpsBanque('0002-volcans.html');
+  corps.questions[1] = { ...corps.questions[1], choisie: 'De la roche fondue', juste: true, jeNeSaisPas: undefined, sur: true };
+  const refait = (await appel(`${url}/scores`, 'POST', corps)).data;
+  assert.deepEqual(refait.questions.map((q) => [q.id, q.journal.length]), [['q1', 2], ['q2', 2]]);
+  assert.deepEqual({ ...refait.questions[1].journal[1], date: 'd' }, { date: 'd', juste: true, sur: true, origine: 'quiz' });
+  // Exposées aussi par la lecture de la Leçon, pas par la liste des Leçons.
+  assert.equal((await appel(url)).data.questions.length, 2);
+  assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'questions'), false);
+});
+
+test('Banque de Questions : le quiz du Pré-test n\'y entre pas', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0001-devine.html', { ...quizBanque, pretest: true });
+  const r = await appel(`${url}/scores`, 'POST', corpsBanque('0001-devine.html', { pretest: true }));
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.data.questions, []);
+  // Même si la page ne porte pas le marqueur, celui du résultat suffit (et inversement).
+  await ecrirePageQuiz(lecon, '0002-devine.html', quizBanque);
+  assert.deepEqual((await appel(`${url}/scores`, 'POST', corpsBanque('0002-devine.html', { pretest: true }))).data.questions, []);
+  assert.deepEqual((await appel(`${url}/scores`, 'POST', corpsBanque('0001-devine.html'))).data.questions, []);
+});
+
+test('Banque de Questions : sans quiz du Kit (anciennes Leçons et pages), pas de Questions, et la Leçon reste lisible', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  // Page du faux prof, au quiz écrit à la main ; score sans résultats par question ; page inexistante ou hors Leçon.
+  for (const corps of [corpsBanque('0001-volcans.html'), { score: 80, page: '0001-volcans.html' }, corpsBanque('9999-absente.html'), corpsBanque('../etat.json')]) {
+    const r = await appel(`${url}/scores`, 'POST', corps);
+    assert.equal(r.status, 201);
+    assert.deepEqual(r.data.questions, []);
+  }
+  // Une Banque illisible ne rend pas la Leçon illisible.
+  await fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), '{ pas du json');
+  const lue = await appel(url);
+  assert.equal(lue.status, 200);
+  assert.deepEqual(lue.data.questions, []);
+  assert.ok((await appel('/api/eleves/zoe-test/lecons')).data.some((l) => l.id === lecon.id));
+});

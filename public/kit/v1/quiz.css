@@ -57,6 +57,10 @@
 .kit-quiz-confiance { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
 .kit-quiz-confiance[hidden] { display: none; }
 .kit-quiz-sur { font: inherit; padding: .4rem .9rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }
+/* Lecture à voix haute (#76) : le bouton « 🔊 » de la page et de chaque question. */
+.kit-lecture { display: block; width: fit-content; font: inherit; font-size: .95rem; padding: .3rem .8rem; margin-bottom: .5rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }
+.kit-lecture[aria-pressed="true"] { background: var(--kit-accent); color: #fff; }
+.kit-lecture[hidden] { display: none; }
 .kit-quiz-retour { margin-top: .7rem; padding: .6rem .9rem; border-radius: 10px; }
 .kit-quiz-retour p { margin: .3rem 0 0; }
 .kit-quiz-retour.kit-juste { background: var(--kit-juste-fond); }

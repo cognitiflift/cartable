@@ -769,7 +769,7 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
 });
 
 test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
-  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
+  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['lecture.js', 'text/javascript'], ['lecture-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
     const res = await fetch(`${base}/kit/v1/${fichier}`);
     assert.equal(res.status, 200, fichier);
     assert.match(res.headers.get('content-type'), new RegExp(type));
@@ -1078,6 +1078,30 @@ test('Nombre de Propositions : réglé à la création et dans le profil, 400 ho
   }
   assert.equal((await appel('/api/eleves/nb-test', 'PUT', { age: 9, niveau: 'Primaire 4', nombrePropositions: '3' })).data.nombrePropositions, 3);
   assert.equal((await appel('/api/eleves/nb-test')).data.nombrePropositions, 3);
+});
+
+test('Lecture à voix haute : coupée par défaut, réglée à la création et dans le Profil, 400 si ce n\'est pas oui ou non', async () => {
+  const defaut = await appel('/api/eleves', 'POST', { pseudo: 'Voix-Defaut', age: 7, niveau: 'Primaire 2' });
+  assert.equal(defaut.data.lectureVoixHaute, false);
+  for (const invalide of ['oui', 1, null]) {
+    assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Voix-Invalide', age: 7, niveau: 'Primaire 2', lectureVoixHaute: invalide })).status, 400);
+  }
+  const cree = await appel('/api/eleves', 'POST', { pseudo: 'Voix-Test', age: 7, niveau: 'Primaire 2', lectureVoixHaute: true });
+  assert.equal(cree.status, 201);
+  assert.equal(cree.data.lectureVoixHaute, true);
+  assert.equal((await appel('/api/eleves/voix-test', 'PUT', { lectureVoixHaute: 'non' })).status, 400);
+  // Changer un autre réglage garde la lecture ; la couper vaut ensuite à chaque lecture du Profil.
+  assert.equal((await appel('/api/eleves/voix-test', 'PUT', { age: 8 })).data.lectureVoixHaute, true);
+  assert.equal((await appel('/api/eleves/voix-test', 'PUT', { lectureVoixHaute: false })).data.lectureVoixHaute, false);
+  assert.equal((await appel('/api/eleves/voix-test')).data.lectureVoixHaute, false);
+  await attendrePropositions('voix-defaut');
+  await attendrePropositions('voix-test');
+});
+
+test('Lecture à voix haute : un Élève existant sans ce réglage ne l\'a pas', async () => {
+  await fs.mkdir(path.join(eleves, 'ancien-voix', 'lecons'), { recursive: true });
+  await fs.writeFile(path.join(eleves, 'ancien-voix', 'profil.json'), JSON.stringify({ pseudo: 'Ancien-Voix', slug: 'ancien-voix', age: 10, niveau: 'Primaire 5' }));
+  assert.equal((await appel('/api/eleves/ancien-voix')).data.lectureVoixHaute, false);
 });
 
 test('Nombre de Propositions : un Élève existant sans ce champ en a 4', async () => {

@@ -6,6 +6,8 @@
 import { corriger, estPartiel, typeDe, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
 import { el } from './dom.js';
 import { RENDUS } from './rendus/index.js';
+import { boutonLecture } from './lecture.js';
+import { texteDeQuestion } from './lecture-logique.js';
 
 export { el };
 
@@ -21,8 +23,10 @@ const messageCorrection = (correction) => {
 // image (US25) s'affiche sous l'énoncé ; une image qui ne se charge pas est retirée, la question reste. `legende` :
 // ce qui précède l'énoncé (numéro, « 🚀 Bonus · »…). `quandCorrigee({ choisie, sur })` est appelé une fois, à la
 // correction : `choisie` = réponse de l'Élève propre au type (index de la réponse avant mélange pour un QCM), ou
-// JE_NE_SAIS_PAS ; `sur` = Confiance (absente après « Je ne sais pas »).
-export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {}) {
+// JE_NE_SAIS_PAS ; `sur` = Confiance (absente après « Je ne sais pas »). `lecture` : bouton « 🔊 » qui lit la question
+// (lecture à voix haute du Profil, #76), puis aussi sa correction une fois corrigée.
+export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false } = {}) {
+  let correction = null;
   const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
   // Confiance : après la réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
   const demande = el('div', { className: 'kit-quiz-confiance', hidden: true }, el('span', {}, 'Tu es sûr ?'));
@@ -48,7 +52,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   });
   const corrigerQuestion = (sur) => {
     demande.remove();
-    const correction = corriger(q, reponse);
+    correction = corriger(q, reponse);
     rendu.montrerCorrection(correction);
     if (correction.jeNeSaisPas) neSaisPas.classList.add('kit-fausse');
     const partiel = estPartiel(correction);
@@ -77,6 +81,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {} } = {
   image?.addEventListener('error', () => image.remove(), { once: true });
   return el('fieldset', { className: `kit-quiz-question kit-quiz-${typeDe(q)}${q.bonus ? ' kit-bonus' : ''}` },
     el('legend', {}, legende, q.enonce),
+    lecture ? boutonLecture(() => texteDeQuestion(q, correction), { titre: 'Lire la question à voix haute' }) : null,
     image,
     rendu.zone,
     demande,

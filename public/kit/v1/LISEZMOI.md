@@ -80,7 +80,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
 
 Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
-Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
 
 ## Formats de rappel actif
 

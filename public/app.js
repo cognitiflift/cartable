@@ -104,6 +104,27 @@ const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies
 const etoiles = (e) => h('span', { className: 'etoiles' },
   Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
 
+// Objectifs de la Leçon : combien sont atteints et Retenus, par exemple « 3 Objectifs · 2 atteints · 1 Retenu », puis
+// chaque Objectif avec son état. Rien sans Objectifs.
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+const ETATS_OBJECTIF = [
+  { cle: 'retenu', icone: '🧠', libelle: 'Retenu : réussi de nouveau un autre jour' },
+  { cle: 'atteint', icone: '✅', libelle: 'atteint' },
+  { cle: 'aConfirmer', icone: '🔮', libelle: 'à confirmer : réussi au Pré-test' },
+];
+const PAS_ENCORE = { icone: '⚪', libelle: 'pas encore atteint' };
+function objectifsRetenus(objectifs = []) {
+  if (!objectifs.length) return null;
+  const compte = (cle) => objectifs.filter((o) => o[cle]).length;
+  const aConfirmer = compte('aConfirmer');
+  return h('span', { className: 'objectifs-retenus' },
+    [pluriel(objectifs.length, 'Objectif'), pluriel(compte('atteint'), 'atteint'), pluriel(compte('retenu'), 'Retenu'), aConfirmer && `${aConfirmer} à confirmer`].filter(Boolean).join(' · '),
+    h('span', { className: 'objectifs' }, objectifs.map((o) => {
+      const etat = ETATS_OBJECTIF.find((e) => o[e.cle]) ?? PAS_ENCORE;
+      return h('span', { title: etat.libelle }, `${etat.icone} ${o.texte}`);
+    })));
+}
+
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
   return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: maitrise.palier },
@@ -124,7 +145,8 @@ async function ecranAccueil(profil) {
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
             l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
-          h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
+          objectifsRetenus(l.objectifs),
+          h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
 }
@@ -136,16 +158,49 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
   lecteur.readAsDataURL(fichier);
 });
 
+// Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, par-dessus l'écran.
+// L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions
+// posées selon le mode viennent de la configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
+async function cadrer(mode) {
+  const cadrage = {};
+  for (const cle of config.questionsCadrage[mode]) {
+    const { question, reponses } = config.cadrage[cle];
+    cadrage[cle] = await new Promise((choisir) => {
+      const fermer = (valeur) => { calque.remove(); document.removeEventListener('keydown', echap); choisir(valeur); };
+      const echap = (e) => e.key === 'Escape' && fermer(null);
+      const calque = h('div', { className: 'cadrage' },
+        h('button', { className: 'secondaire annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'),
+        h('div', { className: 'bulle-prof' }, question),
+        h('div', { className: 'choix' }, Object.entries(reponses).map(([valeur, libelle]) =>
+          h('button', { onclick: () => fermer(valeur) }, libelle))));
+      document.addEventListener('keydown', echap);
+      app.append(calque);
+    });
+    if (cadrage[cle] === null) return null;
+  }
+  return cadrage;
+}
+
 function ecranNouvelleLecon(profil) {
   const erreur = h('p', { className: 'erreur' });
   const boutons = [];
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
-  const demarrer = async (corps) => {
+  // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
+  // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
+  const cadrages = new Map();
+  const demarrer = async (corps, mode, cle) => {
     activer(false);
+    erreur.textContent = '';
+    if (!cadrages.has(cle)) {
+      const reponses = await cadrer(mode);
+      if (!reponses) return activer(true); // Cadrage annulé : l'Élève revient à l'écran, rien n'est envoyé
+      cadrages.set(cle, reponses);
+    }
+    const cadrage = cadrages.get(cle);
     erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
     try {
-      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: await corps() });
+      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage } });
       location.hash = `#/lecon/${lecon.id}`;
     } catch (e) {
       erreur.textContent = e.message;
@@ -153,7 +208,7 @@ function ecranNouvelleLecon(profil) {
     }
   };
 
-  const sujet = h('input', { required: true, maxLength: 80, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
+  const sujet = h('input', { required: true, maxLength: config.sujetMax, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
   const fichiers = h('input', { type: 'file', required: true, multiple: true, accept: '.pdf,image/*' });
   const dateControle = h('input', { type: 'date' });
   boutons.push(h('button', {}, 'Commencer'), h('button', {}, 'Réviser'));
@@ -169,7 +224,7 @@ function ecranNouvelleLecon(profil) {
     if (!actif) return;
     const enPreparation = etat === 'en préparation';
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
-    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre })) },
+    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
       h('span', { className: 'type' }, p.type === 'suite' ? '➡️ Pour aller plus loin' : '✨ Nouveau sujet'),
       p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme'),
       p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
@@ -198,7 +253,7 @@ function ecranNouvelleLecon(profil) {
       demarrer(async () => ({
         dateControle: dateControle.value || undefined,
         fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-      }));
+      }), 'revision', 'revision');
     } },
       h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
       h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
@@ -206,14 +261,18 @@ function ecranNouvelleLecon(profil) {
     h('h2', {}, '💡 Apprendre ce que tu veux'),
     h('form', { className: 'colonne', onsubmit: (ev) => {
       ev.preventDefault();
-      demarrer(async () => ({ sujet: sujet.value }));
+      // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+      const texte = sujet.value.trim();
+      if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
+      if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
+      demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
     } }, sujet, boutons[0]),
     erreur);
 }
 
 // Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
 // L'Étape suivante montre le titre de la page annoncée par le prof, s'il est connu.
-const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Étape suivante', reviser: '📚 Réviser' };
+const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Étape suivante', reviser: '📚 Réviser', commencer: '🚀 Commencer' };
 const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `${LIBELLES_REBOND.suivante} : ${ensuite}` : LIBELLES_REBOND[action]);
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
@@ -227,9 +286,26 @@ async function ecranSession(profil, id) {
   const entete = h('span', {});
   const panneau = h('div', { className: 'panneau' });
   const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
+  const fiche = h('div', { className: 'fiche', style: 'display:none' }); // Ma fiche, par-dessus tout le reste
   let pagesAffichees, iframe;
 
-  const afficherEntete = () => entete.replaceChildren(` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise));
+  // Ma fiche : les documents de référence de la Leçon, dans leur propre calque. La Page de leçon n'est jamais
+  // rechargée : son iframe reste en place dessous, avec son quiz en cours.
+  const ouvrirFiche = () => {
+    const url = (r) => `/fichiers/${profil.slug}/${id}/reference/${r}`;
+    const cadre = h('iframe', { src: url(lecon.references[0]), title: 'Ma fiche' });
+    const choix = lecon.references.length > 1
+      && h('select', { onchange: () => (cadre.src = url(choix.value)) }, lecon.references.map((r) => h('option', { value: r }, r.replace(/\.html$/, ''))));
+    fiche.replaceChildren(
+      h('div', { className: 'fiche-barre' }, h('strong', {}, '📋 Ma fiche'), choix,
+        h('button', { className: 'secondaire', onclick: () => { fiche.style.display = 'none'; fiche.replaceChildren(); } }, '✕ Fermer')),
+      cadre);
+    fiche.style.display = '';
+  };
+  const boutonFiche = h('button', { className: 'secondaire', onclick: ouvrirFiche }, '📋 Ma fiche');
+
+  const afficherEntete = () => entete.replaceChildren(...garder([` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise),
+    lecon.references.length > 0 && [' ', boutonFiche]]));
   // Le panneau n'est reconstruit que si les pages changent : l'iframe garde sinon sa position (et son quiz).
   const afficherPanneau = () => {
     panneau.style.display = lecon.pages.length ? '' : 'none';
@@ -260,7 +336,7 @@ async function ecranSession(profil, id) {
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), lecon.etoiles && etoiles(lecon.etoiles)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]
-          : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, `Quiz : ${score} %`))));
+          : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, prof.retourQuiz.pretest ? 'Pré-test : hors score' : `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
       // Sans Réponses proposées ni page à montrer, l'élève doit quand même pouvoir continuer.
       const choix = [...(prof.choix ?? ["D'accord 👍"]), 'Je ne sais pas 🤷'];
@@ -307,7 +383,7 @@ async function ecranSession(profil, id) {
   afficher();
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
-    h('div', { className: 'seance' }, panneau, calque));
+    h('div', { className: 'seance' }, panneau, calque, fiche));
 }
 
 async function route() {

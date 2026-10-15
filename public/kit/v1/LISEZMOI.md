@@ -64,6 +64,7 @@ Dans la page (`lessons/NNNN-titre.html`), avec des chemins absolus :
 Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">`. Le Kit l'affiche à cet endroit.
 
 - `objectifs` : numéros des Objectifs (de lesson.json) que couvre le quiz par défaut.
+- `pretest` (facultatif) : `true` pour le quiz du Pré-test (la page « Devine ! » de trois questions, au début d'une Leçon). Le Kit le signale à l'appli, qui le garde hors score. Indique pour chaque question les Objectifs qu'elle couvre : ceux réussis au Pré-test seront « à confirmer ».
 - `questions` : la liste, dans l'ordre d'affichage (questions bonus à la fin). Pour chaque question :
   - `id` : identifiant court, unique dans la page et stable (`q1`, `q2`, `b1`…).
   - `type` : `"qcm"` (seul format de cette version).
@@ -78,7 +79,38 @@ Une question mal formée est ignorée. Il faut au moins une question hors bonus.
 
 ## Ce que fait le Kit
 
-Il affiche les questions, mélange les réponses, corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question à l'appli. Tu n'as rien à écrire pour cela.
+Il affiche les questions, mélange les réponses, demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
+
+## Figure
+
+Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Mets-le dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source et licence).
+
+```html
+<figure class="kit-figure">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/…/Volcan.jpg" alt="Le Stromboli en éruption, de nuit">
+  <figcaption>
+    Le Stromboli projette de la lave par son cratère.
+    <small class="kit-credit">Wikimedia Commons, Jean Dupont, CC BY-SA 4.0</small>
+  </figcaption>
+</figure>
+```
+
+- Schéma, frise ou carte : dessine un `<svg>` dans la figure, à la place de `<img>`. Rien à déclarer. Trace ses textes et ses traits en `currentColor` (`fill="currentColor"`, `stroke="currentColor"`) : ils prennent la couleur du texte et restent lisibles en mode sombre.
+- Photo trouvée en ligne (de préférence Wikimedia Commons ou le site d'un musée, jamais une adresse devinée) : cite dans `src` l'adresse directe du fichier image, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
+
+```json
+[
+  {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/…/Volcan.jpg",
+    "source": "Wikimedia Commons, Jean Dupont",
+    "licence": "CC BY-SA 4.0",
+    "alt": "Le Stromboli en éruption, de nuit",
+    "page": "0002-le-magma.html"
+  }
+]
+```
+
+Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la.
 
 ## Style de base
 

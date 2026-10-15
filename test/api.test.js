@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import http from 'node:http';
 import { slugify } from '../lib/store.js';
 
 let serveur, base, dossier, eleves;
@@ -21,8 +22,10 @@ before(async () => {
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait écrire dans lesson.json
   // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
+  // Les fichiers `images-page` et `images-manifeste` sont recopiés tels quels en lessons/0002-images.html et images.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
+  // CARTABLE_IMAGES_LOCALES=1 : le serveur accepte les images du petit serveur local lancé par les tests de Visuels.
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
@@ -81,6 +84,8 @@ else
 fi
 [ -e '${dossier}/ensuite' ] && echo '{"titre":"Les volcans","categorie":"Sciences","ensuite":"Les volcans endormis"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
+[ -e '${dossier}/images-page' ] && cp '${dossier}/images-page' lessons/0002-images.html
+[ -e '${dossier}/images-manifeste' ] && cp '${dossier}/images-manifeste' images.json
 if [ -e '${dossier}/choix' ]; then
   printf '%s\\n' '{"result":"Pourquoi ?\\nCHOIX: Un exposé | Un devoir","session_id":"s-123","is_error":false'"$COUT"'}'
   exit 0
@@ -90,7 +95,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -280,6 +285,12 @@ test('Continuer : en Leçon libre, le prof écrit la suite prévue dans lesson.j
   const page = await avecFichier('ensuite', () => message(lecon, 'ok'));
   assert.equal(page.data.ensuite, 'Les volcans endormis');
   assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).ensuite, 'Les volcans endormis');
+  // Tant que le quiz de la dernière page n'est pas fait, « Continuer » ramène à cette page : la carte n'annonce pas la suite.
+  assert.equal(page.data.quizEnAttente, true);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).quizEnAttente, true);
+  await appel(`${url}/scores`, 'POST', { score: 40, page: '0001-volcans.html' });
+  assert.equal((await appel(url)).data.quizEnAttente, false);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id).quizEnAttente, false);
 
   // Le Retour de quiz, instantané, garde le titre annoncé ; l'Étape suivante le rappelle au prof.
   const retour = (await appel(`${url}/retours`, 'POST', { score: 40 })).data;
@@ -563,9 +574,9 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
   };
   assert.equal(lecon.niveauLecon, 1);
   assert.deepEqual(lecon.objectifs, [
-    { texte: 'Nommer les parties d’un volcan', atteint: false },
-    { texte: 'Expliquer une éruption', atteint: false },
-    { texte: 'Situer trois volcans', atteint: false },
+    { texte: 'Nommer les parties d’un volcan', atteint: false, retenu: false, aConfirmer: false },
+    { texte: 'Expliquer une éruption', atteint: false, retenu: false, aConfirmer: false },
+    { texte: 'Situer trois volcans', atteint: false, retenu: false, aConfirmer: false },
   ]);
   assert.equal((await resume()).niveauLecon, 1);
 
@@ -586,6 +597,40 @@ test('Niveau de Leçon : niveau 1 au départ, monte quand un quiz réussi couvre
 
   // Le Retour de quiz accepte aussi les numéros.
   assert.equal((await appel(`${url}/retours`, 'POST', { score: 90, page: '0001-volcans.html', objectifs: [2] })).status, 200);
+});
+
+test('Retenu : un Objectif réussi de nouveau au moins 24 heures plus tard est Retenu, dans la Leçon et la liste', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const fichier = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'etat.json');
+  const retenus = (l) => l.objectifs.map((o) => o.retenu);
+  const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  // Dates des entrées de score fixées par le test, dans etat.json (Espace personnel lisible).
+  const dater = async (...dates) => {
+    const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+    etat.scores = etat.scores.map((s, i) => ({ ...s, date: dates[i] }));
+    await fs.writeFile(fichier, JSON.stringify(etat));
+  };
+  for (const [score, objectifs] of [[85, [1, 2]], [90, [1]], [100, [2]]]) {
+    assert.equal((await appel(`${url}/scores`, 'POST', { score, page: '0001-volcans.html', objectifs })).status, 201);
+  }
+
+  // Deux succès le même jour : atteints, pas Retenus.
+  await dater('2026-10-01T09:00:00.000Z', '2026-10-01T18:00:00.000Z', '2026-10-01T20:00:00.000Z');
+  assert.deepEqual(retenus((await appel(url)).data), [false, false, false]);
+  assert.deepEqual(retenus(await resume()), [false, false, false]);
+
+  // Objectif 1 réussi de nouveau 25 heures plus tard : Retenu ; le Niveau de Leçon ne change pas.
+  await dater('2026-10-01T09:00:00.000Z', '2026-10-02T10:00:00.000Z', '2026-10-01T20:00:00.000Z');
+  const lue = (await appel(url)).data;
+  assert.deepEqual(retenus(lue), [true, false, false]);
+  assert.deepEqual(lue.objectifs.map((o) => o.atteint), [true, true, false]);
+  assert.equal(lue.niveauLecon, 3);
+  assert.deepEqual(retenus(await resume()), [true, false, false]);
+
+  // Un quiz raté ensuite ne retire rien : Retenu pour toujours.
+  const rate = (await appel(`${url}/scores`, 'POST', { score: 10, page: '0001-volcans.html', objectifs: [1] })).data;
+  assert.deepEqual(retenus(rate), [true, false, false]);
 });
 
 test('Niveau de Leçon : pas de Niveau sans Objectifs, ni pour une Leçon de révision', async () => {
@@ -777,6 +822,43 @@ test('Résultats par question : la consigne du Rebond suivant porte les question
   assert.equal(page.split('Résultats du dernier quiz').length, 2);
   assert.match(page, /il a choisi « De la lave refroidie »/);
   assert.equal(page.split('court encart sur ce qu\'il a raté').length, 2);
+});
+
+test('Confiance : gardée dans les résultats par question, sans effet sur le score ; les erreurs commises « sûr » sont listées à part dans la consigne du Rebond', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const args = path.join(dossier, `args-${lecon.id}`);
+  const q = (id, juste, sur) => ({ id, enonce: `Question ${id} ?`, choisie: juste ? 'oui' : 'non', bonne: 'oui', juste, bonus: false, ...(sur !== undefined && { sur }) });
+  const corps = { score: 0, page: '0001-volcans.html', questions: [q('q1', false, true), q('q2', false, false), q('q3', true, true), q('q4', false, 'oui'), q('q5', true)] };
+  const r = await appel(`${url}/scores`, 'POST', corps);
+  assert.equal(r.status, 201);
+  const entree = r.data.scores.at(-1);
+  assert.equal(entree.score, 40);
+  assert.deepEqual(entree.questions.map((x) => x.sur), [true, false, true, undefined, undefined]);
+  assert.equal(Object.hasOwn(entree.questions[3], 'sur'), false, 'une Confiance invalide est ignorée');
+
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', corps)).data.rebondsProposes, ['revoir']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(args, 'utf8');
+  const [, sures] = consigne.split('Erreurs commises en étant « sûr »');
+  assert.ok(sures, 'la consigne porte une liste des erreurs commises « sûr »');
+  assert.match(sures, /^[^]*?- « Question q1 \? »/);
+  assert.doesNotMatch(sures.split('\n\n')[0], /Question q2|Question q3|Question q4/);
+  assert.match(consigne, /retravaille-les d'abord/);
+});
+
+test('Confiance : un quiz sans Confiance (anciens scores) ne porte aucune liste d\'erreurs « sûr »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data;
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const corps = { score: 50, page: 'p.html', questions: [{ id: 'q1', enonce: 'A ?', choisie: 'non', bonne: 'oui', juste: false, bonus: false }, { id: 'q2', enonce: 'B ?', choisie: 'oui', bonne: 'oui', juste: true, bonus: false }] };
+  assert.equal((await appel(`${url}/scores`, 'POST', corps)).status, 201);
+  await appel(`${url}/retours`, 'POST', corps);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' })).status, 200);
+  const consigne = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.doesNotMatch(consigne, /« sûr »/);
+  assert.match(consigne, /il a choisi « non »/);
 });
 
 test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision, gagnées par les quiz et annoncées par le Retour de quiz', async () => {
@@ -1361,4 +1443,336 @@ test('Prompt système allégé : sections dynamiques exclues, réglages utilisat
   assert.ok(recus.includes('--exclude-dynamic-system-prompt-sections'));
   assert.ok(recus.includes('--strict-mcp-config'));
   assert.equal(recus[recus.indexOf('--setting-sources') + 1], 'user');
+});
+
+const argsDe = (lecon) => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+const nombreDeLecons = async (slug) => (await appel(`/api/eleves/${slug}/lecons`)).data.length;
+
+test('Cadrage : une Leçon libre l\'enregistre et le premier prompt du prof en porte les libellés', async () => {
+  const lecon = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'expose', deja: 'un-peu' } });
+  assert.equal(lecon.status, 201);
+  assert.deepEqual(lecon.data.cadrage, { pourquoi: 'expose', deja: 'un-peu' });
+  assert.equal(lecon.data.messages[0].texte, 'les comètes'); // l'Élève voit son sujet, pas le Cadrage
+  assert.equal(lecon.data.messages.length, 2); // un seul tour du prof : le Cadrage ne coûte aucun token
+  assert.equal(lecon.data.cout.tours, 1);
+  const args = await argsDe(lecon.data);
+  assert.match(args, /Pourquoi \? Pour un exposé ou un projet/);
+  assert.match(args, /Tu en sais déjà… Un peu/);
+  assert.deepEqual((await appel(`/api/eleves/zoe-test/lecons/${lecon.data.id}`)).data.cadrage, { pourquoi: 'expose', deja: 'un-peu' });
+  assert.deepEqual((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.data.id).cadrage, { pourquoi: 'expose', deja: 'un-peu' });
+});
+
+test('Cadrage : questions et réponses fermées servies par la configuration, avec « Je ne sais pas », et les questions posées selon le mode', async () => {
+  const { cadrage, questionsCadrage } = (await appel('/api/config')).data;
+  assert.equal(cadrage.pourquoi.question, 'Pourquoi ?');
+  assert.deepEqual(questionsCadrage, { libre: ['pourquoi', 'deja'], revision: ['deja'] });
+  assert.equal((await appel('/api/config')).data.sujetMax, 80);
+  assert.equal(cadrage.deja.reponses['je-ne-sais-pas'], 'Je ne sais pas');
+  assert.equal(cadrage.pourquoi.reponses.controle, 'Pour un contrôle');
+});
+
+test('Cadrage : valeurs inconnues refusées (400) sans créer de Leçon ; Cadrage absent accepté', async () => {
+  const avant = await nombreDeLecons('zoe-test');
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'pour rire' } })).status, 400);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { deja: 'rien', envie: 'x' } })).status, 400);
+  assert.equal(await nombreDeLecons('zoe-test'), avant);
+  const sans = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes' });
+  assert.equal(sans.status, 201);
+  assert.equal(sans.data.cadrage, null);
+  assert.doesNotMatch(await argsDe(sans.data), /Tu en sais déjà/);
+});
+
+test('Cadrage : une Leçon depuis une Proposition l\'enregistre et le transmet au prof, valeurs inconnues refusées', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cadre-Prop', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const { propositions } = await attendrePropositions('cadre-prop');
+  const refus = await appel('/api/eleves/cadre-prop/lecons', 'POST', { proposition: propositions[0].titre, cadrage: { deja: 'tout' } });
+  assert.equal(refus.status, 400);
+  assert.equal(await nombreDeLecons('cadre-prop'), 0);
+  const lecon = await appel('/api/eleves/cadre-prop/lecons', 'POST', { proposition: propositions[0].titre, cadrage: { pourquoi: 'curiosite', deja: 'je-ne-sais-pas' } });
+  assert.equal(lecon.status, 201);
+  assert.deepEqual(lecon.data.cadrage, { pourquoi: 'curiosite', deja: 'je-ne-sais-pas' });
+  const args = await argsDe(lecon.data);
+  assert.match(args, /Pourquoi \? Par curiosité ; Tu en sais déjà… Je ne sais pas/);
+});
+
+test('Cadrage : une Leçon de révision ne garde que « Tu en sais déjà… », « Pourquoi ? » refusé', async () => {
+  const fichiers = [{ nom: 'page1.pdf', data: Buffer.from('%PDF-1.4 faux').toString('base64') }];
+  const avant = await nombreDeLecons('zoe-test');
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { pourquoi: 'controle', deja: 'rien' } })).status, 400);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { deja: 'tout' } })).status, 400);
+  assert.equal(await nombreDeLecons('zoe-test'), avant);
+  const lecon = await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { deja: 'beaucoup' } });
+  assert.equal(lecon.status, 201);
+  assert.deepEqual(lecon.data.cadrage, { deja: 'beaucoup' });
+  const args = await argsDe(lecon.data);
+  assert.match(args, /Tu en sais déjà… Beaucoup/);
+  assert.doesNotMatch(args, /Pourquoi \?/);
+});
+
+test('Cadrage : les Propositions reçoivent un résumé des Cadrages récents', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cadre-Idees', age: 10, niveau: 'Primaire 5' })).status, 201);
+  await attendrePropositions('cadre-idees');
+  const args = path.join(dossier, 'args-propositions');
+  await fs.rm(args, { force: true });
+  await appel('/api/eleves/cadre-idees/lecons', 'POST', { sujet: 'les requins', cadrage: { pourquoi: 'en-parler', deja: 'beaucoup' } });
+  await sonderJusqua(() => fs.readFile(args, 'utf8').catch(() => ''), (a) => a.includes('Les volcans (Sciences)'), 'Pas de régénération après le tour');
+  await attendrePropositions('cadre-idees');
+  const consignes = await fs.readFile(args, 'utf8');
+  assert.match(consignes, /Cadrage/);
+  assert.match(consignes, /Pourquoi \? Pour en parler avec quelqu'un ; Tu en sais déjà… Beaucoup/);
+});
+
+// Visuels : petit serveur d'images local, lancé par le test (aucun accès réseau extérieur).
+// PNG de 1 pixel sous /tableau.png ; /page.png sert du HTML sous un type d'image ; /texte.txt du texte ; le reste, 404.
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+const avecServeurImages = async (fn) => {
+  const serveurImages = http.createServer((req, res) => {
+    if (req.url === '/tableau.png') return res.writeHead(200, { 'Content-Type': 'image/png' }).end(PNG);
+    if (req.url === '/page.png') return res.writeHead(200, { 'Content-Type': 'image/png' }).end('<html>pas une image</html>');
+    if (req.url === '/texte.txt') return res.writeHead(200, { 'Content-Type': 'text/plain' }).end('bonjour');
+    res.writeHead(404).end();
+  });
+  await new Promise((r) => serveurImages.listen(0, '127.0.0.1', r));
+  try {
+    return await fn(`http://127.0.0.1:${serveurImages.address().port}`);
+  } finally {
+    serveurImages.close();
+  }
+};
+
+// Le prof écrit une page avec des figures et le manifeste d'images, le temps de `fn`.
+const avecPageImages = async ({ page, manifeste }, fn) => {
+  await fs.writeFile(path.join(dossier, 'images-page'), page);
+  await fs.writeFile(path.join(dossier, 'images-manifeste'), JSON.stringify(manifeste));
+  try {
+    return await fn();
+  } finally {
+    await fs.rm(path.join(dossier, 'images-page'), { force: true });
+    await fs.rm(path.join(dossier, 'images-manifeste'), { force: true });
+  }
+};
+
+const figure = (src, legende) => `<figure class="kit-figure"><img src="${src}" alt="${legende}"><figcaption>${legende}</figcaption></figure>`;
+const lirePage = async (lecon, page) => (await fetch(`${base}/fichiers/zoe-test/${lecon.id}/lessons/${page}`)).text();
+
+test('Visuels : consigne du prof (visuel qui explique, légende, source et licence, question du quiz, manifeste) et figure du Kit documentée', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les tableaux' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  for (const attendu of [/au moins un visuel/, /légende/, /licence/, /au moins une question du quiz/, /décorati/, /Wikimedia Commons/, /SVG/, /currentColor/, /images\.json/, /kit-figure/]) {
+    assert.match(args, attendu);
+  }
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /class="kit-figure"/);
+  assert.match(doc, /images\.json/);
+  assert.match(doc, /currentColor/);
+  assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure/);
+});
+
+test('Visuels : une image déclarée est rapatriée dans la Leçon et son adresse réécrite dans la page', () => avecServeurImages(async (serveurImages) => {
+  const distante = `${serveurImages}/tableau.png`;
+  const lecon = await avecPageImages({
+    page: `<h1>Magritte</h1>${figure(distante, 'Le tableau')}`,
+    manifeste: [{ url: distante, source: 'Musée test', licence: 'CC BY-SA 4.0', alt: 'Le tableau', page: '0002-images.html' }],
+  }, async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Magritte' })).data);
+
+  const html = await lirePage(lecon, '0002-images.html');
+  assert.ok(!html.includes(distante));
+  const locale = html.match(/<img src="([^"]+)"/)[1];
+  assert.match(locale, /^\.\.\/images\/[^/]+\.png$/);
+  const image = await fetch(new URL(locale, `${base}/fichiers/zoe-test/${lecon.id}/lessons/0002-images.html`));
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), PNG);
+  assert.match(html, /<figcaption>Le tableau<\/figcaption>/);
+}));
+
+test('Visuels : une adresse morte, un fichier qui n\'est pas une image ou une adresse hors HTTP(S) est retiré de la page, légende gardée, et signalé au tour suivant seulement', () => avecServeurImages(async (serveurImages) => {
+  const mortes = [`${serveurImages}/disparue.png`, `${serveurImages}/page.png`, `${serveurImages}/texte.txt`, 'file:///etc/passwd'];
+  const lecon = await avecPageImages({
+    page: `<h1>Magritte</h1>${mortes.map((url, i) => figure(url, `Légende ${i}`)).join('')}`,
+    manifeste: mortes.map((url) => ({ url, source: 'Musée test', licence: 'CC0', alt: 'x', page: '0002-images.html' })),
+  }, async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Magritte encore' })).data);
+
+  const html = await lirePage(lecon, '0002-images.html');
+  assert.doesNotMatch(html, /<img/);
+  for (let i = 0; i < mortes.length; i++) assert.match(html, new RegExp(`<figcaption>Légende ${i}</figcaption>`));
+
+  const args = async () => fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.doesNotMatch(await args(), /Images retirées/);
+  await message(lecon, 'ok');
+  const signale = await args();
+  assert.match(signale, /Images retirées/);
+  assert.ok(signale.includes(`${serveurImages}/disparue.png (0002-images.html) : adresse morte (erreur 404)`));
+  assert.ok(signale.includes(`${serveurImages}/page.png (0002-images.html) : fichier qui n'est pas une image`));
+  assert.ok(signale.includes(`${serveurImages}/texte.txt (0002-images.html) : fichier qui n'est pas une image`));
+  assert.ok(signale.includes('file:///etc/passwd (0002-images.html) : adresse qui n\'est pas en HTTP(S)'));
+  await message(lecon, 'ok');
+  assert.doesNotMatch(await args(), /Images retirées/);
+}));
+
+test('Ma fiche : la Leçon lue expose ses documents de référence (reference/*.html), liste vide sinon', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les glaciers' })).data;
+  assert.deepEqual(lecon.references, []);
+  const dossierReference = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'reference');
+  await fs.mkdir(dossierReference);
+  await fs.writeFile(path.join(dossierReference, 'glossaire.html'), '<h1>Glossaire</h1>');
+  await fs.writeFile(path.join(dossierReference, 'fiche.html'), '<h1>Fiche</h1>');
+  await fs.writeFile(path.join(dossierReference, 'notes.txt'), 'pas un document');
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`)).data;
+  assert.deepEqual(lue.references, ['fiche.html', 'glossaire.html']);
+  assert.equal((await fetch(`${base}/fichiers/zoe-test/${lecon.id}/reference/fiche.html`)).status, 200);
+});
+
+test('Pré-test : la consigne du premier tour d\'une Leçon libre fait poser deux questions au prof, puis mission, Objectifs et Pré-test', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'curiosite', deja: 'un-peu' } })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /« À la fin, tu voudrais pouvoir… »/);
+  assert.match(args, /« Où as-tu croisé ce sujet \? »/);
+  assert.match(args, /une à la fois/);
+  assert.match(args, /Pré-test/);
+  assert.match(args, /trois questions/);
+  assert.match(args, /"pretest": true/);
+  assert.match(args, /niveau annoncé \(Tu en sais déjà… Un peu\)/);
+  assert.doesNotMatch(args, /le plus dur/);
+  // Les tours suivants de la première Séance (réponses aux questions du prof) ne la répètent pas.
+  assert.equal((await message(lecon, 'Le reconnaître dans le ciel')).status, 200);
+  assert.doesNotMatch(await argsDe(lecon), /Où as-tu croisé ce sujet/);
+});
+
+test('Pré-test : une Leçon de révision demande « Qu\'est-ce qui te semble le plus dur ? » et un Pré-test tiré du Document source', async () => {
+  const fichiers = [{ nom: 'page1.pdf', data: Buffer.from('%PDF-1.4 faux').toString('base64') }];
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers, cadrage: { deja: 'beaucoup' } })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /« Qu'est-ce qui te semble le plus dur \? »/);
+  assert.match(args, /Pré-test/);
+  assert.match(args, /tiré du Document source/);
+  assert.match(args, /niveau annoncé \(Tu en sais déjà… Beaucoup\)/);
+  assert.doesNotMatch(args, /À la fin, tu voudrais pouvoir/);
+  assert.doesNotMatch(args, /Où as-tu croisé/);
+});
+
+test('Pré-test : sans Cadrage, la consigne du premier tour vise le niveau de l\'élève', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les marées' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /« À la fin, tu voudrais pouvoir… »/);
+  assert.match(args, /Pré-test/);
+  assert.doesNotMatch(args, /niveau annoncé/);
+});
+
+// Résultats d'un Pré-test de trois questions, tels qu'envoyés par le Kit : q1 (Objectif 1) et q2 (Objectif 2) justes, q3 (Objectif 3) ratée.
+const corpsPretest = () => ({
+  score: 67, page: '0001-volcans.html', objectifs: [1, 2, 3], pretest: true,
+  questions: [
+    { id: 'q1', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false, objectifs: [1], sur: false },
+    { id: 'q2', enonce: 'Le magma, c’est…', choisie: 'De la roche fondue', bonne: 'De la roche fondue', juste: true, bonus: false, objectifs: [2] },
+    { id: 'q3', enonce: 'Où est l’Etna ?', choisie: 'En Islande', bonne: 'En Sicile', juste: false, bonus: false, objectifs: [3], sur: true },
+  ],
+});
+
+test('Pré-test : son score est enregistré à part, hors Maîtrise, Objectifs et Étoiles ; Objectifs réussis « à confirmer »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }], cadrage: { deja: 'rien' } })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const r = await appel(`${url}/scores`, 'POST', { ...corpsPretest(), questions: corpsPretest().questions.map((q) => ({ ...q, juste: true, choisie: q.bonne })) });
+  assert.equal(r.status, 201);
+  const lue = r.data;
+  assert.equal(lue.scores.at(-1).pretest, true);
+  assert.equal(lue.scores.at(-1).score, 100);
+  assert.equal(lue.maitrise, null);
+  assert.deepEqual(lue.objectifs.map((o) => o.atteint), [false, false, false]);
+  assert.deepEqual(lue.etoiles, { quiz: false, bonus: false, defi: false });
+  assert.deepEqual(lue.objectifs.map((o) => o.aConfirmer), [true, true, true]);
+  // Un vrai quiz réussi ensuite atteint l'Objectif 1 : il n'est plus « à confirmer ».
+  const vrai = (await appel(`${url}/scores`, 'POST', { score: 100, page: '0002-volcans.html', objectifs: [1] })).data;
+  assert.deepEqual(vrai.objectifs.map((o) => [o.atteint, o.aConfirmer]), [[true, false], [false, true], [false, true]]);
+  assert.equal(vrai.maitrise.pourcentage, 100);
+  assert.equal(vrai.etoiles.quiz, true);
+  assert.equal(vrai.scores.at(-1).pretest, undefined);
+  const resume = (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
+  assert.deepEqual(resume.objectifs.map((o) => o.aConfirmer), [false, true, true]);
+});
+
+test('Pré-test : l\'écart avec « Tu en sais déjà… » est exposé par la Leçon', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans', cadrage: { pourquoi: 'curiosite', deja: 'rien' } })).data);
+  assert.equal(lecon.pretest, null);
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', corpsPretest())).data;
+  assert.equal(lue.pretest.ecart, 'plus');
+  assert.deepEqual([lue.pretest.deja, lue.pretest.justes, lue.pretest.total], ['rien', 2, 3]);
+  assert.match(lue.pretest.texte, /^Tu pensais découvrir ce sujet, et tu as trouvé 2 réponses sur 3 : tu en sais plus/);
+  assert.equal(lue.maitrise, null);
+});
+
+test('Pré-test : le Retour montre l\'écart, seul « Commencer » est proposé, et sa consigne porte les résultats par question', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans', cadrage: { pourquoi: 'curiosite', deja: 'beaucoup' } })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  assert.equal((await appel(`${url}/scores`, 'POST', corpsPretest())).status, 201);
+  const retour = (await appel(`${url}/retours`, 'POST', corpsPretest())).data;
+  const prof = retour.messages.at(-1);
+  assert.deepEqual(prof.retourQuiz, { score: 67, action: 'commencer', pretest: true });
+  assert.equal(retour.messages.at(-2).texte, '🔮 Pré-test terminé');
+  assert.match(prof.texte, /Tu pensais en savoir beaucoup, et tu as trouvé 2 réponses sur 3 : tu te connais bien/);
+  assert.doesNotMatch(prof.texte, /Bravo|Étoile|%/);
+  assert.deepEqual(retour.rebondsProposes, ['commencer']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'suivante' })).status, 400);
+
+  const suite = await appel(`${url}/rebonds`, 'POST', { action: 'commencer' });
+  assert.equal(suite.status, 200);
+  assert.equal(suite.data.messages.at(-2).texte, '🚀 On commence !');
+  const consigne = await argsDe(lecon);
+  assert.match(consigne, /Rebond : Commencer/);
+  assert.match(consigne, /première vraie page de leçon/);
+  assert.match(consigne, /Résultats du Pré-test/);
+  assert.match(consigne, /« Où sort la lave \? » \(Objectif 1\) : juste/);
+  assert.match(consigne, /« Le magma, c’est… » \(Objectif 2\) : juste/);
+  assert.match(consigne, /« Où est l’Etna \? » \(Objectif 3\) : il a choisi « En Islande », la bonne réponse était « En Sicile »/);
+  assert.match(consigne, /À confirmer : 1, 2/);
+  assert.match(consigne, /Tu en sais déjà… Beaucoup/);
+  assert.doesNotMatch(consigne, /Résultats du dernier quiz/);
+  // Un quiz ordinaire après le Pré-test retrouve les Rebonds habituels.
+  const ordinaire = { score: 50, page: '0002-volcans.html' };
+  await appel(`${url}/scores`, 'POST', ordinaire);
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', ordinaire)).data.rebondsProposes, ['suivante']);
+});
+
+test('Pré-test : un Retour de Pré-test en Leçon de révision ne fait gagner aucune Étoile et ne propose que « Commencer »', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const parfait = { ...corpsPretest(), questions: corpsPretest().questions.map((q) => ({ ...q, juste: true, choisie: q.bonne })) };
+  await appel(`${url}/scores`, 'POST', parfait);
+  const retour = (await appel(`${url}/retours`, 'POST', parfait)).data;
+  assert.equal(retour.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
+  assert.deepEqual(retour.rebondsProposes, ['commencer']);
+  assert.match(retour.messages.at(-1).texte, /Tu as trouvé 3 réponses sur 3 avant même la leçon/);
+  // Le score suivant (vrai quiz) gagne bien son Étoile, annoncée par son propre Retour.
+  await appel(`${url}/rebonds`, 'POST', { action: 'commencer' });
+  await appel(`${url}/scores`, 'POST', { score: 90 });
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 90 })).data.messages.at(-1).retourQuiz.nouvellesEtoiles, ['quiz']);
+});
+
+test('Pré-test : refait en cours de Leçon, il reste hors score mais ne propose pas « Commencer » et n\'annule pas le Défi en cours', async () => {
+  const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { fichiers: [{ nom: 'page.pdf', data: pdf }] })).data);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', { score: 90 });
+  assert.deepEqual((await appel(`${url}/retours`, 'POST', { score: 90 })).data.rebondsProposes, ['defi']);
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'defi' })).data.defiEnCours, true);
+
+  await appel(`${url}/scores`, 'POST', corpsPretest());
+  const retour = (await appel(`${url}/retours`, 'POST', corpsPretest())).data;
+  assert.equal(retour.defiEnCours, true);
+  assert.deepEqual(retour.rebondsProposes, []);
+  assert.equal(retour.messages.at(-1).retourQuiz.pretest, true);
+  assert.equal(retour.maitrise.pourcentage, 90);
+  // Le Défi suivant, réussi, termine bien la Leçon.
+  await appel(`${url}/scores`, 'POST', { score: 85 });
+  assert.equal((await appel(`${url}/retours`, 'POST', { score: 85 })).data.messages.at(-1).retourQuiz.action, 'terminee');
+});
+
+test('Pré-test : un marqueur invalide est ignoré, le score compte comme un quiz ordinaire', async () => {
+  const lecon = await avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data);
+  const lue = (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { ...corpsPretest(), pretest: 'oui' })).data;
+  assert.equal(Object.hasOwn(lue.scores.at(-1), 'pretest'), false);
+  assert.equal(lue.maitrise.pourcentage, 67);
+  assert.equal(lue.pretest, null);
 });

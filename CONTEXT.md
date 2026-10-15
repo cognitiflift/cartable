@@ -57,7 +57,27 @@ Page HTML produite par une Séance, avec son contenu et son quiz. Une Leçon en 
 _Avoid_: leçon (réservé à la Leçon entière)
 
 **Objectif**:
-Chose concrète que l'Élève saura faire au bout d'une Leçon. Les Objectifs sont fixés dès la première Séance (tirés du Document source pour une Leçon de révision), puis les pages s'enchaînent librement pour les atteindre. Ceux d'une Leçon libre suivent sa mission : ils s'allongent quand l'Élève accepte de l'élargir. Un Objectif est atteint quand l'Élève réussit (80 % ou plus) un quiz qui le couvre.
+Chose concrète que l'Élève saura faire au bout d'une Leçon. Les Objectifs sont fixés dès la première Séance (tirés du Document source pour une Leçon de révision), puis les pages s'enchaînent librement pour les atteindre. Ceux d'une Leçon libre suivent sa mission : ils s'allongent quand l'Élève accepte de l'élargir. Un Objectif est atteint quand l'Élève réussit (80 % ou plus) un quiz qui le couvre ; il fait alors monter le Niveau de Leçon. Atteint ne veut pas encore dire **Retenu**. Un Objectif couvert par une question réussie au Pré-test est **à confirmer** : il n'est pas atteint pour autant.
+
+**Retenu**:
+Objectif réussi au moins deux fois, dans des quiz réussis (80 % ou plus, hors Pré-test) passés à au moins 24 heures d'intervalle ; les quiz faits en Révisant comptent. Mesure ce qui tient dans le temps, alors qu'un Objectif atteint peut n'être qu'une réussite du moment, juste après avoir lu la page. Calculé par l'appli, acquis pour toujours, sans effet sur le Niveau de Leçon. La carte de la Leçon affiche par exemple « 3 Objectifs · 1 Retenu ».
+_Avoid_: acquis (palier de la Maîtrise), mémorisé, atteint (un Objectif atteint n'est pas forcément Retenu)
+
+**À confirmer**:
+État d'un Objectif couvert par une question réussie au Pré-test : l'Élève semble déjà le savoir, mais ce n'est ni atteint ni Retenu tant qu'un vrai quiz ne l'a pas confirmé. Sert au prof pour ne pas réenseigner ce que l'Élève sait.
+_Avoid_: acquis, déjà su
+
+**Cadrage**:
+Questions posées au tout début d'une Leçon, avant la première Page de leçon, pour situer l'Élève. En deux temps : d'abord l'appli pose elle-même deux questions fixes, à réponses fermées et sans tour de l'agent, **Pourquoi ?** (curiosité, école, exposé ou projet, contrôle, pour en parler avec quelqu'un) et **Tu en sais déjà…** (rien, je découvre ; un peu ; beaucoup ; je suis incollable) ; puis, dans la première Séance, le prof pose deux questions propres au sujet avec des Réponses proposées, **À la fin, tu voudrais pouvoir…** et **Où as-tu croisé ce sujet ?** Pour une Leçon de révision, seule « Tu en sais déjà… » reste côté appli, et la question du prof devient « Qu'est-ce qui te semble le plus dur ? ». Chaque question accepte « Je ne sais pas ». Les réponses sont enregistrées dans la Leçon et servent aussi aux Propositions.
+_Avoid_: questionnaire, diagnostic, mission (la mission est ce que le prof écrit après le Cadrage)
+
+**Pré-test**:
+Courte page « Devine ! » de trois questions que le prof crée à la fin du Cadrage, au niveau annoncé par « Tu en sais déjà… », sans contenu à enseigner (tirée du Document source pour une Leçon de révision). Son score est hors Maîtrise, hors Objectifs atteints, hors Étoiles et hors Rebond : après lui, l'appli propose un seul Rebond, « Commencer », qui transmet ses résultats au prof pour orienter la première vraie Page de leçon. Son Retour de quiz montre, avec bienveillance, l'écart entre ce que l'Élève pensait savoir et ce qu'il a trouvé.
+_Avoid_: évaluation, test de niveau, examen
+
+**Confiance**:
+Ce que l'Élève indique après chaque réponse d'un quiz, avant de voir la correction : « sûr » ou « pas sûr ». Ne change jamais le score. Les erreurs commises « sûr » sont signalées au prof, qui les retravaille en priorité.
+_Avoid_: certitude, assurance, auto-évaluation (réservé à « Tu en sais déjà… » du Cadrage)
 
 **Dépassement**:
 Ce qui va un tout petit peu au-delà du contenu d'une Leçon pour éveiller la curiosité de l'Élève : un encart « Pour aller plus loin » dans la Page de leçon et 2 ou 3 questions bonus dans son quiz. Pour une Leçon de révision, il est signalé comme hors du Document source. Distinct du **Défi**, qui reste sur le même contenu, en plus difficile.
@@ -78,7 +98,7 @@ Ce que consomme un appel à l'agent (tokens et coût indicatif), avec le type de
 _Avoid_: prix, facture
 
 **Rebond**:
-Ce que l'appli propose à l'Élève après un quiz, d'après le score de ce quiz (pas la Maîtrise) : pour une Leçon de révision (ou une Leçon qu'on Révise), **Revoir** sous 80 % (une page qui reprend autrement ce qui est raté), sinon **Défi** (une page plus difficile, dont la réussite termine la Leçon de révision) ; pour une Leçon libre, toujours **Étape suivante** (la page nouvelle que l'agent choisit selon la zone proximale de l'Élève, dans la même Leçon).
+Ce que l'appli propose à l'Élève après un quiz, d'après le score de ce quiz (pas la Maîtrise) : pour une Leçon de révision (ou une Leçon qu'on Révise), **Revoir** sous 80 % (une page qui reprend autrement ce qui est raté), sinon **Défi** (une page plus difficile, dont la réussite termine la Leçon de révision) ; pour une Leçon libre, toujours **Étape suivante** (la page nouvelle que l'agent choisit selon la zone proximale de l'Élève, dans la même Leçon). Après le premier Pré-test d'une Leçon, seul **Commencer** est proposé : il transmet au prof les résultats du Pré-test pour la première vraie Page de leçon.
 _Avoid_: suite (réservé aux Propositions), leçon suivante
 
 **Proposition**:
@@ -98,7 +118,7 @@ Récompenses d'une Leçon de révision, au nombre de trois, acquises pour toujou
 Retravailler une Leçon comme une Leçon de révision (Revoir ou Défi selon le score), dans la même Leçon. Sur une Leçon de révision terminée, c'est la seule suite proposée : elle repart du Document source et permet de gagner les Étoiles manquantes, ou de s'entraîner encore avant un contrôle. Sur une Leçon libre, elle n'est proposée que si la dernière Page de leçon date de plus d'une semaine : elle repart des pages déjà vues, ne rapporte rien et ne change ni les Objectifs ni le Niveau de Leçon (seulement la Maîtrise) ; après le Défi, l'Élève retrouve l'Étape suivante.
 
 **Type de tâche**:
-Ce que l'appli demande à l'agent à un tour donné, dans une liste fermée : **première Séance** (les tours d'une Leçon qui n'a pas encore de Page de leçon), **page** (une Séance suivante ; le Retour de quiz, composé par l'appli, n'est pas un tour de l'agent), **Rebond** (Étape suivante, Revoir, Défi, Réviser) et **Propositions**. Le Coût d'un tour et le Modèle en dépendent.
+Ce que l'appli demande à l'agent à un tour donné, dans une liste fermée : **première Séance** (les tours d'une Leçon qui n'a pas encore de Page de leçon), **page** (une Séance suivante ; le Retour de quiz, composé par l'appli, n'est pas un tour de l'agent), **Rebond** (Étape suivante, Revoir, Défi, Réviser, Commencer) et **Propositions**. Le Coût d'un tour et le Modèle en dépendent.
 
 **Relais**:
 Fonctionnement des tours de l'agent dans une Leçon qui a déjà sa première Page de leçon : chacun démarre une **session neuve** et reçoit le **préambule de relais**, au lieu de reprendre la conversation précédente. Il allège le Coût d'un tour ; la première Séance, elle, reprend toujours sa session.

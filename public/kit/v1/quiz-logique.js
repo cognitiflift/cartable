@@ -3,9 +3,12 @@
 // validation, avec les mêmes limites, pour le quiz affiché et pour le résultat enregistré.
 //
 // Données écrites par le prof dans la Page de leçon (voir LISEZMOI.md) :
-//   { objectifs: [n…], questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs? }] }
+//   { objectifs: [n…], pretest?, questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs? }] }
+// `pretest: true` : quiz du Pré-test (« Devine ! »), hors Maîtrise, Objectifs atteints, Étoiles et Rebond ordinaire.
 // Message envoyé à l'appli à la fin du quiz (`cartable-score`) :
-//   { type, score, page, objectifs, bonus?, questions: [{ id, enonce, choisie, bonne, juste, bonus, objectifs }] }
+//   { type, score, page, objectifs, pretest?, bonus?, questions: [{ id, enonce, choisie, bonne, juste, bonus, objectifs, sur? }] }
+// `sur` : Confiance de l'Élève, donnée après le choix et avant la correction (true = « sûr », false = « pas sûr ») ;
+// absente si l'Élève ne l'a pas donnée (anciennes pages). Elle n'entre jamais dans le score.
 
 // Limites communes : au-delà, un texte est tronqué (jamais écarté) et les questions en trop sont ignorées.
 export const QUESTIONS_MAX = 50;
@@ -73,7 +76,7 @@ function questionValide(q) {
 export function lireQuiz(donnees) {
   const questions = questionsValides(donnees?.questions, questionValide);
   if (!questions.some((q) => !q.bonus)) return null;
-  return { objectifs: numeros(donnees.objectifs), questions };
+  return { objectifs: numeros(donnees.objectifs), ...(donnees.pretest === true && { pretest: true }), questions };
 }
 
 // Résultats par question reçus par l'appli (`questions` du message `cartable-score`), validés avec les mêmes limites
@@ -84,7 +87,10 @@ export function lireResultats(brut, nombreObjectifs = Infinity) {
     if (!q || typeof q !== 'object' || typeof q.juste !== 'boolean') return null;
     const [id, enonce, choisie, bonne] = [texte(q.id, ID_MAX), texte(q.enonce), texte(q.choisie), texte(q.bonne)];
     if (!id || !enonce || !choisie || !bonne) return null;
-    return { id, enonce, choisie, bonne, juste: q.juste, bonus: q.bonus === true, objectifs: numeros(q.objectifs, nombreObjectifs) };
+    return {
+      id, enonce, choisie, bonne, juste: q.juste, bonus: q.bonus === true, objectifs: numeros(q.objectifs, nombreObjectifs),
+      ...(typeof q.sur === 'boolean' && { sur: q.sur }),
+    };
   });
 }
 
@@ -103,14 +109,16 @@ export function melanger(nombre, aleatoire = Math.random) {
   return ordre;
 }
 
-// Message de fin de quiz. `choix` : id de question → index de la réponse choisie (avant mélange).
-// Score : % de questions justes hors bonus, arrondi. Objectifs : ceux du quiz et ceux propres aux questions.
-export function messageScore(quiz, choix, page) {
+// Message de fin de quiz. `choix` : id de question → index de la réponse choisie (avant mélange) ; `confiance` :
+// id de question → true (« sûr ») ou false (« pas sûr »). Score : % de questions justes hors bonus, arrondi, sans
+// effet de la Confiance. Objectifs : ceux du quiz et ceux propres aux questions. Un quiz de Pré-test porte son marqueur.
+export function messageScore(quiz, choix, page, confiance = {}) {
   const questions = quiz.questions.map((q) => {
     const { juste, bonne } = corriger(q, choix[q.id]);
-    return { id: q.id, enonce: q.enonce, choisie: q.reponses[choix[q.id]] ?? null, bonne, juste, bonus: q.bonus, objectifs: q.objectifs ?? quiz.objectifs };
+    return { id: q.id, enonce: q.enonce, choisie: q.reponses[choix[q.id]] ?? null, bonne, juste, bonus: q.bonus, objectifs: q.objectifs ?? quiz.objectifs,
+      ...(typeof confiance[q.id] === 'boolean' && { sur: confiance[q.id] }) };
   });
   const objectifs = [...new Set(questions.filter((q) => !q.bonus).flatMap((q) => q.objectifs))].sort((a, b) => a - b);
   const bonus = bonusDesQuestions(questions);
-  return { type: 'cartable-score', score: scoreDesQuestions(questions), page, objectifs, ...(bonus && { bonus }), questions };
+  return { type: 'cartable-score', score: scoreDesQuestions(questions), page, objectifs, ...(quiz.pretest && { pretest: true }), ...(bonus && { bonus }), questions };
 }

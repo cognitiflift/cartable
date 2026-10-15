@@ -27,50 +27,69 @@ function demarrer() {
   }
 
   const choix = {};
+  const confiance = {};
   const page = location.pathname.split('/').pop();
   const fin = el('div', { className: 'kit-quiz-fin', hidden: true });
   let envoye = false;
 
   const terminer = () => {
-    if (envoye || Object.keys(choix).length < quiz.questions.length) return;
+    if (envoye || Object.keys(confiance).length < quiz.questions.length) return;
     envoye = true;
-    const message = messageScore(quiz, choix, page);
+    const message = messageScore(quiz, choix, page, confiance);
     fin.hidden = false;
-    fin.append(
-      el('p', { className: 'kit-quiz-score' }, `Ton score : ${message.score} %`),
+    // Sans questions bonus, pas de ligne bonus : append() écrirait « null » en texte.
+    fin.append(...[
+      // Pré-test : hors score, on n'affiche que le nombre de bonnes réponses devinées.
+      el('p', { className: 'kit-quiz-score' }, message.pretest
+        ? `🔮 Tu as deviné ${message.questions.filter((q) => q.juste && !q.bonus).length} sur ${message.questions.filter((q) => !q.bonus).length}`
+        : `Ton score : ${message.score} %`),
       message.bonus ? el('p', {}, `🚀 Questions bonus : ${message.bonus.reussies} sur ${message.bonus.total}`) : null,
-    );
+    ].filter((e) => e != null));
     window.parent.postMessage(message, '*');
   };
 
   let numero = 0;
   quiz.questions.forEach((q) => {
     const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
+    // Confiance : après le choix d'une réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
+    const demande = el('div', { className: 'kit-quiz-confiance', hidden: true }, el('span', {}, 'Tu es sûr ?'));
+    let choisi = null;
+    const corrigerQuestion = (sur) => {
+      confiance[q.id] = sur;
+      demande.remove();
+      const { juste, bonne, explication } = corriger(q, choix[q.id]);
+      for (const b of boutons) if (Number(b.dataset.index) === q.bonne) b.classList.add('kit-bonne');
+      if (!juste) choisi.classList.add('kit-fausse');
+      retour.hidden = false;
+      retour.classList.add(juste ? 'kit-juste' : 'kit-faux');
+      retour.append(
+        el('strong', {}, juste ? '✅ Bravo !' : `❌ La bonne réponse : ${bonne}`),
+        explication ? el('p', {}, explication) : null,
+      );
+      terminer();
+    };
+    for (const [libelle, sur] of [['👍 Sûr', true], ['🤔 Pas sûr', false]]) {
+      const bouton = el('button', { type: 'button', className: 'kit-quiz-sur' }, libelle);
+      bouton.addEventListener('click', () => corrigerQuestion(sur), { once: true });
+      demande.append(bouton);
+    }
     const boutons = melanger(q.reponses.length).map((i) => {
       const bouton = el('button', { type: 'button', className: 'kit-quiz-reponse' }, q.reponses[i]);
       bouton.dataset.index = i;
       bouton.addEventListener('click', () => {
         if (q.id in choix) return;
         choix[q.id] = i;
-        const { juste, bonne, explication } = corriger(q, i);
-        for (const b of boutons) {
-          b.disabled = true;
-          if (Number(b.dataset.index) === q.bonne) b.classList.add('kit-bonne');
-        }
-        if (!juste) bouton.classList.add('kit-fausse');
-        retour.hidden = false;
-        retour.classList.add(juste ? 'kit-juste' : 'kit-faux');
-        retour.append(
-          el('strong', {}, juste ? '✅ Bravo !' : `❌ La bonne réponse : ${bonne}`),
-          explication ? el('p', {}, explication) : null,
-        );
-        terminer();
+        choisi = bouton;
+        for (const b of boutons) b.disabled = true;
+        bouton.classList.add('kit-choisie');
+        demande.hidden = false;
       });
       return bouton;
     });
     zone.append(el('fieldset', { className: `kit-quiz-question${q.bonus ? ' kit-bonus' : ''}` },
       el('legend', {}, q.bonus ? '🚀 Bonus · ' : `${++numero}. `, q.enonce),
       el('div', { className: 'kit-quiz-reponses' }, ...boutons),
+      demande,
       retour));
   });
   if (quiz.questions.some((q) => q.bonus)) {

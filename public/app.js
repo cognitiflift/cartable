@@ -104,6 +104,15 @@ const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies
 const etoiles = (e) => h('span', { className: 'etoiles' },
   Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
 
+// Objectifs de la Leçon et combien sont Retenus, par exemple « 3 Objectifs · 1 Retenu ». Rien sans Objectifs.
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+function objectifsRetenus(objectifs = []) {
+  if (!objectifs.length) return null;
+  const retenus = objectifs.filter((o) => o.retenu).length;
+  return h('span', { className: 'objectifs-retenus', title: 'Retenu : réussi de nouveau un autre jour' },
+    `${pluriel(objectifs.length, 'Objectif')} · ${pluriel(retenus, 'Retenu')}`);
+}
+
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
   return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: maitrise.palier },
@@ -124,6 +133,7 @@ async function ecranAccueil(profil) {
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
             l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
+          objectifsRetenus(l.objectifs),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
@@ -248,9 +258,26 @@ async function ecranSession(profil, id) {
   const entete = h('span', {});
   const panneau = h('div', { className: 'panneau' });
   const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
+  const fiche = h('div', { className: 'fiche', style: 'display:none' }); // Ma fiche, par-dessus tout le reste
   let pagesAffichees, iframe;
 
-  const afficherEntete = () => entete.replaceChildren(` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise));
+  // Ma fiche : les documents de référence de la Leçon, dans leur propre calque. La Page de leçon n'est jamais
+  // rechargée : son iframe reste en place dessous, avec son quiz en cours.
+  const ouvrirFiche = () => {
+    const url = (r) => `/fichiers/${profil.slug}/${id}/reference/${r}`;
+    const cadre = h('iframe', { src: url(lecon.references[0]), title: 'Ma fiche' });
+    const choix = lecon.references.length > 1
+      && h('select', { onchange: () => (cadre.src = url(choix.value)) }, lecon.references.map((r) => h('option', { value: r }, r.replace(/\.html$/, ''))));
+    fiche.replaceChildren(
+      h('div', { className: 'fiche-barre' }, h('strong', {}, '📋 Ma fiche'), choix,
+        h('button', { className: 'secondaire', onclick: () => { fiche.style.display = 'none'; fiche.replaceChildren(); } }, '✕ Fermer')),
+      cadre);
+    fiche.style.display = '';
+  };
+  const boutonFiche = h('button', { className: 'secondaire', onclick: ouvrirFiche }, '📋 Ma fiche');
+
+  const afficherEntete = () => entete.replaceChildren(...garder([` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise),
+    lecon.references.length > 0 && [' ', boutonFiche]]));
   // Le panneau n'est reconstruit que si les pages changent : l'iframe garde sinon sa position (et son quiz).
   const afficherPanneau = () => {
     panneau.style.display = lecon.pages.length ? '' : 'none';
@@ -328,7 +355,7 @@ async function ecranSession(profil, id) {
   afficher();
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
-    h('div', { className: 'seance' }, panneau, calque));
+    h('div', { className: 'seance' }, panneau, calque, fiche));
 }
 
 async function route() {

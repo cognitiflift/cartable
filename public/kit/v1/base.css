@@ -43,6 +43,11 @@ h1 { color: var(--kit-accent); font-size: 1.9rem; }
 h2 { margin-top: 2rem; border-bottom: 3px solid var(--kit-accent-doux); padding-bottom: .2rem; }
 a { color: var(--kit-accent); }
 img, svg, video { max-width: 100%; height: auto; }
+/* Figure : un visuel qui explique, sa légende et son crédit (source, licence). */
+.kit-figure { margin: 1.5rem 0; background: var(--kit-carte); border: 1px solid var(--kit-bord); border-radius: 14px; padding: .8rem; text-align: center; }
+.kit-figure img, .kit-figure svg { display: block; margin: 0 auto; border-radius: 8px; max-height: 70vh; width: auto; }
+.kit-figure figcaption { margin-top: .6rem; font-size: .95rem; text-align: left; }
+.kit-credit { display: block; margin-top: .2rem; color: var(--kit-doux); font-size: .8rem; }
 .encart, aside { background: var(--kit-accent-doux); border-left: 5px solid var(--kit-accent); border-radius: 10px; padding: .8rem 1.1rem; margin: 1.2rem 0; }
 
 /* Quiz */
@@ -62,6 +67,10 @@ img, svg, video { max-width: 100%; height: auto; }
 .kit-quiz-reponse:disabled { cursor: default; }
 .kit-quiz-reponse.kit-bonne { border-color: var(--kit-juste); background: var(--kit-juste-fond); }
 .kit-quiz-reponse.kit-fausse { border-color: var(--kit-faux); background: var(--kit-faux-fond); }
+.kit-quiz-reponse.kit-choisie { border-color: var(--kit-accent); }
+.kit-quiz-confiance { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
+.kit-quiz-confiance[hidden] { display: none; }
+.kit-quiz-sur { font: inherit; padding: .4rem .9rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }
 .kit-quiz-retour { margin-top: .7rem; padding: .6rem .9rem; border-radius: 10px; }
 .kit-quiz-retour p { margin: .3rem 0 0; }
 .kit-quiz-retour.kit-juste { background: var(--kit-juste-fond); }

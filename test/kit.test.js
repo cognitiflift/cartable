@@ -80,3 +80,14 @@ test('Kit : une question dont l\'énoncé commence par 🚀 est une question bon
   assert.equal(message.score, 100);
   assert.deepEqual(message.bonus, { reussies: 0, total: 1 });
 });
+
+test('Kit : la Confiance (« sûr / pas sûr ») est portée par chaque résultat, sans changer le score', () => {
+  const lu = lireQuiz(quiz);
+  const choix = { q1: 0, q2: 0, q3: 0 };
+  const avec = messageScore(lu, choix, 'p.html', { q1: true, q2: true, q3: false });
+  assert.deepEqual(avec.questions.map((q) => q.sur), [true, true, false]);
+  assert.equal(avec.score, messageScore(lu, choix, 'p.html').score);
+  assert.equal(avec.score, 50);
+  // Sans Confiance donnée pour une question, le résultat n'a pas de champ `sur`.
+  assert.equal(Object.hasOwn(messageScore(lu, choix, 'p.html', { q1: false }).questions[1], 'sur'), false);
+});

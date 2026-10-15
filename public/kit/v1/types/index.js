@@ -10,15 +10,22 @@
 //                   n'est pas une réponse possible à cette question ; `detail` : la réponse détaillée, en données.
 //                   `reponse` vaut null quand l'Élève a choisi « Je ne sais pas » (seul `bonne` sert alors).
 //   lireDetail?(brut) → `detail` validé (reçu par l'appli dans un résultat), ou null pour l'écarter.
+//   minoritaire?: true → sans bonne réponse vérifiable : ses questions restent moins nombreuses que les autres questions
+//                   comptées dans le score (celles en trop sont ignorées, voir lireQuiz).
+//   autoEvaluation?: true → l'Élève évalue lui-même sa réponse : ni Confiance ni « Je ne sais pas ».
 // La réponse de l'Élève (`choix` de messageScore, `choisie` d'une Révision du jour) est propre au type, en JSON.
 import { qcm } from './qcm.js';
 import { trous } from './trous.js';
 import { ordre } from './ordre.js';
 import { etapes } from './etapes.js';
+import { devoile } from './devoile.js';
+import { explication } from './explication.js';
 
 export const TYPES = {
   qcm,
   trous,
   ordre,
   etapes,
+  devoile,
+  explication,
 };

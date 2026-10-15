@@ -302,3 +302,80 @@ test('Kit : un exemple à étapes compte dans le score avec son crédit partiel,
   assert.deepEqual(lireResultats(message.questions), message.questions);
   for (const detail of [{ choix: 'x' }, { choix: [] }, {}]) assert.equal(Object.hasOwn(lireResultats([{ ...e1, detail }])[0], 'detail'), false, JSON.stringify(detail));
 });
+
+// Formats « réfléchis puis dévoile » et « meilleure explication » (spec #48, ticket #72).
+const devoile = {
+  id: 'd1', type: 'devoile', enonce: 'Pourquoi la lave refroidit-elle en sortant ?',
+  reponse: 'Elle perd sa chaleur au contact de l’air.', explication: 'L’air est bien plus froid que la lave.',
+};
+
+test('Kit : « réfléchis puis dévoile » a une réponse à dévoiler ; sans elle, il est écarté', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [devoile, quiz.questions[0], quiz.questions[1]] }).questions;
+  assert.equal(q.type, 'devoile');
+  assert.equal(q.reponse, devoile.reponse);
+  for (const mal of [{ ...devoile, reponse: '' }, { ...devoile, reponse: undefined }, { ...devoile, reponse: ['a'] }]) {
+    assert.deepEqual(lireQuiz({ objectifs: [1], questions: [mal, quiz.questions[0]] }).questions.map((x) => x.id), ['q1']);
+  }
+});
+
+test('Kit : « réfléchis puis dévoile » vaut juste si l\'Élève l\'avait, 0,5 à moitié, faux sinon', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [devoile, quiz.questions[0], quiz.questions[1]] }).questions;
+  const avais = corriger(q, 'avais');
+  assert.equal(avais.juste, true);
+  assert.equal(avais.points, 1);
+  assert.equal(avais.choisie, 'Je l’avais');
+  assert.equal(avais.bonne, devoile.reponse);
+  const moitie = corriger(q, 'moitie');
+  assert.equal(moitie.juste, false);
+  assert.equal(moitie.points, 0.5);
+  assert.equal(moitie.choisie, 'À moitié');
+  const pas = corriger(q, 'pas');
+  assert.equal(pas.juste, false);
+  assert.equal(pas.points, 0);
+  assert.equal(pas.choisie, 'Je ne l’avais pas');
+  for (const r of ['oui', 1, null, ['avais'], 'toString']) assert.equal(corriger(q, r).choisie, null, JSON.stringify(r));
+});
+
+test('Kit : « réfléchis puis dévoile » reste minoritaire dans le score ; les questions en trop sont ignorées et signalées au prof', () => {
+  const d = (n, extra = {}) => ({ ...devoile, id: `d${n}`, ...extra });
+  const q = (n) => ({ ...quiz.questions[0], id: `q${n}` });
+  // 3 questions vérifiables : au plus 2 « dévoile » comptées dans le score, les premières du quiz.
+  const donnees = { objectifs: [1], questions: [d(1), q(1), d(2), q(2), d(3), q(3), d(4)] };
+  assert.deepEqual(lireQuiz(donnees).questions.map((x) => x.id), ['d1', 'q1', 'd2', 'q2', 'q3']);
+  const raison = 'trop de questions « devoile » : elles doivent rester moins nombreuses que les autres questions comptées dans le score';
+  assert.deepEqual(questionsIgnorees(donnees), [{ id: 'd3', raison }, { id: 'd4', raison }]);
+  // Une question bonus est hors score : elle n'est pas limitée et ne compte pas parmi les autres.
+  assert.deepEqual(lireQuiz({ objectifs: [1], questions: [d(1, { bonus: true }), d(2, { bonus: true }), q(1), d(3)] }).questions.map((x) => x.id), ['d1', 'd2', 'q1']);
+  // À égalité, ce n'est plus une minorité.
+  assert.deepEqual(lireQuiz({ objectifs: [1], questions: [d(1), q(1)] }).questions.map((x) => x.id), ['q1']);
+  // Seulement des « dévoile » : aucune question comptée, pas de quiz.
+  assert.equal(lireQuiz({ objectifs: [1], questions: [d(1)] }), null);
+  assert.deepEqual(questionsIgnorees({ objectifs: [1], questions: [d(1)] }).map((x) => x.id ?? null), ['d1', null]);
+});
+
+const explication = {
+  id: 'e1', type: 'explication', enonce: 'Pourquoi la lave devient-elle noire en refroidissant ?',
+  reponses: ['Elle se solidifie en roche', 'Elle brûle', 'La pluie la salit'], bonne: 0, explication: 'En refroidissant, elle devient une roche.',
+};
+
+test('Kit : « choisis la meilleure explication » se valide et se corrige comme un QCM, et garde son type', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [explication] }).questions;
+  assert.equal(q.type, 'explication');
+  assert.deepEqual(q.reponses, explication.reponses);
+  assert.deepEqual(corriger(q, 0), { juste: true, points: 1, bonne: 'Elle se solidifie en roche', choisie: 'Elle se solidifie en roche', explication: explication.explication });
+  assert.equal(corriger(q, 2).juste, false);
+  assert.equal(corriger(q, 3).choisie, null);
+  assert.equal(lireQuiz({ objectifs: [1], questions: [{ ...explication, bonne: 5 }] }), null);
+});
+
+test('Kit : dévoile et meilleure explication passent dans le message et la validation de l\'appli, sans Confiance pour dévoile', () => {
+  const lu = lireQuiz({ objectifs: [1], questions: [explication, devoile, quiz.questions[0]] });
+  const message = messageScore(lu, { e1: 0, d1: 'moitie', q1: 1 }, 'p.html', { e1: true, d1: true, q1: false });
+  // L'auto-évaluation remplace la Confiance : une Confiance reçue pour dévoile est ignorée.
+  // (1 + 0,5 + 0) / 3 = 50 %.
+  assert.equal(message.score, 50);
+  const [e1, d1] = message.questions;
+  assert.deepEqual(e1, { id: 'e1', type: 'explication', enonce: explication.enonce, choisie: 'Elle se solidifie en roche', bonne: 'Elle se solidifie en roche', juste: true, bonus: false, objectifs: [1], sur: true });
+  assert.deepEqual(d1, { id: 'd1', type: 'devoile', enonce: devoile.enonce, choisie: 'À moitié', bonne: devoile.reponse, juste: false, points: 0.5, bonus: false, objectifs: [1] });
+  assert.deepEqual(lireResultats(message.questions), message.questions);
+});

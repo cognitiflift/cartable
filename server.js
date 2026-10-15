@@ -4,13 +4,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsFragiles, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
+import { maintenantDe } from './lib/horloge.js';
+import { revisionsDuJour } from './lib/revisions.js';
+import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
+import { jourValide, minuitDu } from './lib/jour.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -24,6 +28,8 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
 const enCours = new Set(); // leçons dont l'agent travaille : un seul agent par leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
+const variantesEnCours = new Set(); // élèves dont un tour de Variantes travaille : un seul à la fois par Élève
+const variantesARelancer = new Map(); // élève → Leçons dont des Questions ont pu devenir à varier pendant ce tour
 
 const json = (res, status, data) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -58,8 +64,8 @@ async function envoyerFichier(res, base, relatif) {
 
 // Tour repris dans la session en cours (première Séance, ou CARTABLE_RELAIS=0) : l'agent reçoit les scores récents et
 // les résultats du dernier quiz pour cibler les erreurs (l'Élève ne voit pas cet ajout), et, pour une Leçon qui n'en a
-// pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs. `resultatsQuiz: false` : comme pour le
-// préambule de relais.
+// pas encore (Leçons d'avant les Objectifs), la demande de fixer ses Objectifs. Les Questions les plus fragiles y sont
+// citées comme dans le préambule de relais. `resultatsQuiz: false` : comme pour le préambule de relais.
 function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   const lignes = [];
   if (lecon.scores.length) {
@@ -67,6 +73,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
     lignes.push(`[Scores aux quiz : ${lecon.scores.slice(-5).map(resumeScore).join(' ; ')}.${m ? ` Maîtrise : ${m.pourcentage} %, ${m.palier}.` : ''}]`);
     if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1), null, lecon));
   }
+  lignes.push(...consigneQuestionsFragiles(lecon.questions));
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
@@ -179,18 +186,62 @@ async function regenererPropositions(slug) {
   return lirePropositions(slug);
 }
 
+// Variantes des Questions (#69) : après une réponse à une Question (quiz de page ou Révision du jour), un tour du prof
+// en arrière-plan, que l'Élève n'attend jamais, écrit des Variantes pour les Questions de la Leçon à varier (voir
+// lib/variantes.js). Un seul tour à la fois par Élève : une Leçon arrivée pendant ce tour est reprise juste après.
+function varierQuestions(slug, id) {
+  if (variantesEnCours.has(slug)) {
+    variantesARelancer.set(slug, new Set([...(variantesARelancer.get(slug) ?? []), id]));
+    return;
+  }
+  variantesEnCours.add(slug);
+  (async () => {
+    const cles = await store.demanderVariantes(slug, id);
+    if (!cles.length) return;
+    try {
+      const profil = await store.lireEleve(slug);
+      const { cout } = await lancerAgent({
+        cwd: store.variantesDir(slug, id),
+        prompt: `Écris ${VARIANTES_PAR_QUESTION} variantes pour chacune des ${cles.length} questions de questions-a-varier.json.`,
+        consignes: consignesVariantes(profil), // le Profil pour présenter l'Élève (âge, niveau)
+        tache: 'variantes', // Modèle fixé par la tâche, pas par le Profil (ADR 0005)
+        teach: false,
+      });
+      await store.enregistrerCoutVariantes(slug, cout);
+    } catch (e) {
+      console.error(`Variantes de ${slug}/${id} : ${e.message}`);
+    } finally {
+      await store.rattacherVariantes(slug, id, cles);
+    }
+  })()
+    .catch((e) => console.error(`Variantes de ${slug}/${id} : ${e.message}`))
+    .finally(() => {
+      variantesEnCours.delete(slug);
+      // La Leçon de ce tour n'est pas reprise tout de suite (un tour raté n'est pas retenté sans nouvelle réponse).
+      const suivantes = [...(variantesARelancer.get(slug) ?? [])].filter((lecon) => lecon !== id);
+      variantesARelancer.delete(slug);
+      for (const lecon of suivantes) varierQuestions(slug, lecon);
+    });
+}
+
+// Image d'une Question servie hors de sa Page de leçon (Révisions du jour, US25) : son adresse relative à la page
+// (`../images/<fichier>`, voir lib/banque.js) devient celle du fichier de la Leçon servi sous /fichiers.
+const avecAdresseDImage = (slug, q) =>
+  q.image ? { ...q, image: { ...q.image, src: `/fichiers/${slug}/${q.lecon}/images/${path.basename(q.image.src)}` } } : q;
+
 async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut }) {
   const cadrage = validerCadrage(brut, 'revision');
-  const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage });
+  // Date de contrôle (#68) : gardée dans la Leçon, c'est l'appli qui resserre les révisions jusqu'à elle (lib/memoire.js).
+  const controle = jourValide(dateControle) ? dateControle : null;
+  const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage, dateControle: controle });
   const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
-  const controle = typeof dateControle === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateControle) ? dateControle : null;
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
-    `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle} (organise la révision espacée jusqu'à cette date)` : ''}.`,
+    `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle}` : ''}.`,
     `Lis le document. Après le Pré-test viendra une révision fidèle au document (seul le Dépassement va au-delà, signalé comme hors document), avec un quiz d'évaluation. Si un passage est illisible, laisse-le de côté et signale-le dans la page.`,
     consignePremierTour('revision', cadrage),
   ].join('\n');
-  const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(controle).toLocaleDateString('fr-BE')})` : ''}.`;
+  const affiche = `📄 Voici ma leçon à réviser${controle ? ` (contrôle le ${new Date(minuitDu(controle)).toLocaleDateString('fr-BE')})` : ''}.`;
   return tourDeParole({ slug, id: lecon.id, prompt: promptCadrage(prompt, cadrage), affiche, premier: true });
 }
 
@@ -284,12 +335,27 @@ async function api(req, res, segments) {
     if (m === 'PUT') return json(res, 200, await store.modifierProfil(slug, await lireCorps(req)));
   } else if (r2 === 'couts' && !id) {
     if (m === 'GET') return json(res, 200, await store.lireCouts(slug));
+  } else if (r2 === 'revisions' && !id) {
+    // Révisions du jour (#66) : servies et corrigées par l'appli, jamais de tour du prof.
+    const maintenant = maintenantDe(req.headers);
+    if (m === 'GET') {
+      const suite = new URL(req.url, 'http://x').searchParams.get('suite') === '1';
+      const { dues, questions } = revisionsDuJour(await store.leconsAReviser(slug, { maintenant }), { maintenant, suite });
+      return json(res, 200, { dues, questions: questions.map((q) => avecAdresseDImage(slug, q)) });
+    }
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const reponse = await store.repondreEnRevision(slug, corps, { maintenant });
+      varierQuestions(slug, corps.lecon);
+      return json(res, 200, reponse);
+    }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
-      if (m === 'GET') return json(res, 200, await store.listerLecons(slug));
+      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant: maintenantDe(req.headers) }));
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps));
@@ -303,9 +369,11 @@ async function api(req, res, segments) {
         return json(res, 201, await tourDeParole({ slug, id: lecon.id, prompt, affiche: sujet, premier: true }));
       }
     } else if (!r3) {
-      if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id));
+      if (m === 'GET') return json(res, 200, await store.lireLecon(slug, id, { maintenant: maintenantDe(req.headers) }));
     } else if (r3 === 'scores' && m === 'POST') {
-      return json(res, 201, await store.enregistrerScore(slug, id, await lireCorps(req)));
+      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant: maintenantDe(req.headers) });
+      varierQuestions(slug, id);
+      return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
       return json(res, 200, await retourQuiz(slug, id, await lireCorps(req)));
     } else if (r3 === 'rebonds' && m === 'POST') {

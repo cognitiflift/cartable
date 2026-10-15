@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { objectifsAtteints, etatObjectifs, niveauLecon, calculerMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
+import { memoireDeQuestion } from '../lib/memoire.js';
 
 const objectifs = ['Nommer les parties d’un volcan', 'Expliquer une éruption', 'Situer trois volcans'];
 const score = (valeur, couverts) => ({ score: valeur, date: '2026-10-01T10:00:00.000Z', ...(couverts && { objectifs: couverts }) });
@@ -134,4 +135,82 @@ test('À confirmer : plus dès qu’un vrai quiz a atteint l’Objectif', () => 
 test('À confirmer : une question bonus réussie ou un Pré-test sans résultats par question ne confirme rien', () => {
   assert.deepEqual(aConfirmer([pretest(question(true, [1], { bonus: true }))]), [false, false, false]);
   assert.deepEqual(aConfirmer([{ ...score(100, [1, 2]), pretest: true }]), [false, false, false]);
+});
+
+// Maîtrise et Retenu appuyés sur la mémoire des Questions (spec #47, ticket #67). Une Question de la Banque : son
+// contenu (Objectifs couverts) et son journal de réponses (voir lib/banque.js), avec sa mémoire à `maintenant`
+// (lib/memoire.js) comme la Leçon la calcule.
+const qBanque = (couverts, ...reponses) => ({ id: `q${couverts.join('-')}`, page: '0001-volcans.html', contenu: { objectifs: couverts }, journal: reponses });
+const enMemoire = (questions, maintenant) => questions.map((q) => ({ ...q, ...memoireDeQuestion(q.journal, { maintenant }) }));
+const maitriseAvec = (scores, maintenant, questions) => calculerMaitrise(scores, maintenant, enMemoire(questions, maintenant));
+const juste = (date, autres = {}) => ({ date, juste: true, origine: 'quiz', ...autres });
+const faux = (date) => ({ date, juste: false, origine: 'quiz' });
+const JOUR = 86_400_000;
+
+test('Maîtrise : avec des Questions, moyenne de leur probabilité de se souvenir aujourd’hui, pas des scores', () => {
+  const t = '2026-10-01T10:00:00.000Z';
+  // Juste après les réponses : l'Élève s'en souvient à coup sûr, même si le quiz était raté.
+  assert.deepEqual(maitriseAvec([score(40)], Date.parse(t), [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 100, palier: 'acquis' });
+});
+
+test('Maîtrise : avec des Questions, elle baisse avec l’oubli, paliers 80 % et 50 % inchangés', () => {
+  const t = '2026-10-01T10:00:00.000Z';
+  const questions = [qBanque([1], juste(t))]; // une réponse juste : stabilité FSRS-5 de 3,173 jours
+  // Au bout d'une stabilité, la probabilité de se souvenir vaut 90 %.
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3.173 * JOUR, questions), { pourcentage: 90, palier: 'acquis' });
+  // Au bout de 30 jours : (1 + 19/81 × 30 / 3,173)^-0,5 ≈ 56 %.
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 30 * JOUR, questions), { pourcentage: 56, palier: 'à consolider' });
+  // Au bout d'un an : ≈ 20 %.
+  assert.equal(maitriseAvec([score(100)], Date.parse(t) + 365 * JOUR, questions).palier, 'non acquis');
+});
+
+test('Maîtrise : une Question ratée s’oublie plus vite qu’une Question sue', () => {
+  const t = '2026-10-01T10:00:00.000Z';
+  // Trois jours plus tard : sue (S = 3,173) ≈ 90 %, ratée (S = 0,40255) ≈ 60 % ; moyenne ≈ 75 %.
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 75, palier: 'à consolider' });
+});
+
+test('Maîtrise : sans Questions (anciennes Leçons), même calcul qu’avant', () => {
+  const scores = [{ score: 90, date: '2026-09-01T10:00:00.000Z' }, { score: 70, date: '2026-09-01T10:00:00.000Z' }];
+  // Moyenne 80, moins 10 points par semaine entière au-delà de 3 semaines (30 jours : 1 semaine).
+  assert.deepEqual(calculerMaitrise(scores, Date.parse('2026-10-01T10:00:00.000Z'), []), { pourcentage: 70, palier: 'à consolider' });
+  assert.deepEqual(calculerMaitrise(scores, Date.parse('2026-10-01T10:00:00.000Z')), { pourcentage: 70, palier: 'à consolider' });
+  assert.equal(calculerMaitrise([], Date.parse('2026-10-01T10:00:00.000Z'), []), null);
+});
+
+const retenusAvec = (scores, questions, mode = 'libre') => etatObjectifs(objectifs, scores, mode, enMemoire(questions, Date.parse('2026-10-05T09:00:00.000Z'))).map((o) => o.retenu);
+const J1 = '2026-10-01T09:00:00.000Z';
+const J2 = '2026-10-02T09:00:00.000Z';
+
+test('Retenu : avec des Questions, une seule réponse juste ne suffit pas (stabilité d’environ 3 jours)', () => {
+  assert.deepEqual(retenusAvec([le(J1, 100, [1])], [qBanque([1], juste(J1))]), [false, false, false]);
+});
+
+test('Retenu : avec des Questions, deux réponses justes à un jour d’écart suffisent (stabilité d’environ 6 jours)', () => {
+  assert.deepEqual(retenusAvec([le(J1, 100, [1]), le(J2, 100, [1])], [qBanque([1], juste(J1), juste(J2))]), [true, false, false]);
+});
+
+test('Retenu : avec des Questions, deux réponses justes le même jour ne suffisent pas', () => {
+  assert.deepEqual(retenusAvec([le(J1, 100, [1])], [qBanque([1], juste(J1), juste('2026-10-01T15:00:00.000Z'))]), [false, false, false]);
+});
+
+test('Retenu : avec des Questions, il suit leur mémoire : une Question oubliée le fait perdre', () => {
+  const scores = [le(J1, 100, [1]), le(J2, 100, [1]), le('2026-10-04T09:00:00.000Z', 50, [1])];
+  // La règle des deux succès espacés dirait Retenu ; la Question ratée le 4 retombe sous une stabilité de quelques jours.
+  assert.deepEqual(retenusAvec(scores, [qBanque([1], juste(J1), juste(J2), faux('2026-10-04T09:00:00.000Z'))]), [false, false, false]);
+});
+
+test('Retenu : avec des Questions, toutes celles qui couvrent l’Objectif doivent être stables', () => {
+  const scores = [le(J1, 100, [1]), le(J2, 100, [1])];
+  assert.deepEqual(retenusAvec(scores, [qBanque([1], juste(J1), juste(J2)), qBanque([1], juste(J2))]), [false, false, false]);
+});
+
+test('Retenu : un Objectif qu’aucune Question ne couvre garde la règle des deux succès espacés', () => {
+  const scores = [le(J1, 100, [1, 2]), le(J2, 100, [1, 2])];
+  assert.deepEqual(retenusAvec(scores, [qBanque([1], juste(J1))]), [false, true, false]);
+});
+
+test('Retenu : avec des Questions stables, jamais sans être atteint', () => {
+  const revises = [le(J1, 90, [1], { reviser: true }), le(J2, 90, [1], { reviser: true })];
+  assert.deepEqual(retenusAvec(revises, [qBanque([1], juste(J1), juste(J2))], 'libre'), [false, false, false]);
 });

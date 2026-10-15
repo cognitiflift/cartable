@@ -26,6 +26,22 @@ before(async () => {
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
   // CARTABLE_IMAGES_LOCALES=1 : le serveur accepte les images du petit serveur local lancé par les tests de Visuels.
+  // CARTABLE_HORLOGE_INJECTABLE=1 : le serveur prend « maintenant » dans l'en-tête X-Cartable-Maintenant (révisions datées).
+  // Dans le dossier des Variantes d'une Leçon, il note chaque lancement (`lancements-variantes`) et ses arguments
+  // (`args-variantes`), puis écrit variantes.json d'après questions-a-varier.json (faux-variantes.mjs) : pour chaque
+  // Question, deux variantes valides (réponses inversées) et une mal formée. `variantes-attendre` le fait patienter,
+  // `variantes-echouer` le fait échouer, `variantes-mal-formees` ne lui fait écrire que des variantes mal formées.
+  await fs.writeFile(path.join(dossier, 'faux-variantes.mjs'), `import fs from 'node:fs';
+const demandes = JSON.parse(fs.readFileSync('questions-a-varier.json', 'utf8'));
+const malFormees = fs.existsSync(process.argv[2]);
+const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication });
+const sortie = Object.fromEntries(demandes.map((q) => [q.cle, [
+  ...(malFormees ? [] : [variante(q, 1), variante(q, 2)]),
+  { enonce: q.enonce + ' (mal formée)', reponses: q.reponses, bonne: 9, explication: '' },
+  { enonce: '', reponses: ['a'], bonne: 0 },
+]]));
+fs.writeFileSync('variantes.json', JSON.stringify(sortie));
+`);
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
@@ -35,6 +51,18 @@ else
   COUT=',"total_cost_usd":0.25,'"$USAGE"',"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}'
 fi
 [ -e '${dossier}/sans-cout' ] && COUT=''
+if [ "$(basename "$PWD")" = variantes ]; then
+  echo lancement >> '${dossier}/lancements-variantes'
+  printf '%s\n' "$@" > '${dossier}/args-variantes'
+  while [ -e '${dossier}/variantes-attendre' ]; do sleep 0.05; done
+  if [ -e '${dossier}/variantes-echouer' ]; then
+    echo '{"result":"You have hit your limit","is_error":true}'
+    exit 0
+  fi
+  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees'
+  echo '{"result":"ok","session_id":"s-var","is_error":false,"total_cost_usd":0.01,"modelUsage":{"claude-haiku-test":{"costUSD":0.01}}}'
+  exit 0
+fi
 if [ "$(basename "$PWD")" = propositions ]; then
   echo lancement >> '${dossier}/lancements-propositions'
   printf '%s\n' "$@" > '${dossier}/args-propositions'
@@ -95,7 +123,7 @@ echo '{"result":"Bonjour !","session_id":"s-123","is_error":false'"$COUT"'}'
   const port = 3100 + Math.floor(Math.random() * 500);
   base = `http://localhost:${port}`;
   serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1' },
+    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_IMAGES_LOCALES: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
     cwd: path.join(import.meta.dirname, '..'),
     stdio: 'pipe',
   });
@@ -108,8 +136,9 @@ after(async () => {
   await fs.rm(dossier, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
-const appel = async (url, method = 'GET', body) => {
-  const res = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
+// `entetes` : en-têtes en plus, comme X-Cartable-Maintenant pour fixer la date du serveur.
+const appel = async (url, method = 'GET', body, entetes = {}) => {
+  const res = await fetch(base + url, { method, headers: { 'Content-Type': 'application/json', ...entetes }, body: body && JSON.stringify(body) });
   return { status: res.status, data: await res.json().catch(() => null), res };
 };
 
@@ -738,8 +767,8 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   assert.equal((await resume()).depassement, true);
 });
 
-test('Kit : servi sous son chemin versionné (quiz, logique, style de base, documentation)', async () => {
-  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
+test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
+  for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
     const res = await fetch(`${base}/kit/v1/${fichier}`);
     assert.equal(res.status, 200, fichier);
     assert.match(res.headers.get('content-type'), new RegExp(type));
@@ -1393,7 +1422,7 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.equal(parId[a.id].titre, 'Les volcans');
   assert.equal(parId[a.id].total.coutUsd, 0.75);
   assert.deepEqual(Object.fromEntries(Object.entries(parId[a.id].parTache).map(([t, c]) => [t, c.tours])),
-    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0 });
+    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0, variantes: 0 });
   assert.equal(parId[b.id].total.coutUsd, 0.5);
   assert.equal(parId[b.id].parTache.premiereSeance.tours, 2);
 
@@ -1775,4 +1804,591 @@ test('Pré-test : un marqueur invalide est ignoré, le score compte comme un qui
   assert.equal(Object.hasOwn(lue.scores.at(-1), 'pretest'), false);
   assert.equal(lue.maitrise.pourcentage, 67);
   assert.equal(lue.pretest, null);
+});
+
+// Banque de Questions (#64) : le prof écrit une page avec le quiz du Kit, l'Élève y répond.
+const quizBanque = {
+  objectifs: [1],
+  questions: [
+    { id: 'q1', type: 'qcm', enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.' },
+    { id: 'q2', type: 'qcm', enonce: 'Le magma, c’est…', reponses: ['De la glace', 'De la roche fondue'], bonne: 1, explication: 'Roche fondue.', objectifs: [2] },
+    { id: 'b1', type: 'qcm', enonce: '🚀 Le plus grand volcan ?', reponses: ['Olympus Mons', 'Etna'], bonne: 0, explication: 'Sur Mars.' },
+  ],
+};
+// Leçon de zoe-test (créée si besoin : ces tests peuvent tourner seuls), avec trois Objectifs.
+const leconBanque = async (corps = { sujet: 'les volcans' }) => {
+  await appel('/api/eleves', 'POST', { pseudo: 'Zoé-Test', age: 11, niveau: 'Primaire 6' });
+  return avecFichier('objectifs', async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', corps)).data);
+};
+const ecrirePageQuiz = async (lecon, page, quiz) => {
+  const dir = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'lessons');
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, page), `<!doctype html><html><body><h1>Volcans</h1>
+<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>
+<script type="module" src="/kit/v1/quiz.js"></script></body></html>`);
+};
+// Résultats envoyés par le Kit pour `quizBanque` : q1 juste « pas sûr », q2 « Je ne sais pas », b1 (bonus) juste.
+const corpsBanque = (page, autres = {}) => ({
+  score: 50, page, objectifs: [1, 2],
+  questions: [
+    { id: 'q1', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false, objectifs: [1], sur: false },
+    { id: 'q2', enonce: 'Le magma, c’est…', choisie: 'Je ne sais pas', bonne: 'De la roche fondue', juste: false, jeNeSaisPas: true, bonus: false, objectifs: [2] },
+    { id: 'b1', enonce: 'Le plus grand volcan ?', choisie: 'Olympus Mons', bonne: 'Olympus Mons', juste: true, bonus: true, objectifs: [1] },
+  ],
+  ...autres,
+});
+
+test('Banque de Questions : un quiz crée les Questions de la Leçon, le même quiz refait ajoute des réponses sans les dupliquer', async () => {
+  const lecon = await leconBanque();
+  assert.deepEqual(lecon.questions, []);
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0002-volcans.html', quizBanque);
+
+  const premiere = await appel(`${url}/scores`, 'POST', corpsBanque('0002-volcans.html'));
+  assert.equal(premiere.status, 201);
+  // Le bonus n'entre pas dans la Banque.
+  assert.deepEqual(premiere.data.questions.map((q) => q.id), ['q1', 'q2']);
+  const [q1, q2] = premiere.data.questions;
+  assert.equal(q1.page, '0002-volcans.html');
+  assert.deepEqual(q1.contenu, { enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: 'Le cratère.', objectifs: [1] });
+  assert.deepEqual(q2.contenu.objectifs, [2]);
+  // Journal : date, juste, Confiance si présente, « Je ne sais pas », origine.
+  assert.equal(q1.journal.length, 1);
+  assert.ok(!Number.isNaN(Date.parse(q1.journal[0].date)));
+  assert.deepEqual({ ...q1.journal[0], date: 'd' }, { date: 'd', juste: true, sur: false, origine: 'quiz' });
+  assert.deepEqual({ ...q2.journal[0], date: 'd' }, { date: 'd', juste: false, jeNeSaisPas: true, origine: 'quiz' });
+
+  // Le même quiz refait : mêmes Questions, une réponse de plus chacune.
+  const corps = corpsBanque('0002-volcans.html');
+  corps.questions[1] = { ...corps.questions[1], choisie: 'De la roche fondue', juste: true, jeNeSaisPas: undefined, sur: true };
+  const refait = (await appel(`${url}/scores`, 'POST', corps)).data;
+  assert.deepEqual(refait.questions.map((q) => [q.id, q.journal.length]), [['q1', 2], ['q2', 2]]);
+  assert.deepEqual({ ...refait.questions[1].journal[1], date: 'd' }, { date: 'd', juste: true, sur: true, origine: 'quiz' });
+  // Exposées aussi par la lecture de la Leçon, pas par la liste des Leçons.
+  assert.equal((await appel(url)).data.questions.length, 2);
+  assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'questions'), false);
+});
+
+test('Banque de Questions : le quiz du Pré-test n\'y entre pas', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0001-devine.html', { ...quizBanque, pretest: true });
+  const r = await appel(`${url}/scores`, 'POST', corpsBanque('0001-devine.html', { pretest: true }));
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.data.questions, []);
+  // Même si la page ne porte pas le marqueur, celui du résultat suffit (et inversement).
+  await ecrirePageQuiz(lecon, '0002-devine.html', quizBanque);
+  assert.deepEqual((await appel(`${url}/scores`, 'POST', corpsBanque('0002-devine.html', { pretest: true }))).data.questions, []);
+  assert.deepEqual((await appel(`${url}/scores`, 'POST', corpsBanque('0001-devine.html'))).data.questions, []);
+});
+
+test('Banque de Questions : sans quiz du Kit (anciennes Leçons et pages), pas de Questions, et la Leçon reste lisible', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  // Page du faux prof, au quiz écrit à la main ; score sans résultats par question ; page inexistante ou hors Leçon.
+  for (const corps of [corpsBanque('0001-volcans.html'), { score: 80, page: '0001-volcans.html' }, corpsBanque('9999-absente.html'), corpsBanque('../etat.json')]) {
+    const r = await appel(`${url}/scores`, 'POST', corps);
+    assert.equal(r.status, 201);
+    assert.deepEqual(r.data.questions, []);
+  }
+  // Une Banque illisible ne rend pas la Leçon illisible.
+  await fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), '{ pas du json');
+  const lue = await appel(url);
+  assert.equal(lue.status, 200);
+  assert.deepEqual(lue.data.questions, []);
+  assert.ok((await appel('/api/eleves/zoe-test/lecons')).data.some((l) => l.id === lecon.id));
+});
+
+// Planificateur FSRS (#65) : la Leçon expose, pour chaque Question, sa probabilité de se souvenir à la date du serveur
+// et sa prochaine révision, recalculées depuis le journal.
+test('Mémoire des Questions : la Leçon expose probabilité de se souvenir et prochaine révision, à la date du serveur', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const banque = {
+    '0002-volcans.html#q1': { id: 'q1', page: '0002-volcans.html', contenu: { enonce: 'Où sort la lave ?', reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] },
+      journal: [{ date: '2026-10-01T10:00:00.000Z', juste: true, origine: 'quiz' }] },
+    '0002-volcans.html#q2': { id: 'q2', page: '0002-volcans.html', contenu: { enonce: 'Le magma ?', reponses: ['a', 'b'], bonne: 1, explication: '', objectifs: [1] },
+      journal: [{ date: '2026-10-01T10:00:00.000Z', juste: false, jeNeSaisPas: true, origine: 'quiz' }] },
+  };
+  await fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), JSON.stringify(banque));
+  const lire = async (maintenant) => (await appel(url, 'GET', undefined, { 'X-Cartable-Maintenant': maintenant })).data.questions;
+
+  const [q1, q2] = await lire('2026-10-01T10:00:00.000Z');
+  // Juste et sûr → revue 3 jours plus tard ; « Je ne sais pas » → dès le lendemain.
+  assert.equal(q1.prochaineRevision, '2026-10-04T10:00:00.000Z');
+  assert.equal(q2.prochaineRevision, '2026-10-02T10:00:00.000Z');
+  assert.equal(q1.rappel, 1);
+  // La probabilité baisse avec la date du serveur ; le journal n'a pas bougé (rien n'est rangé en double).
+  const [plusTard] = await lire('2026-10-20T10:00:00.000Z');
+  assert.ok(plusTard.rappel < 0.9 && plusTard.rappel > 0, `${plusTard.rappel}`);
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), 'utf8')), banque);
+  // Sans en-tête : la date réelle, après la dernière réponse.
+  const [reel] = (await appel(url)).data.questions;
+  assert.ok(reel.rappel > 0 && reel.rappel < 1);
+});
+
+test('Mémoire des Questions : un quiz répondu à la date du serveur est daté de ce jour-là', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  await ecrirePageQuiz(lecon, '0002-volcans.html', quizBanque);
+  const jour = { 'X-Cartable-Maintenant': '2026-11-02T08:00:00.000Z' };
+  const r = await appel(`${url}/scores`, 'POST', corpsBanque('0002-volcans.html'), jour);
+  assert.equal(r.status, 201);
+  assert.equal(r.data.scores.at(-1).date, '2026-11-02T08:00:00.000Z');
+  const [q1, q2] = r.data.questions;
+  assert.equal(q1.journal[0].date, '2026-11-02T08:00:00.000Z');
+  assert.equal(q1.rappel, 1);
+  // Juste mais pas sûr → difficile (1,18 jour : le lendemain) ; « Je ne sais pas » → à revoir, le lendemain aussi.
+  assert.equal(q1.prochaineRevision, '2026-11-03T08:00:00.000Z');
+  assert.equal(q2.prochaineRevision, '2026-11-03T08:00:00.000Z');
+});
+
+// Révisions du jour (#66) : les Questions dues de toutes les Leçons d'un Élève, servies et corrigées par l'appli,
+// sans tour du prof. Chaque test a son propre Élève : la route couvre toutes ses Leçons.
+const BANQUE_DATE = '2026-11-02T12:00:00.000Z'; // quiz du Kit répondu ce jour-là : q1 juste pas sûr, q2 « Je ne sais pas »
+const LENDEMAIN = '2026-11-03T12:00:00.000Z'; // leur prochaine révision (voir « Mémoire des Questions »)
+const le = (date) => ({ 'X-Cartable-Maintenant': date });
+// Élève neuf avec `nombre` Leçons, chacune avec les Questions de `quizBanque` répondues à BANQUE_DATE. Attend ses
+// Propositions et efface les traces de lancement du faux `claude`, pour vérifier ensuite qu'aucun n'est lancé.
+const eleveRevisions = async (pseudo, nombre = 2) => {
+  const slug = slugify(pseudo);
+  await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecons = [];
+  for (let i = 0; i < nombre; i++) {
+    const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: `sujet ${i}` })).data);
+    const dir = path.join(eleves, slug, 'lecons', lecon.id, 'lessons');
+    await fs.writeFile(path.join(dir, '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizBanque)}</script>`);
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+    lecons.push(lecon);
+  }
+  await attendrePropositions(slug);
+  await fs.rm(path.join(dossier, 'lancements-propositions'), { force: true });
+  for (const l of lecons) await fs.rm(path.join(dossier, `demarre-${l.id}`), { force: true });
+  return { slug, lecons };
+};
+const aucunClaudeLance = async (lecons) => {
+  assert.equal(await existe(path.join(dossier, 'lancements-propositions')), false);
+  for (const l of lecons) assert.equal(await demarre(l), false);
+};
+
+test('Révisions du jour : les Questions dues de toutes les Leçons, mélangées entre Leçons, sans lancer le prof', async () => {
+  const { slug, lecons } = await eleveRevisions('Revis-Due');
+  const url = `/api/eleves/${slug}/revisions`;
+  // Le jour du quiz : rien n'est dû.
+  const avant = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(avant.status, 200);
+  assert.deepEqual(avant.data, { dues: 0, questions: [] });
+  // Le lendemain : les quatre Questions, deux par Leçon, jamais deux de suite de la même Leçon.
+  const { data } = await appel(url, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.dues, 4);
+  assert.equal(data.questions.length, 4);
+  assert.deepEqual(new Set(data.questions.map((q) => q.lecon)), new Set(lecons.map((l) => l.id)));
+  for (let i = 1; i < data.questions.length; i++) assert.notEqual(data.questions[i].lecon, data.questions[i - 1].lecon);
+  // Tout ce qu'il faut pour l'afficher avec le rendu du Kit, et ouvrir la Page de leçon d'origine.
+  const q1 = data.questions.find((q) => q.id === 'q1');
+  assert.equal(q1.page, '0002-volcans.html');
+  assert.equal(q1.titreLecon, 'Les volcans');
+  assert.equal(q1.enonce, 'Où sort la lave ?');
+  assert.deepEqual(q1.reponses, ['Par le cratère', 'Par les racines']);
+  assert.equal(q1.explication, 'Le cratère.');
+  // Dû le jour même, dès le matin : la date compte, pas l'heure.
+  assert.equal((await appel(url, 'GET', undefined, le('2026-11-03T11:00:00.000Z'))).data.dues, 4);
+  await aucunClaudeLance(lecons);
+});
+
+test('Révisions du jour : une série de 10 Questions au plus, les plus en retard d\'abord', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Serie', 1);
+  // Douze Questions de plus, répondues justes et sûres trois jours avant les deux premières : plus en retard.
+  const questions = Array.from({ length: 12 }, (_, i) => ({ id: `r${i}`, type: 'qcm', enonce: `Question ${i} ?`, reponses: ['oui', 'non'], bonne: 0, explication: '' }));
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0003-serie.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify({ objectifs: [1], questions })}</script>`);
+  const corps = { score: 100, page: '0003-serie.html', objectifs: [1], questions: questions.map((q) => ({ id: q.id, enonce: q.enonce, choisie: 'oui', bonne: 'oui', juste: true, bonus: false, objectifs: [1], sur: true })) };
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le('2026-10-30T12:00:00.000Z'))).status, 201);
+
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.dues, 14);
+  assert.equal(data.questions.length, 10);
+  assert.ok(data.questions.every((q) => q.page === '0003-serie.html'));
+});
+
+test('Révisions du jour : une réponse est corrigée par le serveur et journalisée ; ratée, la Question revient bientôt, sue, elle s\'éloigne', async () => {
+  const { slug, lecons } = await eleveRevisions('Revis-Reponse', 1);
+  const [lecon] = lecons;
+  const url = `/api/eleves/${slug}/revisions`;
+  const repondre = (corps, date = LENDEMAIN) => appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', ...corps }, le(date));
+
+  // q1 : bonne réponse (index 0 avant mélange), sûr. Le `juste` envoyé par le client est ignoré.
+  const sue = await repondre({ id: 'q1', choisie: 0, sur: true, juste: false });
+  assert.equal(sue.status, 200);
+  assert.equal(sue.data.juste, true);
+  assert.equal(sue.data.bonne, 'Par le cratère');
+  assert.equal(sue.data.explication, 'Le cratère.');
+  // q2 : mauvaise réponse, pourtant annoncée juste par le client.
+  const ratee = await repondre({ id: 'q2', choisie: 0, sur: true, juste: true });
+  assert.equal(ratee.data.juste, false);
+  assert.equal(ratee.data.bonne, 'De la roche fondue');
+
+  // Journal : origine « revision », date du serveur, Confiance.
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  const [q1, q2] = questions;
+  assert.deepEqual(q1.journal.at(-1), { date: LENDEMAIN, juste: true, sur: true, origine: 'revision' });
+  assert.deepEqual(q2.journal.at(-1), { date: LENDEMAIN, juste: false, sur: true, origine: 'revision' });
+  // Ratée : de nouveau due le lendemain. Sue : plusieurs jours plus tard.
+  assert.equal(q2.prochaineRevision, '2026-11-04T12:00:00.000Z');
+  assert.ok(Date.parse(q1.prochaineRevision) >= Date.parse('2026-11-06T12:00:00.000Z'), q1.prochaineRevision);
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data, { dues: 0, questions: [] });
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-04T12:00:00.000Z'))).data.questions.map((q) => q.id), ['q2']);
+
+  // « Je ne sais pas » : faux, sans Confiance, comme dans le Kit.
+  const jnsp = await repondre({ id: 'q2', choisie: 'je-ne-sais-pas', sur: true }, '2026-11-04T12:00:00.000Z');
+  assert.equal(jnsp.data.juste, false);
+  const relu = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions[1];
+  assert.deepEqual(relu.journal.at(-1), { date: '2026-11-04T12:00:00.000Z', juste: false, jeNeSaisPas: true, origine: 'revision' });
+  await aucunClaudeLance(lecons);
+});
+
+test('Révisions du jour : après les Questions dues, « continuer » propose celles qui ne le sont pas encore, sauf celles déjà répondues aujourd\'hui', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Suite', 1);
+  const url = `/api/eleves/${slug}/revisions`;
+  await appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0, sur: true }, le(LENDEMAIN));
+  // q2 reste due : « continuer » ne la sert pas (elle est dans la série du jour), ni q1, répondue aujourd'hui.
+  assert.deepEqual((await appel(`${url}?suite=1`, 'GET', undefined, le(LENDEMAIN))).data, { dues: 1, questions: [] });
+  // Le surlendemain, q2 répondue la veille et revue aujourd'hui : q1, pas encore due, peut être revue en plus.
+  await appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q2', choisie: 1, sur: true }, le('2026-11-04T09:00:00.000Z'));
+  const suite = (await appel(`${url}?suite=1`, 'GET', undefined, le('2026-11-04T12:00:00.000Z'))).data;
+  assert.equal(suite.dues, 0);
+  assert.deepEqual(suite.questions.map((q) => q.id), ['q1']);
+});
+
+test('Révisions du jour : réponse refusée pour une Question inconnue (404) ou un choix invalide (400), sans rien journaliser', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Refus', 1);
+  const url = `/api/eleves/${slug}/revisions`;
+  const repondre = (corps) => appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0, ...corps });
+  for (const corps of [{ id: 'inconnue' }, { page: '0009-autre.html' }, { lecon: '2026-01-01-inconnue' }]) assert.equal((await repondre(corps)).status, 404, JSON.stringify(corps));
+  for (const corps of [{ choisie: 2 }, { choisie: -1 }, { choisie: '0' }, { choisie: null }, { lecon: '../x' }]) assert.equal((await repondre(corps)).status, 400, JSON.stringify(corps));
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.deepEqual(questions.map((q) => q.journal.length), [1, 1]);
+});
+
+test('Révisions du jour : réponses de révision et score de quiz simultanés, aucune réponse perdue', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Ensemble', 1);
+  // Un quiz de page qui se termine pendant des réponses de révision (deux onglets) : trois réponses par Question.
+  const revision = (i) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 });
+  const envois = [revision(0), revision(1), revision(2), appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html')), revision(3), revision(4), revision(5)];
+  const reponses = await Promise.all(envois);
+  assert.ok(reponses.every((r) => r.status < 300), JSON.stringify(reponses.map((r) => [r.status, r.data?.erreur])));
+  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  // Réponse du premier quiz, du quiz simultané, et trois de révision.
+  assert.deepEqual(questions.map((q) => q.journal.length), [5, 5]);
+});
+
+// Date de contrôle (#68) : une Leçon de révision de l'Élève `slug`, avec le quiz de `quizBanque` répondu à BANQUE_DATE.
+const PDF = Buffer.from('%PDF-1.4 faux').toString('base64');
+const leconControle = async (slug, dateControle) => {
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle })).data;
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizBanque)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  await fs.rm(path.join(dossier, `demarre-${lecon.id}`), { force: true });
+  return lecon;
+};
+// Minuit local du jour J de novembre 2026, en ISO : le planificateur compte en jours de l'Élève (heure du serveur).
+const minuitNovembre = (jour) => new Date(2026, 10, jour).toISOString();
+
+test('Date de contrôle : gardée et exposée par la Leçon de révision, sans consigne d\'espacement au prof', async () => {
+  const { slug } = await eleveRevisions('Controle-Date', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-11-20' })).data;
+  assert.equal(lecon.dateControle, '2026-11-20');
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.dateControle, '2026-11-20');
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`)).data.find((l) => l.id === lecon.id).dateControle, '2026-11-20');
+  // Compte à rebours de l'accueil : jours locaux restants avant le contrôle, à la date de la lecture.
+  const le18 = { 'X-Cartable-Maintenant': new Date(2026, 10, 18, 23, 30).toISOString() };
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, le18)).data.find((l) => l.id === lecon.id).joursAvantControle, 2);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /contrôle le 2026-11-20/);
+  assert.doesNotMatch(prompt, /révision espacée/);
+  // Sans date, ou illisible : null.
+  const sans = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: 'bientôt' })).data;
+  assert.equal(sans.dateControle, null);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${sans.id}`)).data.dateControle, null);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${sans.id}`)).data.joursAvantControle, null);
+  // Une date impossible (mois 13, 30 février) n'est pas gardée non plus.
+  for (const impossible of ['2026-13-45', '2027-02-30']) {
+    const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: impossible })).data;
+    assert.equal(lecon.dateControle, null, impossible);
+  }
+  const libre = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${libre.id}`)).data.dateControle, null);
+});
+
+test('Date de contrôle : les Questions de la Leçon passent en premier dans les Révisions du jour', async () => {
+  const { slug, lecons: [libre] } = await eleveRevisions('Controle-Priorite', 1);
+  const controle = await leconControle(slug, '2026-11-20');
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.dues, 4);
+  assert.deepEqual(data.questions.map((q) => q.lecon), [controle.id, controle.id, libre.id, libre.id]);
+  // Le contrôle passé, plus de priorité : de nouveau mélangées entre Leçons.
+  const apres = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le('2026-11-21T12:00:00.000Z'))).data.questions;
+  for (let i = 1; i < apres.length; i++) assert.notEqual(apres[i].lecon, apres[i - 1].lecon);
+});
+
+test('Date de contrôle : une révision qui tomberait après la date est avancée à la veille, puis le planificateur reprend son cours', async () => {
+  const { slug } = await eleveRevisions('Controle-Avance', 0);
+  const lecon = await leconControle(slug, '2026-11-06');
+  // q1 sue et sûre le 3 : sans contrôle, revue le 6 ou plus tard ; avec un contrôle le 6, la veille.
+  const reponse = await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0, sur: true }, le(LENDEMAIN));
+  assert.equal(reponse.data.prochaineRevision, minuitNovembre(5));
+  const lue = async (date) => (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(date))).data.questions.find((q) => q.id === 'q1');
+  assert.equal((await lue('2026-11-04T12:00:00.000Z')).prochaineRevision, minuitNovembre(5));
+  const dues = async (date) => (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(date))).data.questions.map((q) => q.id);
+  assert.ok((await dues('2026-11-05T12:00:00.000Z')).includes('q1'));
+  // Après le contrôle : la date normale, plus tard que la veille.
+  assert.ok(Date.parse((await lue('2026-11-07T12:00:00.000Z')).prochaineRevision) >= Date.parse('2026-11-06T12:00:00.000Z'));
+});
+
+// Maîtrise et Retenu appuyés sur la mémoire des Questions (#67).
+test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souvenir ; Retenu suit leur stabilité', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  // Deux quiz réussis couvrant l'Objectif 1, à un jour d'écart.
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, { 'X-Cartable-Maintenant': '2026-10-01T10:00:00.000Z' });
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, { 'X-Cartable-Maintenant': '2026-10-02T10:00:00.000Z' });
+  const question = (id, journal) => ({ id, page: '0002-volcans.html', contenu: { enonce: `${id} ?`, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] }, journal });
+  const ecrire = (banque) => fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), JSON.stringify(banque));
+  const lire = async (maintenant) => (await appel(url, 'GET', undefined, { 'X-Cartable-Maintenant': maintenant })).data;
+
+  // Une Question répondue juste une seule fois : stabilité 3,173 jours, donc 90 % au bout de 3,173 jours.
+  await ecrire({ '0002-volcans.html#q1': question('q1', [{ date: '2026-10-02T10:00:00.000Z', juste: true, origine: 'quiz' }]) });
+  const t = Date.parse('2026-10-02T10:00:00.000Z');
+  assert.deepEqual((await lire(new Date(t + 3.173 * 86_400_000).toISOString())).maitrise, { pourcentage: 90, palier: 'acquis' });
+  assert.deepEqual((await lire(new Date(t + 30 * 86_400_000).toISOString())).maitrise, { pourcentage: 56, palier: 'à consolider' });
+  // Stabilité de quelques jours seulement : pas Retenu, même avec deux quiz réussis espacés.
+  assert.equal((await lire('2026-10-03T10:00:00.000Z')).objectifs[0].retenu, false);
+
+  // Répondue juste deux jours de suite : stabilité d'environ 6 jours, Retenu.
+  await ecrire({ '0002-volcans.html#q1': question('q1', [
+    { date: '2026-10-01T10:00:00.000Z', juste: true, origine: 'quiz' }, { date: '2026-10-02T10:00:00.000Z', juste: true, origine: 'quiz' },
+  ]) });
+  const lue = await lire('2026-10-03T10:00:00.000Z');
+  assert.equal(lue.objectifs[0].retenu, true);
+  assert.equal(lue.objectifs[1].retenu, false);
+  // La liste des Leçons montre la même Maîtrise, à la même date.
+  const resume = (await appel('/api/eleves/zoe-test/lecons', 'GET', undefined, { 'X-Cartable-Maintenant': '2026-10-03T10:00:00.000Z' })).data.find((l) => l.id === lecon.id);
+  assert.deepEqual(resume.maitrise, lue.maitrise);
+});
+
+// Consignes du prof (spec #47) : au début d'une nouvelle page, le préambule cite les Questions les plus fragiles.
+const banqueFragile = () => {
+  const question = (id, enonce, journal) => [`0002-volcans.html#${id}`, { id, page: '0002-volcans.html', contenu: { enonce, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] }, journal }];
+  const le = (jour, juste, autres = {}) => ({ date: `2026-10-0${jour}T10:00:00.000Z`, juste, origine: 'quiz', ...autres });
+  return Object.fromEntries([
+    question('solide', 'Question bien sue ?', [le(1, true), le(3, true), le(7, true)]),
+    question('ratee', 'Question ratée ?', [le(7, false)]),
+    question('hesitante', 'Question hésitante ?', [le(7, true, { sur: false })]),
+    question('sue', 'Question sue une fois ?', [le(7, true)]),
+  ]);
+};
+const fragilesDans = (prompt) => ['Question bien sue', 'Question ratée', 'Question hésitante', 'Question sue une fois'].filter((e) => prompt.includes(`« ${e} ? »`));
+
+test('Consignes du prof : le préambule de relais cite les trois Questions les plus fragiles, de la plus fragile à la moins fragile', async () => {
+  const lecon = await leconBanque();
+  await fs.writeFile(path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueFragile()));
+  assert.equal((await message(lecon, 'Page suivante')).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Questions les plus fragiles/);
+  assert.deepEqual(fragilesDans(prompt), ['Question ratée', 'Question hésitante', 'Question sue une fois']);
+  assert.ok(prompt.indexOf('Question ratée') < prompt.indexOf('Question hésitante') && prompt.indexOf('Question hésitante') < prompt.indexOf('Question sue une fois'));
+  assert.match(prompt, /« Question ratée \? » \(0002-volcans\.html\)/);
+});
+
+test('Consignes du prof : le préambule d\'une session reprise cite aussi les Questions les plus fragiles ; rien sans Questions', async () => {
+  const lecon = await leconBanque();
+  const dir = path.join(eleves, 'zoe-test', 'lecons', lecon.id);
+  // Pas encore de page : la session est reprise, avec le préambule court.
+  await fs.rm(path.join(dir, 'lessons'), { recursive: true });
+  await fs.writeFile(path.join(dir, 'questions.json'), JSON.stringify(banqueFragile()));
+  assert.equal((await message(lecon, 'On continue')).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.doesNotMatch(prompt, /Passage de relais/);
+  assert.deepEqual(fragilesDans(prompt), ['Question ratée', 'Question hésitante', 'Question sue une fois']);
+
+  const sans = await leconBanque();
+  assert.equal((await message(sans, 'Page suivante')).status, 200);
+  assert.doesNotMatch(await argsDe(sans), /Questions les plus fragiles/);
+});
+
+// Variantes des Questions (#69), écrites en arrière-plan par le faux `claude` (voir faux-variantes.mjs).
+const nbLancementsVariantes = async () => (await fs.readFile(path.join(dossier, 'lancements-variantes'), 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length;
+const pause = (ms = 200) => new Promise((r) => setTimeout(r, ms));
+// Élève neuf avec `nombre` Leçons dont la page 0002-volcans.html porte `quizBanque` ; Propositions attendues et traces
+// de lancement des Variantes effacées.
+const eleveVariantes = async (pseudo, nombre = 1) => {
+  const slug = slugify(pseudo);
+  await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecons = [];
+  for (let i = 0; i < nombre; i++) {
+    const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: `sujet ${i}` })).data);
+    await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quizBanque)}</script>`);
+    lecons.push(lecon);
+  }
+  await attendrePropositions(slug);
+  await fs.rm(path.join(dossier, 'lancements-variantes'), { force: true });
+  const quiz = (lecon, date = BANQUE_DATE) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(date));
+  const lire = async (lecon) => (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  const avecVariantes = (lecon) => sonderJusqua(() => lire(lecon), (qs) => qs.length && qs.every((q) => q.variantes?.length), 'Variantes jamais rattachées');
+  // Plus aucun tour de Variantes en cours : le dossier de travail est vidé à la fin de chaque tour.
+  const finDuTour = (lecon) => sonderJusqua(() => existe(path.join(eleves, slug, 'lecons', lecon.id, 'variantes', 'questions-a-varier.json')), (e) => !e, 'Tour de Variantes jamais fini');
+  return { slug, lecons, quiz, lire, avecVariantes, finDuTour };
+};
+
+test('Variantes : demandées en arrière-plan quand une Question atteint deux réponses, au Modèle le moins cher, puis rattachées', async () => {
+  const { lecons: [lecon], quiz, lire, avecVariantes } = await eleveVariantes('Var-Lance');
+  // Une seule réponse par Question : pas de Variantes.
+  assert.equal((await quiz(lecon)).status, 201);
+  await pause();
+  assert.equal(await nbLancementsVariantes(), 0);
+
+  // Deuxième réponse : un tour en arrière-plan, que l'Élève n'attend pas.
+  await avecFichier('variantes-attendre', async () => {
+    assert.equal((await quiz(lecon)).status, 201);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 1, 'Variantes jamais demandées');
+    assert.ok((await lire(lecon)).every((q) => !q.variantes?.length));
+  });
+  const questions = await avecVariantes(lecon);
+  const args = await fs.readFile(path.join(dossier, 'args-variantes'), 'utf8');
+  assert.match(args, /--model\nhaiku\n/);
+  assert.match(args, /--effort\nlow\n/);
+  assert.doesNotMatch(args, /--add-dir/);
+  // Deux variantes valides par Question, les mal formées écartées ; Objectifs de la Question d'origine.
+  const q1 = questions.find((q) => q.id === 'q1');
+  assert.deepEqual(q1.variantes, [
+    { enonce: 'Où sort la lave ? (variante 1)', reponses: ['Par les racines', 'Par le cratère'], bonne: 1, explication: 'Le cratère.', objectifs: [1] },
+    { enonce: 'Où sort la lave ? (variante 2)', reponses: ['Par les racines', 'Par le cratère'], bonne: 1, explication: 'Le cratère.', objectifs: [1] },
+  ]);
+  // Coût du tour gardé avec son type de tâche.
+  assert.equal((await appel('/api/eleves/var-lance/couts')).data.parTache.variantes.tours, 1);
+  // Un nouveau quiz garde les Variantes et n'en redemande pas.
+  await quiz(lecon);
+  await pause();
+  assert.equal(await nbLancementsVariantes(), 1);
+  assert.equal((await lire(lecon)).find((q) => q.id === 'q1').variantes.length, 2);
+});
+
+test('Variantes : un seul tour à la fois par Élève, les Questions d\'une autre Leçon sont variées après', async () => {
+  const { lecons: [a, b], quiz, avecVariantes } = await eleveVariantes('Var-Seul', 2);
+  await quiz(a);
+  await quiz(b);
+  await avecFichier('variantes-attendre', async () => {
+    await quiz(a);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 1, 'Variantes jamais demandées');
+    // Pendant le tour de la Leçon a, b atteint deux réponses : pas de second tour simultané.
+    assert.equal((await quiz(b)).status, 201);
+    await pause();
+    assert.equal(await nbLancementsVariantes(), 1);
+  });
+  await avecVariantes(a);
+  await avecVariantes(b);
+  assert.equal(await nbLancementsVariantes(), 2);
+});
+
+test('Variantes : un tour raté ou sans variante valide ne rattache rien, et n\'est retenté qu\'une fois', async () => {
+  const { lecons: [lecon], quiz, lire, finDuTour } = await eleveVariantes('Var-Echec');
+  await quiz(lecon);
+  await avecFichier('variantes-echouer', async () => {
+    await quiz(lecon);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 1, 'Variantes jamais demandées');
+    await finDuTour(lecon);
+  });
+  assert.ok((await lire(lecon)).every((q) => !q.variantes?.length));
+  // Réponse suivante : un second essai, qui n'écrit que des variantes mal formées.
+  await avecFichier('variantes-mal-formees', async () => {
+    await quiz(lecon);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 2, 'Variantes jamais redemandées');
+    await finDuTour(lecon);
+  });
+  assert.ok((await lire(lecon)).every((q) => !q.variantes?.length));
+  // Plus d'essai ensuite : la Question reste sans Variantes.
+  await quiz(lecon);
+  await pause();
+  assert.equal(await nbLancementsVariantes(), 2);
+});
+
+test('Variantes : une Révision du jour sert la Question ou une variante ; la réponse met à jour la Question d\'origine', async () => {
+  const { slug, lecons: [lecon], quiz, avecVariantes } = await eleveVariantes('Var-Revision');
+  await quiz(lecon);
+  await quiz(lecon);
+  await avecVariantes(lecon);
+  const url = `/api/eleves/${slug}/revisions`;
+  // Tirage au hasard : sur 30 séries, la Question d'origine et ses deux variantes sont servies.
+  const servies = new Set();
+  for (let i = 0; i < 30; i++) {
+    const { data } = await appel(url, 'GET', undefined, le(LENDEMAIN));
+    const q1 = data.questions.find((q) => q.id === 'q1');
+    servies.add(q1.variante ?? 'origine');
+    if (q1.variante !== undefined) {
+      assert.equal(q1.enonce, `Où sort la lave ? (variante ${q1.variante + 1})`);
+      assert.deepEqual(q1.reponses, ['Par les racines', 'Par le cratère']);
+    } else assert.equal(q1.enonce, 'Où sort la lave ?');
+  }
+  assert.deepEqual(servies, new Set(['origine', 0, 1]));
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 2);
+
+  // Réponse à la variante 1 : corrigée avec sa propre bonne réponse, journalisée sur la Question d'origine.
+  const repondre = (corps) => appel(url, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', ...corps }, le(LENDEMAIN));
+  assert.equal((await repondre({ choisie: 0, variante: 1 })).data.juste, false);
+  assert.equal((await repondre({ choisie: 9, variante: 1 })).status, 400);
+  assert.equal((await repondre({ choisie: 1, variante: 5 })).status, 400);
+  const juste = await repondre({ choisie: 1, variante: 1, sur: true });
+  assert.equal(juste.status, 200);
+  assert.equal(juste.data.juste, true);
+  assert.equal(juste.data.bonne, 'Par le cratère');
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
+  assert.deepEqual(q1.journal.slice(-2), [
+    { date: LENDEMAIN, juste: false, origine: 'revision', variante: 1 },
+    { date: LENDEMAIN, juste: true, sur: true, origine: 'revision', variante: 1 },
+  ]);
+  // Même état de mémoire : la Question (et donc ses variantes) n'est plus due aujourd'hui.
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+});
+
+test('Variantes : une Question réécrite par le prof perd ses Variantes, qui sont redemandées', async () => {
+  const { slug, lecons: [lecon], quiz, lire, avecVariantes } = await eleveVariantes('Var-Reecrite');
+  await quiz(lecon);
+  await quiz(lecon);
+  await avecVariantes(lecon);
+  const reecrit = { ...quizBanque, questions: quizBanque.questions.map((q) => (q.id === 'q1' ? { ...q, enonce: 'D’où sort la lave ?' } : q)) };
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(reecrit)}</script>`);
+  await avecFichier('variantes-attendre', async () => {
+    await quiz(lecon);
+    const questions = await lire(lecon);
+    assert.deepEqual(questions.find((q) => q.id === 'q1').variantes, []);
+    assert.equal(questions.find((q) => q.id === 'q2').variantes.length, 2);
+    await sonderJusqua(nbLancementsVariantes, (n) => n === 2, 'Variantes jamais redemandées');
+  });
+  const q1 = (await avecVariantes(lecon)).find((q) => q.id === 'q1');
+  assert.equal(q1.variantes[0].enonce, 'D’où sort la lave ? (variante 1)');
+});
+
+test('Révisions du jour : une Question avec une image la garde dans la Leçon et dans la révision (US25)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Image', 1);
+  // Le prof ajoute une image rapatriée (images/ de la Leçon) à q1, une image distante à q2 : l'Élève refait le quiz.
+  const quiz = structuredClone(quizBanque);
+  quiz.questions[0].image = { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' };
+  quiz.questions[1].image = { src: 'https://upload.wikimedia.org/magma.png', alt: 'Du magma' };
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const questions = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  assert.deepEqual(questions.find((q) => q.id === 'q1').contenu.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
+  // Une image qui n'est pas dans la Leçon (non rapatriée) n'est pas gardée : la révision se fait hors ligne.
+  assert.equal(questions.find((q) => q.id === 'q2').contenu.image, undefined);
+  // En révision, son adresse est celle du fichier de la Leçon servi par l'appli.
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.questions.find((q) => q.id === 'q1').image, { src: `/fichiers/${slug}/${lecon.id}/images/cratere.png`, alt: 'Le cratère du Stromboli' });
+  assert.equal(data.questions.find((q) => q.id === 'q2').image, undefined);
+  // Ses Variantes gardent son image, comme ses Objectifs : elles testent la même chose.
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  banque['0002-volcans.html#q1'].variantes = [{ enonce: 'Par où la lave sort-elle ?', reponses: ['Le cratère', 'Les racines'], bonne: 0, explication: '' }];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+  const [variante] = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions.find((q) => q.id === 'q1').variantes;
+  assert.deepEqual(variante.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
 });

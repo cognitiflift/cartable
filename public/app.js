@@ -1,3 +1,5 @@
+import { rendreQuestion } from '/kit/v1/question.js';
+
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
 let config;
@@ -133,10 +135,12 @@ function badgeMaitrise(maitrise) {
 }
 
 async function ecranAccueil(profil) {
-  const lecons = await api(`eleves/${profil.slug}/lecons`);
+  const [lecons, revisions] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`)]);
   const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
   montrer(
     h('h2', {}, `Salut ${profil.pseudo} !`),
+    carteRevisions(revisions.dues),
+    comptesARebours(lecons),
     h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
     lecons.length === 0 && h('p', {}, "Tu n'as pas encore de leçon."),
     config.categories.filter((c) => parCategorie[c]).map((c) => [
@@ -149,6 +153,63 @@ async function ecranAccueil(profil) {
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
     ]));
+}
+
+// Carte « Mes révisions du jour » (#66) : le nombre de Questions dues, d'un geste vers l'écran de révision.
+const carteRevisions = (dues) => h('button', { className: `carte carte-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
+  h('strong', {}, '🧠 Mes révisions du jour'),
+  h('small', {}, dues ? `${pluriel(dues, 'question')} à revoir` : 'Rien à revoir aujourd’hui 🎉'));
+
+// Compte à rebours des contrôles (#68) : pour chaque Leçon de révision dont le contrôle est aujourd'hui ou à venir,
+// le nombre de jours restants (calculé par le serveur, voir lib/jour.js), le plus proche d'abord.
+const texteControle = (jours) => (jours === 0 ? "aujourd'hui" : jours === 1 ? 'demain' : `dans ${jours} jours`);
+function comptesARebours(lecons) {
+  const aVenir = lecons.filter((l) => Number.isInteger(l.joursAvantControle) && l.joursAvantControle >= 0).map((l) => ({ l, jours: l.joursAvantControle }))
+    .sort((a, b) => a.jours - b.jours);
+  return aVenir.length > 0 && h('ul', { className: 'comptes-a-rebours' }, aVenir.map(({ l, jours }) =>
+    h('li', {}, h('a', { href: `#/lecon/${l.id}` }, `📅 ${l.titre} : contrôle ${texteControle(jours)}`))));
+}
+
+// Révisions du jour (#66) : des séries courtes de Questions dues, toutes Leçons mélangées, affichées tout de suite avec
+// le rendu du quiz du Kit, sans le prof. Chaque réponse part au serveur, qui la corrige lui-même et la journalise.
+// À la fin des Questions dues, un message le dit, et l'Élève peut continuer avec des Questions pas encore dues.
+async function ecranRevisions(profil) {
+  const url = `eleves/${profil.slug}/revisions`;
+  const zone = h('section', { className: 'kit-quiz revisions' });
+  const erreur = h('p', { className: 'erreur' });
+  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'), zone, erreur);
+
+  const fin = (suite) => [
+    h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
+    h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ',
+      h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons')),
+  ];
+  // Une série : les Questions l'une après l'autre ; à la fin, la série suivante ou le message de fin.
+  const serie = async (suite = false) => {
+    erreur.textContent = '';
+    const { questions } = await api(`${url}${suite ? '?suite=1' : ''}`);
+    if (!questions.length) return zone.replaceChildren(...fin(suite));
+    let i = 0;
+    const suivante = () => {
+      if (i >= questions.length) return serie(suite);
+      const q = questions[i++];
+      const lien = h('a', { href: `#/lecon/${q.lecon}/${encodeURIComponent(q.page)}`, target: '_blank' }, '📖 Relire la page');
+      const ensuite = h('p', { hidden: true }, h('button', { onclick: suivante }, i < questions.length ? 'Question suivante ▶️' : 'Continuer ▶️'));
+      zone.replaceChildren(
+        h('p', { className: 'revision-origine' }, h('small', {}, `${q.titreLecon} · question ${i} sur ${questions.length} · `, lien)),
+        rendreQuestion(q, {
+          quandCorrigee: async ({ choisie, sur }) => {
+            try {
+              await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
+              ensuite.hidden = false;
+            } catch (e) { erreur.textContent = e.message; }
+          },
+        }),
+        ensuite);
+    };
+    suivante();
+  };
+  await serie();
 }
 
 const enBase64 = (fichier) => new Promise((resolve, reject) => {
@@ -278,7 +339,8 @@ const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
 // Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
 // Tout se déduit du dernier message du prof.
-async function ecranSession(profil, id) {
+// `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière.
+async function ecranSession(profil, id, pageDemandee = null) {
   let lecon = await api(`eleves/${profil.slug}/lecons/${id}`);
   let attente = null; // { texte, centre } pendant que le prof travaille
   let retourFerme = false;
@@ -313,7 +375,8 @@ async function ecranSession(profil, id) {
     pagesAffichees = lecon.pages.join();
     const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}`;
     const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
-    choix.value = lecon.pages.at(-1);
+    choix.value = lecon.pages.includes(pageDemandee) ? pageDemandee : lecon.pages.at(-1);
+    pageDemandee = null; // seulement à l'ouverture : une nouvelle page du prof s'affiche ensuite comme d'habitude
     iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
     panneau.replaceChildren(choix, iframe);
   };
@@ -391,7 +454,7 @@ async function route() {
   quitterEcran = () => {};
   try {
     config ??= await api('config');
-    const [, page, id] = location.hash.split('/');
+    const [, page, id, sousPage] = location.hash.split('/');
     if (page === 'nouvel-eleve') return await ecranNouvelEleve();
     const slug = pseudoCourant();
     const profil = slug && (await api(`eleves/${slug}`).catch(() => null));
@@ -399,7 +462,8 @@ async function route() {
     barreNav(profil);
     if (page === 'profil') return await ecranProfil(profil);
     if (page === 'nouvelle-lecon') return ecranNouvelleLecon(profil);
-    if (page === 'lecon') return await ecranSession(profil, id);
+    if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
+    if (page === 'revisions') return await ecranRevisions(profil);
     return await ecranAccueil(profil);
   } catch (e) {
     montrer(h('p', { className: 'erreur' }, e.message));

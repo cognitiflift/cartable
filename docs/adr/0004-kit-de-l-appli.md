@@ -16,5 +16,5 @@ Les anciennes Leçons gardent leurs propres composants et s'ouvrent comme avant 
 ## Consequences
 
 - Les questions deviennent des données structurées, réutilisables plus tard (Banque de Questions, Révisions du jour).
-- Le Kit étant versionné, une page déjà créée continue d'utiliser la version qu'elle cite ; une évolution incompatible passe par une nouvelle version.
+- Le Kit étant versionné, une page déjà créée continue d'utiliser la version qu'elle cite ; une évolution incompatible passe par une nouvelle version. Un ajout compatible (champ facultatif, résultat en plus que les lecteurs d'avant ignorent, page d'avant qui marche à l'identique) reste dans la version en cours et est listé dans sa documentation : ainsi « Je ne sais pas » et l'image d'une question (spec #47) sont entrés dans la v1.
 - Le prof doit pouvoir lire une courte documentation du Kit (format des questions, exemple) pour écrire des pages justes du premier coup.

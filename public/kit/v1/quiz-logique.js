@@ -3,17 +3,25 @@
 // validation, avec les mêmes limites, pour le quiz affiché et pour le résultat enregistré.
 //
 // Données écrites par le prof dans la Page de leçon (voir LISEZMOI.md) :
-//   { objectifs: [n…], pretest?, questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs? }] }
+//   { objectifs: [n…], pretest?, questions: [{ id, type: 'qcm', enonce, reponses: [texte…], bonne: <index>, explication, bonus?, objectifs?, image? }] }
+// `image` (ajout compatible de la v1, spec #47 US25) : { src, alt } d'une image propre à la question, rapatriée dans
+// images/ de la Leçon (`../images/<fichier>`, relatif à la page) ou distante (http(s), en attendant le rapatriement).
 // `pretest: true` : quiz du Pré-test (« Devine ! »), hors Maîtrise, Objectifs atteints, Étoiles et Rebond ordinaire.
 // Message envoyé à l'appli à la fin du quiz (`cartable-score`) :
-//   { type, score, page, objectifs, pretest?, bonus?, questions: [{ id, enonce, choisie, bonne, juste, bonus, objectifs, sur? }] }
+//   { type, score, page, objectifs, pretest?, bonus?, questions: [{ id, enonce, choisie, bonne, juste, jeNeSaisPas?, bonus, objectifs, sur? }] }
 // `sur` : Confiance de l'Élève, donnée après le choix et avant la correction (true = « sûr », false = « pas sûr ») ;
 // absente si l'Élève ne l'a pas donnée (anciennes pages). Elle n'entre jamais dans le score.
+// `jeNeSaisPas: true` : l'Élève a choisi « Je ne sais pas » (#64) plutôt qu'une réponse ; la question compte comme
+// fausse, sans Confiance, et `choisie` vaut « Je ne sais pas » (les lecteurs d'avant ce champ restent justes).
 
 // Limites communes : au-delà, un texte est tronqué (jamais écarté) et les questions en trop sont ignorées.
 export const QUESTIONS_MAX = 50;
 export const ID_MAX = 100;
 export const TEXTE_MAX = 500;
+
+// Choix « Je ne sais pas » dans `choix` (voir messageScore), et le texte envoyé à sa place comme réponse choisie.
+export const JE_NE_SAIS_PAS = 'je-ne-sais-pas';
+export const TEXTE_JE_NE_SAIS_PAS = 'Je ne sais pas';
 
 // Texte non vide, sans espaces autour, tronqué à `max` caractères ; null sinon.
 const texte = (v, max = TEXTE_MAX) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max).trim() : null);
@@ -48,6 +56,17 @@ export function bonusDesQuestions(questions) {
 
 const ROCKET = /^🚀\s*/u;
 
+// Image d'une question : adresse rapatriée dans la Leçon (`../images/<fichier>`) ou distante en HTTP(S), et texte
+// alternatif non vide ; null sinon (la question reste, sans image).
+export const IMAGE_LOCALE_RE = /^\.\.\/images\/[\w-]+(\.[\w-]+)*$/;
+const IMAGE_DISTANTE_RE = /^https?:\/\/[^\s"'<>]+$/;
+function imageValide(v) {
+  const alt = texte(v?.alt);
+  const src = typeof v?.src === 'string' ? v.src.trim() : '';
+  if (!alt || src.length > 2000 || !(IMAGE_LOCALE_RE.test(src) || IMAGE_DISTANTE_RE.test(src))) return null;
+  return { src, alt };
+}
+
 function questionValide(q) {
   if (!q || typeof q !== 'object') return null;
   const [id, enonce] = [texte(q.id, ID_MAX), texte(q.enonce)];
@@ -68,6 +87,7 @@ function questionValide(q) {
     explication: texte(q.explication) ?? '',
     bonus: q.bonus === true || fusee,
     ...(Array.isArray(q.objectifs) && { objectifs: numeros(q.objectifs) }),
+    ...(imageValide(q.image) && { image: imageValide(q.image) }),
   };
 }
 
@@ -87,9 +107,12 @@ export function lireResultats(brut, nombreObjectifs = Infinity) {
     if (!q || typeof q !== 'object' || typeof q.juste !== 'boolean') return null;
     const [id, enonce, choisie, bonne] = [texte(q.id, ID_MAX), texte(q.enonce), texte(q.choisie), texte(q.bonne)];
     if (!id || !enonce || !choisie || !bonne) return null;
+    // « Je ne sais pas » est toujours faux, et sans Confiance.
+    const jeNeSaisPas = q.jeNeSaisPas === true;
     return {
-      id, enonce, choisie, bonne, juste: q.juste, bonus: q.bonus === true, objectifs: numeros(q.objectifs, nombreObjectifs),
-      ...(typeof q.sur === 'boolean' && { sur: q.sur }),
+      id, enonce, choisie, bonne, juste: q.juste && !jeNeSaisPas, ...(jeNeSaisPas && { jeNeSaisPas }),
+      bonus: q.bonus === true, objectifs: numeros(q.objectifs, nombreObjectifs),
+      ...(typeof q.sur === 'boolean' && !jeNeSaisPas && { sur: q.sur }),
     };
   });
 }
@@ -109,12 +132,15 @@ export function melanger(nombre, aleatoire = Math.random) {
   return ordre;
 }
 
-// Message de fin de quiz. `choix` : id de question → index de la réponse choisie (avant mélange) ; `confiance` :
+// Message de fin de quiz. `choix` : id de question → index de la réponse choisie (avant mélange), ou JE_NE_SAIS_PAS ; `confiance` :
 // id de question → true (« sûr ») ou false (« pas sûr »). Score : % de questions justes hors bonus, arrondi, sans
 // effet de la Confiance. Objectifs : ceux du quiz et ceux propres aux questions. Un quiz de Pré-test porte son marqueur.
 export function messageScore(quiz, choix, page, confiance = {}) {
   const questions = quiz.questions.map((q) => {
     const { juste, bonne } = corriger(q, choix[q.id]);
+    if (choix[q.id] === JE_NE_SAIS_PAS) {
+      return { id: q.id, enonce: q.enonce, choisie: TEXTE_JE_NE_SAIS_PAS, bonne, juste: false, jeNeSaisPas: true, bonus: q.bonus, objectifs: q.objectifs ?? quiz.objectifs };
+    }
     return { id: q.id, enonce: q.enonce, choisie: q.reponses[choix[q.id]] ?? null, bonne, juste, bonus: q.bonus, objectifs: q.objectifs ?? quiz.objectifs,
       ...(typeof confiance[q.id] === 'boolean' && { sur: confiance[q.id] }) };
   });

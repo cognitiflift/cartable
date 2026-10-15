@@ -78,7 +78,7 @@ Une question mal formée est ignorée. Il faut au moins une question hors bonus.
 
 ## Ce que fait le Kit
 
-Il affiche les questions, mélange les réponses, corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question à l'appli. Tu n'as rien à écrire pour cela.
+Il affiche les questions, mélange les réponses, demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
 
 ## Style de base
 

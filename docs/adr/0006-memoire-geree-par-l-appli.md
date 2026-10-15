@@ -31,3 +31,7 @@ L'appli prend donc la mémoire en charge, dans l'esprit des ADR 0002 et 0003 : l
 - Le planificateur se teste en fonctions pures avec une horloge injectée, sans serveur ni temps réel.
 - La règle « deux succès espacés » de Retenu (ADR 0003) devient le cas des Leçons sans Questions.
 - L'appli ne valide des variantes que la forme (QCM bien formé, énoncé nouveau, une bonne réponse) : qu'elles testent la même chose avec la même bonne réponse en sens est seulement demandé au prof. Une variante fausse sur le fond resterait ; elle partage la mémoire de la Question et sera oubliée si le prof réécrit la question d'origine.
+
+## Mise à jour du 2026-10-15 : formats de rappel actif (spec #48)
+
+Les formats où l'Élève répond en plusieurs éléments (texte à trous, ordre, associer, classer, exemple à étapes) et « réfléchis puis dévoile » (« à moitié ») donnent un crédit partiel. Une réponse juste en partie (des points, sans être entièrement juste) vaut « difficile », comme juste mais pas sûr : l'Élève en savait une part, la Question revient vite sans repartir de zéro. Faux sans aucun point ou « Je ne sais pas » vaut toujours « à revoir ». Le journal garde ces points (`points`) ; la règle de notation reste dans le module pur de la mémoire. Les variantes restent des QCM : seuls les QCM et leur cas particulier « choisis la meilleure explication » en reçoivent.

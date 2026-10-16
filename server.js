@@ -21,6 +21,7 @@ import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu } from './lib/badges.js';
+import { calendrier, paliersObtenus } from './lib/calendrier.js';
 import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -449,9 +450,9 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }, mainte
 }
 
 // Badges (#95) : recalculés depuis tout l'historique de l'Élève à `maintenant`, puis fusionnés avec son fichier de Badges
-// (lib/badges.js), sans jamais en retirer. Renvoie { nouveaux, fichier, calcul } ; `nouveaux` : Paliers gagnés par ce
-// recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office l'historique) ; `totaux` : total
-// d'Étoiles et de Fusées de l'Élève (#96).
+// (lib/badges.js), sans jamais en retirer. Renvoie { nouveaux, fichier, calcul, totaux, lecons, evenements } ;
+// `nouveaux` : Paliers gagnés par ce recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office
+// l'historique) ; `totaux` : total d'Étoiles et de Fusées de l'Élève (#96) ; `lecons`, `evenements` : l'historique lu.
 async function recalculerBadges(slug, maintenant) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const calcul = calculerBadges({ lecons, evenements, maintenant });
@@ -459,7 +460,7 @@ async function recalculerBadges(slug, maintenant) {
     const fusion = fusionnerBadges(avant, calcul, maintenant);
     return [fusion.fichier, fusion];
   });
-  return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }) };
+  return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
 }
 
 // Après chaque quiz (et chaque fin de Révision du jour) : les nouveaux Paliers, à annoncer par l'appelant.
@@ -586,12 +587,14 @@ async function api(req, res, segments) {
       });
     }
   } else if (r2 === 'badges' && !id) {
-    // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture, et les totaux d'Étoiles et de Fusées (#96). Ouverture de l'écran (?ouverture=1) :
-    // la réponse montre encore « Nouveau » et le mot d'accueil, effacés pour la suite.
+    // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture, les totaux d'Étoiles et de Fusées (#96) et
+    // le calendrier des Jours travaillés (#99), sans aucun score. Ouverture de l'écran (?ouverture=1) : la réponse
+    // montre encore « Nouveau » et le mot d'accueil, effacés pour la suite.
     if (m === 'GET') {
-      const { fichier, calcul, totaux } = await recalculerBadges(slug, maintenant);
+      const { fichier, calcul, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
       if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
-      return json(res, 200, { ...vueMesBadges(fichier, calcul), totaux });
+      const jours = calendrier({ lecons, evenements, paliers: paliersObtenus(fichier, calcul), maintenant });
+      return json(res, 200, { ...vueMesBadges(fichier, calcul), totaux, calendrier: jours });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));

@@ -255,10 +255,10 @@ const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-ba
 const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
 
 // Mes badges (#95) : la collection des Badges, obtenus avec leur Palier et leur date, à venir en grisé avec leur
-// progression (« 7/15 »), et le total d'Étoiles et de Fusées de l'Élève (#96). L'ouvrir efface « Nouveau » ; le mot
-// d'accueil s'affiche à la première ouverture.
+// progression (« 7/15 »), le total d'Étoiles et de Fusées de l'Élève (#96) et le calendrier des Jours travaillés (#99).
+// L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
 async function ecranBadges(profil) {
-  const { collection, nouveaux, accueil, totaux } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
@@ -266,6 +266,7 @@ async function ecranBadges(profil) {
     accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
     totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
       `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`),
+    calendrierJours(calendrier),
     h('div', { className: 'grille badges' }, collection.map((b) => {
       const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
       return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
@@ -274,6 +275,59 @@ async function ecranBadges(profil) {
         obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
         b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`));
     })));
+}
+
+// Calendrier des Jours travaillés (#99), mois par mois : pâle quand l'Élève a travaillé, plein quand l'Objectif du
+// jour est atteint, 🛡️ quand un Joker a couvert le jour. Toucher un jour montre ce qui a été fait et gagné, sans score.
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const moisSuivant = (mois, n) => { const [a, m] = mois.split('-').map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
+function calendrierJours({ aujourdhui, jours }) {
+  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
+  const premier = (jours[0]?.jour ?? aujourdhui).slice(0, 7);
+  const dernier = aujourdhui.slice(0, 7);
+  let mois = dernier;
+  const bloc = h('section', { className: 'calendrier' });
+  const detail = (j) => {
+    const faits = [j.quiz && `${j.quiz} quiz`, j.revisions && pluriel(j.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
+    const gains = [j.gains.etoiles && `⭐ ${j.gains.etoiles}`, j.gains.fusees && `🚀 ${j.gains.fusees}`].filter(Boolean).join(' · ');
+    return h('div', { className: 'carte calendrier-detail' },
+      h('strong', {}, dateBadge(j.jour)),
+      j.lecons.length > 0 && h('small', {}, `📚 ${j.lecons.map((l) => l.titre).join(', ')}`),
+      faits && h('small', {}, faits),
+      j.joker && h('small', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
+      (gains || j.gains.paliers.length > 0) && h('small', {}, gains && `Gagné : ${gains} `,
+        j.gains.paliers.map((p) => h('span', {}, pastilleBadge(p), ` ${p.nom}, ${p.palier} `))),
+      !faits && !j.lecons.length && !j.joker && !gains && !j.gains.paliers.length && h('small', {}, 'Rien ce jour-là.'));
+  };
+  const afficher = (choisi) => {
+    const [a, m] = mois.split('-').map(Number);
+    const decalage = (new Date(a, m - 1, 1).getDay() + 6) % 7; // lundi en premier
+    const nombre = new Date(a, m, 0).getDate();
+    const cases = [...Array(decalage).fill(null), ...Array.from({ length: nombre }, (_, i) => `${mois}-${String(i + 1).padStart(2, '0')}`)];
+    const zone = h('div', {});
+    bloc.replaceChildren(
+      h('div', { className: 'calendrier-mois' },
+        h('button', { className: 'secondaire', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(); } }, '‹'),
+        h('strong', {}, `${MOIS[m - 1]} ${a}`),
+        h('button', { className: 'secondaire', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(); } }, '›')),
+      h('div', { className: 'calendrier-grille' },
+        ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'].map((d) => h('span', { className: 'calendrier-entete' }, d)),
+        cases.map((jour) => {
+          if (!jour) return h('span', {});
+          const j = duJour(jour);
+          return h('button', {
+            className: `calendrier-jour ${j.etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour === choisi ? ' choisi' : ''}`,
+            disabled: jour > aujourdhui,
+            onclick: () => afficher(jour),
+          }, String(Number(jour.slice(8))), j.joker && h('span', { className: 'calendrier-joker' }, '🛡️'));
+        })),
+      zone);
+    if (choisi) zone.append(detail(duJour(choisi)));
+  };
+  afficher();
+  return bloc;
 }
 
 // Récapitulatif de la semaine passée (#75) : le serveur ne l'envoie qu'au premier retour de la semaine (le lundi, ou le

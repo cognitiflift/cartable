@@ -3043,6 +3043,24 @@ test('Badges : un Palier atteint reste après la suppression de la Leçon qui l\
   assert.deepEqual(apres.prochain, { palier: 'argent', seuil: 3 });
 });
 
+test('Calendrier de Mes badges (#99) : Jours travaillés, ce qui a été fait et gagné chaque jour, sans aucun score', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Badges-Calendrier', 1); // lundi 2 novembre : une page terminée
+  await quizDuJour(slug, lecon, '2026-11-03T12:00:00.000Z', '0003-volcans.html');
+  await quizDuJour(slug, lecon, '2026-11-04T12:00:00.000Z', '0004-volcans.html');
+  // Jeudi 5 : la Leçon est seulement ouverte, sans quiz : le jour reste vide.
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}?ouverture=1`, 'GET', undefined, le('2026-11-05T12:00:00.000Z'));
+  const { calendrier } = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-05T13:00:00.000Z'))).data;
+  assert.equal(calendrier.aujourdhui, '2026-11-05');
+  const volcans = { id: lecon.id, titre: 'Les volcans' };
+  assert.deepEqual(calendrier.jours, [
+    { jour: '2026-11-02', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } },
+    { jour: '2026-11-03', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 1, fusees: 0, paliers: [] } },
+    { jour: '2026-11-04', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0,
+      gains: { etoiles: 1, fusees: 0, paliers: [{ id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze' }] } },
+  ]);
+  assert.doesNotMatch(JSON.stringify(calendrier), /score|%/i);
+});
+
 test('Badges : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/badges')).status, 404);
 });

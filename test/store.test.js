@@ -83,7 +83,7 @@ test('Une Leçon existante à l\'ancien format l-… se liste, se lit et reçoit
   assert.deepEqual((await store.listerLecons('zoe')).map((l) => l.id), ['l-mutm4ihi']);
   assert.deepEqual((await store.lireLecon('zoe', 'l-mutm4ihi')).pages, ['0001-fractions.html']);
   await store.enregistrerScore('zoe', 'l-mutm4ihi', { score: 90 });
-  assert.equal((await store.lireLecon('zoe', 'l-mutm4ihi')).maitrise.palier, 'acquis');
+  assert.equal((await store.lireLecon('zoe', 'l-mutm4ihi')).maitrise.palier, 'bien en tête');
 });
 
 test('Leçon de révision : identifiant date + revision, suffixe -2 le même jour', async () => {

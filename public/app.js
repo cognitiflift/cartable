@@ -152,7 +152,8 @@ async function ecranParent(profil) {
     SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
 
-const PALIERS = { 'non acquis': 'rouge', 'à consolider': 'orange', acquis: 'vert' };
+// Couleur de chaque palier de Maîtrise (spec #84) : le mot se lit sans chiffre, le pourcentage reste en infobulle.
+const PALIERS = { 'à revoir': 'rouge', 'à consolider': 'orange', 'bien en tête': 'vert' };
 
 // Trois Étoiles d'une Leçon de révision, pleines ou vides.
 const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
@@ -182,9 +183,8 @@ function objectifsRetenus(objectifs = []) {
 
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
-  return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: maitrise.palier },
-    h('span', { className: 'jauge' }, h('span', { style: `width:${maitrise.pourcentage}%` })),
-    `${maitrise.pourcentage} % · ${maitrise.palier}`);
+  const mot = maitrise.palier[0].toUpperCase() + maitrise.palier.slice(1);
+  return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: `Maîtrise : ${maitrise.pourcentage} %` }, mot);
 }
 
 async function ecranAccueil(profil) {

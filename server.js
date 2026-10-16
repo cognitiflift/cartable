@@ -151,7 +151,7 @@ async function chronometrer(slug, id, maintenant, operation) {
   }
 }
 
-async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant = Date.now() }) {
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -177,7 +177,9 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 // questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
 // Une Leçon libre qui avait des Objectifs et en a davantage après le tour a été élargie (le prof a ajouté des Objectifs
 // à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
-async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant = Date.now() }) {
+// L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :
+// c'est donc l'ajout d'Objectifs, constaté après le tour, qui marque l'élargissement.
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant }) {
   const { texte, choix } = extraireChoix(reponse);
   // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
   // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
@@ -463,13 +465,11 @@ async function recalculerBadges(slug, maintenant) {
   return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
 }
 
-// Après chaque quiz (et chaque fin de Révision du jour) : les nouveaux Paliers, à annoncer par l'appelant.
-const mettreAJourBadges = async (slug, maintenant) => (await recalculerBadges(slug, maintenant)).nouveaux;
-
-// Les nouveaux Paliers, nommés pour leur annonce (lib/retour.js) : [{ id, nom, palier }].
+// Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
+// [{ id, nom, palier, jour }].
 async function annoncerBadges(slug, maintenant) {
   const { nouveaux, calcul } = await recalculerBadges(slug, maintenant);
-  return nouveaux.map(({ id, palier }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier }));
+  return nouveaux.map(({ id, palier, jour }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier, jour }));
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -515,9 +515,10 @@ async function terminerRevisionDuJour(slug, maintenant) {
   const etoile = etoileDuJour(evenements, maintenant);
   const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
   await store.enregistrerEvenement(slug, evenement);
-  const { nouveaux: paliers, calcul } = await recalculerBadges(slug, maintenant);
+  const nouveaux = await annoncerBadges(slug, maintenant);
+  const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));
   // Annonce des nouveaux Paliers sur l'écran de fin (#98), par la même phrase préparée que le Retour de quiz.
-  const annonce = phraseBadges(paliers.map(({ id, palier }) => ({ nom: calcul.find((b) => b.id === id).nom, palier })));
+  const annonce = phraseBadges(nouveaux);
   return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement], maintenant).length };
 }
 

@@ -238,7 +238,7 @@ function carteRythme({ objectifDuJour: o, serieDeJours }) {
   return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
     h('strong', {}, objectif),
     h('small', {}, jours,
-      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série de jours si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
+      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
     serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`));
 }
 

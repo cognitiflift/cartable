@@ -2938,7 +2938,7 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal(lundi.status, 200);
   assert.deepEqual(lundi.data, {
     objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
-    serieDeJours: { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true },
+    serieDeJours: { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: true },
     recapitulatif: null,
   });
   // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
@@ -2946,11 +2946,11 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   for (let i = 0; i < 4; i++) assert.equal((await reviser(i)).status, 200);
   const mardi = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
   assert.deepEqual(mardi.objectifDuJour, { revisions: 4, revisionsVisees: 5, pages: 0, pagesVisees: 1, atteint: false });
-  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: false });
+  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: false });
   // La cinquième : objectif atteint, deux jours de suite.
   await reviser(4);
-  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 : le récapitulatif de la semaine passée ; la série, sans joker, est à refaire.
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 : le récapitulatif de la semaine passée ; cinq jours manqués, plus que les 3 Jokers : la série est à refaire.
   const suivant = (await appel(url, 'GET', undefined, le('2026-11-09T12:00:00.000Z'))).data;
   assert.deepEqual(suivant.recapitulatif, { du: '2026-11-02', au: '2026-11-08', objectifsRetenus: 0, revisions: 5, pages: 1, joursAtteints: 2 });
   assert.equal(suivant.serieDeJours.jours, 0);
@@ -2958,17 +2958,17 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
 });
 
-test('Rythme : une semaine complète rapporte un joker, qui protège tout seul la série d\'un jour manqué', async () => {
+test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls la série des jours manqués', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
   const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
   for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
   const url = `/api/eleves/${slug}/rythme`;
-  // Dimanche 8 : sept jours de suite, un joker gagné.
-  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 1, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce au joker.
+  // Dimanche 8 : sept jours de suite, les 3 Jokers de la semaine intacts.
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce à un Joker de la nouvelle semaine.
   await page('10');
   const mardi = (await appel(url, 'GET', undefined, le('2026-11-10T18:00:00.000Z'))).data;
-  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 0, jokersUtilises: 1, aujourdhui: true });
+  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 2, jokersUtilises: 1, aujourdhui: true });
   assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
 });
 

@@ -243,7 +243,7 @@ function carteRythme({ objectifDuJour: o, serieDeJours }) {
   return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
     h('strong', {}, objectif),
     h('small', {}, jours,
-      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série de jours si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
+      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
     serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`));
 }
 
@@ -299,30 +299,44 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
   const zone = h('section', { className: 'kit-quiz revisions' });
   const erreur = h('p', { className: 'erreur' });
 
-  const fin = (suite) => [
+  // Récompenses de la série menée jusqu'au bout (#94), annoncées en tête de l'écran qui suit.
+  const annonces = (recompenses) => (recompenses?.etoile ? [h('p', { className: 'bulle-prof' }, '⭐ Nouvelle Étoile : Révision du jour terminée !')] : []);
+  const fin = (suite, recompenses) => [
+    ...annonces(recompenses),
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
     h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ', boutonFin),
   ];
   // Une série : les Questions l'une après l'autre ; à la fin, la série suivante ou le message de fin.
-  const serie = async (suite = false) => {
+  // `recompenses` : celles de la série précédente, à annoncer.
+  const serie = async (suite = false, recompenses = null) => {
     erreur.textContent = '';
     let questions;
     try { ({ questions } = await api(`${url}${suite ? '?suite=1' : ''}`)); } catch (e) { return (erreur.textContent = e.message); }
-    if (!questions.length) return zone.replaceChildren(...fin(suite));
+    if (!questions.length) return zone.replaceChildren(...fin(suite, recompenses));
     let i = 0;
-    const suivante = () => {
+    let repondues = 0; // réponses bien reçues par le serveur
+    const suivante = async () => {
       arreterLecture();
-      if (i >= questions.length) return serie(suite);
+      if (i >= questions.length) {
+        // Chaque Question de la série a sa réponse : la Révision du jour est menée jusqu'au bout.
+        let nouvelles = null;
+        if (repondues === questions.length) {
+          try { ({ recompenses: nouvelles } = await api(`${url}/terminee`, { method: 'POST', body: {} })); } catch (e) { erreur.textContent = e.message; }
+        }
+        return serie(suite, nouvelles);
+      }
       const q = questions[i++];
       const lien = h('a', { href: `#/lecon/${q.lecon}/${encodeURIComponent(q.page)}`, target: '_blank' }, '📖 Relire la page');
       const ensuite = h('p', { hidden: true }, h('button', { onclick: suivante }, i < questions.length ? 'Question suivante ▶️' : 'Continuer ▶️'));
       zone.replaceChildren(
+        ...(i === 1 ? annonces(recompenses) : []),
         h('p', { className: 'revision-origine' }, h('small', {}, `${q.titreLecon} · question ${i} sur ${questions.length} · `, lien)),
         rendreQuestion(q, {
           lecture: profil.lectureVoixHaute,
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
+              repondues++;
               ensuite.hidden = false;
             } catch (e) { erreur.textContent = e.message; }
           },

@@ -2939,7 +2939,7 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal(lundi.status, 200);
   assert.deepEqual(lundi.data, {
     objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
-    serieDeJours: { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true },
+    serieDeJours: { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: true },
     recapitulatif: null,
   });
   // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
@@ -2947,11 +2947,11 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   for (let i = 0; i < 4; i++) assert.equal((await reviser(i)).status, 200);
   const mardi = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
   assert.deepEqual(mardi.objectifDuJour, { revisions: 4, revisionsVisees: 5, pages: 0, pagesVisees: 1, atteint: false });
-  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: false });
+  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: false });
   // La cinquième : objectif atteint, deux jours de suite.
   await reviser(4);
-  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 : le récapitulatif de la semaine passée ; la série, sans joker, est à refaire.
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 : le récapitulatif de la semaine passée ; cinq jours manqués, plus que les 3 Jokers : la série est à refaire.
   const suivant = (await appel(url, 'GET', undefined, le('2026-11-09T12:00:00.000Z'))).data;
   assert.deepEqual(suivant.recapitulatif, { du: '2026-11-02', au: '2026-11-08', objectifsRetenus: 0, revisions: 5, pages: 1, joursAtteints: 2 });
   assert.equal(suivant.serieDeJours.jours, 0);
@@ -2959,17 +2959,17 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
 });
 
-test('Rythme : une semaine complète rapporte un joker, qui protège tout seul la série d\'un jour manqué', async () => {
+test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls la série des jours manqués', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
   const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
   for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
   const url = `/api/eleves/${slug}/rythme`;
-  // Dimanche 8 : sept jours de suite, un joker gagné.
-  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 1, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce au joker.
+  // Dimanche 8 : sept jours de suite, les 3 Jokers de la semaine intacts.
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce à un Joker de la nouvelle semaine.
   await page('10');
   const mardi = (await appel(url, 'GET', undefined, le('2026-11-10T18:00:00.000Z'))).data;
-  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 0, jokersUtilises: 1, aujourdhui: true });
+  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 2, jokersUtilises: 1, aujourdhui: true });
   assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
 });
 
@@ -3080,4 +3080,53 @@ test('Étoiles et Fusées : un ancien historique compte d\'emblée, sans annonce
   // Le quiz suivant n'annonce que ce qu'il gagne.
   const suivant = await quizDePage(slug, lecon, { score: 50, page: '0001-a.html' });
   assert.doesNotMatch(suivant.messages.at(-1).texte, /Étoile|Fusée/);
+});
+
+// Étoile de la Révision du jour (#94) : quand l'Élève a répondu à chaque Question d'une série, l'écran le signale ;
+// la première série menée jusqu'au bout de la journée rapporte une Étoile, quel que soit le score. Jamais de tour du prof.
+const repondreRevision = (slug, lecon, id, choisie, date) =>
+  appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie, sur: true }, le(date));
+const terminerRevision = (slug, date) => appel(`/api/eleves/${slug}/revisions/terminee`, 'POST', {}, le(date));
+
+test('Étoile de la Révision du jour : une série menée jusqu\'au bout rapporte une Étoile, même avec des erreurs ; une deuxième le même jour, non ; le lendemain, oui', async () => {
+  const { slug, lecons } = await eleveRevisions('Etoile-Revis', 1);
+  const [lecon] = lecons;
+  // Une série : q1 fausse, q2 « Je ne sais pas ».
+  await repondreRevision(slug, lecon, 'q1', 1, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 'je-ne-sais-pas', LENDEMAIN);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.equal(fin.status, 200);
+  assert.deepEqual(fin.data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // « Encore des questions », menée jusqu'au bout le même jour : pas d'autre Étoile.
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-03T16:00:00.000Z');
+  const encore = await terminerRevision(slug, '2026-11-03T16:00:00.000Z');
+  assert.deepEqual(encore.data, { recompenses: { etoile: false, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // Le jour suivant : une nouvelle Étoile.
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  const demain = await terminerRevision(slug, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual(demain.data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 2 });
+  // L'événement daté est dans le journal des événements de l'Élève.
+  const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(journal.filter((e) => e.type === 'revision-terminee').map((e) => e.date), [LENDEMAIN, '2026-11-03T16:00:00.000Z', '2026-11-04T12:00:00.000Z']);
+  await aucunClaudeLance(lecons);
+});
+
+test('Étoile de la Révision du jour : une série abandonnée ne rapporte rien ; les jours passés avec une réponse de Révision du jour comptent', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Passe', 1);
+  // Avant l'Étoile de la Révision du jour : une réponse le 3 novembre suffit à compter ce jour-là.
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data.etoilesRevisionDuJour, 2);
+  // Le 5, série abandonnée : l'écran ne signale rien, et le 6 le compte n'a pris que ce jour-là.
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-05T12:00:00.000Z');
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-06T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-06T12:00:00.000Z')).data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 3 });
+});
+
+test('Étoile de la Révision du jour : refusée (400) sans réponse de Révision du jour dans la journée, rien n\'est enregistré', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Refus', 1);
+  assert.equal((await terminerRevision(slug, LENDEMAIN)).status, 400);
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  assert.deepEqual((await terminerRevision(slug, LENDEMAIN)).data.recompenses, { etoile: true, paliers: [] });
+  assert.equal((await terminerRevision('inconnu-etoile', LENDEMAIN)).status, 404);
 });

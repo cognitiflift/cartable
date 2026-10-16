@@ -162,10 +162,15 @@ async function ecranParent(profil) {
     SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
 
-// Trois Étoiles d'une Leçon de révision, pleines ou vides.
+// Étoiles d'une Leçon : en Leçon de révision, ses trois Étoiles pleines ou vides ; en Leçon libre, leur nombre
+// (« ⭐ n », rien à 0).
 const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
-const etoiles = (e) => h('span', { className: 'etoiles' },
-  Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
+const etoiles = (e) => (typeof e === 'number'
+  ? e > 0 && h('span', { className: 'etoiles', title: 'Pages réussies' }, `⭐ ${e}`)
+  : h('span', { className: 'etoiles' },
+    Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆'))));
+// Fusées d'une Leçon (« 🚀 n ») : une par page avec un Dépassement réussi ; rien à 0.
+const fusees = (n) => n > 0 && h('span', { className: 'fusees', title: 'Dépassements réussis' }, `🚀 ${n}`);
 
 // Objectifs de la Leçon : combien sont atteints et Retenus, par exemple « 3 Objectifs · 2 atteints · 1 Retenu », puis
 // chaque Objectif avec son état. Rien sans Objectifs.
@@ -218,8 +223,8 @@ async function ecranAccueil(profil) {
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
-            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
-            l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
+            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), l.etoiles != null && etoiles(l.etoiles),
+            fusees(l.depassement)),
           objectifsRetenus(l.objectifs),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),

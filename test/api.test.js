@@ -486,7 +486,7 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     assert.deepEqual(fin.objectifs.map((o) => o.atteint), [true, false, false]);
     assert.equal(fin.niveauLecon, 2);
     // Dépassement réussi en Révisant : pas de 🚀, la révision ne rapporte rien.
-    assert.equal(fin.depassement, false);
+    assert.equal(fin.depassement, 0);
     assert.equal(fin.maitrise.pourcentage, 78); // (50 + 90 + 95) / 3
   }));
 
@@ -758,7 +758,7 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
   const score = (corps) => appel(`${url}/scores`, 'POST', { page: '0001-volcans.html', ...corps });
   const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
-  assert.equal((await appel(url)).data.depassement, false);
+  assert.equal((await appel(url)).data.depassement, 0);
 
   // Invalides : ignorés sans erreur, le score principal s'enregistre quand même.
   for (const bonus of [{ reussies: 2, total: 4 }, { reussies: 3, total: 2 }, { reussies: -1, total: 3 }, { reussies: 1.5, total: 3 }, { total: 3 }, 'beaucoup']) {
@@ -767,22 +767,22 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
     assert.equal(r.data.scores.at(-1).bonus, undefined);
   }
   const sansBonus = (await appel(url)).data;
-  assert.equal(sansBonus.depassement, false);
+  assert.equal(sansBonus.depassement, 0);
 
   // 1 bonus sur 3 : gardé, pas de Dépassement réussi.
   const un = await score({ score: 60, bonus: { reussies: 1, total: 3 } });
   assert.deepEqual(un.data.scores.at(-1).bonus, { reussies: 1, total: 3 });
-  assert.equal(un.data.depassement, false);
+  assert.equal(un.data.depassement, 0);
 
   // 2 bonus sur 3 : Dépassement réussi, sans effet sur le score ni la Maîtrise.
   const deux = await score({ score: 60, bonus: { reussies: 2, total: 3 } });
   assert.equal(deux.data.scores.at(-1).score, 60);
   assert.deepEqual(deux.data.maitrise, sansBonus.maitrise);
-  assert.equal(deux.data.depassement, true);
-  assert.equal((await resume()).depassement, true);
+  assert.equal(deux.data.depassement, 1);
+  assert.equal((await resume()).depassement, 1);
   // Acquis pour toujours : un quiz suivant sans bonus ne le retire pas.
   await score({ score: 60 });
-  assert.equal((await resume()).depassement, true);
+  assert.equal((await resume()).depassement, 1);
 });
 
 test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
@@ -969,12 +969,13 @@ test('Étoiles : le Retour de quiz n\'annonce que ce qu\'il fait gagner, avec ou
   assert.equal(await retour(85), undefined);
 });
 
-test('Étoiles : aucune pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
+test('Étoiles : un nombre pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
   const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Les volcans' })).data;
+  assert.equal(libre.etoiles, 0);
   await appel(`/api/eleves/zoe-test/lecons/${libre.id}/scores`, 'POST', { score: 100, bonus: { reussies: 3, total: 3 } });
   const lue = (await appel(`/api/eleves/zoe-test/lecons/${libre.id}`)).data;
-  assert.equal(lue.etoiles, null);
-  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, null);
+  assert.equal(lue.etoiles, 1);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, 1);
 
   // Leçon de révision d'avant cette version : scores sans contexte, date de fin posée.
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
@@ -2974,4 +2975,109 @@ test('Rythme : une semaine complète rapporte un joker, qui protège tout seul l
 
 test('Rythme : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
+});
+
+// Étoiles et Fusées par Page de leçon (#91, #92) : une au plus par page, annoncées par le Retour de quiz qui les gagne.
+// `quizDePage` : comme l'écran, le score s'enregistre, puis le Retour de quiz ; renvoie la Leçon lue après le Retour.
+const quizDePage = async (slug, lecon, corps, entetes = {}) => {
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', corps, entetes);
+  return (await appel(`${url}/retours`, 'POST', corps, entetes)).data;
+};
+const resumeLecon = async (slug, lecon) => (await appel(`/api/eleves/${slug}/lecons`)).data.find((l) => l.id === lecon.id);
+// Ouvre la phase Réviser directement dans l'état de la Leçon.
+const enRevisant = async (slug, lecon) => {
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  await fs.writeFile(fichier, JSON.stringify({ ...etat, reviserEnCours: true }));
+};
+
+test('Leçon libre : une Étoile et une Fusée par page, annoncées une seule fois, pas une deuxième quand le quiz est refait', async () => {
+  const { slug } = await eleveRevisions('Etoiles-Libre', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  assert.equal(lecon.etoiles, 0);
+  assert.equal(lecon.depassement, 0);
+
+  // Pré-test réussi avec Dépassement : ni Étoile ni Fusée.
+  const pretest = await quizDePage(slug, lecon, { score: 100, page: '0001-a.html', bonus: { reussies: 3, total: 3 }, pretest: true });
+  assert.equal(pretest.etoiles, 0);
+  assert.equal(pretest.depassement, 0);
+
+  // Page 1 réussie avec Dépassement : une Étoile, une Fusée, toutes deux annoncées.
+  const premier = await quizDePage(slug, lecon, { score: 90, page: '0001-a.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(premier.etoiles, 1);
+  assert.equal(premier.depassement, 1);
+  assert.deepEqual(premier.messages.at(-1).retourQuiz.nouvellesEtoiles, ['page']);
+  assert.equal(premier.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.match(premier.messages.at(-1).texte, /⭐ Nouvelle Étoile : page réussie !/);
+  assert.match(premier.messages.at(-1).texte, /🚀 Nouvelle Fusée pour cette page !/);
+
+  // Même page refaite : rien de plus, rien d'annoncé.
+  const refait = await quizDePage(slug, lecon, { score: 100, page: '0001-a.html', bonus: { reussies: 3, total: 3 } });
+  assert.equal(refait.etoiles, 1);
+  assert.equal(refait.depassement, 1);
+  assert.equal(refait.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
+  assert.equal(refait.messages.at(-1).retourQuiz.nouvellesFusees, undefined);
+  assert.doesNotMatch(refait.messages.at(-1).texte, /Étoile|Fusée/);
+
+  // Page 2 : réussie sans Dépassement, une Étoile seulement.
+  const deuxieme = await quizDePage(slug, lecon, { score: 80, page: '0002-b.html' });
+  assert.equal(deuxieme.etoiles, 2);
+  assert.equal(deuxieme.depassement, 1);
+  assert.match(deuxieme.messages.at(-1).texte, /Nouvelle Étoile/);
+  assert.doesNotMatch(deuxieme.messages.at(-1).texte, /Fusée/);
+  const resume = await resumeLecon(slug, lecon);
+  assert.equal(resume.etoiles, 2);
+  assert.equal(resume.depassement, 1);
+});
+
+test('Leçon libre : Étoiles et Fusées datées par page, quiz faits en Révisant exclus', async () => {
+  const { slug } = await eleveRevisions('Pages-Datees', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  await quizDePage(slug, lecon, { score: 90, page: '0001-a.html', bonus: { reussies: 2, total: 3 } }, le('2026-11-02T12:00:00.000Z'));
+  await quizDePage(slug, lecon, { score: 85, page: '0002-b.html' }, le('2026-11-03T12:00:00.000Z'));
+  await enRevisant(slug, lecon);
+  const revise = await quizDePage(slug, lecon, { score: 100, page: '0003-c.html', bonus: { reussies: 3, total: 3 } }, le('2026-11-04T12:00:00.000Z'));
+  assert.deepEqual(revise.recompensesPages, {
+    etoiles: [{ page: '0001-a.html', date: '2026-11-02T12:00:00.000Z' }, { page: '0002-b.html', date: '2026-11-03T12:00:00.000Z' }],
+    fusees: [{ page: '0001-a.html', date: '2026-11-02T12:00:00.000Z' }],
+  });
+  assert.doesNotMatch(revise.messages.at(-1).texte, /Étoile|Fusée/);
+});
+
+test('Leçon de révision : une Fusée par page, ses 3 Étoiles inchangées, nouvelles pages en Révisant comprises', async () => {
+  const { slug } = await eleveRevisions('Fusees-Revision', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }] })).data;
+  assert.deepEqual(lecon.etoiles, { quiz: false, bonus: false, defi: false });
+  const premier = await quizDePage(slug, lecon, { score: 60, page: '0001-a.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(premier.depassement, 1);
+  assert.deepEqual(premier.etoiles, { quiz: false, bonus: true, defi: false });
+  assert.deepEqual(premier.messages.at(-1).retourQuiz.nouvellesEtoiles, ['bonus']);
+  assert.equal(premier.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.match(premier.messages.at(-1).texte, /⭐ Nouvelle Étoile : questions bonus réussies !\n🚀 Nouvelle Fusée pour cette page !/);
+  await enRevisant(slug, lecon);
+  const revise = await quizDePage(slug, lecon, { score: 60, page: '0002-revoir.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(revise.depassement, 2);
+  assert.equal(revise.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.equal((await resumeLecon(slug, lecon)).depassement, 2);
+});
+
+test('Étoiles et Fusées : un ancien historique compte d\'emblée, sans annonce rétroactive', async () => {
+  const { slug } = await eleveRevisions('Historique-Pages', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  // Anciens scores sans page, chacun déjà commenté par un Retour de quiz.
+  etat.scores = [
+    { score: 90, date: '2026-09-01T10:00:00.000Z', bonus: { reussies: 2, total: 3 } },
+    { score: 85, date: '2026-09-02T10:00:00.000Z' },
+  ];
+  etat.scoresCommentes = 2;
+  await fs.writeFile(fichier, JSON.stringify(etat));
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.equal(lue.etoiles, 2);
+  assert.equal(lue.depassement, 1);
+  // Le quiz suivant n'annonce que ce qu'il gagne.
+  const suivant = await quizDePage(slug, lecon, { score: 50, page: '0001-a.html' });
+  assert.doesNotMatch(suivant.messages.at(-1).texte, /Étoile|Fusée/);
 });

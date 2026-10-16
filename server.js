@@ -150,7 +150,7 @@ async function chronometrer(slug, id, maintenant, operation) {
   }
 }
 
-async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant = Date.now() }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -165,7 +165,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve } });
+    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant });
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
@@ -174,7 +174,9 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 
 // Fin d'un tour du prof, dont les fichiers sont déjà dans la Leçon (`pagesAvant` : ses pages avant le tour) : images,
 // questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
-async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout }) {
+// Une Leçon libre qui avait des Objectifs et en a davantage après le tour a été élargie (le prof a ajouté des Objectifs
+// à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant = Date.now() }) {
   const { texte, choix } = extraireChoix(reponse);
   // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
   // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
@@ -192,7 +194,11 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
   const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
   await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout });
   relancerPropositions(slug);
-  return store.lireLecon(slug, id);
+  const apres = await store.lireLecon(slug, id);
+  if (apres.mode === 'libre' && lecon.objectifs.length > 0 && apres.objectifs.length > lecon.objectifs.length) {
+    await noterEvenement(slug, { type: 'mission-elargie', date: new Date(maintenant).toISOString(), lecon: id });
+  }
+  return apres;
 }
 
 // Page suivante préparée pendant le quiz (#74) : quand un tour laisse une Page de leçon affichée, un seul tour du prof
@@ -257,13 +263,13 @@ async function ecarterPreparation(slug, id, preparation) {
 }
 
 // Page préparée retenue pour le Rebond `action` : elle devient la Page de leçon, sans nouveau tour.
-async function adopterPreparation(slug, id, preparation, action) {
+async function adopterPreparation(slug, id, preparation, action, maintenant) {
   const lecon = await store.lireLecon(slug, id);
   const pagesAvant = await store.instantanePages(slug, id);
   await store.adopterPreparation(slug, id);
   await store.noterPreparation(slug, { lecon: id, action, utilisee: true });
   const { reponse, sessionId, cout } = preparation;
-  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout });
+  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant });
 }
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
@@ -478,9 +484,9 @@ async function rebond(slug, id, { action }, maintenant) {
   // deux cas, l'attente de l'Élève compte, même nulle : celle d'une préparation qui n'avait pas fini comprise.
   const apres = await occuper(slug, id, () => chronometrer(slug, id, maintenant, async () => {
     const preparation = await prendrePreparation(slug, id);
-    if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action);
+    if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action, maintenant);
     await ecarterPreparation(slug, id, preparation);
-    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
+    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action], maintenant });
   }));
   preparerPageSuivante(slug, id);
   return apres;

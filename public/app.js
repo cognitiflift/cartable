@@ -271,7 +271,7 @@ async function ecranBadges(profil) {
       return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
         pastilleBadge(b),
         h('strong', {}, b.nom),
-        obtenus.map((p) => h('small', {}, `${p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
+        obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
         b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`));
     })));
 }

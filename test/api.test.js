@@ -23,7 +23,8 @@ before(async () => {
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait écrire dans lesson.json
-  // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
+  // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json,
+  // et `objectifs-elargis` quatre (une mission élargie).
   // Les fichiers `images-page` et `images-manifeste` sont recopiés tels quels en lessons/0002-images.html et images.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
@@ -112,6 +113,7 @@ if [ -e '${dossier}/objectifs' ]; then
 else
   echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 fi
+[ -e '${dossier}/objectifs-elargis' ] && echo '{"titre":"Les volcans","categorie":"Sciences","objectifs":["Nommer les parties d’un volcan","Expliquer une éruption","Situer trois volcans","Comparer deux volcans"]}' > lesson.json
 [ -e '${dossier}/ensuite' ] && echo '{"titre":"Les volcans","categorie":"Sciences","ensuite":"Les volcans endormis"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
 [ -e '${dossier}/images-page' ] && cp '${dossier}/images-page' lessons/0002-images.html
@@ -3043,6 +3045,43 @@ test('Badges : un Palier atteint reste après la suppression de la Leçon qui l\
 
 test('Badges : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/badges')).status, 404);
+});
+
+// Badges surprise (#97) : cachés dans Mes badges tant qu'ils ne sont pas obtenus.
+test('Badges surprise : « Mission élargie » quand le prof ajoute des Objectifs à une Leçon libre, pas sinon', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Mission-Test', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const slug = 'mission-test';
+  const url = `/api/eleves/${slug}/badges`;
+  // Premier tour : la Leçon reçoit ses trois Objectifs (pas un élargissement).
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' }, le('2026-11-02T12:00:00.000Z'))).data);
+  const messageLe = (date) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/messages`, 'POST', { texte: 'Encore !' }, le(date));
+  await avecFichier('objectifs', () => messageLe('2026-11-03T12:00:00.000Z')); // mêmes Objectifs
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data, 'mission-elargie'), undefined);
+  await avecFichier('objectifs-elargis', () => messageLe('2026-11-04T12:00:00.000Z'));
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  const mission = { id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', surprise: true, palier: 'unique', jour: '2026-11-04' };
+  assert.deepEqual(badgeDe(vue, 'mission-elargie'), mission);
+  assert.deepEqual(vue.nouveaux, [{ id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', palier: 'unique', jour: '2026-11-04' }]);
+  const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(journal.filter((e) => e.type === 'mission-elargie'), [{ type: 'mission-elargie', date: '2026-11-04T12:00:00.000Z', lecon: lecon.id }]);
+});
+
+test('Badges surprise : attribués d\'office d\'après l\'historique (« Content de te revoir », « Prêt pour le contrôle »)', async () => {
+  // Lundi 2 novembre : une page terminée ; 15 jours sans rien ; mercredi 18 : une Révision du jour, veille d'un contrôle.
+  const { slug, lecons: [lecon] } = await eleveRevisions('Surprise-Office', 1);
+  const etatFile = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(etatFile, 'utf8'));
+  await fs.writeFile(etatFile, JSON.stringify({ ...etat, mode: 'revision', dateControle: '2026-11-19' }));
+  const questionsFile = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const questions = JSON.parse(await fs.readFile(questionsFile, 'utf8'));
+  Object.values(questions)[0].journal.push({ date: '2026-11-18T12:00:00.000Z', juste: true, origine: 'revision' });
+  await fs.writeFile(questionsFile, JSON.stringify(questions));
+  const vue = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-20T12:00:00.000Z'))).data;
+  assert.equal(badgeDe(vue, 'content-de-te-revoir')?.jour, '2026-11-18');
+  assert.equal(badgeDe(vue, 'pret-pour-le-controle')?.jour, '2026-11-18');
+  assert.equal(badgeDe(vue, 'mission-elargie'), undefined);
+  assert.deepEqual(vue.nouveaux, []);
+  await aucunClaudeLance([lecon]);
 });
 
 // Étoiles et Fusées par Page de leçon (#91, #92) : une au plus par page, annoncées par le Retour de quiz qui les gagne.

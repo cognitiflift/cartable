@@ -325,8 +325,12 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
   const zone = h('section', { className: 'kit-quiz revisions' });
   const erreur = h('p', { className: 'erreur' });
 
-  // Récompenses de la série menée jusqu'au bout (#94), annoncées en tête de l'écran qui suit.
-  const annonces = (recompenses) => (recompenses?.etoile ? [h('p', { className: 'bulle-prof' }, '⭐ Nouvelle Étoile : Révision du jour terminée !')] : []);
+  // Récompenses de la série menée jusqu'au bout (#94), annoncées en tête de l'écran qui suit : l'Étoile du jour, puis
+  // les nouveaux Paliers de Badge dans la phrase préparée par le serveur (#98).
+  const annonces = (recompenses) => [
+    recompenses?.etoile && '⭐ Nouvelle Étoile : Révision du jour terminée !',
+    recompenses?.annonce,
+  ].filter(Boolean).map((texte) => h('p', { className: 'bulle-prof' }, texte));
   const fin = (suite, recompenses) => [
     ...annonces(recompenses),
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),

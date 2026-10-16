@@ -182,3 +182,54 @@ test('Badges surprise (données) : cachés tant qu\'ils ne sont pas obtenus, pui
   const surprise = vueMesBadges(apres, trouve).collection.find((b) => b.id === 'test-surprise');
   assert.deepEqual(surprise, { id: 'test-surprise', emoji: '🎁', nom: 'Surprise', surprise: true, palier: 'unique', jour: '2026-10-04' });
 });
+
+// Badges surprise (#97) : Paliers d'un badge surprise calculés depuis l'historique ([] tant qu'il n'est pas obtenu).
+const paliersSurprise = (id, { lecons = [], evenements = [], maintenant = '2026-12-31' }) =>
+  badge(calculerBadges({ lecons, evenements, maintenant: a(maintenant) }), id).paliers;
+
+test('« Content de te revoir » : un Jour travaillé après plus de 14 jours sans aucun, daté de ce retour', () => {
+  // Pré-test le 1er octobre ; 15 jours sans rien (2 → 16) ; une Révision du jour le 17.
+  const retour = lecon({
+    scores: [{ score: 40, date: iso('2026-10-01'), page: '0001-p.html', pretest: true }],
+    questions: [question('q1', [['2026-10-17', false, { origine: 'revision' }], ['2026-11-20', true, { origine: 'revision' }]])],
+  });
+  assert.deepEqual(paliersSurprise('content-de-te-revoir', { lecons: [retour] }), [{ palier: 'unique', jour: '2026-10-17' }]);
+  const calcul = calculerBadges({ lecons: [retour], evenements: [], maintenant: a('2026-12-31') });
+  assert.equal(badge(calcul, 'content-de-te-revoir').surprise, true);
+});
+
+test('« Content de te revoir » : pas après 13 ni 14 jours de pause, ni pour le tout premier Jour travaillé', () => {
+  const pause = (vides) => lecon({ scores: pagesFaites(['2026-10-01', jourLocal(minuitDu('2026-10-01', vides + 1))]) });
+  assert.deepEqual(paliersSurprise('content-de-te-revoir', { lecons: [pause(13)] }), []);
+  assert.deepEqual(paliersSurprise('content-de-te-revoir', { lecons: [pause(14)] }), []);
+  assert.deepEqual(paliersSurprise('content-de-te-revoir', { lecons: [pause(15)] }), [{ palier: 'unique', jour: '2026-10-17' }]);
+  assert.deepEqual(paliersSurprise('content-de-te-revoir', { lecons: [lecon({ scores: pagesFaites(['2026-10-20']) })] }), []);
+});
+
+const terminee = (jour, heure = 18) => ({ type: 'revision-terminee', date: iso(jour, heure) });
+const controle = (dateControle) => lecon({ id: 'r', mode: 'revision', dateControle });
+
+test('« Prêt pour le contrôle » : une Révision du jour menée jusqu\'au bout la veille de la date de contrôle', () => {
+  const evenements = [terminee('2026-11-05'), terminee('2026-11-09')];
+  assert.deepEqual(paliersSurprise('pret-pour-le-controle', { lecons: [controle('2026-11-10')], evenements }), [{ palier: 'unique', jour: '2026-11-09' }]);
+});
+
+test('« Prêt pour le contrôle » : pas l\'avant-veille, ni le jour même, ni sans Leçon de révision datée', () => {
+  const evenements = [terminee('2026-11-08'), terminee('2026-11-10')];
+  assert.deepEqual(paliersSurprise('pret-pour-le-controle', { lecons: [controle('2026-11-10')], evenements }), []);
+  assert.deepEqual(paliersSurprise('pret-pour-le-controle', { lecons: [controle(null)], evenements: [terminee('2026-11-09')] }), []);
+});
+
+test('« Mission élargie » : une Leçon libre élargie (événement `mission-elargie`), datée de la première', () => {
+  const evenements = [
+    { type: 'mission-elargie', date: iso('2026-10-12'), lecon: 'b' },
+    { type: 'mission-elargie', date: iso('2026-10-08'), lecon: 'a' },
+  ];
+  assert.deepEqual(paliersSurprise('mission-elargie', { evenements }), [{ palier: 'unique', jour: '2026-10-08' }]);
+  assert.deepEqual(paliersSurprise('mission-elargie', { evenements: [terminee('2026-10-08')] }), []);
+});
+
+test('« Prêt pour le contrôle » : d\'après l\'historique, une Révision du jour répondue la veille avant tout événement compte', () => {
+  const ancienne = { ...controle('2026-11-10'), questions: [question('q1', [['2026-11-09', true, { origine: 'revision' }]])] };
+  assert.deepEqual(paliersSurprise('pret-pour-le-controle', { lecons: [ancienne] }), [{ palier: 'unique', jour: '2026-11-09' }]);
+});

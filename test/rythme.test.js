@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { activiteParJour, objectifDuJour, serieDeJours, joursCouvertsParJoker, recapitulatifSemaine } from '../lib/rythme.js';
+import { activiteParJour, objectifDuJour, serieDeJours, joursCouvertsParJoker, recapitulatifSemaine, joursTravailles } from '../lib/rythme.js';
 import { jourLocal } from '../lib/jour.js';
 
 // Dates en heure locale : les jours de l'Élève sont ceux de sa machine (voir lib/jour.js).
@@ -170,4 +170,13 @@ test('Récapitulatif de la semaine : au premier retour de la semaine seulement, 
   // Déjà revenu le lundi 12 (accueil affiché, ou page faite) : plus de récapitulatif le mercredi.
   assert.equal(recapitulatifSemaine(lecons, MERCREDI, { joursActifs: ['2026-10-12'] }), null);
   assert.equal(recapitulatifSemaine([leconLibre([reussi('2026-10-06', [1]), reussi('2026-10-13', [2])])], MERCREDI), null);
+});
+
+test('Jours travaillés : au moins une réponse ce jour-là (quiz de page, Pré-test ou Révision du jour), triés, chacun une fois', () => {
+  const jours = joursTravailles([
+    lecon({ revisions: ['2026-10-14', '2026-10-14'], pages: [['2026-10-12', '0002-a.html']] }),
+    lecon({ quiz: ['2026-10-12'], pages: [['2026-10-10', '0001-pretest.html', { pretest: true }], ['2026-10-11', undefined]] }),
+  ]);
+  assert.deepEqual(jours, ['2026-10-10', '2026-10-11', '2026-10-12', '2026-10-14']);
+  assert.deepEqual(joursTravailles([]), []);
 });

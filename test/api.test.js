@@ -3216,3 +3216,37 @@ test('Étoile de la Révision du jour : refusée (400) sans réponse de Révisio
   assert.deepEqual((await terminerRevision(slug, LENDEMAIN)).data.recompenses, { etoile: true, paliers: [] });
   assert.equal((await terminerRevision('inconnu-etoile', LENDEMAIN)).status, 404);
 });
+
+// Badges Étoiles, Fusées et Révisions du jour (#96).
+test('Badges : une fin de Révision du jour recalcule les Badges et annonce le Palier 🔁 qu\'elle fait atteindre', async () => {
+  const { slug, lecons } = await eleveRevisions('Badges-Revis', 1);
+  const url = `/api/eleves/${slug}/badges`;
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data, 'revisions').palier, null); // fichier de Badges créé
+  await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.deepEqual(fin.data.recompenses.paliers.filter((p) => p.id === 'revisions'), [{ id: 'revisions', palier: 'bronze', jour: '2026-11-03' }]);
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'badges.json'), 'utf8'));
+  assert.equal(fichier.badges.revisions.bronze.jour, '2026-11-03');
+  await aucunClaudeLance(lecons);
+});
+
+test('Mes badges : total d\'Étoiles et de Fusées, toutes Leçons et Révisions du jour confondues', async () => {
+  const { slug, lecons } = await eleveRevisions('Badges-Totaux', 2);
+  const url = `/api/eleves/${slug}/badges`;
+  assert.deepEqual((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.totaux, { etoiles: 0, fusees: 0 });
+  // Leçon 1 : une page réussie avec un Dépassement ; Leçon 2 : deux pages réussies ; une Révision du jour menée jusqu'au bout.
+  const quiz = async (lecon, page, bonus) => {
+    const corps = { score: 90, page, ...(bonus && { bonus: { reussies: 2, total: 3 } }) };
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(LENDEMAIN));
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le(LENDEMAIN));
+  };
+  await quiz(lecons[0], '0003-a.html', true);
+  await quiz(lecons[1], '0003-a.html', false);
+  await quiz(lecons[1], '0004-b.html', false);
+  await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
+  await terminerRevision(slug, LENDEMAIN);
+  const vue = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(vue.totaux, { etoiles: 4, fusees: 1 });
+  assert.equal(badgeDe(vue, 'curieux').palier, 'bronze');
+  assert.equal(badgeDe(vue, 'etoiles').compte, 4);
+});

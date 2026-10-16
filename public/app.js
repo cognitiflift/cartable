@@ -255,14 +255,17 @@ const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-ba
 const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
 
 // Mes badges (#95) : la collection des Badges, obtenus avec leur Palier et leur date, à venir en grisé avec leur
-// progression (« 7/15 »). L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
+// progression (« 7/15 »), le total d'Étoiles et de Fusées de l'Élève (#96) et le calendrier des Jours travaillés (#99).
+// L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
 async function ecranBadges(profil) {
-  const { collection, nouveaux, accueil, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
     h('h2', {}, '🏅 Mes badges'),
     accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
+    totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
+      `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`),
     calendrierJours(calendrier),
     h('div', { className: 'grille badges' }, collection.map((b) => {
       const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);

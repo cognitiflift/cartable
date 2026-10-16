@@ -47,6 +47,7 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 p .maitrise { display:inline-flex; }
 .ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
 .niveau-lecon { font-size:.85rem; font-weight:600; white-space:nowrap; }
+.pastilles { font-size:.85rem; letter-spacing:.1rem; white-space:nowrap; }
 .objectifs-retenus { display:block; font-size:.85rem; color:var(--doux); }
 .objectifs-retenus .objectifs { display:block; margin-top:.2rem; text-align:left; font-size:.8rem; }
 .objectifs-retenus .objectifs > span { display:block; }

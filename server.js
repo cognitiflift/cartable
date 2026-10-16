@@ -542,10 +542,11 @@ async function api(req, res, segments) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
     if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
   } else if (r2 === 'parent' && !id) {
-    // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
+    // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
-      const [lecons, couts, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
-      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements }));
+      const [lecons, couts, evenements, badges] = await Promise.all([
+        store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug), store.lireBadges(slug)]);
+      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements, badges }));
     }
   } else if (r2 === 'indicateurs' && !id) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.

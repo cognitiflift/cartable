@@ -138,6 +138,11 @@ const SECTIONS_PARENT = [
     questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
   { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
     avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise : ${c.maitrise ? `${PALIERS_DE_MAITRISE[c.maitrise.palier].mot} (${c.maitrise.pourcentage} %)` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
+  // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).
+  { titre: '🏅 Badges', rendu: ({ badges: { recents, etoiles, fusees } }) => [
+    h('p', {}, `⭐ ${pluriel(etoiles, 'Étoile')} · 🚀 ${pluriel(fusees, 'Fusée')} en tout.`),
+    listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${b.nom}${b.palier === 'unique' ? '' : ` ${b.palier}`} · ${dateBadge(b.jour)}`)),
+      'Aucun Badge ces 7 derniers jours.')] },
   { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },

@@ -20,6 +20,7 @@ import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } f
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu } from './lib/badges.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -436,6 +437,22 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   });
 }
 
+// Badges (#95) : recalculés depuis tout l'historique de l'Élève à `maintenant`, puis fusionnés avec son fichier de Badges
+// (lib/badges.js), sans jamais en retirer. Renvoie { nouveaux, fichier, calcul } ; `nouveaux` : Paliers gagnés par ce
+// recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office l'historique).
+async function recalculerBadges(slug, maintenant) {
+  const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
+  const calcul = calculerBadges({ lecons, evenements, maintenant });
+  const { fichier, nouveaux } = await store.modifierBadges(slug, (avant) => {
+    const fusion = fusionnerBadges(avant, calcul, maintenant);
+    return [fusion.fichier, fusion];
+  });
+  return { nouveaux, fichier, calcul };
+}
+
+// Après chaque quiz (et chaque fin de Révision du jour) : les nouveaux Paliers, à annoncer par l'appelant.
+const mettreAJourBadges = async (slug, maintenant) => (await recalculerBadges(slug, maintenant)).nouveaux;
+
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
 // consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant ;
 // choisir Réviser ouvre la phase Réviser jusqu'au Défi réussi.
@@ -479,7 +496,8 @@ async function terminerRevisionDuJour(slug, maintenant) {
   const etoile = etoileDuJour(evenements, maintenant);
   const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
   await store.enregistrerEvenement(slug, evenement);
-  return { recompenses: { etoile, paliers: [] }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
+  const paliers = await mettreAJourBadges(slug, maintenant);
+  return { recompenses: { etoile, paliers }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
 }
 
 async function api(req, res, segments) {
@@ -547,6 +565,14 @@ async function api(req, res, segments) {
         recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
     }
+  } else if (r2 === 'badges' && !id) {
+    // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture. Ouverture de l'écran (?ouverture=1) :
+    // la réponse montre encore « Nouveau » et le mot d'accueil, effacés pour la suite.
+    if (m === 'GET') {
+      const { fichier, calcul } = await recalculerBadges(slug, maintenant);
+      if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
+      return json(res, 200, vueMesBadges(fichier, calcul));
+    }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
@@ -580,6 +606,7 @@ async function api(req, res, segments) {
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
       const lecon = await retourQuiz(slug, id, await lireCorps(req));
+      await mettreAJourBadges(slug, maintenant); // annonce dans le Retour de quiz : #98
       preparerPageSuivante(slug, id); // aucune page préparée pendant le quiz : une, avec ses résultats (#74)
       return json(res, 200, lecon);
     } else if (r3 === 'rebonds' && m === 'POST') {

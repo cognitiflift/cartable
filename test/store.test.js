@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, depassementLecon, fuseesDesPages, etoilesDesPages } from '../lib/store.js';
+import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, fuseesLecon, fuseesDesPages, etoilesDesPages } from '../lib/store.js';
 
 let dossier, store;
 
@@ -185,9 +185,9 @@ test('Fusées : une par page distincte avec un Dépassement réussi, datée par 
   assert.deepEqual(fuseesDesPages(scores, 'libre'), attendu);
   // Dans les deux modes.
   assert.deepEqual(fuseesDesPages(scores, 'revision'), attendu);
-  assert.equal(depassementLecon(scores, 'libre'), 2);
-  assert.equal(depassementLecon(scores, 'revision'), 2);
-  assert.equal(depassementLecon([], 'libre'), 0);
+  assert.equal(fuseesLecon(scores, 'libre'), 2);
+  assert.equal(fuseesLecon(scores, 'revision'), 2);
+  assert.equal(fuseesLecon([], 'libre'), 0);
 });
 
 test('Fusées : ni le Pré-test ni Réviser une Leçon libre ; Réviser une Leçon de révision en rapporte', () => {

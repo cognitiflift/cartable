@@ -16,12 +16,12 @@ import { revisionsDuJour } from './lib/revisions.js';
 import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
-import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
+import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
-import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
+import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu } from './lib/badges.js';
-import { calendrier, paliersObtenus } from './lib/calendrier.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
+import { calendrier } from './lib/calendrier.js';
 import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -510,7 +510,7 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
 async function terminerRevisionDuJour(slug, maintenant) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const aujourdhui = jourLocal(maintenant);
-  const repondueAujourdhui = lecons.some((l) => (l.questions ?? []).some((q) => (q.journal ?? []).some((r) => r.origine === 'revision' && jourLocal(Date.parse(r.date)) === aujourdhui)));
+  const repondueAujourdhui = lecons.some((l) => reponsesDeRevision(l).some((r) => jourDe(r.date) === aujourdhui));
   if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
   const etoile = etoileDuJour(evenements, maintenant);
   const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };

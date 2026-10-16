@@ -3172,7 +3172,7 @@ test('Étoile de la Révision du jour : une série menée jusqu\'au bout rapport
   // Le jour suivant : une nouvelle Étoile, et q2, ratée les jours précédents, est réussie : 💪 Retour gagnant (#95).
   await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
   const demain = await terminerRevision(slug, '2026-11-04T12:00:00.000Z');
-  assert.deepEqual(demain.data, { recompenses: { etoile: true, paliers: [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }] }, etoilesRevisionDuJour: 2 });
+  assert.deepEqual(demain.data, { recompenses: { etoile: true, paliers: [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }], annonce: '🏅 Nouveau badge : Retour gagnant, bronze !' }, etoilesRevisionDuJour: 2 });
   // L'événement daté est dans le journal des événements de l'Élève.
   const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
   assert.deepEqual(journal.filter((e) => e.type === 'revision-terminee').map((e) => e.date), [LENDEMAIN, '2026-11-03T16:00:00.000Z', '2026-11-04T12:00:00.000Z']);
@@ -3207,6 +3207,7 @@ test('Badges : une fin de Révision du jour recalcule les Badges et annonce le P
   await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
   const fin = await terminerRevision(slug, LENDEMAIN);
   assert.deepEqual(fin.data.recompenses.paliers.filter((p) => p.id === 'revisions'), [{ id: 'revisions', palier: 'bronze', jour: '2026-11-03' }]);
+  assert.equal(fin.data.recompenses.annonce, '🏅 Nouveaux badges : Révisions du jour, bronze ; Retour gagnant, bronze !'); // annoncé à l'écran de fin (#98)
   const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'badges.json'), 'utf8'));
   assert.equal(fichier.badges.revisions.bronze.jour, '2026-11-03');
   await aucunClaudeLance(lecons);
@@ -3231,4 +3232,42 @@ test('Mes badges : total d\'Étoiles et de Fusées, toutes Leçons et Révisions
   assert.deepEqual(vue.totaux, { etoiles: 4, fusees: 1 });
   assert.equal(badgeDe(vue, 'curieux').palier, 'bronze');
   assert.equal(badgeDe(vue, 'etoiles').compte, 4);
+});
+
+// Annonce des nouveaux Badges (#98) : un Palier nouvellement atteint s'annonce par une phrase préparée dans le Retour
+// de quiz qui l'a fait atteindre, et sur l'écran de fin de Révision du jour ; jamais lors de l'attribution d'office.
+const dernierTexte = (lecon) => lecon.messages.at(-1).texte;
+
+test('Annonce des Badges : le quiz qui fait atteindre un Palier l\'annonce dans son Retour de quiz, une seule fois', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Annonce-Quiz', 1); // lundi 2 novembre : une page terminée
+  const corps = { score: 90, page: '0002-volcans.html' };
+  // Mardi 3 : premier calcul des Badges, attribué d'office (rien à atteindre encore), rien d'annoncé.
+  assert.doesNotMatch(dernierTexte(await quizDePage(slug, lecon, corps, le('2026-11-03T12:00:00.000Z'))), /🏅/);
+  // Mercredi 4 : troisième jour où l'Objectif du jour est atteint, 📅 Régulier bronze.
+  const mercredi = await quizDePage(slug, lecon, corps, le('2026-11-04T12:00:00.000Z'));
+  assert.match(dernierTexte(mercredi), /\n🏅 Nouveau badge : Régulier, bronze !/);
+  // Le même jour, un autre quiz : déjà annoncé, plus rien.
+  assert.doesNotMatch(dernierTexte(await quizDePage(slug, lecon, corps, le('2026-11-04T13:00:00.000Z'))), /🏅/);
+});
+
+test('Annonce des Badges : l\'attribution d\'office n\'annonce rien, même au premier Retour de quiz', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Annonce-Office', 1);
+  // Historique d'avant les Badges : scores des 3 et 4 novembre, sans Retour de quiz.
+  for (const jour of ['03', '04']) await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', { score: 90, page: '0002-volcans.html' }, le('2026-11-04T12:00:00.000Z'))).data;
+  assert.doesNotMatch(dernierTexte(lue), /🏅/);
+  // Le Palier est bien attribué, sans « Nouveau ».
+  const vue = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.equal(badgeDe(vue, 'regulier').palier, 'bronze');
+  assert.deepEqual(vue.nouveaux, []);
+});
+
+test('Annonce des Badges : la fin de Révision du jour qui fait atteindre un Palier l\'annonce par une phrase préparée', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Annonce-Revis', 1);
+  await repondreRevision(slug, lecon, 'q2', 'je-ne-sais-pas', LENDEMAIN);
+  assert.equal((await terminerRevision(slug, LENDEMAIN)).data.recompenses.annonce, undefined); // attribution d'office
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  const { recompenses } = (await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data;
+  assert.deepEqual(recompenses.paliers, [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }]);
+  assert.equal(recompenses.annonce, '🏅 Nouveau badge : Retour gagnant, bronze !');
 });

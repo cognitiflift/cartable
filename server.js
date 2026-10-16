@@ -6,7 +6,7 @@ import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT
 import { resultatQuiz } from './lib/resultats.js';
 import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
-import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
+import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
@@ -398,19 +398,23 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut },
 // Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
 // Pré-test (`pretest: true`) : hors Étoiles et hors Rebond ordinaire, l'appli propose seulement « Commencer » (tant que
 // la Leçon n'a aucun vrai score), et le Retour montre l'écart avec « Tu en sais déjà… ».
-async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
+// Dans les deux cas, les Badges sont recalculés et le Retour annonce les Paliers que ce quiz a fait atteindre (#98),
+// gardés dans ses détails (`nouveauxBadges`) : annoncés une seule fois. L'attribution d'office n'annonce rien.
+async function retourQuiz(slug, id, { score, bonus, questions, pretest }, maintenant) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
   return occuper(slug, id, async () => {
     const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
+    const nouveauxBadges = await annoncerBadges(slug, maintenant);
+    const badgesRetour = nouveauxBadges.length ? { nouveauxBadges } : {};
     if (pretest === true) {
       // Pré-test refait en cours de Leçon (après un vrai score) : toujours hors score, mais sans « Commencer », et le
       // Défi en cours continue.
       const debut = horsPretest(scores).length === 0;
       await store.enregistrerTour(slug, id, {
         question: '🔮 Pré-test terminé',
-        reponse: texteRetourPretest(ecartPretest({ deja: cadrage?.deja, ...compterJustes(resultats) })),
-        details: { retourQuiz: { score: arrondi, ...(debut && { action: 'commencer' }), pretest: true } },
+        reponse: texteRetourPretest(ecartPretest({ deja: cadrage?.deja, ...compterJustes(resultats) }), nouveauxBadges),
+        details: { retourQuiz: { score: arrondi, ...(debut && { action: 'commencer' }), pretest: true, ...badgesRetour } },
         etatLecon: { ...(debut && { defiEnCours: false }), scoresCommentes: scores.length },
       });
       return await store.lireLecon(slug, id);
@@ -421,7 +425,7 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
     const fusees = fuseesGagnees({ scores, dejaComptes: scoresCommentes, mode });
     const retour = {
       score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
-      ...(fusees > 0 && { nouvellesFusees: fusees }),
+      ...(fusees > 0 && { nouvellesFusees: fusees }), ...badgesRetour,
     };
     await store.enregistrerTour(slug, id, {
       question: `📝 Quiz terminé : ${retour.score} %`,
@@ -454,6 +458,12 @@ async function recalculerBadges(slug, maintenant) {
 
 // Après chaque quiz (et chaque fin de Révision du jour) : les nouveaux Paliers, à annoncer par l'appelant.
 const mettreAJourBadges = async (slug, maintenant) => (await recalculerBadges(slug, maintenant)).nouveaux;
+
+// Les nouveaux Paliers, nommés pour leur annonce (lib/retour.js) : [{ id, nom, palier }].
+async function annoncerBadges(slug, maintenant) {
+  const { nouveaux, calcul } = await recalculerBadges(slug, maintenant);
+  return nouveaux.map(({ id, palier }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier }));
+}
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
 // consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant ;
@@ -498,8 +508,10 @@ async function terminerRevisionDuJour(slug, maintenant) {
   const etoile = etoileDuJour(evenements, maintenant);
   const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
   await store.enregistrerEvenement(slug, evenement);
-  const paliers = await mettreAJourBadges(slug, maintenant);
-  return { recompenses: { etoile, paliers }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
+  const { nouveaux: paliers, calcul } = await recalculerBadges(slug, maintenant);
+  // Annonce des nouveaux Paliers sur l'écran de fin (#98), par la même phrase préparée que le Retour de quiz.
+  const annonce = phraseBadges(paliers.map(({ id, palier }) => ({ nom: calcul.find((b) => b.id === id).nom, palier })));
+  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
 }
 
 async function api(req, res, segments) {
@@ -607,8 +619,7 @@ async function api(req, res, segments) {
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
-      const lecon = await retourQuiz(slug, id, await lireCorps(req));
-      await mettreAJourBadges(slug, maintenant); // annonce dans le Retour de quiz : #98
+      const lecon = await retourQuiz(slug, id, await lireCorps(req), maintenant); // annonce aussi les nouveaux Badges (#98)
       preparerPageSuivante(slug, id); // aucune page préparée pendant le quiz : une, avec ses résultats (#74)
       return json(res, 200, lecon);
     } else if (r3 === 'rebonds' && m === 'POST') {

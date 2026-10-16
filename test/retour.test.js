@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { texteRetourQuiz } from '../lib/retour.js';
+import { texteRetourQuiz, texteRetourPretest, phraseBadges } from '../lib/retour.js';
 
 const resultats = (justes, total) => Array.from({ length: total }, (_, i) => ({ id: `q${i + 1}`, juste: i < justes, bonus: false }));
 
@@ -86,4 +86,26 @@ test('Retour de quiz : aucune tournure accordée au genre de l\'Élève', () => 
     }
   }
   for (const t of textes) assert.doesNotMatch(t, /\b(prêt|prête|allé|allée|piégé|piégée|fort|forte|content|contente)\b/i, t);
+});
+
+test('Retour de quiz : annonce un nouveau Palier de Badge, rien sans nouveau Palier', () => {
+  assert.match(texteRetourQuiz({ score: 90, action: 'suivante', nouveauxBadges: [{ nom: 'Curieux', palier: 'argent' }] }), /\n🏅 Nouveau badge : Curieux, argent !/);
+  assert.doesNotMatch(texteRetourQuiz({ score: 90, action: 'suivante', nouveauxBadges: [] }), /🏅/);
+});
+
+test('Retour de quiz : plusieurs Paliers atteints d\'un coup, annoncés ensemble dans une seule phrase accordée', () => {
+  const texte = texteRetourQuiz({ score: 90, action: 'suivante', nouveauxBadges: [{ nom: 'Curieux', palier: 'bronze' }, { nom: 'Régulier', palier: 'bronze' }, { nom: 'Curieux', palier: 'argent' }] });
+  assert.equal(texte.split('\n').filter((l) => l.startsWith('🏅')).length, 1);
+  assert.match(texte, /🏅 Nouveaux badges : Curieux, bronze et argent ; Régulier, bronze !/);
+});
+
+test('Annonce des Badges : un badge surprise s\'annonce sans Palier', () => {
+  assert.equal(phraseBadges([{ nom: 'Content de te revoir', palier: 'unique' }]), '🏅 Nouveau badge : Content de te revoir !');
+  assert.equal(phraseBadges([{ nom: 'Mission élargie', palier: 'unique' }, { nom: 'Curieux', palier: 'or' }]), '🏅 Nouveaux badges : Mission élargie ; Curieux, or !');
+  assert.equal(phraseBadges([]), null);
+});
+
+test('Retour du Pré-test : annonce aussi les nouveaux Paliers de Badge', () => {
+  assert.match(texteRetourPretest(null, [{ nom: 'Curieux', palier: 'bronze' }]), /\n🏅 Nouveau badge : Curieux, bronze !/);
+  assert.doesNotMatch(texteRetourPretest(null), /🏅/);
 });

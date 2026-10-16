@@ -486,7 +486,7 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     assert.deepEqual(fin.objectifs.map((o) => o.atteint), [true, false, false]);
     assert.equal(fin.niveauLecon, 2);
     // Dépassement réussi en Révisant : pas de 🚀, la révision ne rapporte rien.
-    assert.equal(fin.depassement, false);
+    assert.equal(fin.depassement, 0);
     assert.equal(fin.maitrise.pourcentage, 78); // (50 + 90 + 95) / 3
   }));
 
@@ -758,7 +758,7 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
   const score = (corps) => appel(`${url}/scores`, 'POST', { page: '0001-volcans.html', ...corps });
   const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
-  assert.equal((await appel(url)).data.depassement, false);
+  assert.equal((await appel(url)).data.depassement, 0);
 
   // Invalides : ignorés sans erreur, le score principal s'enregistre quand même.
   for (const bonus of [{ reussies: 2, total: 4 }, { reussies: 3, total: 2 }, { reussies: -1, total: 3 }, { reussies: 1.5, total: 3 }, { total: 3 }, 'beaucoup']) {
@@ -767,22 +767,22 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
     assert.equal(r.data.scores.at(-1).bonus, undefined);
   }
   const sansBonus = (await appel(url)).data;
-  assert.equal(sansBonus.depassement, false);
+  assert.equal(sansBonus.depassement, 0);
 
   // 1 bonus sur 3 : gardé, pas de Dépassement réussi.
   const un = await score({ score: 60, bonus: { reussies: 1, total: 3 } });
   assert.deepEqual(un.data.scores.at(-1).bonus, { reussies: 1, total: 3 });
-  assert.equal(un.data.depassement, false);
+  assert.equal(un.data.depassement, 0);
 
   // 2 bonus sur 3 : Dépassement réussi, sans effet sur le score ni la Maîtrise.
   const deux = await score({ score: 60, bonus: { reussies: 2, total: 3 } });
   assert.equal(deux.data.scores.at(-1).score, 60);
   assert.deepEqual(deux.data.maitrise, sansBonus.maitrise);
-  assert.equal(deux.data.depassement, true);
-  assert.equal((await resume()).depassement, true);
+  assert.equal(deux.data.depassement, 1);
+  assert.equal((await resume()).depassement, 1);
   // Acquis pour toujours : un quiz suivant sans bonus ne le retire pas.
   await score({ score: 60 });
-  assert.equal((await resume()).depassement, true);
+  assert.equal((await resume()).depassement, 1);
 });
 
 test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
@@ -969,12 +969,13 @@ test('Étoiles : le Retour de quiz n\'annonce que ce qu\'il fait gagner, avec ou
   assert.equal(await retour(85), undefined);
 });
 
-test('Étoiles : aucune pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
+test('Étoiles : un nombre pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
   const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Les volcans' })).data;
+  assert.equal(libre.etoiles, 0);
   await appel(`/api/eleves/zoe-test/lecons/${libre.id}/scores`, 'POST', { score: 100, bonus: { reussies: 3, total: 3 } });
   const lue = (await appel(`/api/eleves/zoe-test/lecons/${libre.id}`)).data;
-  assert.equal(lue.etoiles, null);
-  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, null);
+  assert.equal(lue.etoiles, 1);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, 1);
 
   // Leçon de révision d'avant cette version : scores sans contexte, date de fin posée.
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
@@ -2938,7 +2939,7 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal(lundi.status, 200);
   assert.deepEqual(lundi.data, {
     objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
-    serieDeJours: { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true },
+    serieDeJours: { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: true },
     recapitulatif: null,
   });
   // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
@@ -2946,11 +2947,11 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   for (let i = 0; i < 4; i++) assert.equal((await reviser(i)).status, 200);
   const mardi = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
   assert.deepEqual(mardi.objectifDuJour, { revisions: 4, revisionsVisees: 5, pages: 0, pagesVisees: 1, atteint: false });
-  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: false });
+  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: false });
   // La cinquième : objectif atteint, deux jours de suite.
   await reviser(4);
-  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 : le récapitulatif de la semaine passée ; la série, sans joker, est à refaire.
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 : le récapitulatif de la semaine passée ; cinq jours manqués, plus que les 3 Jokers : la série est à refaire.
   const suivant = (await appel(url, 'GET', undefined, le('2026-11-09T12:00:00.000Z'))).data;
   assert.deepEqual(suivant.recapitulatif, { du: '2026-11-02', au: '2026-11-08', objectifsRetenus: 0, revisions: 5, pages: 1, joursAtteints: 2 });
   assert.equal(suivant.serieDeJours.jours, 0);
@@ -2958,17 +2959,17 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
 });
 
-test('Rythme : une semaine complète rapporte un joker, qui protège tout seul la série d\'un jour manqué', async () => {
+test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls la série des jours manqués', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
   const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
   for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
   const url = `/api/eleves/${slug}/rythme`;
-  // Dimanche 8 : sept jours de suite, un joker gagné.
-  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 1, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce au joker.
+  // Dimanche 8 : sept jours de suite, les 3 Jokers de la semaine intacts.
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce à un Joker de la nouvelle semaine.
   await page('10');
   const mardi = (await appel(url, 'GET', undefined, le('2026-11-10T18:00:00.000Z'))).data;
-  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 0, jokersUtilises: 1, aujourdhui: true });
+  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 2, jokersUtilises: 1, aujourdhui: true });
   assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
 });
 
@@ -3042,4 +3043,158 @@ test('Badges : un Palier atteint reste après la suppression de la Leçon qui l\
 
 test('Badges : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/badges')).status, 404);
+});
+
+// Étoiles et Fusées par Page de leçon (#91, #92) : une au plus par page, annoncées par le Retour de quiz qui les gagne.
+// `quizDePage` : comme l'écran, le score s'enregistre, puis le Retour de quiz ; renvoie la Leçon lue après le Retour.
+const quizDePage = async (slug, lecon, corps, entetes = {}) => {
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', corps, entetes);
+  return (await appel(`${url}/retours`, 'POST', corps, entetes)).data;
+};
+const resumeLecon = async (slug, lecon) => (await appel(`/api/eleves/${slug}/lecons`)).data.find((l) => l.id === lecon.id);
+// Ouvre la phase Réviser directement dans l'état de la Leçon.
+const enRevisant = async (slug, lecon) => {
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  await fs.writeFile(fichier, JSON.stringify({ ...etat, reviserEnCours: true }));
+};
+
+test('Leçon libre : une Étoile et une Fusée par page, annoncées une seule fois, pas une deuxième quand le quiz est refait', async () => {
+  const { slug } = await eleveRevisions('Etoiles-Libre', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  assert.equal(lecon.etoiles, 0);
+  assert.equal(lecon.depassement, 0);
+
+  // Pré-test réussi avec Dépassement : ni Étoile ni Fusée.
+  const pretest = await quizDePage(slug, lecon, { score: 100, page: '0001-a.html', bonus: { reussies: 3, total: 3 }, pretest: true });
+  assert.equal(pretest.etoiles, 0);
+  assert.equal(pretest.depassement, 0);
+
+  // Page 1 réussie avec Dépassement : une Étoile, une Fusée, toutes deux annoncées.
+  const premier = await quizDePage(slug, lecon, { score: 90, page: '0001-a.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(premier.etoiles, 1);
+  assert.equal(premier.depassement, 1);
+  assert.deepEqual(premier.messages.at(-1).retourQuiz.nouvellesEtoiles, ['page']);
+  assert.equal(premier.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.match(premier.messages.at(-1).texte, /⭐ Nouvelle Étoile : page réussie !/);
+  assert.match(premier.messages.at(-1).texte, /🚀 Nouvelle Fusée pour cette page !/);
+
+  // Même page refaite : rien de plus, rien d'annoncé.
+  const refait = await quizDePage(slug, lecon, { score: 100, page: '0001-a.html', bonus: { reussies: 3, total: 3 } });
+  assert.equal(refait.etoiles, 1);
+  assert.equal(refait.depassement, 1);
+  assert.equal(refait.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
+  assert.equal(refait.messages.at(-1).retourQuiz.nouvellesFusees, undefined);
+  assert.doesNotMatch(refait.messages.at(-1).texte, /Étoile|Fusée/);
+
+  // Page 2 : réussie sans Dépassement, une Étoile seulement.
+  const deuxieme = await quizDePage(slug, lecon, { score: 80, page: '0002-b.html' });
+  assert.equal(deuxieme.etoiles, 2);
+  assert.equal(deuxieme.depassement, 1);
+  assert.match(deuxieme.messages.at(-1).texte, /Nouvelle Étoile/);
+  assert.doesNotMatch(deuxieme.messages.at(-1).texte, /Fusée/);
+  const resume = await resumeLecon(slug, lecon);
+  assert.equal(resume.etoiles, 2);
+  assert.equal(resume.depassement, 1);
+});
+
+test('Leçon libre : Étoiles et Fusées datées par page, quiz faits en Révisant exclus', async () => {
+  const { slug } = await eleveRevisions('Pages-Datees', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  await quizDePage(slug, lecon, { score: 90, page: '0001-a.html', bonus: { reussies: 2, total: 3 } }, le('2026-11-02T12:00:00.000Z'));
+  await quizDePage(slug, lecon, { score: 85, page: '0002-b.html' }, le('2026-11-03T12:00:00.000Z'));
+  await enRevisant(slug, lecon);
+  const revise = await quizDePage(slug, lecon, { score: 100, page: '0003-c.html', bonus: { reussies: 3, total: 3 } }, le('2026-11-04T12:00:00.000Z'));
+  assert.deepEqual(revise.recompensesPages, {
+    etoiles: [{ page: '0001-a.html', date: '2026-11-02T12:00:00.000Z' }, { page: '0002-b.html', date: '2026-11-03T12:00:00.000Z' }],
+    fusees: [{ page: '0001-a.html', date: '2026-11-02T12:00:00.000Z' }],
+  });
+  assert.doesNotMatch(revise.messages.at(-1).texte, /Étoile|Fusée/);
+});
+
+test('Leçon de révision : une Fusée par page, ses 3 Étoiles inchangées, nouvelles pages en Révisant comprises', async () => {
+  const { slug } = await eleveRevisions('Fusees-Revision', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }] })).data;
+  assert.deepEqual(lecon.etoiles, { quiz: false, bonus: false, defi: false });
+  const premier = await quizDePage(slug, lecon, { score: 60, page: '0001-a.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(premier.depassement, 1);
+  assert.deepEqual(premier.etoiles, { quiz: false, bonus: true, defi: false });
+  assert.deepEqual(premier.messages.at(-1).retourQuiz.nouvellesEtoiles, ['bonus']);
+  assert.equal(premier.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.match(premier.messages.at(-1).texte, /⭐ Nouvelle Étoile : questions bonus réussies !\n🚀 Nouvelle Fusée pour cette page !/);
+  await enRevisant(slug, lecon);
+  const revise = await quizDePage(slug, lecon, { score: 60, page: '0002-revoir.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(revise.depassement, 2);
+  assert.equal(revise.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.equal((await resumeLecon(slug, lecon)).depassement, 2);
+});
+
+test('Étoiles et Fusées : un ancien historique compte d\'emblée, sans annonce rétroactive', async () => {
+  const { slug } = await eleveRevisions('Historique-Pages', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  // Anciens scores sans page, chacun déjà commenté par un Retour de quiz.
+  etat.scores = [
+    { score: 90, date: '2026-09-01T10:00:00.000Z', bonus: { reussies: 2, total: 3 } },
+    { score: 85, date: '2026-09-02T10:00:00.000Z' },
+  ];
+  etat.scoresCommentes = 2;
+  await fs.writeFile(fichier, JSON.stringify(etat));
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.equal(lue.etoiles, 2);
+  assert.equal(lue.depassement, 1);
+  // Le quiz suivant n'annonce que ce qu'il gagne.
+  const suivant = await quizDePage(slug, lecon, { score: 50, page: '0001-a.html' });
+  assert.doesNotMatch(suivant.messages.at(-1).texte, /Étoile|Fusée/);
+});
+
+// Étoile de la Révision du jour (#94) : quand l'Élève a répondu à chaque Question d'une série, l'écran le signale ;
+// la première série menée jusqu'au bout de la journée rapporte une Étoile, quel que soit le score. Jamais de tour du prof.
+const repondreRevision = (slug, lecon, id, choisie, date) =>
+  appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie, sur: true }, le(date));
+const terminerRevision = (slug, date) => appel(`/api/eleves/${slug}/revisions/terminee`, 'POST', {}, le(date));
+
+test('Étoile de la Révision du jour : une série menée jusqu\'au bout rapporte une Étoile, même avec des erreurs ; une deuxième le même jour, non ; le lendemain, oui', async () => {
+  const { slug, lecons } = await eleveRevisions('Etoile-Revis', 1);
+  const [lecon] = lecons;
+  // Une série : q1 fausse, q2 « Je ne sais pas ».
+  await repondreRevision(slug, lecon, 'q1', 1, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 'je-ne-sais-pas', LENDEMAIN);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.equal(fin.status, 200);
+  assert.deepEqual(fin.data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // « Encore des questions », menée jusqu'au bout le même jour : pas d'autre Étoile.
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-03T16:00:00.000Z');
+  const encore = await terminerRevision(slug, '2026-11-03T16:00:00.000Z');
+  assert.deepEqual(encore.data, { recompenses: { etoile: false, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // Le jour suivant : une nouvelle Étoile, et q2, ratée les jours précédents, est réussie : 💪 Retour gagnant (#95).
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  const demain = await terminerRevision(slug, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual(demain.data, { recompenses: { etoile: true, paliers: [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }] }, etoilesRevisionDuJour: 2 });
+  // L'événement daté est dans le journal des événements de l'Élève.
+  const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(journal.filter((e) => e.type === 'revision-terminee').map((e) => e.date), [LENDEMAIN, '2026-11-03T16:00:00.000Z', '2026-11-04T12:00:00.000Z']);
+  await aucunClaudeLance(lecons);
+});
+
+test('Étoile de la Révision du jour : une série abandonnée ne rapporte rien ; les jours passés avec une réponse de Révision du jour comptent', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Passe', 1);
+  // Avant l'Étoile de la Révision du jour : une réponse le 3 novembre suffit à compter ce jour-là.
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data.etoilesRevisionDuJour, 2);
+  // Le 5, série abandonnée : l'écran ne signale rien, et le 6 le compte n'a pris que ce jour-là.
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-05T12:00:00.000Z');
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-06T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-06T12:00:00.000Z')).data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 3 });
+});
+
+test('Étoile de la Révision du jour : refusée (400) sans réponse de Révision du jour dans la journée, rien n\'est enregistré', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Refus', 1);
+  assert.equal((await terminerRevision(slug, LENDEMAIN)).status, 400);
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  assert.deepEqual((await terminerRevision(slug, LENDEMAIN)).data.recompenses, { etoile: true, paliers: [] });
+  assert.equal((await terminerRevision('inconnu-etoile', LENDEMAIN)).status, 404);
 });

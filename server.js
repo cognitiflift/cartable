@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, fuseesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
 import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
@@ -13,11 +13,12 @@ import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } fro
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
+import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
 import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
-import { jourValide, minuitDu } from './lib/jour.js';
+import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu } from './lib/badges.js';
 
@@ -416,8 +417,10 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
     const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
     const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
     const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
+    const fusees = fuseesGagnees({ scores, dejaComptes: scoresCommentes, mode });
     const retour = {
       score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
+      ...(fusees > 0 && { nouvellesFusees: fusees }),
     };
     await store.enregistrerTour(slug, id, {
       question: `📝 Quiz terminé : ${retour.score} %`,
@@ -481,6 +484,22 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
   return tourDeParole({ slug, id: lecon.id, prompt, affiche: proposition.titre, premier: true, maintenant });
 }
 
+// Révision du jour menée jusqu'au bout (#94) : enregistre l'événement daté et renvoie les récompenses nouvelles
+// (`etoile` : la première de la journée rapporte une Étoile ; `paliers` : Paliers de Badge nouveaux) et le nombre
+// d'Étoiles de Révision du jour de l'Élève. Le serveur ne sait pas quelle série a été servie : il faut au moins une
+// réponse de Révision du jour dans la journée. Jamais de tour du prof.
+async function terminerRevisionDuJour(slug, maintenant) {
+  const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
+  const aujourdhui = jourLocal(maintenant);
+  const repondueAujourdhui = lecons.some((l) => (l.questions ?? []).some((q) => (q.journal ?? []).some((r) => r.origine === 'revision' && jourLocal(Date.parse(r.date)) === aujourdhui)));
+  if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
+  const etoile = etoileDuJour(evenements, maintenant);
+  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
+  await store.enregistrerEvenement(slug, evenement);
+  const paliers = await mettreAJourBadges(slug, maintenant);
+  return { recompenses: { etoile, paliers }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
+}
+
 async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
@@ -517,6 +536,9 @@ async function api(req, res, segments) {
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
     }
+  } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
+    // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
+    if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
     if (m === 'GET') {

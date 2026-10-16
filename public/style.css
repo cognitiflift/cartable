@@ -50,7 +50,7 @@ p .maitrise { display:inline-flex; }
 .objectifs-retenus { display:block; font-size:.85rem; color:var(--doux); }
 .objectifs-retenus .objectifs { display:block; margin-top:.2rem; text-align:left; font-size:.8rem; }
 .objectifs-retenus .objectifs > span { display:block; }
-.etoiles { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
+.etoiles, .fusees { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }

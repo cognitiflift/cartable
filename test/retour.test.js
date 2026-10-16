@@ -59,6 +59,17 @@ test('Retour de quiz : annonce les Étoiles nouvelles', () => {
   assert.doesNotMatch(texteRetourQuiz({ score: 90, action: 'defi' }), /Étoile/);
 });
 
+test('Retour de quiz : annonce l\'Étoile d\'une page réussie en Leçon libre', () => {
+  assert.match(texteRetourQuiz({ score: 90, action: 'suivante', nouvellesEtoiles: ['page'] }), /⭐ Nouvelle Étoile : page réussie !/);
+  assert.match(texteRetourQuiz({ score: 90, action: 'suivante', nouvellesEtoiles: ['page', 'page'] }), /⭐ Nouvelles Étoiles : pages réussies !/);
+});
+
+test('Retour de quiz : annonce la Fusée gagnée, rien sans nouvelle Fusée', () => {
+  assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 2, total: 3 }, nouvellesFusees: 1 }), /\n🚀 Nouvelle Fusée pour cette page !/);
+  assert.match(texteRetourQuiz({ score: 70, action: 'suivante', nouvellesFusees: 2 }), /🚀 2 nouvelles Fusées !/);
+  assert.doesNotMatch(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 2, total: 3 } }), /Fusée/);
+});
+
 test('Retour de quiz : le Dépassement est salué dès une question bonus réussie, encouragé sinon, absent sans questions bonus', () => {
   assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 2, total: 3 } }), /🚀 Dépassement réussi : 2 questions bonus sur 3 !/);
   assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 1, total: 3 } }), /🚀 1 question bonus réussie sur 3 : bravo d'avoir poussé plus loin !/);

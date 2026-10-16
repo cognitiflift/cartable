@@ -2975,3 +2975,71 @@ test('Rythme : une semaine complète rapporte un joker, qui protège tout seul l
 test('Rythme : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
 });
+
+// Badges (#95) : calculés par l'appli depuis l'historique de l'Élève, recalculés après chaque quiz et fusionnés avec
+// le fichier de Badges de son Espace personnel, sans jamais en retirer ; jamais de tour du prof.
+// Un quiz de page (score puis Retour de quiz) à la date `date`.
+const quizDuJour = async (slug, lecon, date, page = '0002-volcans.html') => {
+  const corps = { score: 90, page };
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(date))).status, 201);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le(date))).status, 200);
+};
+const badgeDe = (vue, id) => vue.collection.find((b) => b.id === id);
+
+test('Badges : un Élève avec un historique et sans fichier reçoit d\'office ses Badges datés, sans « Nouveau », avec le mot d\'accueil', async () => {
+  // Lundi 2 novembre : une page terminée ; mardi 3 et mercredi 4 aussi, scores enregistrés sans Retour de quiz (historique d'avant les Badges).
+  const { slug, lecons } = await eleveRevisions('Badges-Office', 1);
+  for (const jour of ['03', '04']) await appel(`/api/eleves/${slug}/lecons/${lecons[0].id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  assert.equal(await existe(path.join(eleves, slug, 'badges.json')), false);
+  const url = `/api/eleves/${slug}/badges`;
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data;
+  const regulier = { id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze', jour: '2026-11-04' };
+  assert.equal(badgeDe(vue, 'regulier').palier, 'bronze');
+  assert.equal(badgeDe(vue, 'regulier').paliers[0].jour, '2026-11-04');
+  assert.deepEqual(vue.nouveaux, []);
+  assert.deepEqual(vue.dernier, regulier);
+  assert.equal(vue.accueil, true);
+  // Première ouverture de Mes badges : le mot d'accueil s'affiche encore cette fois, puis plus jamais.
+  assert.equal((await appel(`${url}?ouverture=1`, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.accueil, true);
+  assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:01:00.000Z'))).data.accueil, false);
+  await aucunClaudeLance(lecons);
+});
+
+test('Badges : recalculés après un quiz ; « Nouveau » jusqu\'à l\'ouverture de Mes badges, le dernier Badge gagné reste', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Badges-Quiz', 1); // lundi 2 novembre : une page terminée
+  const url = `/api/eleves/${slug}/badges`;
+  await appel(`${url}?ouverture=1`, 'GET', undefined, le(BANQUE_DATE)); // Mes badges ouvert : rien encore
+  await quizDuJour(slug, lecon, '2026-11-03T12:00:00.000Z');
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data, 'regulier').compte, 2);
+  await quizDuJour(slug, lecon, '2026-11-04T12:00:00.000Z');
+  // Le fichier est à jour dès le Retour de quiz.
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'badges.json'), 'utf8'));
+  assert.equal(fichier.badges.regulier.bronze.jour, '2026-11-04');
+  const regulier = { id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze', jour: '2026-11-04' };
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.deepEqual(vue.nouveaux, [regulier]);
+  assert.deepEqual(vue.dernier, regulier);
+  assert.equal(vue.accueil, false);
+  // Ouvrir Mes badges efface « Nouveau » (la réponse montre encore ce qui était nouveau).
+  assert.deepEqual((await appel(`${url}?ouverture=1`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data.nouveaux, [regulier]);
+  const apres = (await appel(url, 'GET', undefined, le('2026-11-04T13:01:00.000Z'))).data;
+  assert.deepEqual(apres.nouveaux, []);
+  assert.deepEqual(apres.dernier, regulier);
+});
+
+test('Badges : un Palier atteint reste après la suppression de la Leçon qui l\'a fait atteindre ; la progression suit le compte actuel', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Badges-Suppr', 1);
+  const etatFile = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  await fs.writeFile(etatFile, JSON.stringify({ ...JSON.parse(await fs.readFile(etatFile, 'utf8')), terminee: BANQUE_DATE }));
+  const url = `/api/eleves/${slug}/badges`;
+  const avant = badgeDe((await appel(url, 'GET', undefined, le(LENDEMAIN))).data, 'jusquau-bout');
+  assert.deepEqual({ compte: avant.compte, palier: avant.palier }, { compte: 1, palier: 'bronze' });
+  await fs.rm(path.join(eleves, slug, 'lecons', lecon.id), { recursive: true });
+  const apres = badgeDe((await appel(url, 'GET', undefined, le(LENDEMAIN))).data, 'jusquau-bout');
+  assert.deepEqual({ compte: apres.compte, palier: apres.palier, jour: apres.paliers[0].jour }, { compte: 0, palier: 'bronze', jour: '2026-11-02' });
+  assert.deepEqual(apres.prochain, { palier: 'argent', seuil: 3 });
+});
+
+test('Badges : Élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne-ici/badges')).status, 404);
+});

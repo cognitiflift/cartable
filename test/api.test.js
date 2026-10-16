@@ -23,7 +23,8 @@ before(async () => {
   // et le fichier `lent` le fait répondre lentement ; il note ses arguments (`args-<leçon>`) et le fichier `choix`
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait écrire dans lesson.json
-  // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json.
+  // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json,
+  // et `objectifs-elargis` quatre (une mission élargie).
   // Les fichiers `images-page` et `images-manifeste` sont recopiés tels quels en lessons/0002-images.html et images.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
@@ -112,6 +113,7 @@ if [ -e '${dossier}/objectifs' ]; then
 else
   echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 fi
+[ -e '${dossier}/objectifs-elargis' ] && echo '{"titre":"Les volcans","categorie":"Sciences","objectifs":["Nommer les parties d’un volcan","Expliquer une éruption","Situer trois volcans","Comparer deux volcans"]}' > lesson.json
 [ -e '${dossier}/ensuite' ] && echo '{"titre":"Les volcans","categorie":"Sciences","ensuite":"Les volcans endormis"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
 [ -e '${dossier}/images-page' ] && cp '${dossier}/images-page' lessons/0002-images.html
@@ -486,7 +488,7 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     assert.deepEqual(fin.objectifs.map((o) => o.atteint), [true, false, false]);
     assert.equal(fin.niveauLecon, 2);
     // Dépassement réussi en Révisant : pas de 🚀, la révision ne rapporte rien.
-    assert.equal(fin.depassement, false);
+    assert.equal(fin.fusees, 0);
     assert.equal(fin.maitrise.pourcentage, 78); // (50 + 90 + 95) / 3
   }));
 
@@ -758,7 +760,7 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
   const score = (corps) => appel(`${url}/scores`, 'POST', { page: '0001-volcans.html', ...corps });
   const resume = async () => (await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id);
-  assert.equal((await appel(url)).data.depassement, false);
+  assert.equal((await appel(url)).data.fusees, 0);
 
   // Invalides : ignorés sans erreur, le score principal s'enregistre quand même.
   for (const bonus of [{ reussies: 2, total: 4 }, { reussies: 3, total: 2 }, { reussies: -1, total: 3 }, { reussies: 1.5, total: 3 }, { total: 3 }, 'beaucoup']) {
@@ -767,22 +769,22 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
     assert.equal(r.data.scores.at(-1).bonus, undefined);
   }
   const sansBonus = (await appel(url)).data;
-  assert.equal(sansBonus.depassement, false);
+  assert.equal(sansBonus.fusees, 0);
 
   // 1 bonus sur 3 : gardé, pas de Dépassement réussi.
   const un = await score({ score: 60, bonus: { reussies: 1, total: 3 } });
   assert.deepEqual(un.data.scores.at(-1).bonus, { reussies: 1, total: 3 });
-  assert.equal(un.data.depassement, false);
+  assert.equal(un.data.fusees, 0);
 
   // 2 bonus sur 3 : Dépassement réussi, sans effet sur le score ni la Maîtrise.
   const deux = await score({ score: 60, bonus: { reussies: 2, total: 3 } });
   assert.equal(deux.data.scores.at(-1).score, 60);
   assert.deepEqual(deux.data.maitrise, sansBonus.maitrise);
-  assert.equal(deux.data.depassement, true);
-  assert.equal((await resume()).depassement, true);
+  assert.equal(deux.data.fusees, 1);
+  assert.equal((await resume()).fusees, 1);
   // Acquis pour toujours : un quiz suivant sans bonus ne le retire pas.
   await score({ score: 60 });
-  assert.equal((await resume()).depassement, true);
+  assert.equal((await resume()).fusees, 1);
 });
 
 test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
@@ -969,12 +971,13 @@ test('Étoiles : le Retour de quiz n\'annonce que ce qu\'il fait gagner, avec ou
   assert.equal(await retour(85), undefined);
 });
 
-test('Étoiles : aucune pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
+test('Étoiles : un nombre pour une Leçon libre ; une ancienne Leçon de révision les tire de son historique', async () => {
   const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Les volcans' })).data;
+  assert.equal(libre.etoiles, 0);
   await appel(`/api/eleves/zoe-test/lecons/${libre.id}/scores`, 'POST', { score: 100, bonus: { reussies: 3, total: 3 } });
   const lue = (await appel(`/api/eleves/zoe-test/lecons/${libre.id}`)).data;
-  assert.equal(lue.etoiles, null);
-  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, null);
+  assert.equal(lue.etoiles, 1);
+  assert.equal((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === libre.id).etoiles, 1);
 
   // Leçon de révision d'avant cette version : scores sans contexte, date de fin posée.
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
@@ -2938,7 +2941,7 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal(lundi.status, 200);
   assert.deepEqual(lundi.data, {
     objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
-    serieDeJours: { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true },
+    serieDeJours: { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: true },
     recapitulatif: null,
   });
   // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
@@ -2946,11 +2949,11 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   for (let i = 0; i < 4; i++) assert.equal((await reviser(i)).status, 200);
   const mardi = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
   assert.deepEqual(mardi.objectifDuJour, { revisions: 4, revisionsVisees: 5, pages: 0, pagesVisees: 1, atteint: false });
-  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: false });
+  assert.deepEqual(mardi.serieDeJours, { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: false });
   // La cinquième : objectif atteint, deux jours de suite.
   await reviser(4);
-  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 : le récapitulatif de la semaine passée ; la série, sans joker, est à refaire.
+  assert.deepEqual((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.serieDeJours, { jours: 2, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 : le récapitulatif de la semaine passée ; cinq jours manqués, plus que les 3 Jokers : la série est à refaire.
   const suivant = (await appel(url, 'GET', undefined, le('2026-11-09T12:00:00.000Z'))).data;
   assert.deepEqual(suivant.recapitulatif, { du: '2026-11-02', au: '2026-11-08', objectifsRetenus: 0, revisions: 5, pages: 1, joursAtteints: 2 });
   assert.equal(suivant.serieDeJours.jours, 0);
@@ -2958,20 +2961,451 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
 });
 
-test('Rythme : une semaine complète rapporte un joker, qui protège tout seul la série d\'un jour manqué', async () => {
+test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls la série des jours manqués', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
   const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
   for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
   const url = `/api/eleves/${slug}/rythme`;
-  // Dimanche 8 : sept jours de suite, un joker gagné.
-  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 1, jokersUtilises: 0, aujourdhui: true });
-  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce au joker.
+  // Dimanche 8 : sept jours de suite, les 3 Jokers de la semaine intacts.
+  assert.deepEqual((await appel(url, 'GET', undefined, le('2026-11-08T18:00:00.000Z'))).data.serieDeJours, { jours: 7, jokers: 3, jokersUtilises: 0, aujourdhui: true });
+  // Lundi 9 manqué ; mardi 10 : une page, la série continue grâce à un Joker de la nouvelle semaine.
   await page('10');
   const mardi = (await appel(url, 'GET', undefined, le('2026-11-10T18:00:00.000Z'))).data;
-  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 0, jokersUtilises: 1, aujourdhui: true });
+  assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 2, jokersUtilises: 1, aujourdhui: true });
   assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
 });
 
 test('Rythme : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
+});
+
+// Badges (#95) : calculés par l'appli depuis l'historique de l'Élève, recalculés après chaque quiz et fusionnés avec
+// le fichier de Badges de son Espace personnel, sans jamais en retirer ; jamais de tour du prof.
+// Un quiz de page (score puis Retour de quiz) à la date `date`.
+const quizDuJour = async (slug, lecon, date, page = '0002-volcans.html') => {
+  const corps = { score: 90, page };
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(date))).status, 201);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le(date))).status, 200);
+};
+const badgeDe = (vue, id) => vue.collection.find((b) => b.id === id);
+
+test('Badges : un Élève avec un historique et sans fichier reçoit d\'office ses Badges datés, sans « Nouveau », avec le mot d\'accueil', async () => {
+  // Lundi 2 novembre : une page terminée ; mardi 3 et mercredi 4 aussi, scores enregistrés sans Retour de quiz (historique d'avant les Badges).
+  const { slug, lecons } = await eleveRevisions('Badges-Office', 1);
+  for (const jour of ['03', '04']) await appel(`/api/eleves/${slug}/lecons/${lecons[0].id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  assert.equal(await existe(path.join(eleves, slug, 'badges.json')), false);
+  const url = `/api/eleves/${slug}/badges`;
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data;
+  const regulier = { id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze', jour: '2026-11-04' };
+  assert.equal(badgeDe(vue, 'regulier').palier, 'bronze');
+  assert.equal(badgeDe(vue, 'regulier').paliers[0].jour, '2026-11-04');
+  assert.deepEqual(vue.nouveaux, []);
+  assert.deepEqual(vue.dernier, regulier);
+  assert.equal(vue.accueil, true);
+  // Première ouverture de Mes badges : le mot d'accueil s'affiche encore cette fois, puis plus jamais.
+  assert.equal((await appel(`${url}?ouverture=1`, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.accueil, true);
+  assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:01:00.000Z'))).data.accueil, false);
+  await aucunClaudeLance(lecons);
+});
+
+test('Badges : recalculés après un quiz ; « Nouveau » jusqu\'à l\'ouverture de Mes badges, le dernier Badge gagné reste', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Badges-Quiz', 1); // lundi 2 novembre : une page terminée
+  const url = `/api/eleves/${slug}/badges`;
+  await appel(`${url}?ouverture=1`, 'GET', undefined, le(BANQUE_DATE)); // Mes badges ouvert : rien encore
+  await quizDuJour(slug, lecon, '2026-11-03T12:00:00.000Z');
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data, 'regulier').compte, 2);
+  await quizDuJour(slug, lecon, '2026-11-04T12:00:00.000Z');
+  // Le fichier est à jour dès le Retour de quiz.
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'badges.json'), 'utf8'));
+  assert.equal(fichier.badges.regulier.bronze.jour, '2026-11-04');
+  const regulier = { id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze', jour: '2026-11-04' };
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.deepEqual(vue.nouveaux, [regulier]);
+  assert.deepEqual(vue.dernier, regulier);
+  assert.equal(vue.accueil, false);
+  // Ouvrir Mes badges efface « Nouveau » (la réponse montre encore ce qui était nouveau).
+  assert.deepEqual((await appel(`${url}?ouverture=1`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data.nouveaux, [regulier]);
+  const apres = (await appel(url, 'GET', undefined, le('2026-11-04T13:01:00.000Z'))).data;
+  assert.deepEqual(apres.nouveaux, []);
+  assert.deepEqual(apres.dernier, regulier);
+});
+
+test('Badges : un Palier atteint reste après la suppression de la Leçon qui l\'a fait atteindre ; la progression suit le compte actuel', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Badges-Suppr', 1);
+  const etatFile = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  await fs.writeFile(etatFile, JSON.stringify({ ...JSON.parse(await fs.readFile(etatFile, 'utf8')), terminee: BANQUE_DATE }));
+  const url = `/api/eleves/${slug}/badges`;
+  const avant = badgeDe((await appel(url, 'GET', undefined, le(LENDEMAIN))).data, 'jusquau-bout');
+  assert.deepEqual({ compte: avant.compte, palier: avant.palier }, { compte: 1, palier: 'bronze' });
+  await fs.rm(path.join(eleves, slug, 'lecons', lecon.id), { recursive: true });
+  const apres = badgeDe((await appel(url, 'GET', undefined, le(LENDEMAIN))).data, 'jusquau-bout');
+  assert.deepEqual({ compte: apres.compte, palier: apres.palier, jour: apres.paliers[0].jour }, { compte: 0, palier: 'bronze', jour: '2026-11-02' });
+  assert.deepEqual(apres.prochain, { palier: 'argent', seuil: 3 });
+});
+
+test('Calendrier de Mes badges (#99) : Jours travaillés, ce qui a été fait et gagné chaque jour, sans aucun score', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Badges-Calendrier', 1); // lundi 2 novembre : une page terminée
+  await quizDuJour(slug, lecon, '2026-11-03T12:00:00.000Z', '0003-volcans.html');
+  await quizDuJour(slug, lecon, '2026-11-04T12:00:00.000Z', '0004-volcans.html');
+  // Jeudi 5 : la Leçon est seulement ouverte, sans quiz : le jour reste vide.
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}?ouverture=1`, 'GET', undefined, le('2026-11-05T12:00:00.000Z'));
+  const { calendrier } = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-05T13:00:00.000Z'))).data;
+  assert.equal(calendrier.aujourdhui, '2026-11-05');
+  const volcans = { id: lecon.id, titre: 'Les volcans' };
+  assert.deepEqual(calendrier.jours, [
+    { jour: '2026-11-02', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } },
+    { jour: '2026-11-03', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 1, fusees: 0, paliers: [] } },
+    { jour: '2026-11-04', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0,
+      gains: { etoiles: 1, fusees: 0, paliers: [{ id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze' }] } },
+  ]);
+  assert.doesNotMatch(JSON.stringify(calendrier), /score|%/i);
+});
+
+test('Badges : Élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne-ici/badges')).status, 404);
+});
+
+// Badges surprise (#97) : cachés dans Mes badges tant qu'ils ne sont pas obtenus.
+test('Badges surprise : « Mission élargie » quand le prof ajoute des Objectifs à une Leçon libre, pas sinon', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Mission-Test', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const slug = 'mission-test';
+  const url = `/api/eleves/${slug}/badges`;
+  // Premier tour : la Leçon reçoit ses trois Objectifs (pas un élargissement).
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' }, le('2026-11-02T12:00:00.000Z'))).data);
+  const messageLe = (date) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/messages`, 'POST', { texte: 'Encore !' }, le(date));
+  await avecFichier('objectifs', () => messageLe('2026-11-03T12:00:00.000Z')); // mêmes Objectifs
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data, 'mission-elargie'), undefined);
+  await avecFichier('objectifs-elargis', () => messageLe('2026-11-04T12:00:00.000Z'));
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  const mission = { id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', surprise: true, palier: 'unique', jour: '2026-11-04' };
+  assert.deepEqual(badgeDe(vue, 'mission-elargie'), mission);
+  assert.deepEqual(vue.nouveaux, [{ id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', palier: 'unique', jour: '2026-11-04' }]);
+  const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(journal.filter((e) => e.type === 'mission-elargie'), [{ type: 'mission-elargie', date: '2026-11-04T12:00:00.000Z', lecon: lecon.id }]);
+});
+
+test('Badges surprise : attribués d\'office d\'après l\'historique (« Content de te revoir », « Prêt pour le contrôle »)', async () => {
+  // Lundi 2 novembre : une page terminée ; 15 jours sans rien ; mercredi 18 : une Révision du jour, veille d'un contrôle.
+  const { slug, lecons: [lecon] } = await eleveRevisions('Surprise-Office', 1);
+  const etatFile = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(etatFile, 'utf8'));
+  await fs.writeFile(etatFile, JSON.stringify({ ...etat, mode: 'revision', dateControle: '2026-11-19' }));
+  const questionsFile = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const questions = JSON.parse(await fs.readFile(questionsFile, 'utf8'));
+  Object.values(questions)[0].journal.push({ date: '2026-11-18T12:00:00.000Z', juste: true, origine: 'revision' });
+  await fs.writeFile(questionsFile, JSON.stringify(questions));
+  const vue = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-20T12:00:00.000Z'))).data;
+  assert.equal(badgeDe(vue, 'content-de-te-revoir')?.jour, '2026-11-18');
+  assert.equal(badgeDe(vue, 'pret-pour-le-controle')?.jour, '2026-11-18');
+  assert.equal(badgeDe(vue, 'mission-elargie'), undefined);
+  assert.deepEqual(vue.nouveaux, []);
+  await aucunClaudeLance([lecon]);
+});
+
+// Étoiles et Fusées par Page de leçon (#91, #92) : une au plus par page, annoncées par le Retour de quiz qui les gagne.
+// `quizDePage` : comme l'écran, le score s'enregistre, puis le Retour de quiz ; renvoie la Leçon lue après le Retour.
+const quizDePage = async (slug, lecon, corps, entetes = {}) => {
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', corps, entetes);
+  return (await appel(`${url}/retours`, 'POST', corps, entetes)).data;
+};
+const resumeLecon = async (slug, lecon) => (await appel(`/api/eleves/${slug}/lecons`)).data.find((l) => l.id === lecon.id);
+// Ouvre la phase Réviser directement dans l'état de la Leçon.
+const enRevisant = async (slug, lecon) => {
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  await fs.writeFile(fichier, JSON.stringify({ ...etat, reviserEnCours: true }));
+};
+
+test('Leçon libre : une Étoile et une Fusée par page, annoncées une seule fois, pas une deuxième quand le quiz est refait', async () => {
+  const { slug } = await eleveRevisions('Etoiles-Libre', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  assert.equal(lecon.etoiles, 0);
+  assert.equal(lecon.fusees, 0);
+
+  // Pré-test réussi avec Dépassement : ni Étoile ni Fusée.
+  const pretest = await quizDePage(slug, lecon, { score: 100, page: '0001-a.html', bonus: { reussies: 3, total: 3 }, pretest: true });
+  assert.equal(pretest.etoiles, 0);
+  assert.equal(pretest.fusees, 0);
+
+  // Page 1 réussie avec Dépassement : une Étoile, une Fusée, toutes deux annoncées.
+  const premier = await quizDePage(slug, lecon, { score: 90, page: '0001-a.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(premier.etoiles, 1);
+  assert.equal(premier.fusees, 1);
+  assert.deepEqual(premier.messages.at(-1).retourQuiz.nouvellesEtoiles, ['page']);
+  assert.equal(premier.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.match(premier.messages.at(-1).texte, /⭐ Nouvelle Étoile : page réussie !/);
+  assert.match(premier.messages.at(-1).texte, /🚀 Nouvelle Fusée pour cette page !/);
+
+  // Même page refaite : rien de plus, rien d'annoncé.
+  const refait = await quizDePage(slug, lecon, { score: 100, page: '0001-a.html', bonus: { reussies: 3, total: 3 } });
+  assert.equal(refait.etoiles, 1);
+  assert.equal(refait.fusees, 1);
+  assert.equal(refait.messages.at(-1).retourQuiz.nouvellesEtoiles, undefined);
+  assert.equal(refait.messages.at(-1).retourQuiz.nouvellesFusees, undefined);
+  assert.doesNotMatch(refait.messages.at(-1).texte, /Étoile|Fusée/);
+
+  // Page 2 : réussie sans Dépassement, une Étoile seulement.
+  const deuxieme = await quizDePage(slug, lecon, { score: 80, page: '0002-b.html' });
+  assert.equal(deuxieme.etoiles, 2);
+  assert.equal(deuxieme.fusees, 1);
+  assert.match(deuxieme.messages.at(-1).texte, /Nouvelle Étoile/);
+  assert.doesNotMatch(deuxieme.messages.at(-1).texte, /Fusée/);
+  const resume = await resumeLecon(slug, lecon);
+  assert.equal(resume.etoiles, 2);
+  assert.equal(resume.fusees, 1);
+});
+
+test('Leçon libre : Étoiles et Fusées datées par page, quiz faits en Révisant exclus', async () => {
+  const { slug } = await eleveRevisions('Pages-Datees', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  await quizDePage(slug, lecon, { score: 90, page: '0001-a.html', bonus: { reussies: 2, total: 3 } }, le('2026-11-02T12:00:00.000Z'));
+  await quizDePage(slug, lecon, { score: 85, page: '0002-b.html' }, le('2026-11-03T12:00:00.000Z'));
+  await enRevisant(slug, lecon);
+  const revise = await quizDePage(slug, lecon, { score: 100, page: '0003-c.html', bonus: { reussies: 3, total: 3 } }, le('2026-11-04T12:00:00.000Z'));
+  // Chaque Étoile et chaque Fusée au jour du quiz qui l'a gagnée, rien pour le quiz fait en Révisant (calendrier de Mes badges).
+  const { calendrier } = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.deepEqual(calendrier.jours.map(({ jour, gains: { etoiles, fusees } }) => ({ jour, etoiles, fusees })), [
+    { jour: '2026-11-02', etoiles: 1, fusees: 1 }, { jour: '2026-11-03', etoiles: 1, fusees: 0 }, { jour: '2026-11-04', etoiles: 0, fusees: 0 },
+  ]);
+  assert.doesNotMatch(revise.messages.at(-1).texte, /Étoile|Fusée/);
+});
+
+test('Leçon de révision : une Fusée par page, ses 3 Étoiles inchangées, nouvelles pages en Révisant comprises', async () => {
+  const { slug } = await eleveRevisions('Fusees-Revision', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'lecon.pdf', data: PDF }] })).data;
+  assert.deepEqual(lecon.etoiles, { quiz: false, bonus: false, defi: false });
+  const premier = await quizDePage(slug, lecon, { score: 60, page: '0001-a.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(premier.fusees, 1);
+  assert.deepEqual(premier.etoiles, { quiz: false, bonus: true, defi: false });
+  assert.deepEqual(premier.messages.at(-1).retourQuiz.nouvellesEtoiles, ['bonus']);
+  assert.equal(premier.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.match(premier.messages.at(-1).texte, /⭐ Nouvelle Étoile : questions bonus réussies !\n🚀 Nouvelle Fusée pour cette page !/);
+  await enRevisant(slug, lecon);
+  const revise = await quizDePage(slug, lecon, { score: 60, page: '0002-revoir.html', bonus: { reussies: 2, total: 3 } });
+  assert.equal(revise.fusees, 2);
+  assert.equal(revise.messages.at(-1).retourQuiz.nouvellesFusees, 1);
+  assert.equal((await resumeLecon(slug, lecon)).fusees, 2);
+});
+
+test('Étoiles et Fusées : un ancien historique compte d\'emblée, sans annonce rétroactive', async () => {
+  const { slug } = await eleveRevisions('Historique-Pages', 0);
+  const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'Les volcans' })).data;
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  // Anciens scores sans page, chacun déjà commenté par un Retour de quiz.
+  etat.scores = [
+    { score: 90, date: '2026-09-01T10:00:00.000Z', bonus: { reussies: 2, total: 3 } },
+    { score: 85, date: '2026-09-02T10:00:00.000Z' },
+  ];
+  etat.scoresCommentes = 2;
+  await fs.writeFile(fichier, JSON.stringify(etat));
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.equal(lue.etoiles, 2);
+  assert.equal(lue.fusees, 1);
+  // Le quiz suivant n'annonce que ce qu'il gagne.
+  const suivant = await quizDePage(slug, lecon, { score: 50, page: '0001-a.html' });
+  assert.doesNotMatch(suivant.messages.at(-1).texte, /Étoile|Fusée/);
+});
+
+// Étoile de la Révision du jour (#94) : quand l'Élève a répondu à chaque Question d'une série, l'écran le signale ;
+// la première série menée jusqu'au bout de la journée rapporte une Étoile, quel que soit le score. Jamais de tour du prof.
+const repondreRevision = (slug, lecon, id, choisie, date) =>
+  appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie, sur: true }, le(date));
+const terminerRevision = (slug, date) => appel(`/api/eleves/${slug}/revisions/terminee`, 'POST', {}, le(date));
+
+test('Étoile de la Révision du jour : une série menée jusqu\'au bout rapporte une Étoile, même avec des erreurs ; une deuxième le même jour, non ; le lendemain, oui', async () => {
+  const { slug, lecons } = await eleveRevisions('Etoile-Revis', 1);
+  const [lecon] = lecons;
+  // Une série : q1 fausse, q2 « Je ne sais pas ».
+  await repondreRevision(slug, lecon, 'q1', 1, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 'je-ne-sais-pas', LENDEMAIN);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.equal(fin.status, 200);
+  assert.deepEqual(fin.data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // « Encore des questions », menée jusqu'au bout le même jour : pas d'autre Étoile.
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-03T16:00:00.000Z');
+  const encore = await terminerRevision(slug, '2026-11-03T16:00:00.000Z');
+  assert.deepEqual(encore.data, { recompenses: { etoile: false, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // Le jour suivant : une nouvelle Étoile, et q2, ratée les jours précédents, est réussie : 💪 Retour gagnant (#95).
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  const demain = await terminerRevision(slug, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual(demain.data, { recompenses: { etoile: true, paliers: [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }], annonce: '🏅 Nouveau badge : Retour gagnant, bronze !' }, etoilesRevisionDuJour: 2 });
+  // L'événement daté est dans le journal des événements de l'Élève.
+  const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(journal.filter((e) => e.type === 'revision-terminee').map((e) => e.date), [LENDEMAIN, '2026-11-03T16:00:00.000Z', '2026-11-04T12:00:00.000Z']);
+  await aucunClaudeLance(lecons);
+});
+
+test('Étoile de la Révision du jour : une série abandonnée ne rapporte rien ; les jours passés avec une réponse de Révision du jour comptent', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Passe', 1);
+  // Avant l'Étoile de la Révision du jour : une réponse le 3 novembre suffit à compter ce jour-là.
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data.etoilesRevisionDuJour, 2);
+  // Le 5, série abandonnée : l'écran ne signale rien, et le 6 le compte n'a pris que ce jour-là.
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-05T12:00:00.000Z');
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-06T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-06T12:00:00.000Z')).data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 3 });
+});
+
+test('Étoile de la Révision du jour : refusée (400) sans réponse de Révision du jour dans la journée, rien n\'est enregistré', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Refus', 1);
+  assert.equal((await terminerRevision(slug, LENDEMAIN)).status, 400);
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  assert.deepEqual((await terminerRevision(slug, LENDEMAIN)).data.recompenses, { etoile: true, paliers: [] });
+  assert.equal((await terminerRevision('inconnu-etoile', LENDEMAIN)).status, 404);
+});
+
+// Badges Étoiles, Fusées et Révisions du jour (#96).
+test('Badges : une fin de Révision du jour recalcule les Badges et annonce le Palier 🔁 qu\'elle fait atteindre', async () => {
+  const { slug, lecons } = await eleveRevisions('Badges-Revis', 1);
+  const url = `/api/eleves/${slug}/badges`;
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data, 'revisions').palier, null); // fichier de Badges créé
+  await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.deepEqual(fin.data.recompenses.paliers.filter((p) => p.id === 'revisions'), [{ id: 'revisions', palier: 'bronze', jour: '2026-11-03' }]);
+  assert.equal(fin.data.recompenses.annonce, '🏅 Nouveaux badges : Révisions du jour, bronze ; Retour gagnant, bronze !'); // annoncé à l'écran de fin (#98)
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'badges.json'), 'utf8'));
+  assert.equal(fichier.badges.revisions.bronze.jour, '2026-11-03');
+  await aucunClaudeLance(lecons);
+});
+
+test('Badges : une série du jour commencée mais pas finie ne compte pas ; la première fin de série fait bouger le total et 🔁', async () => {
+  const { slug, lecons } = await eleveRevisions('Badges-Transition', 1);
+  const url = `/api/eleves/${slug}/badges`;
+  await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
+  // Mes badges ouvert en pleine série : ni Étoile de la Révision du jour, ni 🔁.
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(avant.totaux.etoiles, 0);
+  assert.equal(badgeDe(avant, 'revisions').palier, null);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.equal(fin.data.recompenses.etoile, true);
+  assert.deepEqual(fin.data.recompenses.paliers.filter((p) => p.id === 'revisions'), [{ id: 'revisions', palier: 'bronze', jour: '2026-11-03' }]);
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.totaux.etoiles, 1);
+});
+
+test('Mes badges : total d\'Étoiles et de Fusées, toutes Leçons et Révisions du jour confondues', async () => {
+  const { slug, lecons } = await eleveRevisions('Badges-Totaux', 2);
+  const url = `/api/eleves/${slug}/badges`;
+  assert.deepEqual((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.totaux, { etoiles: 0, fusees: 0 });
+  // Leçon 1 : une page réussie avec un Dépassement ; Leçon 2 : deux pages réussies ; une Révision du jour menée jusqu'au bout.
+  const quiz = async (lecon, page, bonus) => {
+    const corps = { score: 90, page, ...(bonus && { bonus: { reussies: 2, total: 3 } }) };
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(LENDEMAIN));
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le(LENDEMAIN));
+  };
+  await quiz(lecons[0], '0003-a.html', true);
+  await quiz(lecons[1], '0003-a.html', false);
+  await quiz(lecons[1], '0004-b.html', false);
+  await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
+  await terminerRevision(slug, LENDEMAIN);
+  const vue = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(vue.totaux, { etoiles: 4, fusees: 1 });
+  assert.equal(badgeDe(vue, 'curieux').palier, 'bronze');
+  assert.equal(badgeDe(vue, 'etoiles').compte, 4);
+});
+
+// Badges dans la Vue parent (#100) : les Paliers atteints ces 7 derniers jours et les totaux d'Étoiles et de Fusées,
+// lus sans jamais modifier le fichier de Badges (aucun effet sur « Nouveau »).
+test('Vue parent : les Badges des 7 derniers jours (Palier et date) et le total d\'Étoiles et de Fusées, sans toucher au fichier de Badges', async () => {
+  const { slug, lecons } = await eleveRevisions('Parent-Badges', 1);
+  const [lecon] = lecons;
+  // Leçon terminée le 1er octobre : 🏆 bronze ce jour-là, trop ancien pour la Vue parent du 4 novembre.
+  const etatFile = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  await fs.writeFile(etatFile, JSON.stringify({ ...JSON.parse(await fs.readFile(etatFile, 'utf8')), terminee: '2026-10-01T12:00:00.000Z' }));
+  await quizDuJour(slug, lecon, '2026-11-03T12:00:00.000Z');
+  await quizDuJour(slug, lecon, '2026-11-04T12:00:00.000Z'); // 📅 bronze : 3 Jours travaillés
+  const corps = { score: 90, page: '0003-a.html', bonus: { reussies: 2, total: 3 } }; // une Fusée : 🚀 bronze
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le('2026-11-04T12:00:00.000Z'));
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le('2026-11-04T12:00:00.000Z'));
+  const fichierBadges = path.join(eleves, slug, 'badges.json');
+  const avant = await fs.readFile(fichierBadges, 'utf8');
+  const { status, data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'));
+  assert.equal(status, 200);
+  assert.deepEqual(data.badges, {
+    recents: [
+      { id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze', jour: '2026-11-04' },
+      { id: 'curieux', emoji: '🚀', nom: 'Curieux', palier: 'bronze', jour: '2026-11-04' },
+    ],
+    etoiles: 2, // les pages 0002 et 0003 réussies
+    fusees: 1,
+  });
+  // Le fichier de Badges est intact : « Nouveau » reste pour Mes badges.
+  assert.equal(await fs.readFile(fichierBadges, 'utf8'), avant);
+  const { nouveaux } = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.deepEqual(nouveaux.map((n) => n.id).sort(), ['curieux', 'regulier']);
+  await aucunClaudeLance(lecons);
+});
+
+test('Vue parent : sans fichier de Badges, les Badges récents viennent de l\'historique et aucun fichier n\'est créé', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-SansBadge', 1);
+  // Scores sans Retour de quiz (historique d'avant les Badges) : 3 Jours travaillés, du 2 au 4 novembre.
+  for (const jour of ['03', '04']) await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-10T12:00:00.000Z'));
+  assert.deepEqual(data.badges, { recents: [{ id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze', jour: '2026-11-04' }], etoiles: 1, fusees: 0 });
+  // Le 11 novembre, le 4 sort des 7 derniers jours (du 5 au 11).
+  assert.deepEqual((await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-11T12:00:00.000Z'))).data.badges.recents, []);
+  assert.equal(await existe(path.join(eleves, slug, 'badges.json')), false);
+});
+
+test('Vue parent : les badges surprise obtenus ces 7 derniers jours y figurent, sans Palier nommé', async () => {
+  // Comme « Badges surprise : attribués d'office » : retour le 18 novembre après 15 jours de pause, veille d'un contrôle.
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Surprise', 1);
+  const etatFile = path.join(eleves, slug, 'lecons', lecon.id, 'etat.json');
+  const etat = JSON.parse(await fs.readFile(etatFile, 'utf8'));
+  await fs.writeFile(etatFile, JSON.stringify({ ...etat, mode: 'revision', dateControle: '2026-11-19' }));
+  const questionsFile = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const questions = JSON.parse(await fs.readFile(questionsFile, 'utf8'));
+  Object.values(questions)[0].journal.push({ date: '2026-11-18T12:00:00.000Z', juste: true, origine: 'revision' });
+  await fs.writeFile(questionsFile, JSON.stringify(questions));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-20T12:00:00.000Z'));
+  const surprises = data.badges.recents.filter((b) => b.palier === 'unique');
+  assert.deepEqual(surprises.map(({ id, jour }) => ({ id, jour })).sort((x, y) => x.id.localeCompare(y.id)), [
+    { id: 'content-de-te-revoir', jour: '2026-11-18' },
+    { id: 'pret-pour-le-controle', jour: '2026-11-18' },
+  ]);
+  assert.equal(await existe(path.join(eleves, slug, 'badges.json')), false);
+  // Le 25 novembre, le 18 sort des 7 derniers jours (du 19 au 25).
+  const tard = (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-25T12:00:00.000Z'))).data;
+  assert.deepEqual(tard.badges.recents.filter((b) => b.palier === 'unique'), []);
+  await aucunClaudeLance([lecon]);
+});
+
+// Annonce des nouveaux Badges (#98) : un Palier nouvellement atteint s'annonce par une phrase préparée dans le Retour
+// de quiz qui l'a fait atteindre, et sur l'écran de fin de Révision du jour ; jamais lors de l'attribution d'office.
+const dernierTexte = (lecon) => lecon.messages.at(-1).texte;
+
+test('Annonce des Badges : le quiz qui fait atteindre un Palier l\'annonce dans son Retour de quiz, une seule fois', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Annonce-Quiz', 1); // lundi 2 novembre : une page terminée
+  const corps = { score: 90, page: '0002-volcans.html' };
+  // Mardi 3 : premier calcul des Badges, attribué d'office (rien à atteindre encore), rien d'annoncé.
+  assert.doesNotMatch(dernierTexte(await quizDePage(slug, lecon, corps, le('2026-11-03T12:00:00.000Z'))), /🏅/);
+  // Mercredi 4 : troisième jour où l'Objectif du jour est atteint, 📅 Régulier bronze.
+  const mercredi = await quizDePage(slug, lecon, corps, le('2026-11-04T12:00:00.000Z'));
+  assert.match(dernierTexte(mercredi), /\n🏅 Nouveau badge : Régulier, bronze !/);
+  // Le même jour, un autre quiz : déjà annoncé, plus rien.
+  assert.doesNotMatch(dernierTexte(await quizDePage(slug, lecon, corps, le('2026-11-04T13:00:00.000Z'))), /🏅/);
+});
+
+test('Annonce des Badges : l\'attribution d\'office n\'annonce rien, même au premier Retour de quiz', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Annonce-Office', 1);
+  // Historique d'avant les Badges : scores des 3 et 4 novembre, sans Retour de quiz.
+  for (const jour of ['03', '04']) await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', { score: 90, page: '0002-volcans.html' }, le('2026-11-04T12:00:00.000Z'))).data;
+  assert.doesNotMatch(dernierTexte(lue), /🏅/);
+  // Le Palier est bien attribué, sans « Nouveau ».
+  const vue = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.equal(badgeDe(vue, 'regulier').palier, 'bronze');
+  assert.deepEqual(vue.nouveaux, []);
+});
+
+test('Annonce des Badges : la fin de Révision du jour qui fait atteindre un Palier l\'annonce par une phrase préparée', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Annonce-Revis', 1);
+  await repondreRevision(slug, lecon, 'q2', 'je-ne-sais-pas', LENDEMAIN);
+  assert.equal((await terminerRevision(slug, LENDEMAIN)).data.recompenses.annonce, undefined); // attribution d'office
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  const { recompenses } = (await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data;
+  assert.deepEqual(recompenses.paliers, [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }]);
+  assert.equal(recompenses.annonce, '🏅 Nouveau badge : Retour gagnant, bronze !');
 });

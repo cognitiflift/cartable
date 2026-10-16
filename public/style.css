@@ -50,7 +50,7 @@ p .maitrise { display:inline-flex; }
 .objectifs-retenus { display:block; font-size:.85rem; color:var(--doux); }
 .objectifs-retenus .objectifs { display:block; margin-top:.2rem; text-align:left; font-size:.8rem; }
 .objectifs-retenus .objectifs > span { display:block; }
-.etoiles { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
+.etoiles, .fusees { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }
@@ -76,3 +76,28 @@ p .maitrise { display:inline-flex; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }
+/* Badges (#95) : pastilles aux couleurs des Paliers, distinctes du vert « Acquis » de la Maîtrise. */
+.pastille-badge { display:inline-flex; align-items:center; justify-content:center; width:2.2em; height:2.2em; border-radius:50%; border:3px solid var(--bord); background:var(--carte); font-size:1.1em; vertical-align:middle; }
+.pastille-badge.bronze { border-color:#b8733d; background:#f3e0cf; } .pastille-badge.argent { border-color:#9aa4ae; background:#eef1f4; }
+.pastille-badge.or { border-color:#d4a017; background:#fbf0c8; } .pastille-badge.diamant { border-color:#4aa8d8; background:#dff1fb; }
+.pastille-badge.unique { border-color:#9b59b6; background:#f1e4f7; }
+.pastille-badge.pas-encore { filter:grayscale(1); opacity:.45; }
+.badge.a-venir strong { color:var(--doux); }
+.badge strong { display:block; margin-top:.3rem; }
+.carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--accent); color:#fff; }
+.carte-rythme { width:100%; cursor:pointer; } .carte-badges { margin-top:.3rem; }
+.totaux-recompenses { font-size:1.15rem; font-weight:700; }
+/* Calendrier de Mes badges (#99) : Jours travaillés pâles, pleins quand l'Objectif du jour est atteint, 🛡️ Joker. */
+.calendrier { max-width:420px; margin:1rem 0; }
+.calendrier-mois { display:flex; align-items:center; justify-content:space-between; margin-bottom:.4rem; }
+.calendrier-mois strong { text-transform:capitalize; }
+.calendrier-grille { display:grid; grid-template-columns:repeat(7, 1fr); gap:.25rem; }
+.calendrier-entete { text-align:center; font-size:.8rem; color:var(--doux); }
+.calendrier-jour { position:relative; padding:.4rem 0; text-align:center; background:var(--carte); color:var(--texte); border-color:var(--bord); }
+.calendrier-jour.pale { background:color-mix(in srgb, var(--accent) 25%, var(--carte)); }
+.calendrier-jour.plein { background:var(--accent); color:#fff; border-color:var(--accent); }
+.calendrier-jour.aujourdhui { outline:2px solid var(--accent); outline-offset:1px; }
+.calendrier-jour.choisi { box-shadow:0 0 0 3px var(--texte); }
+.calendrier-jour:disabled { opacity:.35; cursor:default; }
+.calendrier-joker { position:absolute; top:-.35rem; right:-.2rem; font-size:.7rem; }
+.calendrier-detail { margin-top:.6rem; }

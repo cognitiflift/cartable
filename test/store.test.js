@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, depassementLecon } from '../lib/store.js';
+import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, fuseesLecon, fuseesDesPages, etoilesDesPages } from '../lib/store.js';
 
 let dossier, store;
 
@@ -173,17 +173,59 @@ test('Rebonds proposés : déduits de l\'action du dernier Retour de quiz, Révi
   assert.deepEqual(apres('terminee'), ['reviser']);
 });
 
-test('Dépassement d\'une Leçon libre (🚀) : un quiz avec 2 bonus réussis, hors quiz faits en Révisant', () => {
+test('Fusées : une par page distincte avec un Dépassement réussi, datée par le premier quiz qui l\'a gagnée', () => {
   const bonus = { reussies: 2, total: 3 };
-  assert.equal(depassementLecon([{ score: 40, bonus }], 'libre'), true);
-  assert.equal(depassementLecon([{ score: 90, bonus: { reussies: 1, total: 3 } }], 'libre'), false);
-  assert.equal(depassementLecon([{ score: 90, bonus, reviser: true }], 'libre'), false);
-  // La Leçon de révision a ses Étoiles, pas de 🚀.
-  assert.equal(depassementLecon([{ score: 40, bonus }], 'revision'), false);
+  const scores = [
+    { score: 40, date: '2026-10-01T10:00:00.000Z', page: '0001-a.html', bonus: { reussies: 1, total: 3 } },
+    { score: 40, date: '2026-10-02T10:00:00.000Z', page: '0001-a.html', bonus },
+    { score: 90, date: '2026-10-03T10:00:00.000Z', page: '0001-a.html', bonus: { reussies: 3, total: 3 } },
+    { score: 90, date: '2026-10-04T10:00:00.000Z', page: '0002-b.html', bonus },
+  ];
+  const attendu = [{ page: '0001-a.html', date: '2026-10-02T10:00:00.000Z' }, { page: '0002-b.html', date: '2026-10-04T10:00:00.000Z' }];
+  assert.deepEqual(fuseesDesPages(scores, 'libre'), attendu);
+  // Dans les deux modes.
+  assert.deepEqual(fuseesDesPages(scores, 'revision'), attendu);
+  assert.equal(fuseesLecon(scores, 'libre'), 2);
+  assert.equal(fuseesLecon(scores, 'revision'), 2);
+  assert.equal(fuseesLecon([], 'libre'), 0);
 });
 
-test('Étoiles : aucune pour une Leçon libre', () => {
-  assert.equal(etoilesLecon([{ score: 100, bonus: { reussies: 3, total: 3 } }], '2026-10-01T10:00:00.000Z', 'libre'), null);
+test('Fusées : ni le Pré-test ni Réviser une Leçon libre ; Réviser une Leçon de révision en rapporte', () => {
+  const bonus = { reussies: 2, total: 3 };
+  const date = '2026-10-01T10:00:00.000Z';
+  assert.deepEqual(fuseesDesPages([{ score: 90, date, page: 'p', bonus, pretest: true }], 'libre'), []);
+  assert.deepEqual(fuseesDesPages([{ score: 90, date, page: 'p', bonus, pretest: true }], 'revision'), []);
+  assert.deepEqual(fuseesDesPages([{ score: 90, date, page: 'p', bonus, reviser: true }], 'libre'), []);
+  assert.deepEqual(fuseesDesPages([{ score: 90, date, page: 'p', bonus, reviser: true }], 'revision'), [{ page: 'p', date }]);
+});
+
+test('Fusées : un ancien score sans page compte comme une page à lui seul', () => {
+  const bonus = { reussies: 2, total: 3 };
+  const scores = [{ score: 40, date: '2026-09-01', bonus }, { score: 40, date: '2026-09-02', bonus }, { score: 40, date: '2026-09-03', page: 'p', bonus }];
+  assert.deepEqual(fuseesDesPages(scores, 'libre').map((f) => f.date), ['2026-09-01', '2026-09-02', '2026-09-03']);
+});
+
+test('Étoiles d\'une Leçon libre : une par page distincte dont un quiz est réussi, sans maximum', () => {
+  const scores = [
+    { score: 70, date: '2026-10-01', page: '0001-a.html' },
+    { score: 80, date: '2026-10-02', page: '0001-a.html' },
+    { score: 100, date: '2026-10-03', page: '0001-a.html' },
+    { score: 90, date: '2026-10-04', page: '0002-b.html' },
+    { score: 95, date: '2026-10-05', page: '0003-c.html', defi: true },
+  ];
+  assert.deepEqual(etoilesDesPages(scores, 'libre'), [
+    { page: '0001-a.html', date: '2026-10-02' }, { page: '0002-b.html', date: '2026-10-04' }, { page: '0003-c.html', date: '2026-10-05' },
+  ]);
+  assert.equal(etoilesLecon(scores, null, 'libre'), 3);
+  assert.equal(etoilesLecon([], null, 'libre'), 0);
+  // Une Leçon de révision garde ses 3 Étoiles nommées.
+  assert.deepEqual(etoilesDesPages(scores, 'revision'), []);
+});
+
+test('Étoiles d\'une Leçon libre : ni le Pré-test, ni Réviser ; un ancien score sans page compte comme une page', () => {
+  assert.deepEqual(etoilesDesPages([{ score: 100, date: 'd', page: 'p', pretest: true }], 'libre'), []);
+  assert.deepEqual(etoilesDesPages([{ score: 100, date: 'd', page: 'p', reviser: true }], 'libre'), []);
+  assert.equal(etoilesDesPages([{ score: 90, date: 'd1' }, { score: 90, date: 'd2' }], 'libre').length, 2);
 });
 
 test('Étoiles : un historique ancien, sans contexte, donne « quiz » et « defi » d\'après ses scores et sa fin', () => {
@@ -227,7 +269,11 @@ test('Étoiles gagnées par un Retour de quiz : comparées aux scores déjà com
   // La fin posée par ce Retour donne l'Étoile « defi », une seule fois.
   assert.deepEqual(etoilesGagnees({ scores: [], dejaComptes: 0, terminee: null, termineeApres: '2026-10-01', mode: 'revision' }), ['defi']);
   assert.deepEqual(etoilesGagnees({ scores: [], dejaComptes: 0, terminee: '2026-10-01', termineeApres: '2026-10-01', mode: 'revision' }), []);
-  assert.deepEqual(etoilesGagnees({ scores: [{ score: 100 }], dejaComptes: 0, terminee: null, termineeApres: null, mode: 'libre' }), []);
+  // Leçon libre : une Étoile par page réussie nouvelle, pas une deuxième pour une page déjà réussie.
+  const libre = { terminee: null, termineeApres: null, mode: 'libre' };
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 100, page: 'p' }], dejaComptes: 0, ...libre }), ['page']);
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 100, page: 'p' }, { score: 90, page: 'p' }], dejaComptes: 1, ...libre }), []);
+  assert.deepEqual(etoilesGagnees({ scores: [{ score: 100, page: 'p' }, { score: 90, page: 'q' }], dejaComptes: 1, ...libre }), ['page']);
 });
 
 test('Rebonds proposés à une date : Réviser s\'ajoute à Étape suivante quand la dernière page date de plus de 7 jours', () => {

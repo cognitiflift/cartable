@@ -2,23 +2,27 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, horsPretest } from './lib/store.js';
+import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, fuseesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
 import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
-import { texteRetourQuiz, texteRetourPretest } from './lib/retour.js';
+import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
+import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
-import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
+import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
-import { jourValide, minuitDu } from './lib/jour.js';
+import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
+import { calendrier } from './lib/calendrier.js';
+import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -147,7 +151,7 @@ async function chronometrer(slug, id, maintenant, operation) {
   }
 }
 
-async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true }) {
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -162,7 +166,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve } });
+    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant });
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
@@ -171,7 +175,11 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 
 // Fin d'un tour du prof, dont les fichiers sont déjà dans la Leçon (`pagesAvant` : ses pages avant le tour) : images,
 // questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
-async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout }) {
+// Une Leçon libre qui avait des Objectifs et en a davantage après le tour a été élargie (le prof a ajouté des Objectifs
+// à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
+// L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :
+// c'est donc l'ajout d'Objectifs, constaté après le tour, qui marque l'élargissement.
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant }) {
   const { texte, choix } = extraireChoix(reponse);
   // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
   // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
@@ -189,7 +197,11 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
   const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
   await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout });
   relancerPropositions(slug);
-  return store.lireLecon(slug, id);
+  const apres = await store.lireLecon(slug, id);
+  if (apres.mode === 'libre' && lecon.objectifs.length > 0 && apres.objectifs.length > lecon.objectifs.length) {
+    await noterEvenement(slug, { type: 'mission-elargie', date: new Date(maintenant).toISOString(), lecon: id });
+  }
+  return apres;
 }
 
 // Page suivante préparée pendant le quiz (#74) : quand un tour laisse une Page de leçon affichée, un seul tour du prof
@@ -254,13 +266,13 @@ async function ecarterPreparation(slug, id, preparation) {
 }
 
 // Page préparée retenue pour le Rebond `action` : elle devient la Page de leçon, sans nouveau tour.
-async function adopterPreparation(slug, id, preparation, action) {
+async function adopterPreparation(slug, id, preparation, action, maintenant) {
   const lecon = await store.lireLecon(slug, id);
   const pagesAvant = await store.instantanePages(slug, id);
   await store.adopterPreparation(slug, id);
   await store.noterPreparation(slug, { lecon: id, action, utilisee: true });
   const { reponse, sessionId, cout } = preparation;
-  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout });
+  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant });
 }
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
@@ -395,19 +407,23 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut },
 // Avec des résultats par question (Kit), le score et le bonus en sont tirés, comme pour le score enregistré.
 // Pré-test (`pretest: true`) : hors Étoiles et hors Rebond ordinaire, l'appli propose seulement « Commencer » (tant que
 // la Leçon n'a aucun vrai score), et le Retour montre l'écart avec « Tu en sais déjà… ».
-async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
+// Dans les deux cas, les Badges sont recalculés et le Retour annonce les Paliers que ce quiz a fait atteindre (#98),
+// gardés dans ses détails (`nouveauxBadges`) : annoncés une seule fois. L'attribution d'office n'annonce rien.
+async function retourQuiz(slug, id, { score, bonus, questions, pretest }, maintenant) {
   const { score: arrondi, bonus: resultatBonus, questions: resultats } = resultatQuiz({ score, bonus, questions });
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
   return occuper(slug, id, async () => {
     const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
+    const nouveauxBadges = await annoncerBadges(slug, maintenant);
+    const badgesRetour = nouveauxBadges.length ? { nouveauxBadges } : {};
     if (pretest === true) {
       // Pré-test refait en cours de Leçon (après un vrai score) : toujours hors score, mais sans « Commencer », et le
       // Défi en cours continue.
       const debut = horsPretest(scores).length === 0;
       await store.enregistrerTour(slug, id, {
         question: '🔮 Pré-test terminé',
-        reponse: texteRetourPretest(ecartPretest({ deja: cadrage?.deja, ...compterJustes(resultats) })),
-        details: { retourQuiz: { score: arrondi, ...(debut && { action: 'commencer' }), pretest: true } },
+        reponse: texteRetourPretest(ecartPretest({ deja: cadrage?.deja, ...compterJustes(resultats) }), nouveauxBadges),
+        details: { retourQuiz: { score: arrondi, ...(debut && { action: 'commencer' }), pretest: true, ...badgesRetour } },
         etatLecon: { ...(debut && { defiEnCours: false }), scoresCommentes: scores.length },
       });
       return await store.lireLecon(slug, id);
@@ -415,8 +431,10 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
     const action = actionRetourQuiz(arrondi, mode, defiEnCours, reviserEnCours);
     const termineeApres = action === 'terminee' ? terminee ?? new Date().toISOString() : terminee;
     const etoiles = etoilesGagnees({ scores, dejaComptes: scoresCommentes, terminee, termineeApres, mode });
+    const fusees = fuseesGagnees({ scores, dejaComptes: scoresCommentes, mode });
     const retour = {
       score: arrondi, action, ...(resultatBonus && { bonus: resultatBonus }), ...(etoiles.length && { nouvellesEtoiles: etoiles }),
+      ...(fusees > 0 && { nouvellesFusees: fusees }), ...badgesRetour,
     };
     await store.enregistrerTour(slug, id, {
       question: `📝 Quiz terminé : ${retour.score} %`,
@@ -433,6 +451,27 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }) {
   });
 }
 
+// Badges (#95) : recalculés depuis tout l'historique de l'Élève à `maintenant`, puis fusionnés avec son fichier de Badges
+// (lib/badges.js), sans jamais en retirer. Renvoie { nouveaux, fichier, calcul, totaux, lecons, evenements } ;
+// `nouveaux` : Paliers gagnés par ce recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office
+// l'historique) ; `totaux` : total d'Étoiles et de Fusées de l'Élève (#96) ; `lecons`, `evenements` : l'historique lu.
+async function recalculerBadges(slug, maintenant) {
+  const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
+  const calcul = calculerBadges({ lecons, evenements, maintenant });
+  const { fichier, nouveaux } = await store.modifierBadges(slug, (avant) => {
+    const fusion = fusionnerBadges(avant, calcul, maintenant);
+    return [fusion.fichier, fusion];
+  });
+  return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+}
+
+// Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
+// [{ id, nom, palier, jour }].
+async function annoncerBadges(slug, maintenant) {
+  const { nouveaux, calcul } = await recalculerBadges(slug, maintenant);
+  return nouveaux.map(({ id, palier, jour }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier, jour }));
+}
+
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
 // consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant ;
 // choisir Réviser ouvre la phase Réviser jusqu'au Défi réussi.
@@ -446,9 +485,9 @@ async function rebond(slug, id, { action }, maintenant) {
   // deux cas, l'attente de l'Élève compte, même nulle : celle d'une préparation qui n'avait pas fini comprise.
   const apres = await occuper(slug, id, () => chronometrer(slug, id, maintenant, async () => {
     const preparation = await prendrePreparation(slug, id);
-    if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action);
+    if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action, maintenant);
     await ecarterPreparation(slug, id, preparation);
-    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action] });
+    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action], maintenant });
   }));
   preparerPageSuivante(slug, id);
   return apres;
@@ -462,6 +501,25 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
   const lecon = await store.creerLecon(slug, { sujet: proposition.titre, mode: 'libre', cadrage });
   const prompt = `${promptCadrage(proposition.titre, cadrage)}\n${consignePremierTour('libre', cadrage)}`;
   return tourDeParole({ slug, id: lecon.id, prompt, affiche: proposition.titre, premier: true, maintenant });
+}
+
+// Révision du jour menée jusqu'au bout (#94) : enregistre l'événement daté et renvoie les récompenses nouvelles
+// (`etoile` : la première de la journée rapporte une Étoile ; `paliers` : Paliers de Badge nouveaux) et le nombre
+// d'Étoiles de Révision du jour de l'Élève. Le serveur ne sait pas quelle série a été servie : il faut au moins une
+// réponse de Révision du jour dans la journée. Jamais de tour du prof.
+async function terminerRevisionDuJour(slug, maintenant) {
+  const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
+  const aujourdhui = jourLocal(maintenant);
+  const repondueAujourdhui = lecons.some((l) => reponsesDeRevision(l).some((r) => jourDe(r.date) === aujourdhui));
+  if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
+  const etoile = etoileDuJour(evenements, maintenant);
+  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
+  await store.enregistrerEvenement(slug, evenement);
+  const nouveaux = await annoncerBadges(slug, maintenant);
+  const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));
+  // Annonce des nouveaux Paliers sur l'écran de fin (#98), par la même phrase préparée que le Retour de quiz.
+  const annonce = phraseBadges(nouveaux);
+  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement], maintenant).length };
 }
 
 async function api(req, res, segments) {
@@ -500,11 +558,15 @@ async function api(req, res, segments) {
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
     }
+  } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
+    // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
+    if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
   } else if (r2 === 'parent' && !id) {
-    // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof.
+    // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
-      const [lecons, couts, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug)]);
-      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements }));
+      const [lecons, couts, evenements, badges] = await Promise.all([
+        store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug), store.lireBadges(slug)]);
+      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements, badges }));
     }
   } else if (r2 === 'indicateurs' && !id) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
@@ -525,6 +587,16 @@ async function api(req, res, segments) {
         serieDeJours: serieDeJours(activite, maintenant),
         recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
+    }
+  } else if (r2 === 'badges' && !id) {
+    // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture, les totaux d'Étoiles et de Fusées (#96) et
+    // le calendrier des Jours travaillés (#99), sans aucun score. Ouverture de l'écran (?ouverture=1) : la réponse
+    // montre encore « Nouveau » et le mot d'accueil, effacés pour la suite.
+    if (m === 'GET') {
+      const { fichier, calcul, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
+      if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
+      const jours = calendrier({ lecons, evenements, paliers: paliersObtenus(fichier, calcul), maintenant });
+      return json(res, 200, { ...vueMesBadges(fichier, calcul), totaux, calendrier: jours });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
@@ -558,7 +630,7 @@ async function api(req, res, segments) {
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
-      const lecon = await retourQuiz(slug, id, await lireCorps(req));
+      const lecon = await retourQuiz(slug, id, await lireCorps(req), maintenant); // annonce aussi les nouveaux Badges (#98)
       preparerPageSuivante(slug, id); // aucune page préparée pendant le quiz : une, avec ses résultats (#74)
       return json(res, 200, lecon);
     } else if (r3 === 'rebonds' && m === 'POST') {

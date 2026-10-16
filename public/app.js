@@ -1,5 +1,6 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
+import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -138,6 +139,11 @@ const SECTIONS_PARENT = [
     questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
   { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
     avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise : ${c.maitrise ? `${PALIERS_DE_MAITRISE[c.maitrise.palier].mot} (${c.maitrise.pourcentage} %)` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
+  // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).
+  { titre: '🏅 Badges', rendu: ({ badges: { recents, etoiles, fusees } }) => [
+    h('p', {}, `⭐ ${pluriel(etoiles, 'Étoile')} · 🚀 ${pluriel(fusees, 'Fusée')} en tout.`),
+    listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${nomEtPalier(b)} · ${dateBadge(b.jour)}`)),
+      'Aucun Badge ces 7 derniers jours.')] },
   { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
@@ -162,10 +168,10 @@ async function ecranParent(profil) {
     SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
 
-// Trois Étoiles d'une Leçon de révision, pleines ou vides.
-const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
-const etoiles = (e) => h('span', { className: 'etoiles' },
-  Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆')));
+// Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0
+// (voir morceauxRecompensesLecon).
+const recompensesLecon = (l) => h('span', { className: 'etoiles' },
+  morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
 
 // Objectifs de la Leçon : combien sont atteints et Retenus, par exemple « 3 Objectifs · 2 atteints · 1 Retenu », puis
 // chaque Objectif avec son état. Rien sans Objectifs.
@@ -203,12 +209,12 @@ function badgeMaitrise(maitrise) {
 }
 
 async function ecranAccueil(profil) {
-  const [lecons, revisions, rythme] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`)]);
+  const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
   const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
   montrer(
     h('h2', {}, `Salut ${profil.pseudo} !`),
     recapitulatifSemaine(profil, rythme.recapitulatif),
-    carteRythme(rythme),
+    carteRythme(rythme, badges),
     carteRevisions(revisions.dues),
     comptesARebours(lecons),
     h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
@@ -218,8 +224,7 @@ async function ecranAccueil(profil) {
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
-            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), l.etoiles && etoiles(l.etoiles),
-            l.depassement && h('span', { title: 'Dépassement réussi' }, '🚀')),
+            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), recompensesLecon(l)),
           objectifsRetenus(l.objectifs),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
@@ -228,18 +233,101 @@ async function ecranAccueil(profil) {
 
 // Rythme (#75) : l'Objectif du jour et la Série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
 // de l'effort et de ce qui a été fait, jamais de l'Élève lui-même ni des autres Élèves ; aucun reproche.
-function carteRythme({ objectifDuJour: o, serieDeJours }) {
+// La carte montre aussi le dernier Badge gagné et « Nouveau » (#95) ; la toucher ouvre Mes badges.
+function carteRythme({ objectifDuJour: o, serieDeJours }, { dernier, nouveaux } = {}) {
   const objectif = o.atteint
     ? '🎯 Objectif du jour atteint : ton travail d’aujourd’hui compte !'
     : `🎯 Objectif du jour : ${o.revisionsVisees} révisions (${o.revisions}/${o.revisionsVisees}) ou ${pluriel(o.pagesVisees, 'page')} de leçon`;
   const jours = serieDeJours.jours
     ? `🔥 ${pluriel(serieDeJours.jours, 'jour')} de suite à travailler${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
     : '🌱 Chaque jour un peu, c’est comme ça qu’on retient';
-  return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
+  return h('button', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}`, onclick: () => (location.hash = '#/badges') },
     h('strong', {}, objectif),
     h('small', {}, jours,
-      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Un joker protège ta série de jours si tu fais une pause d’un jour. Tu en gagnes un par semaine complète.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`));
+      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
+    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+    h('small', { className: 'carte-badges' }, dernier ? [pastilleBadge(dernier), ` Dernier badge : ${nomEtPalier(dernier)}`] : '🏅 Mes badges',
+      nouveaux?.length > 0 && h('span', { className: 'nouveau' }, 'Nouveau')));
+}
+
+// Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
+const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore' }, emoji);
+const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+// Mes badges (#95) : la collection des Badges, obtenus avec leur Palier et leur date, à venir en grisé avec leur
+// progression (« 7/15 »), le total d'Étoiles et de Fusées de l'Élève (#96) et le calendrier des Jours travaillés (#99).
+// L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
+async function ecranBadges(profil) {
+  const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
+  montrer(
+    h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
+    h('h2', {}, '🏅 Mes badges'),
+    accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
+    totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
+      `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`),
+    calendrierJours(calendrier),
+    h('div', { className: 'grille badges' }, collection.map((b) => {
+      const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
+      return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
+        pastilleBadge(b),
+        h('strong', {}, b.nom),
+        obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
+        b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`));
+    })));
+}
+
+// Calendrier des Jours travaillés (#99), mois par mois : pâle quand l'Élève a travaillé, plein quand l'Objectif du
+// jour est atteint, 🛡️ quand un Joker a couvert le jour. Toucher un jour montre ce qui a été fait et gagné, sans score.
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const moisSuivant = (mois, n) => { const [a, m] = mois.split('-').map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
+function calendrierJours({ aujourdhui, jours }) {
+  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
+  const premier = (jours[0]?.jour ?? aujourdhui).slice(0, 7);
+  const dernier = aujourdhui.slice(0, 7);
+  let mois = dernier;
+  const bloc = h('section', { className: 'calendrier' });
+  const detail = (j) => {
+    const faits = [j.quiz && `${j.quiz} quiz`, j.revisions && pluriel(j.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
+    const gains = [j.gains.etoiles && `⭐ ${j.gains.etoiles}`, j.gains.fusees && `🚀 ${j.gains.fusees}`].filter(Boolean).join(' · ');
+    return h('div', { className: 'carte calendrier-detail' },
+      h('strong', {}, dateBadge(j.jour)),
+      j.lecons.length > 0 && h('small', {}, `📚 ${j.lecons.map((l) => l.titre).join(', ')}`),
+      faits && h('small', {}, faits),
+      j.joker && h('small', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
+      (gains || j.gains.paliers.length > 0) && h('small', {}, gains && `Gagné : ${gains} `,
+        j.gains.paliers.map((p) => h('span', {}, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
+      !faits && !j.lecons.length && !j.joker && !gains && !j.gains.paliers.length && h('small', {}, 'Rien ce jour-là.'));
+  };
+  const afficher = (choisi) => {
+    const [a, m] = mois.split('-').map(Number);
+    const decalage = (new Date(a, m - 1, 1).getDay() + 6) % 7; // lundi en premier
+    const nombre = new Date(a, m, 0).getDate();
+    const cases = [...Array(decalage).fill(null), ...Array.from({ length: nombre }, (_, i) => `${mois}-${String(i + 1).padStart(2, '0')}`)];
+    const zone = h('div', {});
+    bloc.replaceChildren(
+      h('div', { className: 'calendrier-mois' },
+        h('button', { className: 'secondaire', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(); } }, '‹'),
+        h('strong', {}, `${MOIS[m - 1]} ${a}`),
+        h('button', { className: 'secondaire', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(); } }, '›')),
+      h('div', { className: 'calendrier-grille' },
+        ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'].map((d) => h('span', { className: 'calendrier-entete' }, d)),
+        cases.map((jour) => {
+          if (!jour) return h('span', {});
+          const j = duJour(jour);
+          return h('button', {
+            className: `calendrier-jour ${j.etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour === choisi ? ' choisi' : ''}`,
+            disabled: jour > aujourdhui,
+            onclick: () => afficher(jour),
+          }, String(Number(jour.slice(8))), j.joker && h('span', { className: 'calendrier-joker' }, '🛡️'));
+        })),
+      zone);
+    if (choisi) zone.append(detail(duJour(choisi)));
+  };
+  afficher();
+  return bloc;
 }
 
 // Récapitulatif de la semaine passée (#75) : le serveur ne l'envoie qu'au premier retour de la semaine (le lundi, ou le
@@ -294,30 +382,48 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
   const zone = h('section', { className: 'kit-quiz revisions' });
   const erreur = h('p', { className: 'erreur' });
 
-  const fin = (suite) => [
+  // Récompenses de la série menée jusqu'au bout (#94), annoncées en tête de l'écran qui suit : l'Étoile du jour, puis
+  // les nouveaux Paliers de Badge dans la phrase préparée par le serveur (#98).
+  const annonces = (recompenses) => [
+    recompenses?.etoile && '⭐ Nouvelle Étoile : Révision du jour terminée !',
+    recompenses?.annonce,
+  ].filter(Boolean).map((texte) => h('p', { className: 'bulle-prof' }, texte));
+  const fin = (suite, recompenses) => [
+    ...annonces(recompenses),
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
     h('p', {}, !suite && h('button', { onclick: () => serie(true) }, '💪 Encore des questions'), ' ', boutonFin),
   ];
   // Une série : les Questions l'une après l'autre ; à la fin, la série suivante ou le message de fin.
-  const serie = async (suite = false) => {
+  // `recompenses` : celles de la série précédente, à annoncer.
+  const serie = async (suite = false, recompenses = null) => {
     erreur.textContent = '';
     let questions;
     try { ({ questions } = await api(`${url}${suite ? '?suite=1' : ''}`)); } catch (e) { return (erreur.textContent = e.message); }
-    if (!questions.length) return zone.replaceChildren(...fin(suite));
+    if (!questions.length) return zone.replaceChildren(...fin(suite, recompenses));
     let i = 0;
-    const suivante = () => {
+    let repondues = 0; // réponses bien reçues par le serveur
+    const suivante = async () => {
       arreterLecture();
-      if (i >= questions.length) return serie(suite);
+      if (i >= questions.length) {
+        // Chaque Question de la série a sa réponse : la Révision du jour est menée jusqu'au bout.
+        let nouvelles = null;
+        if (repondues === questions.length) {
+          try { ({ recompenses: nouvelles } = await api(`${url}/terminee`, { method: 'POST', body: {} })); } catch (e) { erreur.textContent = e.message; }
+        }
+        return serie(suite, nouvelles);
+      }
       const q = questions[i++];
       const lien = h('a', { href: `#/lecon/${q.lecon}/${encodeURIComponent(q.page)}`, target: '_blank' }, '📖 Relire la page');
       const ensuite = h('p', { hidden: true }, h('button', { onclick: suivante }, i < questions.length ? 'Question suivante ▶️' : 'Continuer ▶️'));
       zone.replaceChildren(
+        ...(i === 1 ? annonces(recompenses) : []),
         h('p', { className: 'revision-origine' }, h('small', {}, `${q.titreLecon} · question ${i} sur ${questions.length} · `, lien)),
         rendreQuestion(q, {
           lecture: profil.lectureVoixHaute,
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
+              repondues++;
               ensuite.hidden = false;
             } catch (e) { erreur.textContent = e.message; }
           },
@@ -538,7 +644,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
-          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), lecon.etoiles && etoiles(lecon.etoiles)),
+          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]
           : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, prof.retourQuiz.pretest ? 'Pré-test : hors score' : `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
@@ -609,6 +715,7 @@ async function route() {
     if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
     if (page === 'apercu') return await ecranSession(profil, id, null, { apercu: true });
     if (page === 'revisions') return await ecranRevisions(profil);
+    if (page === 'badges') return await ecranBadges(profil);
     return await ecranAccueil(profil);
   } catch (e) {
     montrer(h('p', { className: 'erreur' }, e.message));

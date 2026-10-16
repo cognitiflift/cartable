@@ -2975,3 +2975,52 @@ test('Rythme : une semaine complète rapporte un joker, qui protège tout seul l
 test('Rythme : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
 });
+
+// Étoile de la Révision du jour (#94) : quand l'Élève a répondu à chaque Question d'une série, l'écran le signale ;
+// la première série menée jusqu'au bout de la journée rapporte une Étoile, quel que soit le score. Jamais de tour du prof.
+const repondreRevision = (slug, lecon, id, choisie, date) =>
+  appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id, choisie, sur: true }, le(date));
+const terminerRevision = (slug, date) => appel(`/api/eleves/${slug}/revisions/terminee`, 'POST', {}, le(date));
+
+test('Étoile de la Révision du jour : une série menée jusqu\'au bout rapporte une Étoile, même avec des erreurs ; une deuxième le même jour, non ; le lendemain, oui', async () => {
+  const { slug, lecons } = await eleveRevisions('Etoile-Revis', 1);
+  const [lecon] = lecons;
+  // Une série : q1 fausse, q2 « Je ne sais pas ».
+  await repondreRevision(slug, lecon, 'q1', 1, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 'je-ne-sais-pas', LENDEMAIN);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.equal(fin.status, 200);
+  assert.deepEqual(fin.data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // « Encore des questions », menée jusqu'au bout le même jour : pas d'autre Étoile.
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-03T16:00:00.000Z');
+  const encore = await terminerRevision(slug, '2026-11-03T16:00:00.000Z');
+  assert.deepEqual(encore.data, { recompenses: { etoile: false, paliers: [] }, etoilesRevisionDuJour: 1 });
+  // Le jour suivant : une nouvelle Étoile.
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  const demain = await terminerRevision(slug, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual(demain.data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 2 });
+  // L'événement daté est dans le journal des événements de l'Élève.
+  const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  assert.deepEqual(journal.filter((e) => e.type === 'revision-terminee').map((e) => e.date), [LENDEMAIN, '2026-11-03T16:00:00.000Z', '2026-11-04T12:00:00.000Z']);
+  await aucunClaudeLance(lecons);
+});
+
+test('Étoile de la Révision du jour : une série abandonnée ne rapporte rien ; les jours passés avec une réponse de Révision du jour comptent', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Passe', 1);
+  // Avant l'Étoile de la Révision du jour : une réponse le 3 novembre suffit à compter ce jour-là.
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-04T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data.etoilesRevisionDuJour, 2);
+  // Le 5, série abandonnée : l'écran ne signale rien, et le 6 le compte n'a pris que ce jour-là.
+  await repondreRevision(slug, lecon, 'q2', 1, '2026-11-05T12:00:00.000Z');
+  await repondreRevision(slug, lecon, 'q1', 0, '2026-11-06T12:00:00.000Z');
+  assert.deepEqual((await terminerRevision(slug, '2026-11-06T12:00:00.000Z')).data, { recompenses: { etoile: true, paliers: [] }, etoilesRevisionDuJour: 3 });
+});
+
+test('Étoile de la Révision du jour : refusée (400) sans réponse de Révision du jour dans la journée, rien n\'est enregistré', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Etoile-Refus', 1);
+  assert.equal((await terminerRevision(slug, LENDEMAIN)).status, 400);
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  assert.deepEqual((await terminerRevision(slug, LENDEMAIN)).data.recompenses, { etoile: true, paliers: [] });
+  assert.equal((await terminerRevision('inconnu-etoile', LENDEMAIN)).status, 404);
+});

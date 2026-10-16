@@ -107,6 +107,16 @@ async function ecranProfil(profil) {
   app.append(h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/parent') }, '👪 Vue parent')));
 }
 
+// Chaque palier de Maîtrise (spec #84) : sa couleur et le mot affiché, le même pour l'Élève (carte d'accueil, en-tête de
+// la Séance) et pour la Vue parent. « Acquis » (#88), mot de fin, en vert marqué avec une coche : distinct de
+// « Bien en tête » et des Paliers des Badges.
+const PALIERS_DE_MAITRISE = {
+  'à revoir': { classe: 'rouge', mot: 'À revoir' },
+  'à consolider': { classe: 'orange', mot: 'À consolider' },
+  'bien en tête': { classe: 'vert', mot: 'Bien en tête' },
+  acquis: { classe: 'acquis', mot: 'Acquis ✓' },
+};
+
 // Vue parent (#77) : un écran par Élève, pour le parent, agrégé par le serveur (GET …/parent). Une section par clé
 // des agrégats : SECTIONS_PARENT en ajoute une sans toucher aux autres (indicateurs, #78).
 const equivalentUsd = (usd) => usd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
@@ -127,7 +137,7 @@ const SECTIONS_PARENT = [
   { titre: '❓ Questions fragiles', rendu: ({ questionsFragiles }) => listeOuVide(
     questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
   { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
-    avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise ${c.maitrise ? `${c.maitrise.pourcentage} %, ${c.maitrise.palier}` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
+    avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise : ${c.maitrise ? `${PALIERS_DE_MAITRISE[c.maitrise.palier].mot} (${c.maitrise.pourcentage} %)` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
   { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
@@ -151,10 +161,6 @@ async function ecranParent(profil) {
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
     SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
-
-// Couleur de chaque palier de Maîtrise (spec #84) : le mot se lit sans chiffre, le pourcentage reste en infobulle.
-// « Acquis » (#88), mot de fin, en vert marqué avec une coche : distinct de « Bien en tête » et des Paliers des Badges.
-const PALIERS = { 'à revoir': 'rouge', 'à consolider': 'orange', 'bien en tête': 'vert', acquis: 'acquis' };
 
 // Trois Étoiles d'une Leçon de révision, pleines ou vides.
 const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
@@ -192,8 +198,8 @@ function pastillesObjectifs(objectifs = []) {
 
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
-  const mot = maitrise.palier[0].toUpperCase() + maitrise.palier.slice(1) + (maitrise.palier === 'acquis' ? ' ✓' : '');
-  return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: `Maîtrise : ${maitrise.pourcentage} %` }, mot);
+  const { classe, mot } = PALIERS_DE_MAITRISE[maitrise.palier];
+  return h('span', { className: `maitrise ${classe}`, title: `Maîtrise : ${maitrise.pourcentage} %` }, mot);
 }
 
 async function ecranAccueil(profil) {

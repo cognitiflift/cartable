@@ -41,7 +41,7 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 .lecon-terminee { background:#d4a017; color:#fff; animation:none; }
 @keyframes pulsation { 50% { box-shadow:0 0 0 8px rgba(46,158,91,.25); } }
 .maitrise { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--doux); margin:.3rem 0; }
-.maitrise.rouge, .maitrise.orange, .maitrise.vert { font-weight:600; } .maitrise.rouge { color:#d64545; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
+.maitrise.rouge, .maitrise.orange, .maitrise.vert { font-weight:600; } .maitrise.rouge { color:#c96a6a; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
 .maitrise.acquis { font-weight:700; color:#fff; background:#1b6e3c; padding:.05rem .55rem; border-radius:999px; width:fit-content; }
 p .maitrise { display:inline-flex; }
 .ligne-maitrise { display:flex; align-items:center; gap:.4rem; }

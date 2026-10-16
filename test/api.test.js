@@ -10,6 +10,7 @@ import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
 const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
+const JOUR_MS = 86_400_000;
 
 before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
@@ -457,7 +458,7 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     assert.deepEqual((await quiz(85, [1])).rebondsProposes, ['suivante']);
     assert.equal((await rebond('reviser')).status, 400);
     // La page la plus récente vieillit de 8 jours : Réviser s'ajoute.
-    const ilYa8Jours = new Date(Date.now() - 8 * 86_400_000);
+    const ilYa8Jours = new Date(Date.now() - 8 * JOUR_MS);
     await fs.utimes(page, ilYa8Jours, ilYa8Jours);
     assert.deepEqual((await appel(url)).data.rebondsProposes, ['suivante', 'reviser']);
 
@@ -583,9 +584,9 @@ test('Maîtrise : pas encore évaluée, puis moyenne des 3 derniers scores et pa
 
 test('Maîtrise : paliers en mots, à revoir sous 50 %, à consolider jusqu’à 80 %, bien en tête à 80 % ou plus', async () => {
   const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les paliers' });
-  const le = { 'X-Cartable-Maintenant': '2026-10-01T10:00:00.000Z' };
-  const score = (s) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: s, page: '0001-paliers.html' }, le);
-  const maitrise = async () => (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`, 'GET', undefined, le)).data.maitrise;
+  const horloge = { 'X-Cartable-Maintenant': '2026-10-01T10:00:00.000Z' };
+  const score = (s) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: s, page: '0001-paliers.html' }, horloge);
+  const maitrise = async () => (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`, 'GET', undefined, horloge)).data.maitrise;
   assert.equal(await maitrise(), null);
   await score(49);
   assert.deepEqual(await maitrise(), { pourcentage: 49, palier: 'à revoir' });
@@ -602,7 +603,7 @@ test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semain
   // Les scores sont stockés en clair dans etat.json (Espace personnel lisible) : on y place un vieux score.
   const fichier = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'etat.json');
   const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
-  etat.scores = [{ score: 90, date: new Date(Date.now() - 35 * 86_400_000).toISOString() }];
+  etat.scores = [{ score: 90, date: new Date(Date.now() - 35 * JOUR_MS).toISOString() }];
   await fs.writeFile(fichier, JSON.stringify(etat));
 
   const liste = await appel('/api/eleves/zoe-test/lecons');
@@ -2225,8 +2226,8 @@ test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souveni
   // Une Question répondue juste une seule fois : stabilité 3,173 jours, donc 90 % au bout de 3,173 jours.
   await ecrire({ '0002-volcans.html#q1': question('q1', [{ date: '2026-10-02T10:00:00.000Z', juste: true, origine: 'quiz' }]) });
   const t = Date.parse('2026-10-02T10:00:00.000Z');
-  assert.deepEqual((await lire(new Date(t + 3.173 * 86_400_000).toISOString())).maitrise, { pourcentage: 90, palier: 'bien en tête' });
-  assert.deepEqual((await lire(new Date(t + 30 * 86_400_000).toISOString())).maitrise, { pourcentage: 56, palier: 'à consolider' });
+  assert.deepEqual((await lire(new Date(t + 3.173 * JOUR_MS).toISOString())).maitrise, { pourcentage: 90, palier: 'bien en tête' });
+  assert.deepEqual((await lire(new Date(t + 30 * JOUR_MS).toISOString())).maitrise, { pourcentage: 56, palier: 'à consolider' });
   // Stabilité de quelques jours seulement : pas Retenu, même avec deux quiz réussis espacés.
   assert.equal((await lire('2026-10-03T10:00:00.000Z')).objectifs[0].retenu, false);
 
@@ -2243,7 +2244,6 @@ test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souveni
 });
 
 // « Acquis » (#88) : tous les Objectifs Retenus et une Maîtrise d'au moins 80 %, lu par tous depuis la Leçon.
-const JOUR_MS = 86_400_000;
 // Banque où chaque Objectif (1 à 3) est couvert par une Question répondue juste aux `dates` données.
 const banqueParObjectif = (dates) => Object.fromEntries([1, 2, 3].map((n) => [`0002-volcans.html#q${n}`, {
   id: `q${n}`, page: '0002-volcans.html',

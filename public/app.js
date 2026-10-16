@@ -1,5 +1,6 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
+import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -141,7 +142,7 @@ const SECTIONS_PARENT = [
   // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).
   { titre: '🏅 Badges', rendu: ({ badges: { recents, etoiles, fusees } }) => [
     h('p', {}, `⭐ ${pluriel(etoiles, 'Étoile')} · 🚀 ${pluriel(fusees, 'Fusée')} en tout.`),
-    listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${b.nom}${b.palier === 'unique' ? '' : ` ${b.palier}`} · ${dateBadge(b.jour)}`)),
+    listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${nomEtPalier(b)} · ${dateBadge(b.jour)}`)),
       'Aucun Badge ces 7 derniers jours.')] },
   { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
@@ -167,15 +168,10 @@ async function ecranParent(profil) {
     SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
 }
 
-// Étoiles d'une Leçon : en Leçon de révision, ses trois Étoiles pleines ou vides ; en Leçon libre, leur nombre
-// (« ⭐ n », rien à 0).
-const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
-const etoiles = (e) => (typeof e === 'number'
-  ? e > 0 && h('span', { className: 'etoiles', title: 'Pages réussies' }, `⭐ ${e}`)
-  : h('span', { className: 'etoiles' },
-    Object.entries(TITRES_ETOILES).map(([cle, titre]) => h('span', { className: e[cle] ? 'pleine' : 'vide', title: titre }, e[cle] ? '⭐' : '☆'))));
-// Fusées d'une Leçon (« 🚀 n ») : une par page avec un Dépassement réussi ; rien à 0.
-const fusees = (n) => n > 0 && h('span', { className: 'fusees', title: 'Dépassements réussis' }, `🚀 ${n}`);
+// Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0
+// (voir morceauxRecompensesLecon).
+const recompensesLecon = (l) => h('span', { className: 'etoiles' },
+  morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
 
 // Objectifs de la Leçon : combien sont atteints et Retenus, par exemple « 3 Objectifs · 2 atteints · 1 Retenu », puis
 // chaque Objectif avec son état. Rien sans Objectifs.
@@ -228,8 +224,7 @@ async function ecranAccueil(profil) {
       h('div', { className: 'grille' }, parCategorie[c].map((l) =>
         h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
           h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
-            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), l.etoiles != null && etoiles(l.etoiles),
-            fusees(l.depassement)),
+            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), recompensesLecon(l)),
           objectifsRetenus(l.objectifs),
           h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
           h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
@@ -251,7 +246,7 @@ function carteRythme({ objectifDuJour: o, serieDeJours }, { dernier, nouveaux } 
     h('small', {}, jours,
       serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
     serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
-    h('small', { className: 'carte-badges' }, dernier ? [pastilleBadge(dernier), ` Dernier badge : ${dernier.nom}, ${dernier.palier}`] : '🏅 Mes badges',
+    h('small', { className: 'carte-badges' }, dernier ? [pastilleBadge(dernier), ` Dernier badge : ${nomEtPalier(dernier)}`] : '🏅 Mes badges',
       nouveaux?.length > 0 && h('span', { className: 'nouveau' }, 'Nouveau')));
 }
 
@@ -303,7 +298,7 @@ function calendrierJours({ aujourdhui, jours }) {
       faits && h('small', {}, faits),
       j.joker && h('small', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
       (gains || j.gains.paliers.length > 0) && h('small', {}, gains && `Gagné : ${gains} `,
-        j.gains.paliers.map((p) => h('span', {}, pastilleBadge(p), ` ${p.nom}, ${p.palier} `))),
+        j.gains.paliers.map((p) => h('span', {}, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
       !faits && !j.lecons.length && !j.joker && !gains && !j.gains.paliers.length && h('small', {}, 'Rien ce jour-là.'));
   };
   const afficher = (choisi) => {
@@ -649,7 +644,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
-          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), lecon.etoiles && etoiles(lecon.etoiles)),
+          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]
           : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, prof.retourQuiz.pretest ? 'Pré-test : hors score' : `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {

@@ -16,12 +16,12 @@ import { revisionsDuJour } from './lib/revisions.js';
 import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
-import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine } from './lib/rythme.js';
+import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
-import { jourValide, minuitDu, jourLocal } from './lib/jour.js';
+import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu } from './lib/badges.js';
-import { calendrier, paliersObtenus } from './lib/calendrier.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
+import { calendrier } from './lib/calendrier.js';
 import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -151,7 +151,7 @@ async function chronometrer(slug, id, maintenant, operation) {
   }
 }
 
-async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant = Date.now() }) {
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -177,7 +177,9 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 // questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
 // Une Leçon libre qui avait des Objectifs et en a davantage après le tour a été élargie (le prof a ajouté des Objectifs
 // à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
-async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant = Date.now() }) {
+// L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :
+// c'est donc l'ajout d'Objectifs, constaté après le tour, qui marque l'élargissement.
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant }) {
   const { texte, choix } = extraireChoix(reponse);
   // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
   // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
@@ -463,13 +465,11 @@ async function recalculerBadges(slug, maintenant) {
   return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
 }
 
-// Après chaque quiz (et chaque fin de Révision du jour) : les nouveaux Paliers, à annoncer par l'appelant.
-const mettreAJourBadges = async (slug, maintenant) => (await recalculerBadges(slug, maintenant)).nouveaux;
-
-// Les nouveaux Paliers, nommés pour leur annonce (lib/retour.js) : [{ id, nom, palier }].
+// Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
+// [{ id, nom, palier, jour }].
 async function annoncerBadges(slug, maintenant) {
   const { nouveaux, calcul } = await recalculerBadges(slug, maintenant);
-  return nouveaux.map(({ id, palier }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier }));
+  return nouveaux.map(({ id, palier, jour }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier, jour }));
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -510,15 +510,16 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
 async function terminerRevisionDuJour(slug, maintenant) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const aujourdhui = jourLocal(maintenant);
-  const repondueAujourdhui = lecons.some((l) => (l.questions ?? []).some((q) => (q.journal ?? []).some((r) => r.origine === 'revision' && jourLocal(Date.parse(r.date)) === aujourdhui)));
+  const repondueAujourdhui = lecons.some((l) => reponsesDeRevision(l).some((r) => jourDe(r.date) === aujourdhui));
   if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
   const etoile = etoileDuJour(evenements, maintenant);
   const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
   await store.enregistrerEvenement(slug, evenement);
-  const { nouveaux: paliers, calcul } = await recalculerBadges(slug, maintenant);
+  const nouveaux = await annoncerBadges(slug, maintenant);
+  const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));
   // Annonce des nouveaux Paliers sur l'écran de fin (#98), par la même phrase préparée que le Retour de quiz.
-  const annonce = phraseBadges(paliers.map(({ id, palier }) => ({ nom: calcul.find((b) => b.id === id).nom, palier })));
-  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
+  const annonce = phraseBadges(nouveaux);
+  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement], maintenant).length };
 }
 
 async function api(req, res, segments) {

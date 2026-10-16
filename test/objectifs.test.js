@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { objectifsAtteints, etatObjectifs, niveauLecon, calculerMaitrise, palierDeMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
+import { objectifsAtteints, etatObjectifs, niveauLecon, calculerMaitrise, palierDeMaitrise, etoilesLecon, fuseesLecon } from '../lib/store.js';
 import { memoireDeQuestion } from '../lib/memoire.js';
 
 const objectifs = ['Nommer les parties d’un volcan', 'Expliquer une éruption', 'Situer trois volcans'];
@@ -116,7 +116,7 @@ test('Pré-test : hors Maîtrise, hors Étoiles et hors Dépassement', () => {
   assert.equal(calculerMaitrise([score(60), { ...score(100), pretest: true }], Date.parse('2026-10-02')).pourcentage, 60);
   assert.equal(etoilesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], null, 'revision').quiz, false);
   assert.equal(etoilesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], null, 'revision').bonus, false);
-  assert.equal(depassementLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], 'libre'), 0);
+  assert.equal(fuseesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], 'libre'), 0);
   assert.equal(etoilesLecon([{ ...score(100), pretest: true }], null, 'libre'), 0);
 });
 

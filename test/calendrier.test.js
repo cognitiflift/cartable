@@ -67,6 +67,7 @@ test('Calendrier : chaque jour dit ce qui a été gagné (Étoiles, Fusées, Pal
         scores: [['2026-10-12', '0002-x.html', 60], ['2026-10-13', '0003-y.html', 80, depasse], ['2026-10-14', '0004-z.html', 90, { defi: true }]] }),
       lecon({ id: '0004-romains', titre: 'Les Romains', revisions: ['2026-10-14'] }),
     ],
+    evenements: [{ type: 'revision-terminee', date: iso('2026-10-14', 11) }],
     paliers: [{ id: 'curieux', emoji: '🚀', nom: 'Curieux', palier: 'bronze', jour: '2026-10-12' }],
     maintenant: a('2026-10-14', 20),
   });

@@ -116,7 +116,8 @@ test('Pré-test : hors Maîtrise, hors Étoiles et hors Dépassement', () => {
   assert.equal(calculerMaitrise([score(60), { ...score(100), pretest: true }], Date.parse('2026-10-02')).pourcentage, 60);
   assert.equal(etoilesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], null, 'revision').quiz, false);
   assert.equal(etoilesLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], null, 'revision').bonus, false);
-  assert.equal(depassementLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], 'libre'), false);
+  assert.equal(depassementLecon([{ ...score(100), pretest: true, bonus: { reussies: 2, total: 2 } }], 'libre'), 0);
+  assert.equal(etoilesLecon([{ ...score(100), pretest: true }], null, 'libre'), 0);
 });
 
 test('À confirmer : les Objectifs couverts par une question réussie au Pré-test', () => {

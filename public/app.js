@@ -208,12 +208,12 @@ function badgeMaitrise(maitrise) {
 }
 
 async function ecranAccueil(profil) {
-  const [lecons, revisions, rythme] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`)]);
+  const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
   const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
   montrer(
     h('h2', {}, `Salut ${profil.pseudo} !`),
     recapitulatifSemaine(profil, rythme.recapitulatif),
-    carteRythme(rythme),
+    carteRythme(rythme, badges),
     carteRevisions(revisions.dues),
     comptesARebours(lecons),
     h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
@@ -233,18 +233,44 @@ async function ecranAccueil(profil) {
 
 // Rythme (#75) : l'Objectif du jour et la Série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
 // de l'effort et de ce qui a été fait, jamais de l'Élève lui-même ni des autres Élèves ; aucun reproche.
-function carteRythme({ objectifDuJour: o, serieDeJours }) {
+// La carte montre aussi le dernier Badge gagné et « Nouveau » (#95) ; la toucher ouvre Mes badges.
+function carteRythme({ objectifDuJour: o, serieDeJours }, { dernier, nouveaux } = {}) {
   const objectif = o.atteint
     ? '🎯 Objectif du jour atteint : ton travail d’aujourd’hui compte !'
     : `🎯 Objectif du jour : ${o.revisionsVisees} révisions (${o.revisions}/${o.revisionsVisees}) ou ${pluriel(o.pagesVisees, 'page')} de leçon`;
   const jours = serieDeJours.jours
     ? `🔥 ${pluriel(serieDeJours.jours, 'jour')} de suite à travailler${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
     : '🌱 Chaque jour un peu, c’est comme ça qu’on retient';
-  return h('div', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}` },
+  return h('button', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}`, onclick: () => (location.hash = '#/badges') },
     h('strong', {}, objectif),
     h('small', {}, jours,
       serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`));
+    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+    h('small', { className: 'carte-badges' }, dernier ? [pastilleBadge(dernier), ` Dernier badge : ${dernier.nom}, ${dernier.palier}`] : '🏅 Mes badges',
+      nouveaux?.length > 0 && h('span', { className: 'nouveau' }, 'Nouveau')));
+}
+
+// Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
+const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore' }, emoji);
+const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+// Mes badges (#95) : la collection des Badges, obtenus avec leur Palier et leur date, à venir en grisé avec leur
+// progression (« 7/15 »). L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
+async function ecranBadges(profil) {
+  const { collection, nouveaux, accueil } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
+  montrer(
+    h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
+    h('h2', {}, '🏅 Mes badges'),
+    accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
+    h('div', { className: 'grille badges' }, collection.map((b) => {
+      const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
+      return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
+        pastilleBadge(b),
+        h('strong', {}, b.nom),
+        obtenus.map((p) => h('small', {}, `${p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
+        b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`));
+    })));
 }
 
 // Récapitulatif de la semaine passée (#75) : le serveur ne l'envoie qu'au premier retour de la semaine (le lundi, ou le
@@ -628,6 +654,7 @@ async function route() {
     if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
     if (page === 'apercu') return await ecranSession(profil, id, null, { apercu: true });
     if (page === 'revisions') return await ecranRevisions(profil);
+    if (page === 'badges') return await ecranBadges(profil);
     return await ecranAccueil(profil);
   } catch (e) {
     montrer(h('p', { className: 'erreur' }, e.message));

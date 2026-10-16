@@ -76,3 +76,13 @@ p .maitrise { display:inline-flex; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }
+/* Badges (#95) : pastilles aux couleurs des Paliers, distinctes du vert « Acquis » de la Maîtrise. */
+.pastille-badge { display:inline-flex; align-items:center; justify-content:center; width:2.2em; height:2.2em; border-radius:50%; border:3px solid var(--bord); background:var(--carte); font-size:1.1em; vertical-align:middle; }
+.pastille-badge.bronze { border-color:#b8733d; background:#f3e0cf; } .pastille-badge.argent { border-color:#9aa4ae; background:#eef1f4; }
+.pastille-badge.or { border-color:#d4a017; background:#fbf0c8; } .pastille-badge.diamant { border-color:#4aa8d8; background:#dff1fb; }
+.pastille-badge.unique { border-color:#9b59b6; background:#f1e4f7; }
+.pastille-badge.pas-encore { filter:grayscale(1); opacity:.45; }
+.badge.a-venir strong { color:var(--doux); }
+.badge strong { display:block; margin-top:.3rem; }
+.carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--accent); color:#fff; }
+.carte-rythme { width:100%; cursor:pointer; } .carte-badges { margin-top:.3rem; }

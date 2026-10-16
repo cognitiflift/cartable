@@ -147,7 +147,7 @@ test('Mes badges : obtenus avec Palier et date (même si le compte a baissé), �
   ]);
   const bout = collection.find((b) => b.id === 'jusquau-bout');
   assert.deepEqual({ palier: bout.palier, compte: bout.compte, prochain: bout.prochain }, { palier: null, compte: 0, prochain: { palier: 'bronze', seuil: 1 } });
-  assert.deepEqual(collection.map((b) => b.emoji), ['📅', '🧠', '💪', '🏆', '🧭']);
+  assert.deepEqual(collection.map((b) => b.emoji), ['📅', '🔁', '🧠', '💪', '🚀', '⭐', '🏆', '🧭']);
 });
 
 test('Mes badges : « Nouveau » pour les Paliers gagnés depuis la dernière ouverture, effacé en ouvrant ; le dernier Badge gagné', () => {
@@ -181,6 +181,43 @@ test('Badges surprise (données) : cachés tant qu\'ils ne sont pas obtenus, pui
   assert.deepEqual(nouveaux, [{ id: 'test-surprise', palier: 'unique', jour: '2026-10-04' }]);
   const surprise = vueMesBadges(apres, trouve).collection.find((b) => b.id === 'test-surprise');
   assert.deepEqual(surprise, { id: 'test-surprise', emoji: '🎁', nom: 'Surprise', surprise: true, palier: 'unique', jour: '2026-10-04' });
+});
+
+// Un quiz de page réussi chaque jour donné (une Étoile par page en Leçon libre), avec un Dépassement réussi (une Fusée)
+// si `bonus`.
+const pagesReussies = (dates, bonus = false) => dates.map((jour, i) => ({ score: 90, date: iso(jour), page: `r${i}.html`, ...(bonus && { bonus: { reussies: 2, total: 3 } }) }));
+
+test('⭐ Collection d\'Étoiles : Étoiles des Leçons et des Révisions du jour, Palier daté du jour de la 10e', () => {
+  const libre = lecon({ scores: pagesReussies(jours('2026-10-01', 8)) });
+  const revisions = lecon({ id: 'rv', questions: [question('q', [['2026-10-12', false, { origine: 'revision' }], ['2026-10-14', true, { origine: 'revision' }]])] });
+  const etoiles = badge(calculerBadges({ lecons: [libre, revisions], evenements: [], maintenant: a('2026-10-20') }), 'etoiles');
+  assert.equal(etoiles.emoji, '⭐');
+  assert.deepEqual(etoiles.seuils, [10, 50, 150, 300]);
+  assert.equal(etoiles.compte, 10);
+  assert.deepEqual(etoiles.paliers, [{ palier: 'bronze', jour: '2026-10-14' }]);
+});
+
+test('🚀 Curieux : Fusées de toutes les Leçons, Paliers datés de la 1re et de la 10e', () => {
+  const libre = lecon({ scores: pagesReussies(jours('2026-10-01', 6), true) });
+  const revision = lecon({ id: 'r', mode: 'revision', scores: pagesReussies(jours('2026-10-11', 5), true) });
+  const curieux = badge(calculerBadges({ lecons: [libre, revision], evenements: [], maintenant: a('2026-10-20') }), 'curieux');
+  assert.equal(curieux.emoji, '🚀');
+  assert.deepEqual(curieux.seuils, [1, 10, 30, 75]);
+  assert.equal(curieux.compte, 11);
+  assert.deepEqual(curieux.paliers, [{ palier: 'bronze', jour: '2026-10-01' }, { palier: 'argent', jour: '2026-10-14' }]);
+});
+
+test('🔁 Révisions du jour : jours avec une Révision du jour menée jusqu\'au bout ; pour le passé, un jour avec au moins une réponse de Révision du jour', () => {
+  const passees = jours('2026-10-01', 9).map((jour, i) => question(`q${i}`, [[jour, true, { origine: 'revision' }]]));
+  const evenements = [
+    { type: 'revision-terminee', date: iso('2026-10-15') },
+    { type: 'revision-terminee', date: iso('2026-10-15', 18) }, // le même jour : une fois
+  ];
+  const revisions = badge(calculerBadges({ lecons: [lecon({ questions: passees })], evenements, maintenant: a('2026-10-20') }), 'revisions');
+  assert.equal(revisions.emoji, '🔁');
+  assert.deepEqual(revisions.seuils, [1, 10, 25, 50]);
+  assert.equal(revisions.compte, 10);
+  assert.deepEqual(revisions.paliers, [{ palier: 'bronze', jour: '2026-10-01' }, { palier: 'argent', jour: '2026-10-15' }]);
 });
 
 // Badges surprise (#97) : Paliers d'un badge surprise calculés depuis l'historique ([] tant qu'il n'est pas obtenu).

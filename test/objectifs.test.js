@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { objectifsAtteints, etatObjectifs, niveauLecon, calculerMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
+import { objectifsAtteints, etatObjectifs, niveauLecon, calculerMaitrise, palierDeMaitrise, etoilesLecon, depassementLecon } from '../lib/store.js';
 import { memoireDeQuestion } from '../lib/memoire.js';
 
 const objectifs = ['Nommer les parties d’un volcan', 'Expliquer une éruption', 'Situer trois volcans'];
@@ -158,10 +158,10 @@ test('Maîtrise : une Question dont la dernière réponse est ratée compte 0, j
   const lendemain = new Date(Date.parse(t) + JOUR).toISOString();
   const ratee = { date: t, juste: false, jeNeSaisPas: true, origine: 'quiz' };
   // « Je ne sais pas » compte comme raté, même trois jours plus tard.
-  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], ratee)]), { pourcentage: 0, palier: 'non acquis' });
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], ratee)]), { pourcentage: 0, palier: 'à revoir' });
   // Réussie le lendemain (Révision du jour) : elle compte de nouveau, 100 % ; la Question sue la veille ≈ 96 %.
   const questions = [qBanque([1], juste(t)), qBanque([2], faux(t), juste(lendemain, { origine: 'revision' }))];
-  assert.deepEqual(maitriseAvec([score(100)], Date.parse(lendemain), questions), { pourcentage: 98, palier: 'acquis' });
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(lendemain), questions), { pourcentage: 98, palier: 'bien en tête' });
 });
 
 test('Maîtrise : une réponse juste en partie n’est pas ratée, elle suit l’oubli', () => {
@@ -175,17 +175,17 @@ test('Maîtrise : avec des Questions, elle baisse avec l’oubli, paliers 80 % e
   const t = '2026-10-01T10:00:00.000Z';
   const questions = [qBanque([1], juste(t))]; // une réponse juste : stabilité FSRS-5 de 3,173 jours
   // Au bout d'une stabilité, la probabilité de se souvenir vaut 90 %.
-  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3.173 * JOUR, questions), { pourcentage: 90, palier: 'acquis' });
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3.173 * JOUR, questions), { pourcentage: 90, palier: 'bien en tête' });
   // Au bout de 30 jours : (1 + 19/81 × 30 / 3,173)^-0,5 ≈ 56 %.
   assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 30 * JOUR, questions), { pourcentage: 56, palier: 'à consolider' });
   // Au bout d'un an : ≈ 20 %.
-  assert.equal(maitriseAvec([score(100)], Date.parse(t) + 365 * JOUR, questions).palier, 'non acquis');
+  assert.equal(maitriseAvec([score(100)], Date.parse(t) + 365 * JOUR, questions).palier, 'à revoir');
 });
 
 test('Maîtrise : une Question ratée et pas encore réussie ne remonte pas avec le temps', () => {
   const t = '2026-10-01T10:00:00.000Z';
   // Trois jours plus tard : sue (S = 3,173) ≈ 90 %, ratée 0 % ; moyenne ≈ 45 %.
-  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 45, palier: 'non acquis' });
+  assert.deepEqual(maitriseAvec([score(100)], Date.parse(t) + 3 * JOUR, [qBanque([1], juste(t)), qBanque([2], faux(t))]), { pourcentage: 45, palier: 'à revoir' });
 });
 
 test('Maîtrise : sans Questions (anciennes Leçons), même calcul qu’avant', () => {
@@ -231,4 +231,21 @@ test('Retenu : un Objectif qu’aucune Question ne couvre garde la règle des de
 test('Retenu : avec des Questions stables, jamais sans être atteint', () => {
   const revises = [le(J1, 90, [1], { reviser: true }), le(J2, 90, [1], { reviser: true })];
   assert.deepEqual(retenusAvec(revises, [qBanque([1], juste(J1), juste(J2))], 'libre'), [false, false, false]);
+});
+
+test('Palier de Maîtrise : à revoir sous 50 %, à consolider de 50 % à moins de 80 %, bien en tête à 80 % ou plus', () => {
+  assert.deepEqual([0, 49, 50, 79, 80, 100].map(palierDeMaitrise), ['à revoir', 'à revoir', 'à consolider', 'à consolider', 'bien en tête', 'bien en tête']);
+});
+
+test('Palier de Maîtrise : acquis seulement avec au moins un Objectif, tous Retenus, et 80 % ou plus', () => {
+  const retenu = { atteint: true, retenu: true };
+  const atteint = { atteint: true, retenu: false };
+  assert.equal(palierDeMaitrise(79, []), 'à consolider');
+  assert.equal(palierDeMaitrise(80, []), 'bien en tête');
+  assert.equal(palierDeMaitrise(79, [retenu, retenu]), 'à consolider');
+  assert.equal(palierDeMaitrise(80, [retenu, atteint]), 'bien en tête');
+  assert.equal(palierDeMaitrise(80, [retenu, retenu]), 'acquis');
+  assert.equal(palierDeMaitrise(100, [retenu]), 'acquis');
+  assert.equal(palierDeMaitrise(100, []), 'bien en tête');
+  assert.equal(palierDeMaitrise(49, [retenu]), 'à revoir');
 });

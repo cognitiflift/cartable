@@ -10,6 +10,7 @@ import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
 const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
+const JOUR_MS = 86_400_000;
 
 before(async () => {
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-'));
@@ -457,7 +458,7 @@ test('Leçon libre laissée plus d\'une semaine : Réviser à côté d\'Étape s
     assert.deepEqual((await quiz(85, [1])).rebondsProposes, ['suivante']);
     assert.equal((await rebond('reviser')).status, 400);
     // La page la plus récente vieillit de 8 jours : Réviser s'ajoute.
-    const ilYa8Jours = new Date(Date.now() - 8 * 86_400_000);
+    const ilYa8Jours = new Date(Date.now() - 8 * JOUR_MS);
     await fs.utimes(page, ilYa8Jours, ilYa8Jours);
     assert.deepEqual((await appel(url)).data.rebondsProposes, ['suivante', 'reviser']);
 
@@ -573,12 +574,28 @@ test('Maîtrise : pas encore évaluée, puis moyenne des 3 derniers scores et pa
   const score = (s) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: s, page: '0001-volcans.html' });
 
   assert.equal((await score(20)).status, 201);
-  assert.deepEqual(await maitrise(), { pourcentage: 20, palier: 'non acquis' });
+  assert.deepEqual(await maitrise(), { pourcentage: 20, palier: 'à revoir' });
   await score(70);
   await score(90);
   assert.deepEqual(await maitrise(), { pourcentage: 60, palier: 'à consolider' });
   await score(80);
-  assert.deepEqual(await maitrise(), { pourcentage: 80, palier: 'acquis' });
+  assert.deepEqual(await maitrise(), { pourcentage: 80, palier: 'bien en tête' });
+});
+
+test('Maîtrise : paliers en mots, à revoir sous 50 %, à consolider jusqu’à 80 %, bien en tête à 80 % ou plus', async () => {
+  const { data: lecon } = await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les paliers' });
+  const horloge = { 'X-Cartable-Maintenant': '2026-10-01T10:00:00.000Z' };
+  const score = (s) => appel(`/api/eleves/zoe-test/lecons/${lecon.id}/scores`, 'POST', { score: s, page: '0001-paliers.html' }, horloge);
+  const maitrise = async () => (await appel(`/api/eleves/zoe-test/lecons/${lecon.id}`, 'GET', undefined, horloge)).data.maitrise;
+  assert.equal(await maitrise(), null);
+  await score(49);
+  assert.deepEqual(await maitrise(), { pourcentage: 49, palier: 'à revoir' });
+  await score(51);
+  assert.deepEqual(await maitrise(), { pourcentage: 50, palier: 'à consolider' });
+  for (const s of [79, 79, 79]) await score(s);
+  assert.deepEqual(await maitrise(), { pourcentage: 79, palier: 'à consolider' });
+  await score(81);
+  assert.deepEqual(await maitrise(), { pourcentage: 80, palier: 'bien en tête' });
 });
 
 test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semaines', async () => {
@@ -586,7 +603,7 @@ test('Maîtrise : baisse de 10 points par semaine sans quiz au-delà de 3 semain
   // Les scores sont stockés en clair dans etat.json (Espace personnel lisible) : on y place un vieux score.
   const fichier = path.join(eleves, 'zoe-test', 'lecons', lecon.id, 'etat.json');
   const etat = JSON.parse(await fs.readFile(fichier, 'utf8'));
-  etat.scores = [{ score: 90, date: new Date(Date.now() - 35 * 86_400_000).toISOString() }];
+  etat.scores = [{ score: 90, date: new Date(Date.now() - 35 * JOUR_MS).toISOString() }];
   await fs.writeFile(fichier, JSON.stringify(etat));
 
   const liste = await appel('/api/eleves/zoe-test/lecons');
@@ -932,7 +949,7 @@ test('Étoiles : exposées par la Leçon et la liste d\'une Leçon de révision,
   // Une Étoile ne se perd jamais, même si la Maîtrise baisse.
   for (const score of [10, 10, 10]) await appel(`${url}/scores`, 'POST', { score });
   const apres = (await appel(url)).data;
-  assert.equal(apres.maitrise.palier, 'non acquis');
+  assert.equal(apres.maitrise.palier, 'à revoir');
   assert.deepEqual(apres.etoiles, { quiz: true, bonus: true, defi: true });
 });
 
@@ -1229,7 +1246,7 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
   await sonderJusqua(nbLancements, (n) => n === 2, 'Pas de relance après la génération en cours');
   await attendrePropositions('prop-suite');
   assert.equal(await nbLancements(), 2);
-  assert.match(await fs.readFile(args, 'utf8'), /Les volcans \(Sciences\) : Maîtrise 30 %, non acquis/);
+  assert.match(await fs.readFile(args, 'utf8'), /Les volcans \(Sciences\) : Maîtrise 30 %, à revoir/);
 
   // Message suivant : nouvelle régénération, qui voit la Maîtrise à jour.
   await appel(`/api/eleves/prop-suite/lecons/${lecon.id}/scores`, 'POST', { score: 90 });
@@ -1239,7 +1256,7 @@ test('Propositions : régénérées après chaque tour de séance, d\'après le 
   await sonderJusqua(nbLancements, (n) => n === 3, 'Pas de régénération après un message');
   await attendrePropositions('prop-suite');
   const consignes = await fs.readFile(args, 'utf8');
-  assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 90 %, acquis/);
+  assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 90 %, bien en tête/);
   assert.match(consignes, /11 ans/);
   assert.match(consignes, /Primaire 6/);
 });
@@ -2209,8 +2226,8 @@ test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souveni
   // Une Question répondue juste une seule fois : stabilité 3,173 jours, donc 90 % au bout de 3,173 jours.
   await ecrire({ '0002-volcans.html#q1': question('q1', [{ date: '2026-10-02T10:00:00.000Z', juste: true, origine: 'quiz' }]) });
   const t = Date.parse('2026-10-02T10:00:00.000Z');
-  assert.deepEqual((await lire(new Date(t + 3.173 * 86_400_000).toISOString())).maitrise, { pourcentage: 90, palier: 'acquis' });
-  assert.deepEqual((await lire(new Date(t + 30 * 86_400_000).toISOString())).maitrise, { pourcentage: 56, palier: 'à consolider' });
+  assert.deepEqual((await lire(new Date(t + 3.173 * JOUR_MS).toISOString())).maitrise, { pourcentage: 90, palier: 'bien en tête' });
+  assert.deepEqual((await lire(new Date(t + 30 * JOUR_MS).toISOString())).maitrise, { pourcentage: 56, palier: 'à consolider' });
   // Stabilité de quelques jours seulement : pas Retenu, même avec deux quiz réussis espacés.
   assert.equal((await lire('2026-10-03T10:00:00.000Z')).objectifs[0].retenu, false);
 
@@ -2224,6 +2241,84 @@ test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souveni
   // La liste des Leçons montre la même Maîtrise, à la même date.
   const resume = (await appel('/api/eleves/zoe-test/lecons', 'GET', undefined, { 'X-Cartable-Maintenant': '2026-10-03T10:00:00.000Z' })).data.find((l) => l.id === lecon.id);
   assert.deepEqual(resume.maitrise, lue.maitrise);
+});
+
+// « Acquis » (#88) : tous les Objectifs Retenus et une Maîtrise d'au moins 80 %, lu par tous depuis la Leçon.
+// Banque où chaque Objectif (1 à 3) est couvert par une Question répondue juste aux `dates` données.
+const banqueParObjectif = (dates) => Object.fromEntries([1, 2, 3].map((n) => [`0002-volcans.html#q${n}`, {
+  id: `q${n}`, page: '0002-volcans.html',
+  contenu: { enonce: `Question ${n} ?`, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [n] },
+  journal: dates.map((date) => ({ date, juste: true, origine: 'quiz' })),
+}]));
+// Élève neuf avec une Leçon à trois Objectifs, tous atteints par des quiz réussis aux `dates`, et leur Banque de Questions.
+const leconAcquise = async (pseudo, dates, corps = { sujet: 'les volcans' }) => {
+  const slug = slugify(pseudo);
+  await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', corps)).data);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  for (const date of dates) await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2, 3] }, le(date));
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueParObjectif(dates)));
+  await attendrePropositions(slug);
+  return { slug, lecon, url };
+};
+
+test('Maîtrise : acquis quand tous les Objectifs sont Retenus et la Maîtrise d\'au moins 80 %, puis redescend sans révision', async () => {
+  const { slug, lecon, url } = await leconAcquise('Acquis-Test', ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-03T10:00:00.000Z'))).data;
+  assert.deepEqual(lue.objectifs.map((o) => o.retenu), [true, true, true]);
+  assert.equal(lue.maitrise.palier, 'acquis');
+  assert.ok(lue.maitrise.pourcentage >= 80);
+  const resume = (await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'))).data.find((l) => l.id === lecon.id);
+  assert.deepEqual(resume.maitrise, lue.maitrise);
+
+  // Des mois plus tard, sans révision : toujours Retenus, mais la Maîtrise a baissé, plus « acquis ».
+  const oubliee = (await appel(url, 'GET', undefined, le('2027-03-01T10:00:00.000Z'))).data;
+  assert.deepEqual(oubliee.objectifs.map((o) => o.retenu), [true, true, true]);
+  assert.ok(oubliee.maitrise.pourcentage < 80);
+  assert.notEqual(oubliee.maitrise.palier, 'acquis');
+});
+
+test('Maîtrise : des quiz tous réussis le jour même (Objectifs atteints, pas Retenus) donnent au mieux « bien en tête »', async () => {
+  const { url } = await leconAcquise('Acquis-Jour-Meme', ['2026-10-01T09:00:00.000Z', '2026-10-01T18:00:00.000Z']);
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-01T19:00:00.000Z'))).data;
+  assert.deepEqual(lue.objectifs.map((o) => [o.atteint, o.retenu]), [[true, false], [true, false], [true, false]]);
+  assert.ok(lue.maitrise.pourcentage >= 80);
+  assert.equal(lue.maitrise.palier, 'bien en tête');
+});
+
+test('Maîtrise : une Leçon sans Objectifs plafonne à « bien en tête »', async () => {
+  await appel('/api/eleves', 'POST', { pseudo: 'Sans-Objectifs', age: 11, niveau: 'Primaire 6' });
+  const lecon = (await appel('/api/eleves/sans-objectifs/lecons', 'POST', { sujet: 'les comètes' })).data;
+  const url = `/api/eleves/sans-objectifs/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-cometes.html' }, le('2026-10-01T10:00:00.000Z'));
+  await attendrePropositions('sans-objectifs');
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-01T10:00:00.000Z'))).data;
+  assert.deepEqual(lue.objectifs, []);
+  assert.deepEqual(lue.maitrise, { pourcentage: 100, palier: 'bien en tête' });
+});
+
+test('Maîtrise : « acquis » porté par le préambule de relais et le résumé des Leçons transmis au prof', async () => {
+  // Horloge réelle : le tour du prof lit la Leçon à l'heure du serveur.
+  const avant = (jours) => new Date(Date.now() - jours * JOUR_MS).toISOString();
+  const { slug, lecon, url } = await leconAcquise('Acquis-Prof', [avant(2), avant(1)]);
+  assert.equal((await appel(url)).data.maitrise.palier, 'acquis');
+  // Le faux `claude` réécrit lesson.json à chaque tour : il y garde les trois Objectifs.
+  assert.equal((await avecFichier('objectifs', () => appel(`${url}/messages`, 'POST', { texte: 'Page suivante' }))).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Maîtrise : \d+ %, acquis\./);
+  await attendrePropositions(slug);
+  assert.match(await fs.readFile(path.join(dossier, 'args-propositions'), 'utf8'), /\) : Maîtrise \d+ %, acquis/);
+});
+
+test('Vue parent : un contrôle à venir porte « acquis » comme la lecture de sa Leçon de révision', async () => {
+  const dates = ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z'];
+  const { slug, lecon, url } = await leconAcquise('Acquis-Parent', dates, { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-10-20' });
+  assert.equal(lecon.mode, 'revision');
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-03T10:00:00.000Z'))).data;
+  assert.equal(lue.maitrise.palier, 'acquis');
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'));
+  assert.deepEqual(data.controles.map((c) => [c.lecon, c.maitrise]), [[lecon.id, lue.maitrise]]);
 });
 
 // Consignes du prof (spec #47) : au début d'une nouvelle page, le préambule cite les Questions les plus fragiles.
@@ -2762,6 +2857,7 @@ test('Vue parent : les contrôles à venir, le plus proche d\'abord, avec la pr�
     { lecon: loin.id, titreLecon: 'Les volcans', dateControle: '2026-11-20', joursAvant: 17, maitrise: await maitrise(loin), questionsDues: 2 },
   ]);
   assert.ok(data.controles[0].maitrise.pourcentage > 0);
+  assert.ok(['à revoir', 'à consolider', 'bien en tête'].includes(data.controles[0].maitrise.palier));
 });
 
 test('Vue parent : le coût des Leçons, total de l\'Élève (Propositions comprises) et coût de chaque Leçon, la plus coûteuse d\'abord', async () => {

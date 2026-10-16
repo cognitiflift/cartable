@@ -141,12 +141,12 @@ test('consignes des Propositions : uniquement des originaux sans Leçon, au nomb
 
 test('consignes des Propositions : suites et originaux répartis par l\'agent, d\'après le titre, la Catégorie et la Maîtrise des Leçons', () => {
   const consignes = consignesPropositions({ ...profil, nombrePropositions: 5 }, [
-    { titre: 'Les volcans', categorie: 'Sciences', maitrise: { pourcentage: 85, palier: 'acquis' } },
+    { titre: 'Les volcans', categorie: 'Sciences', maitrise: { pourcentage: 85, palier: 'bien en tête' } },
     { titre: 'Les fractions', categorie: 'Mathématiques', maitrise: null },
   ]);
   assert.match(consignes, /5 sujets de nouvelles Leçons/);
   assert.doesNotMatch(consignes, /\b4 sujets/);
-  assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 85 %, acquis/);
+  assert.match(consignes, /Les volcans \(Sciences\) : Maîtrise 85 %, bien en tête/);
   assert.match(consignes, /Les fractions \(Mathématiques\) : Maîtrise pas encore évaluée/);
   assert.match(consignes, /"suite"/);
 });
@@ -203,7 +203,7 @@ test('Préambule de relais : la session neuve reçoit l\'état de la Leçon et l
       { score: 50, page: '0001-volcans.html', date: '2026-10-01T10:00:00.000Z' },
       { score: 90, page: '0002-eruptions.html', date: '2026-10-02T10:00:00.000Z', objectifs: [1], bonus: { reussies: 1, total: 2 } },
     ],
-    maitrise: { pourcentage: 72, palier: 'En cours' },
+    maitrise: { pourcentage: 72, palier: 'à consolider' },
     ensuite: 'Les volcans endormis',
     pages: ['0001-volcans.html', '0002-eruptions.html'],
     messages: [],
@@ -215,7 +215,7 @@ test('Préambule de relais : la session neuve reçoit l\'état de la Leçon et l
   assert.match(texte, /1\. Nommer les parties d’un volcan : atteint/);
   assert.match(texte, /2\. Expliquer une éruption : pas encore atteint/);
   assert.match(texte, /50 % \(0001-volcans\.html\) le 2026-10-01 ; 90 % \(0002-eruptions\.html\) le 2026-10-02/);
-  assert.match(texte, /Maîtrise : 72 %, En cours/);
+  assert.match(texte, /Maîtrise : 72 %, à consolider/);
   assert.match(texte, /Résultats du dernier quiz : 0002-eruptions\.html, 90 % ; questions bonus : 1 sur 2/);
   assert.match(texte, /« Les volcans endormis »/);
   assert.match(texte, /0001-volcans\.html, 0002-eruptions\.html/);

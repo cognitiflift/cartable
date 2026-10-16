@@ -23,3 +23,9 @@ Enfin, un Objectif couvert par une question réussie au **Pré-test** est expos�
 - Accepter deux succès le même jour pour Retenu : rejeté, ce serait encore de la fluence.
 - Laisser le prof juger ce qui est Retenu : rejeté, contraire au principe des règles fixées par l'appli.
 - Attendre la répétition espacée (vague suivante) : rejeté, Retenu en donne dès maintenant une version simple, que la répétition espacée affinera.
+
+## Mise à jour du 2026-10-16 : « Acquis » réservé aux Objectifs Retenus (spec #84)
+
+La Maîtrise se lit désormais en paliers de Maîtrise, des mots de mémoire (à revoir, à consolider, bien en tête). Le quatrième, **Acquis ✓**, combine volontairement avancement et mémoire : la Leçon a au moins un Objectif, **tous** ses Objectifs sont Retenus et la Maîtrise est d'au moins 80 %. C'est un mot de fin, qui doit dire « j'ai vraiment retenu toute la Leçon » : il ne peut pas venir d'un seul après-midi de quiz réussis (Objectifs atteints, pas Retenus), ni d'une Leçon dont un Objectif n'a jamais été abordé. Une Leçon sans Objectifs plafonne à « bien en tête ». Le palier est calculé à la lecture par une fonction pure, à partir du pourcentage et de l'état des Objectifs : rien n'est stocké, et une Leçon acquise redescend d'elle-même quand la Maîtrise baisse ou que la mission s'élargit.
+
+Le pourcentage, lui, reste une mesure de mémoire pure : le rejet du plafonnement de la Maîtrise tient toujours. Seul le mot de fin regarde jusqu'où l'Élève est allé.

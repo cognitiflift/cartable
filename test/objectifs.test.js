@@ -236,3 +236,16 @@ test('Retenu : avec des Questions stables, jamais sans être atteint', () => {
 test('Palier de Maîtrise : à revoir sous 50 %, à consolider de 50 % à moins de 80 %, bien en tête à 80 % ou plus', () => {
   assert.deepEqual([0, 49, 50, 79, 80, 100].map(palierDeMaitrise), ['à revoir', 'à revoir', 'à consolider', 'à consolider', 'bien en tête', 'bien en tête']);
 });
+
+test('Palier de Maîtrise : acquis seulement avec au moins un Objectif, tous Retenus, et 80 % ou plus', () => {
+  const retenu = { atteint: true, retenu: true };
+  const atteint = { atteint: true, retenu: false };
+  assert.equal(palierDeMaitrise(79, []), 'à consolider');
+  assert.equal(palierDeMaitrise(80, []), 'bien en tête');
+  assert.equal(palierDeMaitrise(79, [retenu, retenu]), 'à consolider');
+  assert.equal(palierDeMaitrise(80, [retenu, atteint]), 'bien en tête');
+  assert.equal(palierDeMaitrise(80, [retenu, retenu]), 'acquis');
+  assert.equal(palierDeMaitrise(100, [retenu]), 'acquis');
+  assert.equal(palierDeMaitrise(100, []), 'bien en tête');
+  assert.equal(palierDeMaitrise(49, [retenu]), 'à revoir');
+});

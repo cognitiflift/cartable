@@ -153,7 +153,8 @@ async function ecranParent(profil) {
 }
 
 // Couleur de chaque palier de Maîtrise (spec #84) : le mot se lit sans chiffre, le pourcentage reste en infobulle.
-const PALIERS = { 'à revoir': 'rouge', 'à consolider': 'orange', 'bien en tête': 'vert' };
+// « Acquis » (#88), mot de fin, en vert marqué avec une coche : distinct de « Bien en tête » et des Paliers des Badges.
+const PALIERS = { 'à revoir': 'rouge', 'à consolider': 'orange', 'bien en tête': 'vert', acquis: 'acquis' };
 
 // Trois Étoiles d'une Leçon de révision, pleines ou vides.
 const TITRES_ETOILES = { quiz: 'Quiz réussi', bonus: 'Questions bonus réussies', defi: 'Défi réussi' };
@@ -191,7 +192,7 @@ function pastillesObjectifs(objectifs = []) {
 
 function badgeMaitrise(maitrise) {
   if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
-  const mot = maitrise.palier[0].toUpperCase() + maitrise.palier.slice(1);
+  const mot = maitrise.palier[0].toUpperCase() + maitrise.palier.slice(1) + (maitrise.palier === 'acquis' ? ' ✓' : '');
   return h('span', { className: `maitrise ${PALIERS[maitrise.palier]}`, title: `Maîtrise : ${maitrise.pourcentage} %` }, mot);
 }
 

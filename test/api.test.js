@@ -2242,6 +2242,85 @@ test('Maîtrise : une Leçon avec Questions suit leur probabilité de se souveni
   assert.deepEqual(resume.maitrise, lue.maitrise);
 });
 
+// « Acquis » (#88) : tous les Objectifs Retenus et une Maîtrise d'au moins 80 %, lu par tous depuis la Leçon.
+const JOUR_MS = 86_400_000;
+// Banque où chaque Objectif (1 à 3) est couvert par une Question répondue juste aux `dates` données.
+const banqueParObjectif = (dates) => Object.fromEntries([1, 2, 3].map((n) => [`0002-volcans.html#q${n}`, {
+  id: `q${n}`, page: '0002-volcans.html',
+  contenu: { enonce: `Question ${n} ?`, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [n] },
+  journal: dates.map((date) => ({ date, juste: true, origine: 'quiz' })),
+}]));
+// Élève neuf avec une Leçon à trois Objectifs, tous atteints par des quiz réussis aux `dates`, et leur Banque de Questions.
+const leconAcquise = async (pseudo, dates, corps = { sujet: 'les volcans' }) => {
+  const slug = slugify(pseudo);
+  await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', corps)).data);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  for (const date of dates) await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2, 3] }, le(date));
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueParObjectif(dates)));
+  await attendrePropositions(slug);
+  return { slug, lecon, url };
+};
+
+test('Maîtrise : acquis quand tous les Objectifs sont Retenus et la Maîtrise d\'au moins 80 %, puis redescend sans révision', async () => {
+  const { slug, lecon, url } = await leconAcquise('Acquis-Test', ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-03T10:00:00.000Z'))).data;
+  assert.deepEqual(lue.objectifs.map((o) => o.retenu), [true, true, true]);
+  assert.equal(lue.maitrise.palier, 'acquis');
+  assert.ok(lue.maitrise.pourcentage >= 80);
+  const resume = (await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'))).data.find((l) => l.id === lecon.id);
+  assert.deepEqual(resume.maitrise, lue.maitrise);
+
+  // Des mois plus tard, sans révision : toujours Retenus, mais la Maîtrise a baissé, plus « acquis ».
+  const oubliee = (await appel(url, 'GET', undefined, le('2027-03-01T10:00:00.000Z'))).data;
+  assert.deepEqual(oubliee.objectifs.map((o) => o.retenu), [true, true, true]);
+  assert.ok(oubliee.maitrise.pourcentage < 80);
+  assert.notEqual(oubliee.maitrise.palier, 'acquis');
+});
+
+test('Maîtrise : des quiz tous réussis le jour même (Objectifs atteints, pas Retenus) donnent au mieux « bien en tête »', async () => {
+  const { url } = await leconAcquise('Acquis-Jour-Meme', ['2026-10-01T09:00:00.000Z', '2026-10-01T18:00:00.000Z']);
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-01T19:00:00.000Z'))).data;
+  assert.deepEqual(lue.objectifs.map((o) => [o.atteint, o.retenu]), [[true, false], [true, false], [true, false]]);
+  assert.ok(lue.maitrise.pourcentage >= 80);
+  assert.equal(lue.maitrise.palier, 'bien en tête');
+});
+
+test('Maîtrise : une Leçon sans Objectifs plafonne à « bien en tête »', async () => {
+  await appel('/api/eleves', 'POST', { pseudo: 'Sans-Objectifs', age: 11, niveau: 'Primaire 6' });
+  const lecon = (await appel('/api/eleves/sans-objectifs/lecons', 'POST', { sujet: 'les comètes' })).data;
+  const url = `/api/eleves/sans-objectifs/lecons/${lecon.id}`;
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-cometes.html' }, le('2026-10-01T10:00:00.000Z'));
+  await attendrePropositions('sans-objectifs');
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-01T10:00:00.000Z'))).data;
+  assert.deepEqual(lue.objectifs, []);
+  assert.deepEqual(lue.maitrise, { pourcentage: 100, palier: 'bien en tête' });
+});
+
+test('Maîtrise : « acquis » porté par le préambule de relais et le résumé des Leçons transmis au prof', async () => {
+  // Horloge réelle : le tour du prof lit la Leçon à l'heure du serveur.
+  const avant = (jours) => new Date(Date.now() - jours * JOUR_MS).toISOString();
+  const { slug, lecon, url } = await leconAcquise('Acquis-Prof', [avant(2), avant(1)]);
+  assert.equal((await appel(url)).data.maitrise.palier, 'acquis');
+  // Le faux `claude` réécrit lesson.json à chaque tour : il y garde les trois Objectifs.
+  assert.equal((await avecFichier('objectifs', () => appel(`${url}/messages`, 'POST', { texte: 'Page suivante' }))).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Maîtrise : \d+ %, acquis\./);
+  await attendrePropositions(slug);
+  assert.match(await fs.readFile(path.join(dossier, 'args-propositions'), 'utf8'), /\) : Maîtrise \d+ %, acquis/);
+});
+
+test('Vue parent : un contrôle à venir porte « acquis » comme la lecture de sa Leçon de révision', async () => {
+  const dates = ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z'];
+  const { slug, lecon, url } = await leconAcquise('Acquis-Parent', dates, { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-10-20' });
+  assert.equal(lecon.mode, 'revision');
+  const lue = (await appel(url, 'GET', undefined, le('2026-10-03T10:00:00.000Z'))).data;
+  assert.equal(lue.maitrise.palier, 'acquis');
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'));
+  assert.deepEqual(data.controles.map((c) => [c.lecon, c.maitrise]), [[lecon.id, lue.maitrise]]);
+});
+
 // Consignes du prof (spec #47) : au début d'une nouvelle page, le préambule cite les Questions les plus fragiles.
 const banqueFragile = () => {
   const question = (id, enonce, journal) => [`0002-volcans.html#${id}`, { id, page: '0002-volcans.html', contenu: { enonce, reponses: ['a', 'b'], bonne: 0, explication: '', objectifs: [1] }, journal }];

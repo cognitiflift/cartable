@@ -3270,6 +3270,20 @@ test('Badges : une fin de Révision du jour recalcule les Badges et annonce le P
   await aucunClaudeLance(lecons);
 });
 
+test('Badges : une série du jour commencée mais pas finie ne compte pas ; la première fin de série fait bouger le total et 🔁', async () => {
+  const { slug, lecons } = await eleveRevisions('Badges-Transition', 1);
+  const url = `/api/eleves/${slug}/badges`;
+  await repondreRevision(slug, lecons[0], 'q2', 1, LENDEMAIN);
+  // Mes badges ouvert en pleine série : ni Étoile de la Révision du jour, ni 🔁.
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(avant.totaux.etoiles, 0);
+  assert.equal(badgeDe(avant, 'revisions').palier, null);
+  const fin = await terminerRevision(slug, LENDEMAIN);
+  assert.equal(fin.data.recompenses.etoile, true);
+  assert.deepEqual(fin.data.recompenses.paliers.filter((p) => p.id === 'revisions'), [{ id: 'revisions', palier: 'bronze', jour: '2026-11-03' }]);
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.totaux.etoiles, 1);
+});
+
 test('Mes badges : total d\'Étoiles et de Fusées, toutes Leçons et Révisions du jour confondues', async () => {
   const { slug, lecons } = await eleveRevisions('Badges-Totaux', 2);
   const url = `/api/eleves/${slug}/badges`;

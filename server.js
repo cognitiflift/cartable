@@ -518,7 +518,7 @@ async function terminerRevisionDuJour(slug, maintenant) {
   const { nouveaux: paliers, calcul } = await recalculerBadges(slug, maintenant);
   // Annonce des nouveaux Paliers sur l'écran de fin (#98), par la même phrase préparée que le Retour de quiz.
   const annonce = phraseBadges(paliers.map(({ id, palier }) => ({ nom: calcul.find((b) => b.id === id).nom, palier })));
-  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement]).length };
+  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement], maintenant).length };
 }
 
 async function api(req, res, segments) {

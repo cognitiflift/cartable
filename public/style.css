@@ -19,6 +19,7 @@
   --accent:#2747c9; --sur-accent:#fff; --nouveau:#fbbf24; --sur-nouveau:#14182b; --retenu:#15803d; --sur-retenu:#fff; --station-vide:#80879a; --troncon:#dde1ea;
   --station-atteinte:#fff; --hachure:#fff; --encre-noire:#000; --voile:rgb(20 24 43 / .5);
   --rouge:#b42318; --orange:#a8530b; --vert:#15803d;
+  --palier-bronze:#9a5a24; --palier-argent:#6b7684; --palier-or:#9a7206; --palier-diamant:#1f7fb3; --palier-unique:#8e44ad;
   --ligne-francais:#c2410c; --ligne-mathematiques:#2f6fed; --ligne-sciences:#0f8a6a; --ligne-histoire:#8a5a14;
   --ligne-geographie:#0e7490; --ligne-langues:#9333ea; --ligne-arts:#db2777; --ligne-autre:#4b5563;
   color-scheme:light dark; interpolate-size:allow-keywords;
@@ -28,6 +29,7 @@
   --nuit:#14182b; --sur-nuit-doux:#a6acc2;
   --accent:#8aa2ff; --sur-accent:#0f1220; --nouveau:#fcd34d; --sur-nouveau:#0f1220; --retenu:#34c463; --sur-retenu:#0f1220; --station-vide:#737a96; --troncon:#2f3550; --hachure:#d9dce6; --voile:rgb(0 0 0 / .65);
   --rouge:#f58b8b; --orange:#f5b14c; --vert:#5ad98a;
+  --palier-bronze:#d99a62; --palier-argent:#b6c0cb; --palier-or:#e8c04a; --palier-diamant:#6cc4ef; --palier-unique:#c792e6;
   --ligne-francais:#fb923c; --ligne-mathematiques:#7aa2ff; --ligne-sciences:#34d399; --ligne-histoire:#e0a75e;
   --ligne-geographie:#38bdf8; --ligne-langues:#c084fc; --ligne-arts:#f472b6; --ligne-autre:#9ca3af;
 } }
@@ -71,7 +73,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .jours { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.35rem; }
 .jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; min-height:6.3rem; }
 .jour.aujourdhui { background:color-mix(in srgb, var(--accent) 9%, transparent); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
-.jour .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
+.jour .nom, .calendrier-grille .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
 .jour.aujourdhui .nom { color:var(--accent); }
 .tampon { position:relative; display:grid; place-items:center; width:2.35rem; height:2.35rem; border-radius:50%; border:2px dashed var(--station-vide); font-weight:800; font-variant-numeric:tabular-nums; color:var(--doux); }
 .jour.futur .tampon { border-style:dotted; color:color-mix(in srgb, var(--doux) 75%, var(--carte)); }
@@ -212,27 +214,41 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }
-/* Badges (#95) : pastilles aux couleurs des Paliers, distinctes du vert « Acquis » de la Maîtrise. */
-.pastille-badge { display:inline-flex; align-items:center; justify-content:center; width:2.2em; height:2.2em; border-radius:50%; border:3px solid var(--bord); background:var(--carte); font-size:1.1em; vertical-align:middle; }
-.pastille-badge.bronze { border-color:#b8733d; background:#f3e0cf; } .pastille-badge.argent { border-color:#9aa4ae; background:#eef1f4; }
-.pastille-badge.or { border-color:#d4a017; background:#fbf0c8; } .pastille-badge.diamant { border-color:#4aa8d8; background:#dff1fb; }
-.pastille-badge.unique { border-color:#9b59b6; background:#f1e4f7; }
+/* Badges (#95) : pastilles cerclées à la couleur de leur Palier, sur un fond pâle de la même teinte ; distinctes du vert
+   « Acquis » de la Maîtrise. */
+.pastille-badge { --palier:var(--bord); display:inline-flex; align-items:center; justify-content:center; width:2.2em; height:2.2em; border-radius:50%; border:3px solid var(--palier); background:color-mix(in srgb, var(--palier) 18%, var(--carte)); font-size:1.1em; vertical-align:middle; }
+.pastille-badge.bronze { --palier:var(--palier-bronze); } .pastille-badge.argent { --palier:var(--palier-argent); } .pastille-badge.or { --palier:var(--palier-or); }
+.pastille-badge.diamant { --palier:var(--palier-diamant); } .pastille-badge.unique { --palier:var(--palier-unique); }
 .pastille-badge.pas-encore { filter:grayscale(1); opacity:.45; }
 .badge.a-venir strong { color:var(--doux); }
 .badge strong { display:block; margin-top:.3rem; }
+/* La collection de Mes badges : la pastille à gauche, le nom et les Paliers à côté, en cartes simples serrées. */
+.grille.badges { grid-template-columns:repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
+.grille.badges .badge { display:flex; align-items:flex-start; gap:.8rem; padding:.8rem 1rem; }
+.grille.badges .badge strong { margin-top:.15rem; }
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
-.totaux-recompenses { font-size:1.15rem; font-weight:700; }
-/* Calendrier de Mes badges (#99) : Jours travaillés pâles, pleins quand l'Objectif du jour est atteint, 🛡️ Joker. */
-.calendrier { max-width:420px; margin:1rem 0; }
-.calendrier-mois { display:flex; align-items:center; justify-content:space-between; margin-bottom:.4rem; }
-.calendrier-mois strong { text-transform:capitalize; }
-.calendrier-grille { display:grid; grid-template-columns:repeat(7, 1fr); gap:.25rem; }
-.calendrier-entete { text-align:center; font-size:.8rem; color:var(--doux); }
-.calendrier-jour { position:relative; padding:.4rem 0; text-align:center; background:var(--carte); color:var(--texte); border-color:var(--bord); }
-.calendrier-jour.pale { background:color-mix(in srgb, var(--accent) 25%, var(--carte)); }
-.calendrier-jour.plein { background:var(--accent); color:var(--sur-accent); border-color:var(--accent); }
-.calendrier-jour.aujourdhui { outline:2px solid var(--accent); outline-offset:1px; }
-.calendrier-jour.choisi { box-shadow:0 0 0 3px var(--texte); }
-.calendrier-jour:disabled { opacity:.35; cursor:default; }
-.calendrier-joker { position:absolute; top:-.35rem; right:-.2rem; font-size:.7rem; }
-.calendrier-detail { margin-top:.6rem; }
+/* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
+.badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
+.badges-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
+.totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
+.collection h3 { margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+@media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
+/* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
+   entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */
+.mon-calendrier { display:flex; flex-direction:column; gap:.8rem; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 2px 10px rgb(var(--ombre) / .05); }
+.calendrier-mois { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }
+.calendrier-mois strong { font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.calendrier-mois strong::first-letter { text-transform:uppercase; }
+.calendrier-mois button { min-width:2.75rem; min-height:2.75rem; font-size:1.2rem; line-height:1; }
+.calendrier-grille { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.15rem; justify-items:center; }
+.calendrier-grille .nom { padding:.2rem 0 .35rem; }
+.calendrier-jour { display:grid; place-items:center; width:100%; min-height:2.9rem; padding:.2rem 0; border:0; border-radius:12px; background:transparent; color:inherit; font-weight:inherit; }
+.calendrier-jour:hover:not(:disabled) { background:color-mix(in srgb, var(--texte) 6%, transparent); }
+.calendrier-jour:disabled { opacity:1; cursor:default; background:transparent; }
+.calendrier-jour.choisi .tampon { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .38rem var(--texte); }
+.calendrier-detail { display:flex; flex-direction:column; gap:.35rem; padding-top:.8rem; border-top:1px dashed var(--bord); line-height:1.35; }
+.calendrier-detail strong { font-size:1.05rem; }
+.calendrier-detail p { margin:0; }
+.calendrier-detail .gain-badge { white-space:nowrap; }
+@media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.6rem; } .badges-tete h2 { font-size:1.6rem; } }

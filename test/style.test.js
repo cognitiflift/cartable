@@ -93,18 +93,6 @@ const EXCEPTIONS = [
     ['.cadrage', 'background', 'rgba(0,0,0,.45)'],
     ['@media (prefers-color-scheme: dark) .cadrage', 'background', 'rgba(0,0,0,.75)'],
   ]),
-  ...ecran('Mes badges : pastilles des Paliers', [
-    ['.pastille-badge.bronze', 'border-color', '#b8733d'],
-    ['.pastille-badge.bronze', 'background', '#f3e0cf'],
-    ['.pastille-badge.argent', 'border-color', '#9aa4ae'],
-    ['.pastille-badge.argent', 'background', '#eef1f4'],
-    ['.pastille-badge.or', 'border-color', '#d4a017'],
-    ['.pastille-badge.or', 'background', '#fbf0c8'],
-    ['.pastille-badge.diamant', 'border-color', '#4aa8d8'],
-    ['.pastille-badge.diamant', 'background', '#dff1fb'],
-    ['.pastille-badge.unique', 'border-color', '#9b59b6'],
-    ['.pastille-badge.unique', 'background', '#f1e4f7'],
-  ]),
 ];
 
 function ecran(nom, ecarts) {

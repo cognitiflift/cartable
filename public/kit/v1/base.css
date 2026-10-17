@@ -1,22 +1,42 @@
 /* Kit v1 — feuille de style de base d'une Page de leçon : lisibilité, couleur de la Catégorie, mode sombre, quiz.
    Catégorie : <html data-categorie="sciences"> (francais, mathematiques, sciences, histoire, geographie, langues, arts, autre).
-   Couleurs et quiz : quiz.css. */
+   Couleurs, polices et quiz : quiz.css. Style du plan du réseau de l'appli (DESIGN.md) : fond gris froid, cartes
+   blanches, Overpass pour les titres et Atkinson Hyperlegible Next pour le texte, servies par l'appli. */
 @import url('quiz.css');
+
+@font-face { font-family:"Atkinson Hyperlegible Next"; font-weight:200 800; font-display:swap; src:url(/polices/atkinson-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Atkinson Hyperlegible Next"; font-weight:200 800; font-display:swap; src:url(/polices/atkinson-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family:"Overpass"; font-weight:100 900; font-display:swap; src:url(/polices/overpass-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Overpass"; font-weight:100 900; font-display:swap; src:url(/polices/overpass-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
 * { box-sizing: border-box; }
 body {
   margin: 0 auto; max-width: 46rem; padding: 1.5rem 1rem 3rem;
-  font: 18px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 18px/1.65 var(--kit-police);
   background: var(--kit-fond); color: var(--kit-texte);
 }
-h1, h2, h3 { line-height: 1.25; }
-h1 { color: var(--kit-accent); font-size: 1.9rem; }
-h2 { margin-top: 2rem; border-bottom: 3px solid var(--kit-accent-doux); padding-bottom: .2rem; }
-a { color: var(--kit-accent); }
+h1, h2, h3 { font-family: var(--kit-police-titre); font-weight: 800; line-height: 1.2; letter-spacing: -.01em; text-wrap: balance; }
+h1 { color: var(--kit-accent-fort); font-size: 2rem; line-height: 1.1; }
+h2 { margin-top: 2rem; border-bottom: 3px solid var(--kit-accent-doux); padding-bottom: .2rem; font-size: 1.45rem; }
+h3 { font-size: 1.2rem; }
+a { color: var(--kit-accent-fort); text-underline-offset: .18em; }
+::selection { background: color-mix(in srgb, var(--kit-accent) 30%, transparent); }
+:focus-visible { outline: 3px solid var(--kit-accent-fort); outline-offset: 2px; }
 img, svg, video { max-width: 100%; height: auto; }
-/* Figure : un visuel qui explique, sa légende et son crédit (source, licence). */
+/* Figure : un visuel qui explique, sa légende et son crédit (source, licence). Une carte simple de DESIGN.md. */
 .kit-figure { margin: 1.5rem 0; background: var(--kit-carte); border: 1px solid var(--kit-bord); border-radius: 14px; padding: .8rem; text-align: center; }
 .kit-figure img, .kit-figure svg { display: block; margin: 0 auto; border-radius: 8px; max-height: 70vh; width: auto; }
 .kit-figure figcaption { margin-top: .6rem; font-size: .95rem; text-align: left; }
 .kit-credit { display: block; margin-top: .2rem; color: var(--kit-doux); font-size: .8rem; }
-.encart, aside { background: var(--kit-accent-doux); border-left: 5px solid var(--kit-accent); border-radius: 10px; padding: .8rem 1.1rem; margin: 1.2rem 0; }
+/* Encart (« 🚀 Pour aller plus loin ») : une carte teintée de la couleur de la Catégorie, cerclée de cette couleur,
+   sans bordure latérale. */
+.encart, aside {
+  background: var(--kit-accent-doux); border: 1px solid color-mix(in srgb, var(--kit-accent) 35%, var(--kit-carte));
+  border-radius: 14px; padding: 1rem 1.15rem; margin: 1.5rem 0;
+}
+.encart > :first-child, aside > :first-child { margin-top: 0; }
+.encart > :last-child, aside > :last-child { margin-bottom: 0; }

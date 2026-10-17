@@ -24,6 +24,11 @@ colors:
   rouge: "#b42318"
   orange: "#a8530b"
   vert: "#15803d"
+  palier-bronze: "#9a5a24"
+  palier-argent: "#6b7684"
+  palier-or: "#9a7206"
+  palier-diamant: "#1f7fb3"
+  palier-unique: "#8e44ad"
   ligne-francais: "#c2410c"
   ligne-mathematiques: "#2f6fed"
   ligne-sciences: "#0f8a6a"
@@ -50,6 +55,11 @@ colors:
   rouge-sombre: "#f58b8b"
   orange-sombre: "#f5b14c"
   vert-sombre: "#5ad98a"
+  palier-bronze-sombre: "#d99a62"
+  palier-argent-sombre: "#b6c0cb"
+  palier-or-sombre: "#e8c04a"
+  palier-diamant-sombre: "#6cc4ef"
+  palier-unique-sombre: "#c792e6"
   ligne-francais-sombre: "#fb923c"
   ligne-mathematiques-sombre: "#7aa2ff"
   ligne-sciences-sombre: "#34d399"
@@ -261,7 +271,7 @@ Le monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des c
 
 Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par la préférence de l'appareil ; l'en-tête reste bleu nuit dans les deux.
 
-**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne) et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Séance, Révisions du jour, Mes badges et son calendrier, Vue parent, Profil, nouvelle Leçon, cadrage) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`, pulsation du bouton d'action en Séance, couleurs de Palier des Badges). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
+**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Séance, Révisions du jour, Vue parent, Profil, nouvelle Leçon, cadrage) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`, pulsation du bouton d'action en Séance). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
 
 **Key Characteristics:**
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
@@ -286,6 +296,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Vert Retenu** (`retenu`) : ce qui tient en mémoire. Station Retenue, terminus allumé, pastille « Acquis ✓ ».
 - **Jaune Nouveau** (`nouveau`) : la seule couleur de ce qui est nouveau, distincte de toutes les couleurs de ligne, texte `sur-nouveau` bleu nuit : la pastille « Nouveau » (dans le compteur d'Étoiles et ailleurs).
 - **Mots de Maîtrise** (`rouge`, `orange`, `vert`) : la couleur du texte des paliers « à revoir », « à consolider », « bien en tête », et de « Objectif du jour atteint ». Texte seulement, jamais en aplat.
+- **Paliers des Badges** (`palier-bronze`, `palier-argent`, `palier-or`, `palier-diamant`, `palier-unique`, et leurs variantes `-sombre`) : l'anneau de la pastille d'un Badge, sur un fond pâle de la même teinte (`color-mix(in srgb, var(--palier) 18%, var(--carte))`). Les valeurs claires sont foncées et les sombres éclaircies pour que l'anneau tienne 3:1 contre la carte et contre son fond. Jamais en aplat plein, jamais hors d'une pastille de Badge.
 
 ### Neutral
 - **Gris froid du fond** (`fond`) : le fond de page, sur lequel les cartes se détachent.
@@ -407,6 +418,11 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
 - **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
+
+### Mes badges
+L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusées à droite en chiffres tabulaires), puis deux colonnes (une seule sous 900px) : le calendrier à gauche, la collection à droite.
+- **Calendrier :** une carte comme le bandeau de la semaine (18px, pose du bandeau), le mois en titre entre deux boutons secondaires ‹ ›, les noms de jours en label signalétique, puis un tampon de jour par date, le même que le bandeau (`tamponJour` dans `public/app.js`) : vide, futur, pâle, plein, 🛡️ Joker, aujourd'hui. Chaque jour est un bouton ; le jour touché est entouré d'un anneau `texte` détouré de la carte, comme « vous êtes ici », et son détail (Leçons, quiz, Révisions du jour, gains) s'affiche sous un filet pointillé. Aujourd'hui est montré à l'ouverture.
+- **Collection :** des cartes simples, la pastille du Badge à gauche, le nom, les Paliers obtenus avec leur date et la progression à côté ; un Badge pas encore obtenu est grisé.
 
 ## Do's and Don'ts
 

@@ -899,12 +899,12 @@
       {
         "name": "pose-carte-ligne",
         "value": "0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)",
-        "purpose": "Cartes de Leçon ; --ombre vaut 20 24 43 en clair, 0 0 0 en sombre."
+        "purpose": "--ombre-carte : cartes de Leçon, cartes de Séance (bulle du prof, Retour de quiz, Leçon terminée) et Cadrage ; --ombre vaut 20 24 43 en clair, 0 0 0 en sombre."
       },
       {
         "name": "pose-bandeau",
         "value": "0 2px 10px rgb(var(--ombre) / .05)",
-        "purpose": "Bandeau de la semaine."
+        "purpose": "--ombre-bandeau : bandeau de la semaine et calendrier de Mes badges."
       },
       {
         "name": "vous-etes-ici",
@@ -919,7 +919,7 @@
       {
         "name": "jour-courant",
         "value": "inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)",
-        "purpose": "Cadre d'aujourd'hui dans le bandeau."
+        "purpose": "Cadre d'aujourd'hui dans le bandeau et le calendrier."
       },
       {
         "name": "focus",

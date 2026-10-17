@@ -1,28 +1,43 @@
 /* Kit v1 — style du quiz (couleurs du Kit et questions), importé par base.css dans une Page de leçon, et chargé seul
    par l'appli pour les Révisions du jour (#66), sans les règles de page de base.css. Chargé dans l'appli, il ne doit
    rien changer à son allure : sur :root, seulement des variables --kit-* (et le color-scheme que l'appli pose aussi),
-   et des règles limitées aux classes .kit-*. */
+   et des règles limitées aux classes .kit-*.
+   Une Page de leçon ne charge pas la feuille de l'appli : les variables --kit-* en reprennent les jetons de DESIGN.md
+   (fond gris froid, cartes blanches, encre nuit, polices Overpass et Atkinson Hyperlegible Next), et
+   test/style.test.js vérifie qu'elles leur restent égales. Couleurs de Catégorie : les couleurs de ligne de l'accueil
+   (ligne-*), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. Les teintes douces et les aplats se
+   dérivent de ces jetons par color-mix, déclarés sur :root et sur chaque [data-categorie] pour suivre sa couleur. */
 :root {
-  --kit-fond: #fbf8f3; --kit-texte: #222; --kit-doux: #666; --kit-carte: #fff; --kit-bord: #e4ddd0;
-  --kit-accent: #2f6fed; --kit-accent-doux: #e8efff;
-  --kit-juste: #1e8e4e; --kit-juste-fond: #e3f6ea; --kit-faux: #c0392b; --kit-faux-fond: #fdecea;
+  --kit-police: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --kit-police-titre: "Overpass", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --kit-fond: #f2f4f8; --kit-texte: #14182b; --kit-doux: #4f566c; --kit-carte: #fff; --kit-bord: #dde1ea;
+  --kit-accent: #2747c9; --kit-sur-accent: #fff; --kit-encre-noire: #000;
+  --kit-juste: #15803d; --kit-faux: #b42318;
   color-scheme: light dark;
 }
-[data-categorie="francais"]     { --kit-accent: #c2410c; --kit-accent-doux: #fdeee5; }
-[data-categorie="mathematiques"] { --kit-accent: #2f6fed; --kit-accent-doux: #e8efff; }
-[data-categorie="sciences"]     { --kit-accent: #0f8a6a; --kit-accent-doux: #e1f5ef; }
-[data-categorie="histoire"]     { --kit-accent: #8a5a14; --kit-accent-doux: #f6eddf; }
-[data-categorie="geographie"]   { --kit-accent: #0e7490; --kit-accent-doux: #e0f3f8; }
-[data-categorie="langues"]      { --kit-accent: #9333ea; --kit-accent-doux: #f3e8ff; }
-[data-categorie="arts"]         { --kit-accent: #db2777; --kit-accent-doux: #fde7f1; }
-[data-categorie="autre"]        { --kit-accent: #4b5563; --kit-accent-doux: #eef0f3; }
+[data-categorie="francais"]      { --kit-accent: #c2410c; }
+[data-categorie="mathematiques"] { --kit-accent: #2f6fed; }
+[data-categorie="sciences"]      { --kit-accent: #0f8a6a; }
+[data-categorie="histoire"]      { --kit-accent: #8a5a14; }
+[data-categorie="geographie"]    { --kit-accent: #0e7490; }
+[data-categorie="langues"]       { --kit-accent: #9333ea; }
+[data-categorie="arts"]          { --kit-accent: #db2777; }
+[data-categorie="autre"]         { --kit-accent: #4b5563; }
+/* --kit-accent-fort : l'accent des textes et des aplats sous texte blanc ; en clair, la couleur de ligne foncée de
+   DESIGN.md (82 % de ligne, 18 % d'encre noire), pour un contraste AA sur le fond comme sous --kit-sur-accent. */
+:root, [data-categorie] {
+  --kit-accent-fort: color-mix(in srgb, var(--kit-accent) 82%, var(--kit-encre-noire));
+  --kit-accent-doux: color-mix(in srgb, var(--kit-accent) 12%, var(--kit-carte));
+  --kit-juste-fond: color-mix(in srgb, var(--kit-juste) 12%, var(--kit-carte));
+  --kit-faux-fond: color-mix(in srgb, var(--kit-faux) 10%, var(--kit-carte));
+}
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --kit-fond: #1a1a1d; --kit-texte: #ececec; --kit-doux: #a0a0a8; --kit-carte: #25252a; --kit-bord: #3a3a42;
-    --kit-juste: #4ade80; --kit-juste-fond: #16321f; --kit-faux: #f87171; --kit-faux-fond: #3a1d1d;
+    --kit-fond: #0f1220; --kit-texte: #e8eaf3; --kit-doux: #a6acc2; --kit-carte: #1a1e30; --kit-bord: #2c3248;
+    --kit-accent: #8aa2ff; --kit-sur-accent: #0f1220;
+    --kit-juste: #5ad98a; --kit-faux: #f58b8b;
   }
-  [data-categorie] { --kit-accent-doux: color-mix(in srgb, var(--kit-accent) 22%, #1a1a1d); }
   [data-categorie="francais"]      { --kit-accent: #fb923c; }
   [data-categorie="mathematiques"] { --kit-accent: #7aa2ff; }
   [data-categorie="sciences"]      { --kit-accent: #34d399; }
@@ -31,7 +46,13 @@
   [data-categorie="langues"]       { --kit-accent: #c084fc; }
   [data-categorie="arts"]          { --kit-accent: #f472b6; }
   [data-categorie="autre"]         { --kit-accent: #9ca3af; }
-  :root:not([data-categorie]) { --kit-accent: #7aa2ff; --kit-accent-doux: #22304d; }
+  /* En sombre, la ligne elle-même porte le texte sombre --kit-sur-accent. */
+  :root, [data-categorie] {
+    --kit-accent-fort: var(--kit-accent);
+    --kit-accent-doux: color-mix(in srgb, var(--kit-accent) 22%, var(--kit-carte));
+    --kit-juste-fond: color-mix(in srgb, var(--kit-juste) 18%, var(--kit-carte));
+    --kit-faux-fond: color-mix(in srgb, var(--kit-faux) 18%, var(--kit-carte));
+  }
 }
 
 /* Quiz */
@@ -59,7 +80,7 @@
 .kit-quiz-sur { font: inherit; padding: .4rem .9rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }
 /* Lecture à voix haute (#76) : le bouton « 🔊 » de la page et de chaque question. */
 .kit-lecture { display: block; width: fit-content; font: inherit; font-size: .95rem; padding: .3rem .8rem; margin-bottom: .5rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }
-.kit-lecture[aria-pressed="true"] { background: var(--kit-accent); color: #fff; }
+.kit-lecture[aria-pressed="true"] { background: var(--kit-accent-fort); border-color: var(--kit-accent-fort); color: var(--kit-sur-accent); }
 .kit-lecture[hidden] { display: none; }
 .kit-quiz-retour { margin-top: .7rem; padding: .6rem .9rem; border-radius: 10px; }
 .kit-quiz-retour p { margin: .3rem 0 0; }
@@ -99,7 +120,7 @@
 .kit-associer-colonne { display: flex; flex-direction: column; gap: .5rem; }
 .kit-associer-element { display: flex; align-items: center; gap: .5rem; }
 .kit-associer-numero { flex: none; min-width: 1.6em; height: 1.6em; border-radius: 999px; text-align: center; line-height: 1.6em; font-weight: 700; border: 1px dashed var(--kit-bord); }
-.kit-associer-relie .kit-associer-numero { border: none; background: var(--kit-accent); color: var(--kit-carte); }
+.kit-associer-relie .kit-associer-numero { border: none; background: var(--kit-accent-fort); color: var(--kit-sur-accent); }
 
 /* Classer : les éléments à ranger, puis une case par catégorie (son bouton, puis ce qui y est rangé). */
 .kit-classer-a-ranger, .kit-classer-contenu { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -124,5 +145,5 @@
 
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
-.kit-quiz-score { font-size: 1.4rem; font-weight: 700; color: var(--kit-accent); }
+.kit-quiz-score { font: 800 1.4rem/1.2 var(--kit-police-titre); color: var(--kit-accent-fort); }
 .kit-quiz-erreur { color: var(--kit-faux); }

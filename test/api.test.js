@@ -787,6 +787,13 @@ test('Dépassement : le résultat bonus est gardé avec le score, un résultat i
   assert.equal((await resume()).fusees, 1);
 });
 
+test('Kit : les polices de l\'appli que cite le style de base sont servies à une Page de leçon (#111)', async () => {
+  const css = await (await fetch(`${base}/kit/v1/base.css`)).text();
+  const polices = [...css.matchAll(/url\((\/polices\/[^)]+\.woff2)\)/g)].map((m) => m[1]);
+  assert.deepEqual(new Set(polices), new Set(['/polices/atkinson-latin.woff2', '/polices/atkinson-latin-ext.woff2', '/polices/overpass-latin.woff2', '/polices/overpass-latin-ext.woff2']));
+  for (const police of polices) assert.equal((await fetch(`${base}${police}`)).status, 200, police);
+});
+
 test('Kit : servi sous son chemin versionné (quiz, rendu d\'une question, logique, style de base et du quiz, documentation)', async () => {
   for (const [fichier, type] of [['quiz.js', 'text/javascript'], ['question.js', 'text/javascript'], ['quiz-logique.js', 'text/javascript'], ['lecture.js', 'text/javascript'], ['lecture-logique.js', 'text/javascript'], ['base.css', 'text/css'], ['quiz.css', 'text/css'], ['LISEZMOI.md', 'text/markdown']]) {
     const res = await fetch(`${base}/kit/v1/${fichier}`);

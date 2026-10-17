@@ -21,9 +21,15 @@ colors:
   station-atteinte: "#ffffff"
   hachure: "#ffffff"
   encre-noire: "#000000"
+  voile: "rgb(20 24 43 / .5)"
   rouge: "#b42318"
   orange: "#a8530b"
   vert: "#15803d"
+  palier-bronze: "#9a5a24"
+  palier-argent: "#6b7684"
+  palier-or: "#9a7206"
+  palier-diamant: "#1f7fb3"
+  palier-unique: "#8e44ad"
   ligne-francais: "#c2410c"
   ligne-mathematiques: "#2f6fed"
   ligne-sciences: "#0f8a6a"
@@ -47,9 +53,15 @@ colors:
   station-vide-sombre: "#737a96"
   troncon-sombre: "#2f3550"
   hachure-sombre: "#d9dce6"
+  voile-sombre: "rgb(0 0 0 / .65)"
   rouge-sombre: "#f58b8b"
   orange-sombre: "#f5b14c"
   vert-sombre: "#5ad98a"
+  palier-bronze-sombre: "#d99a62"
+  palier-argent-sombre: "#b6c0cb"
+  palier-or-sombre: "#e8c04a"
+  palier-diamant-sombre: "#6cc4ef"
+  palier-unique-sombre: "#c792e6"
   ligne-francais-sombre: "#fb923c"
   ligne-mathematiques-sombre: "#7aa2ff"
   ligne-sciences-sombre: "#34d399"
@@ -261,7 +273,7 @@ Le monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des c
 
 Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par la préférence de l'appareil ; l'en-tête reste bleu nuit dans les deux.
 
-**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne) et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Séance, Révisions du jour, Mes badges et son calendrier, Vue parent, Profil, nouvelle Leçon, cadrage) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`, pulsation du bouton d'action en Séance, couleurs de Palier des Badges). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
+**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), la Séance (en-tête sur la ligne de la Leçon, bulle du prof, Retour de quiz, Rebond), Nouvelle leçon (Propositions et Cadrage), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Révisions du jour, Vue parent, Profil) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
 
 **Key Characteristics:**
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
@@ -286,6 +298,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Vert Retenu** (`retenu`) : ce qui tient en mémoire. Station Retenue, terminus allumé, pastille « Acquis ✓ ».
 - **Jaune Nouveau** (`nouveau`) : la seule couleur de ce qui est nouveau, distincte de toutes les couleurs de ligne, texte `sur-nouveau` bleu nuit : la pastille « Nouveau » (dans le compteur d'Étoiles et ailleurs).
 - **Mots de Maîtrise** (`rouge`, `orange`, `vert`) : la couleur du texte des paliers « à revoir », « à consolider », « bien en tête », et de « Objectif du jour atteint ». Texte seulement, jamais en aplat.
+- **Paliers des Badges** (`palier-bronze`, `palier-argent`, `palier-or`, `palier-diamant`, `palier-unique`, et leurs variantes `-sombre`) : l'anneau de la pastille d'un Badge, sur un fond pâle de la même teinte (`color-mix(in srgb, var(--palier) 18%, var(--carte))`). Les valeurs claires sont foncées et les sombres éclaircies pour que l'anneau tienne 3:1 contre la carte et contre son fond. Jamais en aplat plein, jamais hors d'une pastille de Badge.
 
 ### Neutral
 - **Gris froid du fond** (`fond`) : le fond de page, sur lequel les cartes se détachent.
@@ -297,6 +310,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Hachure** (`hachure`, `hachure-sombre`) : le fond clair entre les hachures des stations « à confirmer ».
 - **Encre noire** (`encre-noire`) : ne sert qu'à foncer une couleur de ligne (`color-mix`), jamais en aplat.
 - **Voie vide** (`troncon`) : les tronçons de ligne pas encore parcourus.
+- **Voile** (`voile`, `voile-sombre`) : le voile translucide posé sur la Page de leçon derrière une question du prof ou une attente, en Séance, et sous la boîte de dialogue modale du Cadrage ; nuit à 50 % en clair, noir à 65 % en sombre.
 - **Station vide** (`station-vide`) : l'anneau des stations pas encore évaluées, les hachures « à confirmer », le contour des tampons vides et du terminus éteint.
 
 ### Named Rules
@@ -339,14 +353,14 @@ Le rythme vertical : 2.2rem avant « Mes leçons », 1.4rem entre Catégories, 1
 
 ## Elevation & Depth
 
-Le système est plat, avec un soupçon de pose : les cartes de ligne et le bandeau de la semaine reposent sur le fond gris froid grâce à leur bordure `bord` et à une ombre ambiante très diffuse teintée de bleu nuit (`--ombre: 20 24 43`, noir en sombre). Aucun autre élément n'a d'ombre portée. La profondeur sur la ligne est faite de halos : le terminus et la station « vous êtes ici » sont détourés d'un anneau à la couleur de la carte, qui les découpe du trait.
+Le système est plat, avec un soupçon de pose : les cartes de ligne et le bandeau de la semaine reposent sur le fond gris froid grâce à leur bordure `bord` et à une ombre ambiante très diffuse teintée de bleu nuit (`--ombre: 20 24 43`, noir en sombre). Il n'y a que deux poses, déclarées en variables sur le `:root` de `public/style.css` : `--ombre-carte` et `--ombre-bandeau`. Hors des cartes de ligne et du bandeau, seuls trois éléments en portent une : les cartes de Séance posées sur la Page de leçon et la boîte de dialogue du Cadrage prennent la pose de carte de ligne, le calendrier de Mes badges la pose du bandeau. Les cartes simples n'en ont pas. La profondeur sur la ligne est faite de halos : le terminus et la station « vous êtes ici » sont détourés d'un anneau à la couleur de la carte, qui les découpe du trait.
 
 ### Shadow Vocabulary
-- **Pose de carte de ligne** (`box-shadow: 0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon.
-- **Pose du bandeau** (`box-shadow: 0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine.
+- **Pose de carte de ligne** (`--ombre-carte` : `0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon, en Séance les cartes posées sur la Page de leçon (bulle du prof, Retour de quiz, Leçon terminée), et le Cadrage de Nouvelle leçon.
+- **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine et le calendrier de Mes badges.
 - **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station.
 - **Découpe du terminus** (`box-shadow: 0 0 0 .2rem var(--carte)`) : sépare le cartouche du trait.
-- **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau.
+- **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau et le calendrier.
 
 ### Named Rules
 **La règle de la pose légère.** Les ombres sont ambiantes et teintées de nuit, jamais décalées ni dures ; un élément ne monte pas au survol, il change de teinte.
@@ -367,19 +381,20 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Continuer (bouton de ligne) :** fond de la ligne foncée, texte blanc, graisse 800, 2.75rem de haut ; au survol, `brightness(1.1)` ; à l'appui, descend d'1px. En sombre, il devient un aplat de ligne à 22 % sur la carte, cerclé de 2px de couleur de ligne, texte `texte`.
 - **Apprendre quelque chose de nouveau :** fond `nuit`, texte `sur-nuit` ; en sombre, il s'inverse (fond `texte-sombre`, texte `fond-sombre`).
 - **Révisions du jour :** bouton plein à deux lignes (titre fort, détail en petit) quand des Questions sont dues, secondaire sinon.
+- **Rebond (Séance) :** la suite recommandée après un quiz est un bouton plein à deux lignes (action en 800, score du quiz en petit), 12px, 2.75rem de haut ; les autres Rebonds sont des boutons secondaires. Aucun bouton ne pulse.
 - **Focus :** anneau de 3px `accent`, décalé de 2px, sur tout élément.
 - **Désactivé :** opacité 0.5.
 
 ### Chips
 - **Compteur d'Étoiles :** pilule `sur-nuit` à 12 % sur la nuit (20 % au survol), ⭐ et total en chiffres tabulaires 800 ; ouvre Mes badges.
 - **Nouveau :** pilule `nouveau`, 0.75rem, graisse 700.
-- **Acquis ✓ :** pilule `retenu` sur le mot de Maîtrise (en-tête de la Séance). Sur une carte de ligne, une Leçon acquise ne le dit qu'une fois : par le terminus allumé, qui porte la Maîtrise en infobulle.
+- **Acquis ✓ :** pilule `retenu` sur le mot de Maîtrise, là où aucune ligne ne l'accompagne. Sur une carte de ligne comme dans l'en-tête de la Séance, une Leçon acquise ne le dit qu'une fois : par le terminus allumé, qui porte la Maîtrise en infobulle.
 - **Niveau :** cartouche de ligne foncée, capitales Overpass.
 
 ### Cards / Containers
 - **Corner Style:** 18px (carte de ligne, bandeau), 14px (carte simple).
 - **Background:** `carte` sur `fond`.
-- **Shadow Strategy:** pose légère (voir Elevation & Depth) pour la carte de ligne et le bandeau ; les cartes simples n'ont que leur filet.
+- **Shadow Strategy:** pose légère (voir Elevation & Depth) pour la carte de ligne, le bandeau, les cartes de Séance, le Cadrage et le calendrier ; les cartes simples n'ont que leur filet.
 - **Border:** 1px `bord`.
 - **Internal Padding:** 1.05rem 1.25rem 0.5rem pour la carte de ligne (0.95rem 1rem 0.4rem sous 640px), 1rem pour la carte simple.
 
@@ -400,6 +415,13 @@ La signature du système. Le trait est à la couleur de la Catégorie jusqu'à l
 - **Terminus :** cartouche « ACQUIS » en label signalétique, filet `station-vide`, texte `doux` ; allumé, il devient un aplat `retenu` « ACQUIS ✓ ».
 - La ligne entière porte un texte alternatif (« 3 sur 5 Objectifs atteints, 1 Retenu… »). Le dépliant « Voir les Objectifs » reprend chaque station en légende de sa ligne de texte, avec son état en mots ; il s'ouvre en hauteur (0.22s, ease-out), chevron tournant.
 
+### La Séance
+La Page de leçon remplit l'écran sous un en-tête de Séance qui situe l'Élève sur son réseau.
+- **En-tête :** « ← Mes leçons », le cartouche de Niveau et le nom de la Leçon (Title), le mot de Maîtrise (rien quand la Leçon est acquise : le terminus allumé le dit), puis la ligne de la Leçon (`ligneLecon`, prochaine station en « vous êtes ici ») et « Ma fiche ». Sous 640px, la ligne passe sur sa propre rangée.
+- **Bulle du prof :** carte 18px à pose légère, au centre, sur le `voile` quand une page est dessous ; Réponses proposées en boutons pleins de 12px.
+- **Retour de quiz :** carte 18px à pose légère en bas à droite, bouton ✕ secondaire de 2.6rem, au-dessus du Rebond.
+- **Leçon terminée :** carte 18px à pose légère, « 🏆 Leçon terminée » en Title Overpass, score du Défi et récompenses dessous.
+
 ### Le bandeau de la semaine
 Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label signalétique au-dessus et les gains du jour (⭐, 🚀, pastilles de Badge, 📅 contrôle) dessous.
 - **Vide :** contour en tirets `station-vide`, date en `doux` ; **futur :** contour en points, date atténuée.
@@ -407,6 +429,17 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
 - **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
+
+### Mes badges
+L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusées à droite en chiffres tabulaires), puis deux colonnes (une seule sous 900px) : le calendrier à gauche, la collection à droite.
+- **Calendrier :** une carte comme le bandeau de la semaine (18px, pose du bandeau), le mois en titre entre deux boutons secondaires ‹ ›, les noms de jours en label signalétique, puis un tampon de jour par date, le même que le bandeau (`tamponJour` dans `public/app.js`) : vide, futur, pâle, plein, 🛡️ Joker, aujourd'hui. Chaque jour est un bouton ; le jour touché est entouré d'un anneau `texte` détouré de la carte, comme « vous êtes ici », et son détail (Leçons, quiz, Révisions du jour, gains) s'affiche sous un filet pointillé. Aujourd'hui est montré à l'ouverture.
+- **Collection :** des cartes simples, la pastille du Badge à gauche, le nom, les Paliers obtenus avec leur date et la progression à côté ; un Badge pas encore obtenu est grisé.
+
+### Propositions et Cadrage (Nouvelle leçon)
+- **Proposition :** carte simple cliquable (14px, filet, pas d'ombre), dans une grille fluide (`minmax(min(100%, 17rem), 1fr)`). Elle porte la couleur de sa Catégorie par `--ligne`, seulement sur sa puce. Son type est dit en mots dans une cartouche de signalétique (Overpass 800, 0.74rem, capitales) : **Pour aller plus loin** (une suite) en aplat de ligne foncée, comme le cartouche de Niveau, puisqu'elle prolonge une ligne déjà ouverte ; **Nouveau sujet** en filet `station-vide`, texte `doux`, comme le terminus éteint. « 🎒 Au programme » est un mot gras à côté, sans pastille. Puis le titre (Overpass 800, 1.15rem), la Catégorie en `doux` derrière sa puce, et l'accroche.
+- **Les deux autres voies** (réviser une leçon de classe, apprendre ce que tu veux) : deux cartes simples côte à côte sous les Propositions (une seule colonne sur téléphone), titre en Headline, champs étiquetés, bouton plein de 2.75rem.
+- **Cadrage :** une boîte de dialogue modale native (`<dialog>`), carte de 18px à la pose de carte de ligne, posée sur le `voile`. « Question 1 sur 2 » en `doux`, la question en titre de section, les réponses en boutons secondaires empilés (2.75rem de haut, 12px), « ✕ » en bouton secondaire carré dans le coin. Échap ou « ✕ » annule et rend le focus à ce qui l'avait.
+- **Jamais de bande de couleur sur le côté d'une carte** pour dire un type : `test/style.test.js` refuse toute bordure latérale plus épaisse qu'un filet.
 
 ## Do's and Don'ts
 
@@ -425,4 +458,4 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Don't** revenir à une grille de cartes boutons identiques remplies de listes de texte.
 - **Don't** poser d'ombre décalée ou dure, ni faire monter un élément au survol.
 - **Don't** utiliser de capitales espacées hors des cartouches de signalétique.
-- **Don't** reprendre comme modèle les valeurs codées en dur des écrans hérités (verts et ors de la Séance, pulsation, ombres noires en `rgba`).
+- **Don't** reprendre comme modèle les valeurs codées en dur des écrans hérités (couleurs de Palier en dur, ombres noires en `rgba`).

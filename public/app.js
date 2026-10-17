@@ -194,6 +194,8 @@ const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
 // en sont les stations. L'état d'un Objectif se lit à la forme de sa station : vide (pas encore évalué), hachurée
 // (à confirmer), blanche (atteint), verte (Retenu). Le terminus « Acquis » s'allume au palier de Maîtrise Acquis.
 const cleCategorie = (categorie) => categorie.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+// La couleur de ligne d'une Catégorie, en style à poser sur ce qui la porte (carte, section, en-tête de Séance).
+const styleLigne = (categorie) => `--ligne: var(--ligne-${cleCategorie(categorie)}, var(--ligne-autre))`;
 const ETATS_STATION = [
   { cle: 'retenu', classe: 'retenue', libelle: 'Retenu' },
   { cle: 'atteint', classe: 'atteinte', libelle: 'atteint' },
@@ -247,7 +249,7 @@ const controleAVenir = (l) => Number.isInteger(l.joursAvantControle) && l.joursA
 function carteLecon(l) {
   const objectifs = l.objectifs ?? [];
   const adresse = `#/lecon/${l.id}`;
-  return h('article', { className: 'lecon', style: `--ligne: var(--ligne-${cleCategorie(l.categorie)}, var(--ligne-autre))` },
+  return h('article', { className: 'lecon', style: styleLigne(l.categorie) },
     h('div', { className: 'lecon-tete' },
       l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
       h('h4', {}, h('a', { href: adresse }, l.titre)),
@@ -278,7 +280,7 @@ async function ecranAccueil(profil) {
     lecons.length === 0 && h('div', { className: 'reseau-vide' },
       h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Ton réseau est encore vide'), h('span', { className: 'terminus' }, 'Acquis')),
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
-    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: `--ligne: var(--ligne-${cleCategorie(c)}, var(--ligne-autre))` },
+    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: styleLigne(c) },
       h('h3', {}, c),
       h('div', { className: 'lecons-grille' }, parCategorie[c].map(carteLecon)))));
 }
@@ -297,22 +299,28 @@ function joursDeLaSemaine(aujourdhui) {
 }
 const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atteint' };
 
+// Un jour en tampon, seule façon de dessiner un jour : le bandeau de la semaine et le calendrier de Mes badges.
+// Une journée : { jour, etat, joker, gains… }, celle du calendrier du serveur ou jourSansRien. classeJour porte l'état
+// (vide, pâle, plein), aujourd'hui et futur ; lectureJour le dit en mots, le tampon étant muet.
+const classeJour = ({ jour, etat }, aujourdhui) => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}`;
+const lectureJour = (nom, { jour, etat, joker }, aujourdhui) => [nom, jour === aujourdhui && "aujourd'hui", ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
+const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), joker && h('span', { className: 'joker' }, '🛡️'));
+
 function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
-  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
   const caseJour = (jour, i) => {
-    const j = parJour.get(jour) ?? jourSansRien(jour);
-    const futur = jour > aujourdhui;
-    const lecture = [JOURS_ENTIERS[i], jour === aujourdhui && "aujourd'hui", ETATS_JOUR[j.etat], j.joker && 'protégé par un joker'].filter(Boolean).join(', ');
-    return h('li', { className: `jour ${j.etat}${jour === aujourdhui ? ' aujourdhui' : ''}${futur ? ' futur' : ''}` },
-      h('span', { className: 'cache' }, lecture),
+    const journee = parJour.get(jour) ?? jourSansRien(jour);
+    const { gains } = journee;
+    return h('li', { className: classeJour(journee, aujourdhui) },
+      h('span', { className: 'cache' }, lectureJour(JOURS_ENTIERS[i], journee, aujourdhui)),
       h('span', { className: 'nom', ariaHidden: 'true' }, JOURS_SEMAINE[i]),
-      h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), j.joker && h('span', { className: 'joker' }, '🛡️')),
-      (j.gains.etoiles > 0 || j.gains.fusees > 0) && h('span', { className: 'gains' },
-        j.gains.etoiles > 0 && h('span', { title: pluriel(j.gains.etoiles, 'Étoile') }, `⭐${j.gains.etoiles > 1 ? j.gains.etoiles : ''}`),
-        j.gains.fusees > 0 && h('span', { title: pluriel(j.gains.fusees, 'Fusée') }, `🚀${j.gains.fusees > 1 ? j.gains.fusees : ''}`)),
-      j.gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
-        j.gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
+      tamponJour(journee),
+      (gains.etoiles > 0 || gains.fusees > 0) && h('span', { className: 'gains' },
+        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, `⭐${gains.etoiles > 1 ? gains.etoiles : ''}`),
+        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, `🚀${gains.fusees > 1 ? gains.fusees : ''}`)),
+      gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
+        gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
       controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}` }, '📅')));
   };
   const objectif = o.atteint
@@ -341,9 +349,10 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
 const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore' }, emoji);
 const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
 
-// Mes badges (#95) : la collection des Badges, obtenus avec leur Palier et leur date, à venir en grisé avec leur
-// progression (« 7/15 »), le total d'Étoiles et de Fusées de l'Élève (#96) et le calendrier des Jours travaillés (#99).
-// L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
+// Mes badges (#95) : en tête, le total d'Étoiles et de Fusées de l'Élève (#96) ; puis le calendrier des Jours
+// travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection des Badges, obtenus avec leur
+// Palier et leur date, à venir en grisé avec leur progression (« 7/15 »). L'ouvrir efface « Nouveau » ; le mot
+// d'accueil s'affiche à la première ouverture.
 async function ecranBadges(profil) {
   const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
@@ -351,71 +360,84 @@ async function ecranBadges(profil) {
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
-    h('h2', {}, '🏅 Mes badges'),
+    h('div', { className: 'badges-tete' },
+      h('h2', {}, 'Mes badges'),
+      totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
+        `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`)),
     accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
-    totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
-      `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`),
-    calendrierJours(calendrier),
-    h('div', { className: 'grille badges' }, collection.map((b) => {
-      const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
-      return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
-        pastilleBadge(b),
-        h('strong', {}, b.nom),
-        obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
-        b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`));
-    })));
+    h('div', { className: 'badges-corps' },
+      calendrierJours(calendrier),
+      h('section', { className: 'collection', ariaLabel: 'Ma collection' },
+        h('h3', {}, 'Ma collection'),
+        h('div', { className: 'grille badges' }, collection.map((b) => {
+          const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
+          return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
+            pastilleBadge(b),
+            h('div', {},
+              h('strong', {}, b.nom),
+              obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
+              b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`)));
+        })))));
 }
 
-// Calendrier des Jours travaillés (#99), mois par mois : pâle quand l'Élève a travaillé, plein quand l'Objectif du
-// jour est atteint, 🛡️ quand un Joker a couvert le jour. Toucher un jour montre ce qui a été fait et gagné, sans score.
+// Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour comme le bandeau de la semaine : pâle quand
+// l'Élève a travaillé, plein quand l'Objectif du jour est atteint, 🛡️ quand un Joker a couvert le jour. Toucher un jour
+// montre à côté ce qui a été fait et gagné, sans score ; aujourd'hui est montré à l'ouverture.
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const moisSuivant = (mois, n) => { const [a, m] = mois.split('-').map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
 function calendrierJours({ aujourdhui, jours }) {
-  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
   const premier = (jours[0]?.jour ?? aujourdhui).slice(0, 7);
   const dernier = aujourdhui.slice(0, 7);
   let mois = dernier;
-  const bloc = h('section', { className: 'calendrier' });
-  const detail = (j) => {
-    const faits = [j.quiz && `${j.quiz} quiz`, j.revisions && pluriel(j.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
-    const gains = [j.gains.etoiles && `⭐ ${j.gains.etoiles}`, j.gains.fusees && `🚀 ${j.gains.fusees}`].filter(Boolean).join(' · ');
-    return h('div', { className: 'carte calendrier-detail' },
-      h('strong', {}, dateBadge(j.jour)),
-      j.lecons.length > 0 && h('small', {}, `📚 ${j.lecons.map((l) => l.titre).join(', ')}`),
-      faits && h('small', {}, faits),
-      j.joker && h('small', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
-      (gains || j.gains.paliers.length > 0) && h('small', {}, gains && `Gagné : ${gains} `,
-        j.gains.paliers.map((p) => h('span', {}, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
-      !faits && !j.lecons.length && !j.joker && !gains && !j.gains.paliers.length && h('small', {}, 'Rien ce jour-là.'));
+  const bloc = h('section', { className: 'mon-calendrier', ariaLabel: 'Mon calendrier' });
+  const detail = (journee) => {
+    const faits = [journee.quiz && `${journee.quiz} quiz`, journee.revisions && pluriel(journee.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
+    const gains = [journee.gains.etoiles && `⭐ ${journee.gains.etoiles}`, journee.gains.fusees && `🚀 ${journee.gains.fusees}`].filter(Boolean).join(' · ');
+    return [
+      h('strong', {}, dateBadge(journee.jour)),
+      journee.lecons.length > 0 && h('p', {}, `📚 ${journee.lecons.map((l) => l.titre).join(', ')}`),
+      faits && h('p', {}, faits),
+      journee.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
+      (gains || journee.gains.paliers.length > 0) && h('p', {}, gains && `Gagné : ${gains} `,
+        journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
+      !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, 'Rien ce jour-là.')];
   };
-  const afficher = (choisi) => {
+  const afficher = (choisi, focaliser = true) => {
     const [a, m] = mois.split('-').map(Number);
     const decalage = (new Date(a, m - 1, 1).getDay() + 6) % 7; // lundi en premier
     const nombre = new Date(a, m, 0).getDate();
     const cases = [...Array(decalage).fill(null), ...Array.from({ length: nombre }, (_, i) => `${mois}-${String(i + 1).padStart(2, '0')}`)];
-    const zone = h('div', {});
+    let aFocaliser = null;
     bloc.replaceChildren(
-      h('div', { className: 'calendrier-mois' },
-        h('button', { className: 'secondaire', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(); } }, '‹'),
-        h('strong', {}, `${MOIS[m - 1]} ${a}`),
-        h('button', { className: 'secondaire', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(); } }, '›')),
-      h('div', { className: 'calendrier-grille' },
-        ['lu', 'ma', 'me', 'je', 've', 'sa', 'di'].map((d) => h('span', { className: 'calendrier-entete' }, d)),
-        cases.map((jour) => {
-          if (!jour) return h('span', {});
-          const j = duJour(jour);
-          return h('button', {
-            className: `calendrier-jour ${j.etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour === choisi ? ' choisi' : ''}`,
-            disabled: jour > aujourdhui,
-            onclick: () => afficher(jour),
-          }, String(Number(jour.slice(8))), j.joker && h('span', { className: 'calendrier-joker' }, '🛡️'));
-        })),
-      zone);
-    if (choisi) zone.append(detail(duJour(choisi)));
+      h('div', { className: 'calendrier-jours' },
+        h('div', { className: 'calendrier-mois' },
+          h('button', { className: 'secondaire', ariaLabel: 'Mois précédent', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(); } }, '‹'),
+          h('strong', {}, `${MOIS[m - 1]} ${a}`),
+          h('button', { className: 'secondaire', ariaLabel: 'Mois suivant', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(); } }, '›')),
+        h('div', { className: 'calendrier-grille' },
+          JOURS_SEMAINE.map((d) => h('span', { className: 'nom', ariaHidden: 'true' }, d)),
+          cases.map((jour) => {
+            if (!jour) return h('span', {});
+            const journee = duJour(jour);
+            const nom = `${JOURS_ENTIERS[(new Date(`${jour}T12:00:00`).getDay() + 6) % 7]} ${Number(jour.slice(8))} ${MOIS[m - 1]}`;
+            const bouton = h('button', {
+              className: `${classeJour(journee, aujourdhui)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
+              ariaLabel: lectureJour(nom, journee, aujourdhui),
+              ariaPressed: String(jour === choisi),
+              disabled: jour > aujourdhui,
+              onclick: () => afficher(jour),
+            }, tamponJour(journee));
+            if (jour === choisi) aFocaliser = bouton;
+            return bouton;
+          }))),
+      h('div', { className: 'calendrier-detail', ariaLive: 'polite' },
+        choisi ? detail(duJour(choisi)) : h('p', { className: 'doux' }, 'Touche un jour pour voir ce que tu as fait et gagné.')));
+    if (focaliser) aFocaliser?.focus();
   };
-  afficher();
+  afficher(aujourdhui, false); // le détail d'aujourd'hui d'abord, sans prendre le focus
   return bloc;
 }
 
@@ -432,7 +454,7 @@ function recapitulatifSemaine(profil, recap) {
   const faits = [recap.revisions && pluriel(recap.revisions, 'révision'), recap.pages && pluriel(recap.pages, 'page') + ' de leçon',
     recap.joursAtteints && `Objectif du jour atteint ${recap.joursAtteints === 1 ? 'un jour' : `${recap.joursAtteints} jours`}`].filter(Boolean).join(' · ');
   const carte = h('div', { className: 'carte recapitulatif' },
-    h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => {
+    h('button', { className: 'secondaire fermer', title: 'Fermer', ariaLabel: 'Fermer le retour', onclick: () => {
       try { localStorage.setItem(cleRecapitulatif(profil, recap), '1'); } catch { /* stockage indisponible */ }
       carte.remove();
     } }, '✕'),
@@ -517,23 +539,26 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
   lecteur.readAsDataURL(fichier);
 });
 
-// Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, par-dessus l'écran.
-// L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions
-// posées selon le mode viennent de la configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
+// Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, dans une carte en
+// boîte de dialogue modale (le reste de l'écran est inerte sous le voile). L'Élève touche une réponse (« Je ne sais
+// pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions posées selon le mode viennent de la
+// configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
 async function cadrer(mode) {
   const cadrage = {};
-  for (const cle of config.questionsCadrage[mode]) {
+  const cles = config.questionsCadrage[mode];
+  for (const [i, cle] of cles.entries()) {
     const { question, reponses } = config.cadrage[cle];
     cadrage[cle] = await new Promise((choisir) => {
-      const fermer = (valeur) => { calque.remove(); document.removeEventListener('keydown', echap); choisir(valeur); };
-      const echap = (e) => e.key === 'Escape' && fermer(null);
-      const calque = h('div', { className: 'cadrage' },
-        h('button', { className: 'secondaire annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'),
-        h('div', { className: 'bulle-prof' }, question),
-        h('div', { className: 'choix' }, Object.entries(reponses).map(([valeur, libelle]) =>
-          h('button', { onclick: () => fermer(valeur) }, libelle))));
-      document.addEventListener('keydown', echap);
-      app.append(calque);
+      const fermer = (valeur) => { boite.close(); boite.remove(); choisir(valeur); };
+      const boite = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
+        cles.length > 1 && h('p', { className: 'cadrage-etape' }, `Question ${i + 1} sur ${cles.length}`),
+        h('h2', { id: 'cadrage-question' }, question),
+        h('div', { className: 'cadrage-choix' }, Object.entries(reponses).map(([valeur, libelle], j) =>
+          h('button', { className: 'secondaire', autofocus: j === 0, onclick: () => fermer(valeur) }, libelle))),
+        h('button', { className: 'secondaire annuler', ariaLabel: 'Annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'));
+      boite.setAttribute('aria-labelledby', 'cadrage-question');
+      app.append(boite);
+      boite.showModal();
     });
     if (cadrage[cle] === null) return null;
   }
@@ -541,7 +566,7 @@ async function cadrer(mode) {
 }
 
 function ecranNouvelleLecon(profil) {
-  const erreur = h('p', { className: 'erreur' });
+  const erreur = h('p', { className: 'erreur', role: 'status' });
   const boutons = [];
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
@@ -549,11 +574,12 @@ function ecranNouvelleLecon(profil) {
   // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
   const cadrages = new Map();
   const demarrer = async (corps, mode, cle) => {
+    const retour = document.activeElement;
     activer(false);
     erreur.textContent = '';
     if (!cadrages.has(cle)) {
       const reponses = await cadrer(mode);
-      if (!reponses) return activer(true); // Cadrage annulé : l'Élève revient à l'écran, rien n'est envoyé
+      if (!reponses) { activer(true); return retour?.focus(); } // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
       cadrages.set(cle, reponses);
     }
     const cadrage = cadrages.get(cle);
@@ -583,10 +609,15 @@ function ecranNouvelleLecon(profil) {
     if (!actif) return;
     const enPreparation = etat === 'en préparation';
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
-    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
-      h('span', { className: 'type' }, p.type === 'suite' ? '➡️ Pour aller plus loin' : '✨ Nouveau sujet'),
-      p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme'),
-      p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
+    // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
+    // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
+    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
+      h('span', { className: 'proposition-tete' },
+        h('span', { className: 'cartouche-type' }, p.type === 'suite' ? 'Pour aller plus loin' : 'Nouveau sujet'),
+        p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
+      h('strong', { className: 'proposition-titre' }, p.titre),
+      h('span', { className: 'proposition-categorie' }, p.categorie),
+      p.accroche && h('span', { className: 'accroche' }, p.accroche)));
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
       autresIdees.disabled = true;
       // Un refus (génération déjà en cours) revient au même : on attend les Propositions qui se préparent.
@@ -596,7 +627,7 @@ function ecranNouvelleLecon(profil) {
     boutonsIdees = [...cartes, autresIdees];
     idees.replaceChildren(
       h('h2', {}, '🎲 Des idées pour toi'),
-      cartes.length > 0 && h('div', { className: 'grille' }, cartes),
+      cartes.length > 0 && h('div', { className: 'propositions' }, cartes),
       enPreparation
         ? h('p', { className: 'doux' }, cartes.length ? '⏳ Nouvelles idées en préparation…' : 'On prépare tes idées…')
         : autresIdees);
@@ -606,36 +637,37 @@ function ecranNouvelleLecon(profil) {
 
   montrer(
     idees,
-    h('h2', {}, '📄 Réviser une leçon de classe'),
-    h('form', { className: 'colonne', onsubmit: (ev) => {
-      ev.preventDefault();
-      demarrer(async () => ({
-        dateControle: dateControle.value || undefined,
-        fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-      }), 'revision', 'revision');
-    } },
-      h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
-      h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
-      boutons[1]),
-    h('h2', {}, '💡 Apprendre ce que tu veux'),
-    h('form', { className: 'colonne', onsubmit: (ev) => {
-      ev.preventDefault();
-      // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
-      const texte = sujet.value.trim();
-      if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
-      if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
-      demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
-    } }, sujet, boutons[0]),
+    h('div', { className: 'nouvelle-voies' },
+      h('section', { className: 'carte' }, h('h2', {}, '📄 Réviser une leçon de classe'),
+        h('form', { className: 'colonne', onsubmit: (ev) => {
+          ev.preventDefault();
+          demarrer(async () => ({
+            dateControle: dateControle.value || undefined,
+            fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
+          }), 'revision', 'revision');
+        } },
+        h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
+        h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
+        boutons[1])),
+      h('section', { className: 'carte' }, h('h2', {}, '💡 Apprendre ce que tu veux'),
+        h('form', { className: 'colonne', onsubmit: (ev) => {
+          ev.preventDefault();
+          // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+          const texte = sujet.value.trim();
+          if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
+          if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
+          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
+        } }, h('label', {}, 'Ce que tu veux apprendre', h('br'), sujet), boutons[0]))),
     erreur);
 }
 
-// Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
+// Libellé du bouton de chaque Rebond ; le serveur ne reçoit que l'action.
 // L'Étape suivante montre le titre de la page annoncée par le prof, s'il est connu.
 const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Étape suivante', reviser: '📚 Réviser', commencer: '🚀 Commencer' };
 const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `${LIBELLES_REBOND.suivante} : ${ensuite}` : LIBELLES_REBOND[action]);
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
-// Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
+// Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton de la suite recommandée.
 // Tout se déduit du dernier message du prof.
 // `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière. `apercu` : ouverte
 // depuis la vue parent, elle n'est pas notée comme une ouverture par l'Élève (indicateurs, #78).
@@ -643,10 +675,10 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   let lecon = await api(`eleves/${profil.slug}/lecons/${id}${apercu ? '' : '?ouverture=1'}`);
   let attente = null; // { texte, centre } pendant que le prof travaille
   let retourFerme = false;
-  const erreur = h('span', { className: 'erreur' });
-  const entete = h('span', {});
+  const erreur = h('span', { className: 'erreur', role: 'alert' });
+  const entete = h('div', { className: 'seance-tete' });
   const panneau = h('div', { className: 'panneau' });
-  const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
+  const calque = h('div', { ariaLive: 'polite' }); // question, attente ou retour de quiz, par-dessus la leçon, annoncés
   const fiche = h('div', { className: 'fiche', style: 'display:none' }); // Ma fiche, par-dessus tout le reste
   // Révisions du jour faites pendant que le prof prépare la suite (#49, US4), dans leur propre calque, comme Ma fiche :
   // elles ne bougent pas quand la page arrive, une barre le signale et ramène à la Leçon.
@@ -681,10 +713,22 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       cadre);
     fiche.style.display = '';
   };
-  const boutonFiche = h('button', { className: 'secondaire', onclick: ouvrirFiche }, '📋 Ma fiche');
+  const boutonFiche = h('button', { className: 'secondaire fiche-ouvrir', onclick: ouvrirFiche }, '📋 Ma fiche');
 
-  const afficherEntete = () => entete.replaceChildren(...garder([` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise),
-    lecon.references.length > 0 && [' ', boutonFiche]]));
+  // En-tête de Séance : l'Élève est sur la ligne de sa Leçon, à la couleur de sa Catégorie, comme sur sa carte
+  // d'accueil : Niveau, nom, mot de Maîtrise (Acquis : dit par le terminus allumé), puis la ligne et sa prochaine station.
+  const afficherEntete = () => {
+    entete.style.cssText = styleLigne(lecon.categorie);
+    entete.replaceChildren(...garder([
+      h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
+      h('div', { className: 'seance-titre' },
+        lecon.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${lecon.niveauLecon}`),
+        h('h2', {}, lecon.titre),
+        lecon.maitrise?.palier !== 'acquis' && badgeMaitrise(lecon.maitrise)),
+      ligneLecon(lecon, { ici: true }),
+      lecon.references.length > 0 && boutonFiche,
+      erreur]));
+  };
   // Le panneau n'est reconstruit que si les pages changent : l'iframe garde sinon sa position (et son quiz).
   const afficherPanneau = () => {
     panneau.style.display = lecon.pages.length ? '' : 'none';
@@ -718,7 +762,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
-          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
+          ? [h('div', { className: 'lecon-terminee' }, h('strong', {}, '🏆 Leçon terminée'), h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]
           : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, prof.retourQuiz.pretest ? 'Pré-test : hors score' : `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
@@ -767,7 +811,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   afficherEntete();
   afficher();
   montrer(
-    h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
+    entete,
     h('div', { className: 'seance' }, panneau, calque, fiche, revisions));
 }
 

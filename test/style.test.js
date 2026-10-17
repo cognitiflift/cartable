@@ -89,29 +89,6 @@ typography:
 // d'extension »). La liste ne peut que rétrécir : quand un écran revient aux jetons, retirer ses lignes ; une
 // exception qui ne correspond plus à rien fait échouer le test. N'en ajouter aucune : créer un jeton.
 const EXCEPTIONS = [
-  ...ecran('En-tête : bouton secondaire sur la nuit', [
-    ['header button.secondaire', 'border-color', 'rgb(255 255 255 / .32)'],
-    ['header button.secondaire:hover', 'background', 'rgb(255 255 255 / .1)'],
-  ]),
-  ...ecran('En-tête : compteur d\'Étoiles', [
-    ['.compteur-etoiles', 'background', 'rgb(255 255 255 / .12)'],
-    ['.compteur-etoiles:hover', 'background', 'rgb(255 255 255 / .2)'],
-  ]),
-  ...ecran('Accueil : bouton « Apprendre quelque chose de nouveau »', [
-    ['.bouton-nouvelle:hover', 'background', '#fff'],
-    ['@media (prefers-color-scheme: dark) .bouton-nouvelle:hover', 'background', '#fff'],
-  ]),
-  ...ecran('Accueil : carte de ligne (ligne foncée et texte dessus)', [
-    ['.lecon', '--ligne-fonce', '#000'],
-    ['.lecon', '--sur-ligne', '#fff'],
-    ['@media (prefers-color-scheme: dark) .lecon', '--sur-ligne', '#0f1220'],
-  ]),
-  ...ecran('Accueil : stations atteinte et à confirmer', [
-    ['.station.a-confirmer', 'background', '#fff'],
-    ['.station.atteinte', 'background', '#fff'],
-    ['@media (prefers-color-scheme: dark) .station.atteinte', 'border-color', '#fff'],
-    ['@media (prefers-color-scheme: dark) .station.a-confirmer', 'background', '#d9dce6'],
-  ]),
   ...ecran('Séance', [
     ['.seance-centre.voile', 'background', 'rgba(0,0,0,.45)'],
     ['.bulle-prof', 'box-shadow', 'rgba(0,0,0,.2)'],

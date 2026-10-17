@@ -21,6 +21,7 @@ colors:
   station-atteinte: "#ffffff"
   hachure: "#ffffff"
   encre-noire: "#000000"
+  voile: "#14182b8c"
   rouge: "#b42318"
   orange: "#a8530b"
   vert: "#15803d"
@@ -47,6 +48,7 @@ colors:
   station-vide-sombre: "#737a96"
   troncon-sombre: "#2f3550"
   hachure-sombre: "#d9dce6"
+  voile-sombre: "#000000b3"
   rouge-sombre: "#f58b8b"
   orange-sombre: "#f5b14c"
   vert-sombre: "#5ad98a"
@@ -261,7 +263,7 @@ Le monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des c
 
 Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par la préférence de l'appareil ; l'en-tête reste bleu nuit dans les deux.
 
-**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne) et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Séance, Révisions du jour, Mes badges et son calendrier, Vue parent, Profil, nouvelle Leçon, cadrage) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`, pulsation du bouton d'action en Séance, couleurs de Palier des Badges). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
+**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), Nouvelle leçon (Propositions et Cadrage) et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Séance, Révisions du jour, Mes badges et son calendrier, Vue parent, Profil) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`, pulsation du bouton d'action en Séance, couleurs de Palier des Badges). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
 
 **Key Characteristics:**
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
@@ -296,6 +298,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Blanc de station** (`station-atteinte`) : le cœur blanc des stations atteintes, et leur anneau en sombre ; blanc dans les deux thèmes.
 - **Hachure** (`hachure`, `hachure-sombre`) : le fond clair entre les hachures des stations « à confirmer ».
 - **Encre noire** (`encre-noire`) : ne sert qu'à foncer une couleur de ligne (`color-mix`), jamais en aplat.
+- **Voile** (`voile`, `voile-sombre`) : le fond translucide posé sous une boîte de dialogue modale (le Cadrage) ; nuit à 55 % en clair, noir à 70 % en sombre.
 - **Voie vide** (`troncon`) : les tronçons de ligne pas encore parcourus.
 - **Station vide** (`station-vide`) : l'anneau des stations pas encore évaluées, les hachures « à confirmer », le contour des tampons vides et du terminus éteint.
 
@@ -407,6 +410,11 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
 - **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
+
+### Propositions et Cadrage (Nouvelle leçon)
+- **Proposition :** carte simple cliquable (14px, filet, pas d'ombre), dans une grille fluide (`minmax(min(100%, 17rem), 1fr)`). Elle porte la couleur de sa Catégorie par `--ligne`, seulement sur sa puce. Son type est dit en mots dans une cartouche de signalétique (Overpass 800, 0.74rem, capitales) : **Pour aller plus loin** (une suite) en aplat de ligne foncée, comme le cartouche de Niveau, puisqu'elle prolonge une ligne déjà ouverte ; **Nouveau sujet** en filet `station-vide`, texte `doux`, comme le terminus éteint. « 🎒 Au programme » est un mot gras à côté, sans pastille. Puis le titre (Overpass 800, 1.15rem), la Catégorie en `doux` derrière sa puce, et l'accroche.
+- **Cadrage :** une boîte de dialogue modale native (`<dialog>`), carte de 18px à la pose de carte de ligne, posée sur le `voile`. « Question 1 sur 2 » en `doux`, la question en titre de section, les réponses en boutons secondaires empilés (2.75rem de haut, 12px), « ✕ » en bouton secondaire carré dans le coin. Échap ou « ✕ » annule et rend le focus à ce qui l'avait.
+- **Jamais de bande de couleur sur le côté d'une carte** pour dire un type : `test/style.test.js` refuse toute bordure latérale plus épaisse qu'un filet.
 
 ## Do's and Don'ts
 

@@ -17,7 +17,7 @@
   --fond:#f2f4f8; --texte:#14182b; --doux:#4f566c; --carte:#fff; --bord:#dde1ea; --ombre:20 24 43;
   --nuit:#14182b; --sur-nuit:#fff; --sur-nuit-doux:#c3c8db;
   --accent:#2747c9; --sur-accent:#fff; --nouveau:#fbbf24; --sur-nouveau:#14182b; --retenu:#15803d; --sur-retenu:#fff; --station-vide:#80879a; --troncon:#dde1ea;
-  --station-atteinte:#fff; --hachure:#fff; --encre-noire:#000;
+  --station-atteinte:#fff; --hachure:#fff; --encre-noire:#000; --voile:#14182b8c;
   --rouge:#b42318; --orange:#a8530b; --vert:#15803d;
   --ligne-francais:#c2410c; --ligne-mathematiques:#2f6fed; --ligne-sciences:#0f8a6a; --ligne-histoire:#8a5a14;
   --ligne-geographie:#0e7490; --ligne-langues:#9333ea; --ligne-arts:#db2777; --ligne-autre:#4b5563;
@@ -26,7 +26,7 @@
 @media (prefers-color-scheme: dark) { :root {
   --fond:#0f1220; --texte:#e8eaf3; --doux:#a6acc2; --carte:#1a1e30; --bord:#2c3248; --ombre:0 0 0;
   --nuit:#14182b; --sur-nuit-doux:#a6acc2;
-  --accent:#8aa2ff; --sur-accent:#0f1220; --nouveau:#fcd34d; --sur-nouveau:#0f1220; --retenu:#34c463; --sur-retenu:#0f1220; --station-vide:#737a96; --troncon:#2f3550; --hachure:#d9dce6;
+  --accent:#8aa2ff; --sur-accent:#0f1220; --nouveau:#fcd34d; --sur-nouveau:#0f1220; --retenu:#34c463; --sur-retenu:#0f1220; --station-vide:#737a96; --troncon:#2f3550; --hachure:#d9dce6; --voile:#000000b3;
   --rouge:#f58b8b; --orange:#f5b14c; --vert:#5ad98a;
   --ligne-francais:#fb923c; --ligne-mathematiques:#7aa2ff; --ligne-sciences:#34d399; --ligne-histoire:#e0a75e;
   --ligne-geographie:#38bdf8; --ligne-langues:#c084fc; --ligne-arts:#f472b6; --ligne-autre:#9ca3af;
@@ -186,13 +186,27 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 @keyframes pulsation { 50% { box-shadow:0 0 0 8px rgba(46,158,91,.25); } }
 .etoiles, .fusees { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
-.carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
-.carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }
-.carte.suite { border-left:4px solid var(--accent); } .carte.suite .type { color:var(--accent); }
-.carte .au-programme { display:block; width:fit-content; font-size:.75rem; font-weight:600; padding:.1rem .5rem; margin-bottom:.4rem; border-radius:999px; background:var(--accent); color:var(--sur-accent); }
-.cadrage { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; padding:1.5rem; overflow-y:auto; background:rgba(0,0,0,.45); }
-.cadrage .annuler { position:absolute; top:1rem; right:1rem; }
-@media (prefers-color-scheme: dark) { .cadrage { background:rgba(0,0,0,.75); } }
+/* Nouvelle leçon . Propositions : cartes simples, puce de la Catégorie, type dit en mots dans une cartouche de
+   signalétique, pleine à la couleur de la ligne pour une suite, en filet pour un sujet original. */
+.propositions { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap:1rem; margin-bottom:1rem; }
+.proposition { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
+@media (prefers-color-scheme: dark) { .proposition { --ligne-fonce:var(--ligne); } }
+.proposition-tete { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .7rem; }
+.cartouche-type { padding:.36rem .5rem .22rem; border-radius:7px; border:.15rem solid var(--station-vide); color:var(--doux); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; }
+.proposition.suite .cartouche-type { background:var(--ligne-fonce); border-color:var(--ligne-fonce); color:var(--sur-ligne); }
+.proposition .au-programme { font-size:.9rem; font-weight:700; }
+.proposition-titre { font:800 1.15rem/1.2 var(--police-titre); letter-spacing:-.01em; text-wrap:balance; }
+.proposition-categorie { display:inline-flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:600; color:var(--doux); }
+.proposition-categorie::before { content:""; flex:none; width:1rem; height:1rem; border-radius:6px; background:var(--ligne); }
+.proposition .accroche { line-height:1.35; text-wrap:pretty; }
+/* Cadrage : une carte en boîte de dialogue modale, posée sur le voile, réponses en boutons secondaires. */
+.cadrage { width:min(34rem, calc(100% - 2rem)); max-height:calc(100dvh - 2rem); overflow-y:auto; padding:1.4rem 1.5rem 1.5rem; border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.cadrage::backdrop { background:var(--voile); }
+.cadrage-etape { margin:0 3rem .35rem 0; font-size:.9rem; font-weight:700; color:var(--doux); }
+.cadrage h2 { margin:0 3rem 1rem 0; font-size:1.45rem; line-height:1.15; text-wrap:balance; }
+.cadrage-choix { display:flex; flex-direction:column; gap:.5rem; }
+.cadrage-choix button { min-height:2.75rem; padding:.6rem 1rem; border-radius:12px; text-align:left; }
+.cadrage .annuler { position:absolute; top:.9rem; right:.9rem; width:2.75rem; height:2.75rem; padding:0; }
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }

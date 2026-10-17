@@ -1,0 +1,1157 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-17T14:31:54+00:00",
+  "title": "Design System: Cartable",
+  "extensions": {
+    "colorMeta": {
+      "fond": {
+        "role": "neutral",
+        "displayName": "Gris froid du fond",
+        "canonical": "#f2f4f8",
+        "oklch": "oklch(96.7% 0.006 264.5)",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#242528",
+          "#404245",
+          "#5f6165",
+          "#808286",
+          "#a3a5a9",
+          "#c7c9cd",
+          "#eceef2"
+        ]
+      },
+      "carte": {
+        "role": "neutral",
+        "displayName": "Blanc des cartes",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "texte": {
+        "role": "neutral",
+        "displayName": "Encre nuit",
+        "canonical": "#14182b",
+        "oklch": "oklch(21.5% 0.038 273.8)",
+        "tonalRamp": [
+          "#07091b",
+          "#1f2438",
+          "#3b4156",
+          "#5a6077",
+          "#7b819a",
+          "#9da4bd",
+          "#c1c8e3",
+          "#e9eeff"
+        ]
+      },
+      "doux": {
+        "role": "neutral",
+        "displayName": "Gris doux",
+        "canonical": "#4f566c",
+        "oklch": "oklch(45.6% 0.037 271.1)",
+        "tonalRamp": [
+          "#060a1b",
+          "#1e2437",
+          "#3b4156",
+          "#596077",
+          "#7a8299",
+          "#9ca4bd",
+          "#c0c8e2",
+          "#e9eefe"
+        ]
+      },
+      "bord": {
+        "role": "neutral",
+        "displayName": "Filet",
+        "canonical": "#dde1ea",
+        "oklch": "oklch(90.9% 0.013 266.7)",
+        "tonalRamp": [
+          "#090b11",
+          "#22252c",
+          "#3f4249",
+          "#5e6169",
+          "#7f828a",
+          "#a1a5ad",
+          "#c5c9d2",
+          "#eaeef8"
+        ]
+      },
+      "nuit": {
+        "role": "primary",
+        "displayName": "Bleu nuit de la marque",
+        "canonical": "#14182b",
+        "oklch": "oklch(21.5% 0.038 273.8)",
+        "tonalRamp": [
+          "#07091b",
+          "#1f2438",
+          "#3b4156",
+          "#5a6077",
+          "#7b819a",
+          "#9da4bd",
+          "#c1c8e3",
+          "#e9eeff"
+        ]
+      },
+      "sur-nuit": {
+        "role": "neutral",
+        "displayName": "Blanc sur nuit",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "sur-nuit-doux": {
+        "role": "neutral",
+        "displayName": "Gris clair sur nuit",
+        "canonical": "#c3c8db",
+        "oklch": "oklch(83.5% 0.027 274.0)",
+        "tonalRamp": [
+          "#080a16",
+          "#212432",
+          "#3d4151",
+          "#5c6071",
+          "#7d8293",
+          "#9fa4b7",
+          "#c3c8db",
+          "#e9eefe"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Bleu de l'accent",
+        "canonical": "#2747c9",
+        "oklch": "oklch(46.5% 0.204 266.9)",
+        "tonalRamp": [
+          "#010133",
+          "#080477",
+          "#1529ac",
+          "#2e50d3",
+          "#4b75fa",
+          "#7fa1f9",
+          "#b3c9fb",
+          "#e7eeff"
+        ]
+      },
+      "sur-accent": {
+        "role": "neutral",
+        "displayName": "Texte sur l'accent",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "nouveau": {
+        "role": "tertiary",
+        "displayName": "Jaune Nouveau",
+        "canonical": "#fbbf24",
+        "oklch": "oklch(83.7% 0.164 84.4)",
+        "tonalRamp": [
+          "#1b0300",
+          "#441202",
+          "#722508",
+          "#a83400",
+          "#d55325",
+          "#fd784c",
+          "#fdb59f",
+          "#ffe9e2"
+        ]
+      },
+      "sur-nouveau": {
+        "role": "neutral",
+        "displayName": "Texte sur Nouveau",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "retenu": {
+        "role": "tertiary",
+        "displayName": "Vert Retenu",
+        "canonical": "#15803d",
+        "oklch": "oklch(52.7% 0.137 150.1)",
+        "tonalRamp": [
+          "#011003",
+          "#022e11",
+          "#095024",
+          "#167438",
+          "#379954",
+          "#5ebd76",
+          "#83e299",
+          "#c7ffd1"
+        ]
+      },
+      "sur-retenu": {
+        "role": "neutral",
+        "displayName": "Texte sur Retenu",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "station-vide": {
+        "role": "neutral",
+        "displayName": "Station vide",
+        "canonical": "#80879a",
+        "oklch": "oklch(62.4% 0.030 269.5)",
+        "tonalRamp": [
+          "#070b15",
+          "#202531",
+          "#3d424f",
+          "#5c616f",
+          "#7c8291",
+          "#9fa5b5",
+          "#c3c9d9",
+          "#e8eefe"
+        ]
+      },
+      "troncon": {
+        "role": "neutral",
+        "displayName": "Voie vide",
+        "canonical": "#dde1ea",
+        "oklch": "oklch(90.9% 0.013 266.7)",
+        "tonalRamp": [
+          "#090b11",
+          "#22252c",
+          "#3f4249",
+          "#5e6169",
+          "#7f828a",
+          "#a1a5ad",
+          "#c5c9d2",
+          "#eaeef8"
+        ]
+      },
+      "rouge": {
+        "role": "tertiary",
+        "displayName": "Rouge « à revoir »",
+        "canonical": "#b42318",
+        "oklch": "oklch(50.0% 0.182 29.5)",
+        "tonalRamp": [
+          "#1f0000",
+          "#4b0502",
+          "#800200",
+          "#b12015",
+          "#da4a3b",
+          "#fc7664",
+          "#fcb5a9",
+          "#ffe9e5"
+        ]
+      },
+      "orange": {
+        "role": "tertiary",
+        "displayName": "Orange « à consolider »",
+        "canonical": "#a8530b",
+        "oklch": "oklch(53.7% 0.133 52.3)",
+        "tonalRamp": [
+          "#170600",
+          "#3c1b03",
+          "#683002",
+          "#964908",
+          "#bf682a",
+          "#e68b50",
+          "#fbb88f",
+          "#feeade"
+        ]
+      },
+      "vert": {
+        "role": "tertiary",
+        "displayName": "Vert « bien en tête »",
+        "canonical": "#15803d",
+        "oklch": "oklch(52.7% 0.137 150.1)",
+        "tonalRamp": [
+          "#011003",
+          "#022e11",
+          "#095024",
+          "#167438",
+          "#379954",
+          "#5ebd76",
+          "#83e299",
+          "#c7ffd1"
+        ]
+      },
+      "ligne-francais": {
+        "role": "secondary",
+        "displayName": "Ligne Français",
+        "canonical": "#c2410c",
+        "oklch": "oklch(55.3% 0.174 38.4)",
+        "tonalRamp": [
+          "#1b0300",
+          "#441202",
+          "#722508",
+          "#a83400",
+          "#d55325",
+          "#fd784c",
+          "#fdb59f",
+          "#ffe9e2"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-mathematiques": {
+        "role": "secondary",
+        "displayName": "Ligne Mathématiques",
+        "canonical": "#2f6fed",
+        "oklch": "oklch(57.4% 0.202 262.0)",
+        "tonalRamp": [
+          "#000827",
+          "#001d5f",
+          "#02369a",
+          "#1555d1",
+          "#397af9",
+          "#72a3ff",
+          "#adcafe",
+          "#e6efff"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-sciences": {
+        "role": "secondary",
+        "displayName": "Ligne Sciences",
+        "canonical": "#0f8a6a",
+        "oklch": "oklch(56.4% 0.110 168.7)",
+        "tonalRamp": [
+          "#000f09",
+          "#012d20",
+          "#084e3b",
+          "#137258",
+          "#279776",
+          "#53bb99",
+          "#7ae0bc",
+          "#bfffe6"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-histoire": {
+        "role": "secondary",
+        "displayName": "Ligne Histoire",
+        "canonical": "#8a5a14",
+        "oklch": "oklch(50.9% 0.102 70.4)",
+        "tonalRamp": [
+          "#130800",
+          "#361f00",
+          "#5c3904",
+          "#85550c",
+          "#a97737",
+          "#ce9a5b",
+          "#f4be7e",
+          "#feebd6"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-geographie": {
+        "role": "secondary",
+        "displayName": "Ligne Géographie",
+        "canonical": "#0e7490",
+        "oklch": "oklch(52.0% 0.094 223.1)",
+        "tonalRamp": [
+          "#000d13",
+          "#012a36",
+          "#08495c",
+          "#146b85",
+          "#358eab",
+          "#5cb2d0",
+          "#81d7f6",
+          "#d9f4fe"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-langues": {
+        "role": "secondary",
+        "displayName": "Ligne Langues",
+        "canonical": "#9333ea",
+        "oklch": "oklch(55.8% 0.252 302.3)",
+        "tonalRamp": [
+          "#120026",
+          "#320657",
+          "#580495",
+          "#800fd3",
+          "#a247fb",
+          "#b988fa",
+          "#d4bbfc",
+          "#f2ebfe"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-arts": {
+        "role": "secondary",
+        "displayName": "Ligne Arts",
+        "canonical": "#db2777",
+        "oklch": "oklch(59.2% 0.218 0.6)",
+        "tonalRamp": [
+          "#1c010a",
+          "#490322",
+          "#790c3e",
+          "#ac195c",
+          "#e12e7c",
+          "#fd6b9f",
+          "#fdafc6",
+          "#fee8ed"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-autre": {
+        "role": "secondary",
+        "displayName": "Ligne Autre",
+        "canonical": "#4b5563",
+        "oklch": "oklch(44.6% 0.026 256.8)",
+        "tonalRamp": [
+          "#050b16",
+          "#1d2632",
+          "#394350",
+          "#586270",
+          "#788392",
+          "#9ba6b6",
+          "#becadb",
+          "#e5effe"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "fond-sombre": {
+        "role": "neutral",
+        "displayName": "Gris froid du fond (sombre)",
+        "canonical": "#0f1220",
+        "oklch": "oklch(18.7% 0.029 274.0)",
+        "tonalRamp": [
+          "#080a17",
+          "#212433",
+          "#3d4152",
+          "#5c6072",
+          "#7d8194",
+          "#9fa4b8",
+          "#c3c8dd",
+          "#e9eefe"
+        ]
+      },
+      "carte-sombre": {
+        "role": "neutral",
+        "displayName": "Blanc des cartes (sombre)",
+        "canonical": "#1a1e30",
+        "oklch": "oklch(24.0% 0.035 273.9)",
+        "tonalRamp": [
+          "#070a1a",
+          "#202436",
+          "#3c4155",
+          "#5b6076",
+          "#7b8198",
+          "#9ea4bc",
+          "#c2c8e1",
+          "#e9eeff"
+        ]
+      },
+      "texte-sombre": {
+        "role": "neutral",
+        "displayName": "Encre nuit (sombre)",
+        "canonical": "#e8eaf3",
+        "oklch": "oklch(93.8% 0.012 276.1)",
+        "tonalRamp": [
+          "#0a0b10",
+          "#23252b",
+          "#404249",
+          "#5f6168",
+          "#80828a",
+          "#a3a5ad",
+          "#c7c9d1",
+          "#eceef7"
+        ]
+      },
+      "doux-sombre": {
+        "role": "neutral",
+        "displayName": "Gris doux (sombre)",
+        "canonical": "#a6acc2",
+        "oklch": "oklch(74.7% 0.032 273.5)",
+        "tonalRamp": [
+          "#070a19",
+          "#202435",
+          "#3c4154",
+          "#5b6074",
+          "#7c8196",
+          "#9ea4ba",
+          "#c2c8df",
+          "#e9eeff"
+        ]
+      },
+      "bord-sombre": {
+        "role": "neutral",
+        "displayName": "Filet (sombre)",
+        "canonical": "#2c3248",
+        "oklch": "oklch(32.2% 0.040 272.2)",
+        "tonalRamp": [
+          "#06091c",
+          "#1e2439",
+          "#3a4158",
+          "#596079",
+          "#7a819b",
+          "#9ca4bf",
+          "#c0c8e4",
+          "#e9eefe"
+        ]
+      },
+      "sur-nuit-doux-sombre": {
+        "role": "neutral",
+        "displayName": "Gris clair sur nuit (sombre)",
+        "canonical": "#a6acc2",
+        "oklch": "oklch(74.7% 0.032 273.5)",
+        "tonalRamp": [
+          "#070a19",
+          "#202435",
+          "#3c4154",
+          "#5b6074",
+          "#7c8196",
+          "#9ea4ba",
+          "#c2c8df",
+          "#e9eeff"
+        ]
+      },
+      "accent-sombre": {
+        "role": "primary",
+        "displayName": "Bleu de l'accent (sombre)",
+        "canonical": "#8aa2ff",
+        "oklch": "oklch(73.3% 0.138 271.7)",
+        "tonalRamp": [
+          "#040130",
+          "#131466",
+          "#2a378a",
+          "#4758ae",
+          "#667bd4",
+          "#879efb",
+          "#b7c7fc",
+          "#e9eefe"
+        ]
+      },
+      "sur-accent-sombre": {
+        "role": "neutral",
+        "displayName": "Texte sur l'accent (sombre)",
+        "canonical": "#0f1220",
+        "oklch": "oklch(18.7% 0.029 274.0)",
+        "tonalRamp": [
+          "#080a17",
+          "#212433",
+          "#3d4152",
+          "#5c6072",
+          "#7d8194",
+          "#9fa4b8",
+          "#c3c8dd",
+          "#e9eefe"
+        ]
+      },
+      "nouveau-sombre": {
+        "role": "tertiary",
+        "displayName": "Jaune Nouveau (sombre)",
+        "canonical": "#fcd34d",
+        "oklch": "oklch(87.9% 0.153 91.6)",
+        "tonalRamp": [
+          "#160700",
+          "#3c1b01",
+          "#653305",
+          "#914d0f",
+          "#c26608",
+          "#ee872e",
+          "#feb786",
+          "#feeadd"
+        ]
+      },
+      "sur-nouveau-sombre": {
+        "role": "neutral",
+        "displayName": "Texte sur Nouveau (sombre)",
+        "canonical": "#0f1220",
+        "oklch": "oklch(18.7% 0.029 274.0)",
+        "tonalRamp": [
+          "#080a17",
+          "#212433",
+          "#3d4152",
+          "#5c6072",
+          "#7d8194",
+          "#9fa4b8",
+          "#c3c8dd",
+          "#e9eefe"
+        ]
+      },
+      "retenu-sombre": {
+        "role": "tertiary",
+        "displayName": "Vert Retenu (sombre)",
+        "canonical": "#34c463",
+        "oklch": "oklch(72.4% 0.182 149.6)",
+        "tonalRamp": [
+          "#001003",
+          "#012e10",
+          "#065022",
+          "#117535",
+          "#069d46",
+          "#33c362",
+          "#61e986",
+          "#cafed2"
+        ]
+      },
+      "sur-retenu-sombre": {
+        "role": "neutral",
+        "displayName": "Texte sur Retenu (sombre)",
+        "canonical": "#0f1220",
+        "oklch": "oklch(18.7% 0.029 274.0)",
+        "tonalRamp": [
+          "#080a17",
+          "#212433",
+          "#3d4152",
+          "#5c6072",
+          "#7d8194",
+          "#9fa4b8",
+          "#c3c8dd",
+          "#e9eefe"
+        ]
+      },
+      "station-vide-sombre": {
+        "role": "neutral",
+        "displayName": "Station vide (sombre)",
+        "canonical": "#737a96",
+        "oklch": "oklch(58.4% 0.044 274.0)",
+        "tonalRamp": [
+          "#06091d",
+          "#1e233a",
+          "#3a4159",
+          "#737a96",
+          "#7a819d",
+          "#9ca4c0",
+          "#c0c8e6",
+          "#e9eefe"
+        ]
+      },
+      "troncon-sombre": {
+        "role": "neutral",
+        "displayName": "Voie vide (sombre)",
+        "canonical": "#2f3550",
+        "oklch": "oklch(33.6% 0.048 273.9)",
+        "tonalRamp": [
+          "#06081f",
+          "#1e233c",
+          "#3a405c",
+          "#58607d",
+          "#7981a0",
+          "#9ba3c4",
+          "#bfc8e9",
+          "#e9eefe"
+        ]
+      },
+      "rouge-sombre": {
+        "role": "tertiary",
+        "displayName": "Rouge « à revoir » (sombre)",
+        "canonical": "#f58b8b",
+        "oklch": "oklch(75.1% 0.129 20.6)",
+        "tonalRamp": [
+          "#1f0002",
+          "#4b040e",
+          "#781823",
+          "#9d3d41",
+          "#c45f61",
+          "#eb8282",
+          "#fcb3b2",
+          "#ffe8e8"
+        ]
+      },
+      "orange-sombre": {
+        "role": "tertiary",
+        "displayName": "Orange « à consolider » (sombre)",
+        "canonical": "#f5b14c",
+        "oklch": "oklch(80.7% 0.140 74.0)",
+        "tonalRamp": [
+          "#130900",
+          "#352000",
+          "#5a3b04",
+          "#83570c",
+          "#af7501",
+          "#d8962b",
+          "#ffba56",
+          "#feebd4"
+        ]
+      },
+      "vert-sombre": {
+        "role": "tertiary",
+        "displayName": "Vert « bien en tête » (sombre)",
+        "canonical": "#5ad98a",
+        "oklch": "oklch(79.4% 0.160 153.3)",
+        "tonalRamp": [
+          "#001004",
+          "#032e15",
+          "#005028",
+          "#05753e",
+          "#1c9b56",
+          "#3ec174",
+          "#69e797",
+          "#c8fed7"
+        ]
+      },
+      "ligne-francais-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Français (sombre)",
+        "canonical": "#fb923c",
+        "oklch": "oklch(75.8% 0.159 55.9)",
+        "tonalRamp": [
+          "#160700",
+          "#3c1b01",
+          "#653305",
+          "#914d0f",
+          "#c26608",
+          "#ee872e",
+          "#feb786",
+          "#feeadd"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-mathematiques-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Mathématiques (sombre)",
+        "canonical": "#7aa2ff",
+        "oklch": "oklch(72.3% 0.143 265.4)",
+        "tonalRamp": [
+          "#010035",
+          "#051669",
+          "#1c398c",
+          "#395bb1",
+          "#587ed7",
+          "#79a1fe",
+          "#b0c9fe",
+          "#e7effe"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-sciences-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Sciences (sombre)",
+        "canonical": "#34d399",
+        "oklch": "oklch(77.3% 0.153 163.2)",
+        "tonalRamp": [
+          "#000f07",
+          "#012d1d",
+          "#064f36",
+          "#107351",
+          "#059a6c",
+          "#0ec289",
+          "#51e8ad",
+          "#c3ffe1"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-histoire-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Histoire (sombre)",
+        "canonical": "#e0a75e",
+        "oklch": "oklch(76.7% 0.113 71.6)",
+        "tonalRamp": [
+          "#130800",
+          "#352003",
+          "#5c3901",
+          "#855606",
+          "#ac7629",
+          "#d1994f",
+          "#f7bd74",
+          "#feebd6"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-geographie-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Géographie (sombre)",
+        "canonical": "#38bdf8",
+        "oklch": "oklch(75.4% 0.139 232.7)",
+        "tonalRamp": [
+          "#000d16",
+          "#03293a",
+          "#014864",
+          "#066a90",
+          "#1c8dbd",
+          "#28b3ed",
+          "#8ad4fb",
+          "#ddf2ff"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-langues-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Langues (sombre)",
+        "canonical": "#c084fc",
+        "oklch": "oklch(72.2% 0.177 305.5)",
+        "tonalRamp": [
+          "#130024",
+          "#340654",
+          "#59148a",
+          "#7a3daf",
+          "#9c60d5",
+          "#c084fc",
+          "#d8b9fd",
+          "#f3eafe"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-arts-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Arts (sombre)",
+        "canonical": "#f472b6",
+        "oklch": "oklch(72.5% 0.175 349.8)",
+        "tonalRamp": [
+          "#1b010f",
+          "#47022c",
+          "#760c4d",
+          "#a4266f",
+          "#cb4c91",
+          "#f371b5",
+          "#feadd3",
+          "#fee7f1"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-autre-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Autre (sombre)",
+        "canonical": "#9ca3af",
+        "oklch": "oklch(71.4% 0.019 261.3)",
+        "tonalRamp": [
+          "#070b13",
+          "#20252f",
+          "#3c424c",
+          "#5b626c",
+          "#7c838e",
+          "#9ea5b1",
+          "#c2cad6",
+          "#e7effc"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Le titre « Mes leçons » (1.6rem sous 640px)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Le salut du bandeau de la semaine et les titres de section."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Le nom d'une Leçon sur sa carte de ligne (1.15rem sous 640px)."
+      },
+      "title-categorie": {
+        "displayName": "Titre de Catégorie",
+        "purpose": "Le nom de Catégorie, précédé de sa puce de couleur."
+      },
+      "marque": {
+        "displayName": "Marque",
+        "purpose": "« 🎒 Cartable » dans l'en-tête."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Tout le texte courant."
+      },
+      "body-petit": {
+        "displayName": "Petit texte d'action",
+        "purpose": "« Voir les Objectifs », contrôle à venir, « Terminée »."
+      },
+      "label-signaletique": {
+        "displayName": "Label signalétique",
+        "purpose": "Terminus « ACQUIS » et noms de jours ; capitales."
+      },
+      "label-niveau": {
+        "displayName": "Label de Niveau",
+        "purpose": "Le cartouche de Niveau de Leçon ; capitales."
+      },
+      "chiffres": {
+        "displayName": "Chiffres",
+        "purpose": "Compteurs en chiffres tabulaires."
+      }
+    },
+    "shadows": [
+      {
+        "name": "pose-carte-ligne",
+        "value": "0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)",
+        "purpose": "Cartes de Leçon ; --ombre vaut 20 24 43 en clair, 0 0 0 en sombre."
+      },
+      {
+        "name": "pose-bandeau",
+        "value": "0 2px 10px rgb(var(--ombre) / .05)",
+        "purpose": "Bandeau de la semaine."
+      },
+      {
+        "name": "vous-etes-ici",
+        "value": "0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)",
+        "purpose": "Anneau de la prochaine station."
+      },
+      {
+        "name": "decoupe-terminus",
+        "value": "0 0 0 .2rem var(--carte)",
+        "purpose": "Détoure le terminus du trait."
+      },
+      {
+        "name": "jour-courant",
+        "value": "inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)",
+        "purpose": "Cadre d'aujourd'hui dans le bandeau."
+      },
+      {
+        "name": "focus",
+        "value": "outline: 3px solid var(--accent); outline-offset: 2px",
+        "purpose": "Anneau de focus commun (outline)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "teinte",
+        "value": "background .15s, filter .15s",
+        "purpose": "Survol des boutons et du compteur d'Étoiles : la teinte change, rien ne bouge."
+      },
+      {
+        "name": "appui",
+        "value": "transform .15s; translateY(1px)",
+        "purpose": "Appui sur Continuer."
+      },
+      {
+        "name": "depliant",
+        "value": "height .22s ease-out (interpolate-size: allow-keywords, ::details-content)",
+        "purpose": "Ouverture du dépliant des Objectifs."
+      },
+      {
+        "name": "chevron",
+        "value": "transform .2s ease-out",
+        "purpose": "Rotation du chevron du dépliant."
+      },
+      {
+        "name": "reduit",
+        "value": "prefers-reduced-motion: reduce → transition: none; animation: none",
+        "purpose": "Toutes les transitions et animations sont coupées."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sans-age",
+        "value": "max-width: 899px"
+      },
+      {
+        "name": "semaine-empilee",
+        "value": "max-width: 860px"
+      },
+      {
+        "name": "compact",
+        "value": "max-width: 640px"
+      },
+      {
+        "name": "semaine-serree",
+        "value": "max-width: 520px"
+      },
+      {
+        "name": "en-tete-mini",
+        "value": "max-width: 480px"
+      }
+    ],
+    "themes": {
+      "mode": "prefers-color-scheme",
+      "note": "Les jetons suffixés -sombre remplacent leur jeton clair sous prefers-color-scheme: dark ; nuit et sur-nuit ne changent pas."
+    },
+    "fonts": [
+      {
+        "family": "Overpass",
+        "files": [
+          "public/polices/overpass-latin.woff2",
+          "public/polices/overpass-latin-ext.woff2"
+        ],
+        "weights": "100 900",
+        "license": "SIL OFL"
+      },
+      {
+        "family": "Atkinson Hyperlegible Next",
+        "files": [
+          "public/polices/atkinson-latin.woff2",
+          "public/polices/atkinson-latin-ext.woff2"
+        ],
+        "weights": "200 800",
+        "license": "SIL OFL"
+      }
+    ],
+    "frontier": {
+      "redesigned": [
+        "Accueil de l'Élève",
+        "En-tête",
+        "Boutons et champs",
+        "Jetons et polices"
+      ],
+      "inherited": [
+        "Choix de l'Élève",
+        "Séance",
+        "Révisions du jour",
+        "Mes badges et calendrier",
+        "Vue parent",
+        "Profil",
+        "Nouvelle Leçon",
+        "Cadrage"
+      ]
+    }
+  },
+  "components": [
+    {
+      "name": "Bouton plein",
+      "kind": "button",
+      "refersTo": "bouton-plein",
+      "description": "L'action principale d'un écran (Révisions du jour quand des Questions sont dues).",
+      "html": "<button class=\"ds-bouton\">Mes révisions du jour</button>",
+      "css": ".ds-bouton{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:700;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--accent,#2747c9);background:var(--accent,#2747c9);color:var(--sur-accent,#fff);cursor:pointer;transition:background .15s}.ds-bouton:hover{background:color-mix(in srgb,var(--accent,#2747c9) 88%,var(--texte,#14182b))}.ds-bouton:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+    },
+    {
+      "name": "Bouton secondaire",
+      "kind": "button",
+      "refersTo": "bouton-secondaire",
+      "description": "Les actions de second rang, et les boutons de l'en-tête (variante sur nuit).",
+      "html": "<button class=\"ds-secondaire\">Mon profil</button>",
+      "css": ".ds-secondaire{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--bord,#dde1ea);background:var(--carte,#fff);color:var(--texte,#14182b);cursor:pointer;transition:background .15s}.ds-secondaire:hover{background:color-mix(in srgb,var(--texte,#14182b) 6%,var(--carte,#fff))}.ds-secondaire:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+    },
+    {
+      "name": "Continuer (bouton de ligne)",
+      "kind": "button",
+      "refersTo": "bouton-ligne",
+      "description": "Le bouton Continuer d'une carte de ligne, à la couleur foncée de sa Catégorie.",
+      "html": "<a class=\"ds-bouton-ligne\" href=\"#\" style=\"--ligne:#2f6fed\">Continuer</a>",
+      "css": ".ds-bouton-ligne{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem 1.15rem;border-radius:12px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-weight:800;text-decoration:none;transition:filter .15s,transform .15s}.ds-bouton-ligne:hover{filter:brightness(1.1)}.ds-bouton-ligne:active{transform:translateY(1px)}.ds-bouton-ligne:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+    },
+    {
+      "name": "Apprendre quelque chose de nouveau",
+      "kind": "button",
+      "refersTo": "bouton-nouvelle",
+      "description": "L'appel à ouvrir une nouvelle Leçon, en bleu nuit de la marque.",
+      "html": "<button class=\"ds-nouvelle\">Apprendre quelque chose de nouveau</button>",
+      "css": ".ds-nouvelle{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:700;padding:.7rem 1.1rem;border-radius:12px;border:1px solid #14182b;background:#14182b;color:#fff;cursor:pointer;transition:background .15s}.ds-nouvelle:hover{background:color-mix(in srgb,#14182b 85%,#fff)}.ds-nouvelle:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+    },
+    {
+      "name": "Champ",
+      "kind": "input",
+      "refersTo": "champ",
+      "description": "Champ de saisie ou liste de choix (Profil, Vue parent).",
+      "html": "<input class=\"ds-champ\" placeholder=\"Pseudo\">",
+      "css": ".ds-champ{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--bord,#dde1ea);background:var(--carte,#fff);color:var(--texte,#14182b)}.ds-champ:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+    },
+    {
+      "name": "En-tête",
+      "kind": "nav",
+      "refersTo": "en-tete",
+      "description": "La bande bleu nuit commune : marque, compteur d'Étoiles, Élève, Profil et Changer.",
+      "html": "<header class=\"ds-tete\"><strong class=\"ds-marque\">🎒 Cartable</strong><nav class=\"ds-nav\"><a class=\"ds-etoiles\" href=\"#\"><span aria-hidden=\"true\">⭐</span> 12 <span class=\"ds-nouveau\">Nouveau</span></a><span class=\"ds-qui\">Robin · Primaire 6</span><button class=\"ds-tete-btn\">Mon profil</button><button class=\"ds-tete-btn\">Changer</button></nav></header>",
+      "css": ".ds-tete{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 1.5rem;background:#14182b;color:#fff}.ds-marque{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.35rem;line-height:1;letter-spacing:-.01em}.ds-nav{display:flex;align-items:center;gap:.5rem}.ds-qui{color:#c3c8db;margin:0 .3rem}.ds-etoiles{display:inline-flex;align-items:center;gap:.35rem;min-height:2.6rem;padding:.3rem .9rem;border-radius:999px;background:rgb(255 255 255/.12);color:#fff;font-weight:800;font-variant-numeric:tabular-nums;text-decoration:none;transition:background .15s}.ds-etoiles:hover{background:rgb(255 255 255/.2)}.ds-nouveau{padding:0 .45rem;font-size:.75rem;font-weight:700;border-radius:999px;background:#fbbf24;color:#14182b}.ds-tete-btn{font:inherit;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid rgb(255 255 255/.32);background:transparent;color:#fff;cursor:pointer}.ds-tete-btn:hover{background:rgb(255 255 255/.1)}.ds-tete-btn:focus-visible,.ds-etoiles:focus-visible{outline:3px solid #8aa2ff;outline-offset:2px}"
+    },
+    {
+      "name": "Pastilles",
+      "kind": "chip",
+      "refersTo": "pastille-acquis",
+      "description": "Mots de Maîtrise, pastille « Acquis ✓ » (en-tête de la Séance) et pastille « Nouveau ».",
+      "html": "<span class=\"ds-maitrise ds-vert\">Bien en tête</span> <span class=\"ds-maitrise ds-orange\">À consolider</span> <span class=\"ds-acquis\">Acquis ✓</span> <span class=\"ds-pnouveau\">Nouveau</span>",
+      "css": ".ds-maitrise{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:.9rem;font-weight:800}.ds-vert{color:#15803d}.ds-orange{color:#a8530b}.ds-acquis{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:.9rem;font-weight:800;color:#fff;background:#15803d;padding:.1rem .6rem;border-radius:999px}.ds-pnouveau{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:inline-block;padding:0 .45rem;font-size:.75rem;font-weight:700;border-radius:999px;background:#fbbf24;color:#14182b}"
+    },
+    {
+      "name": "Carte de ligne",
+      "kind": "card",
+      "refersTo": "carte-ligne",
+      "description": "Une Leçon : Niveau, nom, Maîtrise, la ligne et ses stations, le terminus, la prochaine station et Continuer.",
+      "html": "<article class=\"ds-lecon\" style=\"--ligne:#2f6fed\"><div class=\"ds-lt\"><span class=\"ds-niveau\">Niveau 5</span><h4 class=\"ds-h\">Les fractions</h4><span class=\"ds-m\">Bien en tête</span></div><div class=\"ds-ligne\"><span class=\"ds-st ds-ret\"></span><span class=\"ds-tr ds-fait\"></span><span class=\"ds-st ds-att\"></span><span class=\"ds-tr ds-fait\"></span><span class=\"ds-st ds-conf ds-ici\"></span><span class=\"ds-tr\"></span><span class=\"ds-st ds-vide\"></span><span class=\"ds-tr\"></span><span class=\"ds-term\">Acquis</span></div><div class=\"ds-bas\"><p class=\"ds-p\"><span class=\"ds-lib\">Prochaine station : </span>Le quiz de ta page</p><a class=\"ds-go\" href=\"#\">Continuer</a></div></article>",
+      "css": ".ds-lecon{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;line-height:1.5;color:#14182b;display:flex;flex-direction:column;gap:.85rem;padding:1.05rem 1.25rem 1rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 1px 2px rgb(20 24 43/.06),0 6px 18px rgb(20 24 43/.05);max-width:34rem}.ds-lt{display:flex;align-items:flex-start;gap:.7rem}.ds-niveau{flex:none;margin-top:.15rem;padding:.36rem .5rem .26rem;border-radius:7px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.78rem;line-height:1;text-transform:uppercase;letter-spacing:.04em}.ds-h{flex:1;margin:0;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.3rem;line-height:1.2;letter-spacing:-.01em}.ds-m{margin-top:.2rem;font-size:.9rem;font-weight:800;color:#15803d}.ds-ligne{display:flex;align-items:center;min-height:2.3rem}.ds-tr{flex:1;min-width:.6rem;height:.55rem;margin:0 -.1rem;background:#dde1ea}.ds-fait{background:var(--ligne)}.ds-st{position:relative;z-index:1;flex:none;width:1.5rem;height:1.5rem;border-radius:50%;box-sizing:border-box}.ds-vide{width:1.15rem;height:1.15rem;margin:0 .175rem;background:#fff;border:.18rem solid #80879a}.ds-conf{background:repeating-linear-gradient(45deg,#80879a 0 .1rem,#fff .1rem .32rem);border:.18rem solid #80879a}.ds-att{background:#fff;border:.3rem solid #14182b}.ds-ret{background:#15803d;border:.3rem solid #15803d}.ds-ici{box-shadow:0 0 0 .2rem #fff,0 0 0 .42rem var(--ligne)}.ds-term{position:relative;z-index:1;flex:none;padding:.42rem .6rem .32rem;border-radius:8px;border:.18rem solid #80879a;background:#fff;color:#4f566c;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;box-shadow:0 0 0 .2rem #fff}.ds-bas{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1rem}.ds-p{flex:1 1 12rem;margin:0;line-height:1.3}.ds-lib{color:#4f566c;font-weight:600}.ds-go{display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem 1.15rem;border-radius:12px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-weight:800;text-decoration:none;transition:filter .15s}.ds-go:hover{filter:brightness(1.1)}.ds-go:focus-visible{outline:3px solid #2747c9;outline-offset:2px}"
+    },
+    {
+      "name": "Bandeau de la semaine",
+      "kind": "custom",
+      "refersTo": "ma-semaine",
+      "description": "Du lundi au dimanche : tampons vide, pâle, plein, futur, avec le jour courant cerclé.",
+      "html": "<ol class=\"ds-jours\"><li class=\"ds-j\"><span class=\"ds-n\">lun</span><span class=\"ds-t\">12</span></li><li class=\"ds-j ds-pale\"><span class=\"ds-n\">mar</span><span class=\"ds-t\">13</span></li><li class=\"ds-j ds-plein\"><span class=\"ds-n\">mer</span><span class=\"ds-t\">14<span class=\"ds-jk\">🛡️</span></span></li><li class=\"ds-j ds-plein ds-auj\"><span class=\"ds-n\">jeu</span><span class=\"ds-t\">15</span><span class=\"ds-g\">⭐2 🚀</span></li><li class=\"ds-j ds-fut\"><span class=\"ds-n\">ven</span><span class=\"ds-t\">16</span></li></ol>",
+      "css": ".ds-jours{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;list-style:none;margin:0;padding:1rem;display:grid;grid-template-columns:repeat(5,4.5rem);gap:.35rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 2px 10px rgb(20 24 43/.05);width:max-content}.ds-j{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.45rem .15rem .5rem;border-radius:12px;min-height:6.3rem}.ds-n{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;color:#4f566c}.ds-t{position:relative;display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:50%;border:2px dashed #80879a;font-weight:800;font-variant-numeric:tabular-nums;color:#4f566c;box-sizing:border-box}.ds-pale .ds-t{border:2px solid transparent;background:color-mix(in srgb,#2747c9 22%,#fff);color:#14182b}.ds-plein .ds-t{border:2px solid #2747c9;background:#2747c9;color:#fff}.ds-fut .ds-t{border-style:dotted}.ds-auj{background:color-mix(in srgb,#2747c9 9%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,#2747c9 45%,transparent)}.ds-auj .ds-n{color:#2747c9}.ds-jk{position:absolute;top:-.45rem;right:-.55rem;font-size:.8rem}.ds-g{font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Le plan du réseau",
+    "overview": "**Creative North Star: \"Le plan du réseau\"**\n\nCartable se lit comme le plan d'un réseau de transport en commun (la STIB bruxelloise en est la référence) : chaque Leçon est une ligne épaisse à la couleur de sa Catégorie, ses Objectifs en sont les stations, et la ligne mène à un terminus « Acquis » posé en cartouche de signalétique. L'Élève voit d'un coup d'œil jusqu'où il est allé et ce qui tient en mémoire, sans pourcentage ni décompte. Au-dessus du réseau, un bandeau de la semaine, du lundi au dimanche, reprend la page de la semaine du journal de classe belge : un tampon par jour, et ce qui a été gagné ce jour-là.\n\nLe monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des cartes blanches posées à peine au-dessus du fond, une typographie de signalétique (Overpass) pour les titres et les noms de ligne, une police conçue pour la lisibilité (Atkinson Hyperlegible Next) pour tout le texte. La couleur est réservée au sens : la couleur de ligne dit la Catégorie, le bleu de l'accent dit l'action et aujourd'hui, le vert dit ce qui est Retenu, l'orange dit ce qui est nouveau. Il convient autant à un enfant de 8 ans qu'à un adulte : rien n'y est infantilisant, rien n'y est compétitif.\n\nLe monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par la préférence de l'appareil ; l'en-tête reste bleu nuit dans les deux.\n\n**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne) et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Séance, Révisions du jour, Mes badges et son calendrier, Vue parent, Profil, nouvelle Leçon, cadrage) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`, pulsation du bouton d'action en Séance, couleurs de Palier des Badges). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.",
+    "keyCharacteristics": [
+      "Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».",
+      "Quatre états de station lisibles sans légende : vide, hachurée, blanche, verte.",
+      "Bandeau lundi→dimanche à tampons, discret à côté des Leçons.",
+      "Bleu nuit pour la marque et l'appel « nouveau », bleu accent pour l'action, vert pour ce qui tient.",
+      "Overpass 800 en signalétique, Atkinson Hyperlegible Next pour lire, chiffres tabulaires.",
+      "Plat par défaut, ombres douces teintées de nuit, aucun relief dur."
+    ],
+    "rules": [
+      {
+        "name": "La règle de la couleur de ligne",
+        "body": "La couleur d'une Catégorie n'appartient qu'à ses Leçons : le trait parcouru, la puce de la Catégorie, le cartouche de Niveau, le bouton Continuer et l'anneau « vous êtes ici ». Elle ne sert jamais à autre chose, et ses valeurs se changent dans une nouvelle version du Kit, jamais ici seul.",
+        "section": "colors"
+      },
+      {
+        "name": "La règle du vert qui tient",
+        "body": "Un aplat vert signifie Retenu ou Acquis, rien d'autre. Le vert des mots de Maîtrise reste du texte.",
+        "section": "colors"
+      },
+      {
+        "name": "La règle de la seule couleur du nouveau",
+        "body": "Ce qui est nouveau porte l'orange `nouveau`, et rien d'autre ne le porte en pastille.",
+        "section": "colors"
+      },
+      {
+        "name": "La règle de la signalétique",
+        "body": "Les capitales espacées sont réservées aux cartouches de signalétique du réseau (terminus, Niveau, noms de jours) ; aucun texte courant, aucun titre n'est en capitales.",
+        "section": "typography"
+      },
+      {
+        "name": "La règle des chiffres alignés",
+        "body": "Les compteurs (Étoiles, Fusées, dates des tampons, total de l'en-tête) sont en chiffres tabulaires.",
+        "section": "typography"
+      },
+      {
+        "name": "La règle de la pose légère",
+        "body": "Les ombres sont ambiantes et teintées de nuit, jamais décalées ni dures ; un élément ne monte pas au survol, il change de teinte.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do donner à chaque Leçon sa couleur de Catégorie par la variable `--ligne` posée sur sa carte ou sa section, à partir des jetons `ligne-*`.",
+      "Do dire l'état d'un Objectif avec les quatre stations (vide, hachurée, blanche, verte) et doubler l'image d'un texte (titre, `aria-label`, ou mots dans le dépliant).",
+      "Do réserver Overpass 800 aux titres, à la marque et aux cartouches de signalétique, et Atkinson Hyperlegible Next à tout le reste.",
+      "Do garder des cibles tactiles d'au moins 2.6rem et l'anneau de focus de 3px `accent`.",
+      "Do fournir chaque nouvelle couleur en clair et en sombre, et couper les transitions sous `prefers-reduced-motion`.",
+      "Do ramener un écran hérité aux jetons et à la grammaire du réseau quand on le redessine."
+    ],
+    "donts": [
+      "Don't modifier les couleurs de ligne sans une nouvelle version du Kit : elles sont partagées avec `public/kit/v1/quiz.css`.",
+      "Don't afficher de pourcentage de Maîtrise ni de décompte « x Objectifs · x atteints » à l'Élève : la ligne et le mot de Maîtrise suffisent.",
+      "Don't employer un aplat vert pour autre chose que Retenu ou Acquis, ni l'orange `nouveau` pour autre chose que ce qui est nouveau.",
+      "Don't revenir à une grille de cartes boutons identiques remplies de listes de texte.",
+      "Don't poser d'ombre décalée ou dure, ni faire monter un élément au survol.",
+      "Don't utiliser de capitales espacées hors des cartouches de signalétique.",
+      "Don't reprendre comme modèle les valeurs codées en dur des écrans hérités (verts et ors de la Séance, pulsation, ombres noires en `rgba`)."
+    ]
+  }
+}

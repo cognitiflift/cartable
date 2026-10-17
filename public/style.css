@@ -1,22 +1,165 @@
-/* Thème clair et sombre (contrôles natifs compris), choisi par l'appli elle-même : quiz.css du Kit, chargé pour les
-   Révisions du jour, pose le même color-scheme et n'ajoute que des variables --kit-* et des règles .kit-*. */
-:root { --fond:#fbf8f3; --texte:#222; --doux:#6b6b6b; --accent:#2f6fed; --carte:#fff; --bord:#e4ddd0; color-scheme:light dark; }
-@media (prefers-color-scheme: dark) { :root { --fond:#1a1a1d; --texte:#eee; --doux:#a0a0a8; --carte:#25252a; --bord:#3a3a42; } }
+/* Cartable, monde « Plan du réseau » : chaque Leçon est une ligne à la couleur de sa Catégorie, ses Objectifs en
+   sont les stations. En-tête bleu nuit, fond gris froid, cartes blanches ; Overpass (signalétique) pour les titres,
+   Atkinson Hyperlegible Next pour le texte, servies par l'appli (licence SIL OFL). Thème clair et sombre (contrôles
+   natifs compris), choisi par l'appli elle-même : quiz.css du Kit, chargé pour les Révisions du jour, pose le même
+   color-scheme et n'ajoute que des variables --kit-* et des règles .kit-*. Couleurs de ligne : celles des Catégories
+   du Kit (kit/v1/quiz.css), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. */
+@font-face { font-family:"Atkinson Hyperlegible Next"; font-weight:200 800; font-display:swap; src:url(/polices/atkinson-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Atkinson Hyperlegible Next"; font-weight:200 800; font-display:swap; src:url(/polices/atkinson-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family:"Overpass"; font-weight:100 900; font-display:swap; src:url(/polices/overpass-latin.woff2) format("woff2");
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Overpass"; font-weight:100 900; font-display:swap; src:url(/polices/overpass-latin-ext.woff2) format("woff2");
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+:root {
+  --police:"Atkinson Hyperlegible Next", system-ui, sans-serif; --police-titre:"Overpass", "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --fond:#f2f4f8; --texte:#14182b; --doux:#4f566c; --carte:#fff; --bord:#dde1ea; --ombre:20 24 43;
+  --nuit:#14182b; --sur-nuit:#fff; --sur-nuit-doux:#c3c8db;
+  --accent:#2747c9; --sur-accent:#fff; --nouveau:#fbbf24; --sur-nouveau:#14182b; --retenu:#15803d; --sur-retenu:#fff; --station-vide:#80879a; --troncon:#dde1ea;
+  --rouge:#b42318; --orange:#a8530b; --vert:#15803d;
+  --ligne-francais:#c2410c; --ligne-mathematiques:#2f6fed; --ligne-sciences:#0f8a6a; --ligne-histoire:#8a5a14;
+  --ligne-geographie:#0e7490; --ligne-langues:#9333ea; --ligne-arts:#db2777; --ligne-autre:#4b5563;
+  color-scheme:light dark; interpolate-size:allow-keywords;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --fond:#0f1220; --texte:#e8eaf3; --doux:#a6acc2; --carte:#1a1e30; --bord:#2c3248; --ombre:0 0 0;
+  --nuit:#14182b; --sur-nuit-doux:#a6acc2;
+  --accent:#8aa2ff; --sur-accent:#0f1220; --nouveau:#fcd34d; --sur-nouveau:#0f1220; --retenu:#34c463; --sur-retenu:#0f1220; --station-vide:#737a96; --troncon:#2f3550;
+  --rouge:#f58b8b; --orange:#f5b14c; --vert:#5ad98a;
+  --ligne-francais:#fb923c; --ligne-mathematiques:#7aa2ff; --ligne-sciences:#34d399; --ligne-histoire:#e0a75e;
+  --ligne-geographie:#38bdf8; --ligne-langues:#c084fc; --ligne-arts:#f472b6; --ligne-autre:#9ca3af;
+} }
 * { box-sizing: border-box; }
-body { margin:0; font:17px/1.5 system-ui, sans-serif; background:var(--fond); color:var(--texte); }
-header { display:flex; justify-content:space-between; align-items:center; padding:.6rem 1rem; border-bottom:1px solid var(--bord); }
-header h1 { margin:0; font-size:1.2rem; } header a { color:inherit; text-decoration:none; }
-main { max-width:1100px; margin:0 auto; padding:1rem; }
-button, input, select, textarea { font:inherit; padding:.5rem .8rem; border-radius:8px; border:1px solid var(--bord); background:var(--carte); color:inherit; }
-button { cursor:pointer; background:var(--accent); color:#fff; border-color:var(--accent); }
-button.secondaire { background:var(--carte); color:var(--texte); border-color:var(--bord); }
+body { margin:0; font:17px/1.5 var(--police); background:var(--fond); color:var(--texte); }
+::selection { background:color-mix(in srgb, var(--accent) 30%, transparent); }
+:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+a { color:var(--accent); text-underline-offset:.18em; }
+h2 { margin-top:1.5rem; font-family:var(--police-titre); font-weight:800; letter-spacing:-.01em; }
+.cache { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.65rem clamp(1rem, 3vw, 2rem); background:var(--nuit); color:var(--sur-nuit); }
+@media (prefers-color-scheme: dark) { header { border-bottom:1px solid var(--bord); } }
+header h1 { margin:0; font:800 1.35rem/1 var(--police-titre); letter-spacing:-.01em; } header h1 a { color:inherit; text-decoration:none; }
+#nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
+#nav .qui { color:var(--sur-nuit-doux); margin:0 .3rem 0 .4rem; }
+@media (max-width: 899px) { #nav .age { display:none; } }
+header button.secondaire { background:transparent; color:var(--sur-nuit); border-color:rgb(255 255 255 / .32); }
+header button.secondaire:hover { background:rgb(255 255 255 / .1); }
+.compteur-etoiles { display:inline-flex; align-items:center; gap:.35rem; min-height:2.6rem; padding:.3rem .9rem; border-radius:999px; background:rgb(255 255 255 / .12); color:var(--sur-nuit); font-weight:800; font-variant-numeric:tabular-nums; text-decoration:none; transition:background .15s; }
+.compteur-etoiles:hover { background:rgb(255 255 255 / .2); }
+.compteur-etoiles .nouveau { margin-left:.15rem; }
+main { max-width:1200px; margin:0 auto; padding:1.2rem clamp(1rem, 3vw, 2rem) 3rem; }
+button, input, select, textarea { font:inherit; padding:.5rem .8rem; border-radius:10px; border:1px solid var(--bord); background:var(--carte); color:inherit; }
+button { cursor:pointer; background:var(--accent); color:var(--sur-accent); border-color:var(--accent); font-weight:700; transition:background .15s, box-shadow .15s; }
+button:hover { background:color-mix(in srgb, var(--accent) 88%, var(--texte)); }
+button.secondaire { background:var(--carte); color:var(--texte); border-color:var(--bord); font-weight:600; }
+button.secondaire:hover { background:color-mix(in srgb, var(--texte) 6%, var(--carte)); }
 button:disabled { opacity:.5; cursor:wait; }
 .grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:.8rem; }
-.carte { background:var(--carte); border:1px solid var(--bord); border-radius:12px; padding:1rem; text-align:left; color:var(--texte); }
+.carte { background:var(--carte); border:1px solid var(--bord); border-radius:14px; padding:1rem; text-align:left; color:var(--texte); font-weight:400; }
+button.carte:hover { background:color-mix(in srgb, var(--texte) 4%, var(--carte)); }
 .carte small { color:var(--doux); display:block; }
 form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; }
-.erreur { color:#c0392b; min-height:1.5em; }
-h2 { margin-top:1.5rem; }
+.erreur { color:var(--rouge); min-height:1.5em; }
+
+/* Accueil . Ma semaine : du lundi au dimanche, comme la page de la semaine du journal de classe. */
+.ma-semaine { display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 20rem); gap:1rem 2rem; align-items:center; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 2px 10px rgb(var(--ombre) / .05); }
+.semaine-titre { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.2rem 1rem; margin-bottom:.7rem; }
+.semaine-titre h2 { margin:0; font-size:1.45rem; line-height:1.1; }
+.semaine-titre a { font-size:.9rem; font-weight:600; }
+.jours { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.35rem; }
+.jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; min-height:6.3rem; }
+.jour.aujourdhui { background:color-mix(in srgb, var(--accent) 9%, transparent); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.jour .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
+.jour.aujourdhui .nom { color:var(--accent); }
+.tampon { position:relative; display:grid; place-items:center; width:2.35rem; height:2.35rem; border-radius:50%; border:2px dashed var(--station-vide); font-weight:800; font-variant-numeric:tabular-nums; color:var(--doux); }
+.jour.futur .tampon { border-style:dotted; color:color-mix(in srgb, var(--doux) 75%, var(--carte)); }
+.jour.pale .tampon { border:2px solid transparent; background:color-mix(in srgb, var(--accent) 22%, var(--carte)); color:var(--texte); }
+.jour.plein .tampon { border:2px solid var(--accent); background:var(--accent); color:var(--sur-accent); }
+.tampon .joker { position:absolute; top:-.45rem; right:-.55rem; font-size:.8rem; }
+.gains { display:flex; justify-content:center; gap:.3rem; font-size:.85rem; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.gains-badges { display:flex; flex-wrap:wrap; justify-content:center; gap:.15rem; }
+.gains .controle-jour { text-decoration:none; }
+.gain-badge .pastille-badge { width:1.6em; height:1.6em; border-width:2px; font-size:.85em; }
+.semaine-cote { display:flex; flex-direction:column; gap:.6rem; }
+.objectif-du-jour strong { display:block; line-height:1.3; text-wrap:balance; }
+.objectif-du-jour small { display:block; color:var(--doux); margin-top:.15rem; }
+.objectif-du-jour.atteint strong { color:var(--vert); }
+.bouton-revisions { display:flex; flex-direction:column; align-items:flex-start; gap:.05rem; width:100%; padding:.7rem 1rem; border-radius:12px; text-align:left; }
+.bouton-revisions small { font-weight:400; opacity:.92; }
+.recapitulatif { position:relative; margin:0 0 1rem; padding-right:2.6rem; }
+.recapitulatif strong { display:block; }
+.recapitulatif .fermer { position:absolute; top:.5rem; right:.5rem; padding:.1rem .5rem; }
+@media (max-width: 860px) { .ma-semaine { grid-template-columns:1fr; } }
+@media (max-width: 520px) { .ma-semaine { padding:.8rem .7rem; gap:.6rem; } .semaine-titre { margin-bottom:.4rem; } .semaine-titre a { display:none; } .jours { gap:.15rem; } .jour { min-height:0; padding:.35rem 0; } .tampon { width:2rem; height:2rem; font-size:.9rem; } .gains { font-size:.72rem; flex-direction:column; align-items:center; gap:0; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.95rem; } .bouton-revisions { flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .lecons-tete { margin-top:1.4rem; } }
+
+/* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
+.lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }
+.lecons-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
+.lecons-tete button { padding:.7rem 1.1rem; border-radius:12px; }
+.bouton-nouvelle { background:var(--nuit); border-color:var(--nuit); color:var(--sur-nuit); }
+.bouton-nouvelle:hover { background:color-mix(in srgb, var(--nuit) 85%, #fff); }
+@media (prefers-color-scheme: dark) { .bouton-nouvelle { background:var(--texte); border-color:var(--texte); color:var(--fond); } .bouton-nouvelle:hover { background:#fff; } }
+.categorie { margin-top:1.4rem; }
+.categorie h3 { display:flex; align-items:center; gap:.65rem; margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.categorie h3::before { content:""; width:1.4rem; height:1.4rem; border-radius:6px; background:var(--ligne); }
+.lecons-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1rem; }
+.lecon { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, #000); --sur-ligne:#fff; display:flex; flex-direction:column; gap:.85rem; padding:1.05rem 1.25rem .5rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+@media (prefers-color-scheme: dark) { .lecon { --ligne-fonce:var(--ligne); --sur-ligne:#0f1220; } }
+.lecon-tete { display:flex; align-items:flex-start; gap:.7rem; }
+.niveau { flex:none; margin-top:.15rem; padding:.36rem .5rem .26rem; border-radius:7px; background:var(--ligne-fonce); color:var(--sur-ligne); font:800 .78rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.lecon h4 { flex:1; min-width:0; margin:0; font:800 1.3rem/1.2 var(--police-titre); letter-spacing:-.01em; text-wrap:balance; }
+.lecon h4 a { color:inherit; text-decoration:none; } .lecon h4 a:hover { text-decoration:underline; text-decoration-thickness:2px; }
+.maitrise { flex:none; margin-top:.2rem; font-size:.9rem; font-weight:600; color:var(--doux); white-space:nowrap; }
+.maitrise.rouge, .maitrise.orange, .maitrise.vert { font-weight:800; } .maitrise.rouge { color:var(--rouge); } .maitrise.orange { color:var(--orange); } .maitrise.vert { color:var(--vert); }
+.maitrise.acquis { font-weight:800; color:var(--sur-retenu); background:var(--retenu); padding:.1rem .6rem; border-radius:999px; }
+p .maitrise { display:inline-flex; }
+/* La ligne et ses stations : vide (pas encore évalué), hachurée (à confirmer), blanche (atteint), verte (Retenu). */
+.ligne { position:relative; display:flex; align-items:center; min-height:2.3rem; }
+.troncon { flex:1; min-width:.6rem; height:.55rem; margin:0 -.1rem; background:var(--troncon); }
+.troncon.fait { background:var(--ligne); }
+.ligne.en-travaux { justify-content:space-between; }
+.ligne.en-travaux::before { content:""; position:absolute; left:0; right:2rem; top:50%; height:.55rem; transform:translateY(-50%); border-radius:999px; }
+.ligne.en-travaux::before { background:repeating-linear-gradient(90deg, var(--ligne) 0 .9rem, transparent .9rem 1.5rem); opacity:.55; }
+.ligne .travaux { position:relative; padding:.1rem .6rem; margin-left:.8rem; background:var(--carte); color:var(--doux); font-size:.9rem; font-weight:600; }
+.station { position:relative; z-index:1; flex:none; display:grid; place-items:center; width:1.5rem; height:1.5rem; border-radius:50%; }
+.station.pas-encore { width:1.15rem; height:1.15rem; margin:0 .175rem; background:var(--carte); border:.18rem solid var(--station-vide); }
+.station.a-confirmer { background:repeating-linear-gradient(45deg, var(--station-vide) 0 .1rem, #fff .1rem .32rem); border:.18rem solid var(--station-vide); }
+.station.atteinte { background:#fff; border:.3rem solid var(--texte); }
+.station.retenue { background:var(--retenu); border:.3rem solid var(--retenu); }
+/* Prochaine station : un anneau à la couleur de la ligne autour de la station, comme « vous êtes ici ». */
+.station.ici { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne); }
+@media (prefers-color-scheme: dark) { .station.atteinte { border-color:#fff; } .station.a-confirmer { background:repeating-linear-gradient(45deg, var(--station-vide) 0 .1rem, #d9dce6 .1rem .32rem); } }
+.terminus { position:relative; z-index:1; flex:none; padding:.42rem .6rem .32rem; border-radius:8px; border:.18rem solid var(--station-vide); background:var(--carte); color:var(--doux); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; box-shadow:0 0 0 .2rem var(--carte); }
+.terminus.allume { border-color:var(--retenu); background:var(--retenu); color:var(--sur-retenu); }
+.lecon-bas { display:flex; align-items:center; flex-wrap:wrap; gap:.6rem 1rem; }
+.prochaine { flex:1 1 15rem; min-width:0; margin:0; line-height:1.3; text-wrap:pretty; }
+.prochaine .libelle { color:var(--doux); font-weight:600; }
+.controle, .terminee { font-weight:700; font-size:.92rem; white-space:nowrap; }
+.etoiles, .fusees { white-space:nowrap; font-variant-numeric:tabular-nums; } .etoiles .vide { color:var(--doux); }
+a.bouton { display:inline-flex; align-items:center; min-height:2.75rem; padding:.55rem 1.15rem; border-radius:12px; background:var(--ligne-fonce); color:var(--sur-ligne); font-weight:800; text-decoration:none; transition:filter .15s, transform .15s; }
+a.bouton:hover { filter:brightness(1.1); }
+@media (prefers-color-scheme: dark) { a.bouton { background:color-mix(in srgb, var(--ligne) 22%, var(--carte)); color:var(--texte); box-shadow:inset 0 0 0 2px var(--ligne); } } a.bouton:active { transform:translateY(1px); }
+details.objectifs { margin:0 -.25rem; border-top:1px dashed var(--bord); }
+details.objectifs summary { display:flex; align-items:center; gap:.45rem; min-height:2.75rem; padding:0 .25rem; cursor:pointer; list-style:none; font-weight:700; font-size:.92rem; color:var(--doux); }
+details.objectifs summary::-webkit-details-marker { display:none; }
+details.objectifs summary::before { content:""; width:.45rem; height:.45rem; border-right:2px solid; border-bottom:2px solid; transform:translateY(-.1rem) rotate(45deg); transition:transform .2s ease-out; }
+details.objectifs[open] summary::before { transform:translateY(.1rem) rotate(-135deg); }
+details.objectifs summary:hover { color:var(--texte); }
+details.objectifs .cacher, details.objectifs[open] .voir { display:none; } details.objectifs[open] .cacher { display:inline; }
+details.objectifs::details-content { height:0; overflow:clip; transition:height .22s ease-out, content-visibility .22s allow-discrete; }
+details.objectifs[open]::details-content { height:auto; }
+details.objectifs ul { list-style:none; margin:0; padding:.2rem .25rem .9rem; display:flex; flex-direction:column; gap:.55rem; }
+details.objectifs li { display:grid; grid-template-columns:1.5rem 1fr; gap:.7rem; align-items:start; line-height:1.35; }
+details.objectifs li .station { margin-top:-.05rem; }
+details.objectifs li small { display:block; color:var(--doux); font-size:.82rem; }
+.reseau-vide { margin-top:1rem; padding:1.5rem; background:var(--carte); border:1px dashed var(--bord); border-radius:18px; --ligne:var(--ligne-autre); }
+.reseau-vide p { margin:.8rem 0 0; color:var(--doux); }
+header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
+@media (max-width: 480px) { header { padding-inline:.75rem; gap:.5rem; } header h1 .nom-appli { display:none; } #nav { gap:.35rem; } header button.secondaire { padding:.45rem .6rem; font-size:.9rem; } .compteur-etoiles { padding:.3rem .7rem; } }
+@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
+
 /* Séance : la zone de leçon remplit l'écran sous l'en-tête, quelle que soit sa hauteur. */
 body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
 body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; }
@@ -40,38 +183,15 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 .action-suivante small, .lecon-terminee small { font-size:.75rem; font-weight:400; opacity:.9; }
 .lecon-terminee { background:#d4a017; color:#fff; animation:none; }
 @keyframes pulsation { 50% { box-shadow:0 0 0 8px rgba(46,158,91,.25); } }
-.maitrise { display:flex; align-items:center; gap:.4rem; font-size:.85rem; color:var(--doux); margin:.3rem 0; }
-.maitrise.rouge, .maitrise.orange, .maitrise.vert { font-weight:600; } .maitrise.rouge { color:#c96a6a; } .maitrise.orange { color:#e08a1e; } .maitrise.vert { color:#2e9e5b; }
-.maitrise.acquis { font-weight:700; color:#fff; background:#1b6e3c; padding:.05rem .55rem; border-radius:999px; width:fit-content; }
-p .maitrise { display:inline-flex; }
-.ligne-maitrise { display:flex; align-items:center; gap:.4rem; }
-.niveau-lecon { font-size:.85rem; font-weight:600; white-space:nowrap; }
-.pastilles { font-size:.85rem; letter-spacing:.1rem; white-space:nowrap; }
-.objectifs-retenus { display:block; font-size:.85rem; color:var(--doux); }
-.objectifs-retenus .objectifs { display:block; margin-top:.2rem; text-align:left; font-size:.8rem; }
-.objectifs-retenus .objectifs > span { display:block; }
 .etoiles, .fusees { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
 .carte .accroche { display:block; font-size:.9rem; margin-top:.3rem; }
 .carte .type { display:block; font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.3rem; color:var(--doux); }
 .carte.suite { border-left:4px solid var(--accent); } .carte.suite .type { color:var(--accent); }
-.carte .au-programme { display:block; width:fit-content; font-size:.75rem; font-weight:600; padding:.1rem .5rem; margin-bottom:.4rem; border-radius:999px; background:var(--accent); color:#fff; }
-.carte .continuer { display:block; font-size:.9rem; margin-top:.3rem; color:var(--accent); font-weight:600; }
+.carte .au-programme { display:block; width:fit-content; font-size:.75rem; font-weight:600; padding:.1rem .5rem; margin-bottom:.4rem; border-radius:999px; background:var(--accent); color:var(--sur-accent); }
 .cadrage { position:fixed; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; padding:1.5rem; overflow-y:auto; background:rgba(0,0,0,.45); }
 .cadrage .annuler { position:absolute; top:1rem; right:1rem; }
 @media (prefers-color-scheme: dark) { .cadrage { background:rgba(0,0,0,.75); } }
-/* Révisions du jour (#66) : le quiz du Kit (kit/v1/quiz.css) dans l'appli, une question à la fois. */
-.carte-revisions { display:block; width:100%; max-width:420px; margin:.6rem 0 1rem; }
-.carte-revisions strong { display:block; font-size:1.1rem; }
-/* Rythme (#75) : Objectif du jour, série et jokers ; récapitulatif de la semaine. */
-.carte-rythme, .recapitulatif { display:block; max-width:420px; margin:.6rem 0; }
-.carte-rythme strong, .recapitulatif strong { display:block; }
-.carte-rythme.atteint { border-left:4px solid var(--accent); }
-.recapitulatif { position:relative; padding-right:2.6rem; }
-.recapitulatif .fermer { position:absolute; top:.4rem; right:.4rem; padding:.1rem .5rem; }
-.comptes-a-rebours { list-style:none; padding:0; margin:0 0 1rem; }
-.comptes-a-rebours li { margin:.2rem 0; font-weight:600; }
-.carte-revisions:not(.secondaire) small { color:inherit; opacity:.9; }
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
@@ -84,8 +204,7 @@ p .maitrise { display:inline-flex; }
 .pastille-badge.pas-encore { filter:grayscale(1); opacity:.45; }
 .badge.a-venir strong { color:var(--doux); }
 .badge strong { display:block; margin-top:.3rem; }
-.carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--accent); color:#fff; }
-.carte-rythme { width:100%; cursor:pointer; } .carte-badges { margin-top:.3rem; }
+.carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 .totaux-recompenses { font-size:1.15rem; font-weight:700; }
 /* Calendrier de Mes badges (#99) : Jours travaillés pâles, pleins quand l'Objectif du jour est atteint, 🛡️ Joker. */
 .calendrier { max-width:420px; margin:1rem 0; }
@@ -95,7 +214,7 @@ p .maitrise { display:inline-flex; }
 .calendrier-entete { text-align:center; font-size:.8rem; color:var(--doux); }
 .calendrier-jour { position:relative; padding:.4rem 0; text-align:center; background:var(--carte); color:var(--texte); border-color:var(--bord); }
 .calendrier-jour.pale { background:color-mix(in srgb, var(--accent) 25%, var(--carte)); }
-.calendrier-jour.plein { background:var(--accent); color:#fff; border-color:var(--accent); }
+.calendrier-jour.plein { background:var(--accent); color:var(--sur-accent); border-color:var(--accent); }
 .calendrier-jour.aujourdhui { outline:2px solid var(--accent); outline-offset:1px; }
 .calendrier-jour.choisi { box-shadow:0 0 0 3px var(--texte); }
 .calendrier-jour:disabled { opacity:.35; cursor:default; }

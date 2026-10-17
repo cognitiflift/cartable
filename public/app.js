@@ -32,15 +32,30 @@ const garder = (enfants) => enfants.flat(Infinity).filter((e) => e != null && e 
 const montrer = (...enfants) => app.replaceChildren(...garder(enfants));
 const pseudoCourant = () => localStorage.getItem('pseudo');
 
+// En-tête : le total d'Étoiles de l'Élève, qui ouvre Mes badges, puis son Profil. Le total vient de GET …/badges, lu une
+// fois par Élève puis mis à jour par l'accueil et Mes badges (retenirRecompenses), pour ne pas le relire à chaque écran.
+let recompensesConnues = null; // { slug, etoiles, nouveau }
+const retenirRecompenses = (profil, { totaux, nouveaux }) => {
+  recompensesConnues = { slug: profil.slug, etoiles: totaux?.etoiles ?? 0, nouveau: nouveaux?.length > 0 };
+};
 function barreNav(profil) {
-  nav.replaceChildren(
-    ...(profil
-      ? [h('span', {}, `${profil.pseudo} · ${profil.niveau} · ${profil.age} ans `),
-         h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, 'Mon profil'),
-         ' ',
-         h('button', { className: 'secondaire', onclick: () => { localStorage.removeItem('pseudo'); location.hash = '#/'; route(); } }, 'Changer')]
-      : []),
-  );
+  if (!profil) return nav.replaceChildren();
+  const connues = recompensesConnues?.slug === profil.slug ? recompensesConnues : null;
+  const compteur = h('a', { className: 'compteur-etoiles', href: '#/badges', title: 'Mes badges' },
+    h('span', { ariaHidden: 'true' }, '⭐'),
+    h('span', { className: 'nombre' }, connues ? String(connues.etoiles) : '…'),
+    h('span', { className: 'cache' }, ' Étoiles, voir mes badges'),
+    connues?.nouveau && h('span', { className: 'nouveau' }, 'Nouveau'));
+  nav.replaceChildren(compteur,
+    h('span', { className: 'qui' }, `${profil.pseudo} · ${profil.niveau}`, h('span', { className: 'age' }, ` · ${profil.age} ans`)),
+    h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, 'Mon profil'),
+    h('button', { className: 'secondaire', onclick: () => { localStorage.removeItem('pseudo'); location.hash = '#/'; route(); } }, 'Changer'));
+  if (!connues) {
+    api(`eleves/${profil.slug}/badges`).then((badges) => {
+      retenirRecompenses(profil, badges);
+      if (nav.contains(compteur)) barreNav(profil);
+    }).catch(() => {});
+  }
 }
 
 async function ecranChoix() {
@@ -173,81 +188,153 @@ async function ecranParent(profil) {
 const recompensesLecon = (l) => h('span', { className: 'etoiles' },
   morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
 
-// Objectifs de la Leçon : combien sont atteints et Retenus, par exemple « 3 Objectifs · 2 atteints · 1 Retenu », puis
-// chaque Objectif avec son état. Rien sans Objectifs.
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
-const ETATS_OBJECTIF = [
-  { cle: 'retenu', icone: '🧠', libelle: 'Retenu : réussi de nouveau un autre jour' },
-  { cle: 'atteint', icone: '✅', libelle: 'atteint' },
-  { cle: 'aConfirmer', icone: '🔮', libelle: 'à confirmer : réussi au Pré-test' },
+
+// Accueil : chaque Leçon est une ligne du réseau, à la couleur de sa Catégorie (celle du Kit), et ses Objectifs
+// en sont les stations. L'état d'un Objectif se lit à la forme de sa station : vide (pas encore évalué), hachurée
+// (à confirmer), blanche (atteint), verte (Retenu). Le terminus « Acquis » s'allume au palier de Maîtrise Acquis.
+const cleCategorie = (categorie) => categorie.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const ETATS_STATION = [
+  { cle: 'retenu', classe: 'retenue', libelle: 'Retenu' },
+  { cle: 'atteint', classe: 'atteinte', libelle: 'atteint' },
+  { cle: 'aConfirmer', classe: 'a-confirmer', libelle: 'à confirmer' },
 ];
-const PAS_ENCORE = { icone: '⚪', libelle: 'pas encore atteint' };
-function objectifsRetenus(objectifs = []) {
-  if (!objectifs.length) return null;
+const PAS_EVALUE = { classe: 'pas-encore', libelle: 'pas encore évalué' };
+const etatStation = (objectif) => ETATS_STATION.find((e) => objectif[e.cle]) ?? PAS_EVALUE;
+const station = (objectif, attrs = {}) => h('span', { className: `station ${etatStation(objectif).classe}`, ...attrs });
+
+function resumeObjectifs(objectifs) {
   const compte = (cle) => objectifs.filter((o) => o[cle]).length;
   const aConfirmer = compte('aConfirmer');
-  return h('span', { className: 'objectifs-retenus' },
-    [pluriel(objectifs.length, 'Objectif'), pluriel(compte('atteint'), 'atteint'), pluriel(compte('retenu'), 'Retenu'), aConfirmer && `${aConfirmer} à confirmer`].filter(Boolean).join(' · '),
-    h('span', { className: 'objectifs' }, objectifs.map((o) => {
-      const etat = ETATS_OBJECTIF.find((e) => o[e.cle]) ?? PAS_ENCORE;
-      return h('span', { title: etat.libelle }, `${etat.icone} ${o.texte}`);
-    })));
+  return [`${compte('atteint')} sur ${pluriel(objectifs.length, 'Objectif')} atteints`, pluriel(compte('retenu'), 'Retenu'),
+    aConfirmer && `${aConfirmer} à confirmer`].filter(Boolean).join(', ');
 }
 
-// Une pastille par Objectif d'une Leçon libre, pleine si l'Objectif est atteint : « ●●●●○ ». Rien sans Objectifs.
-function pastillesObjectifs(objectifs = []) {
-  if (!objectifs.length) return null;
-  const atteints = objectifs.filter((o) => o.atteint).length;
-  return h('span', { className: 'pastilles', title: `${atteints} ${atteints > 1 ? 'Objectifs atteints' : 'Objectif atteint'} sur ${objectifs.length}` },
-    objectifs.map((o) => (o.atteint ? '●' : '○')).join(''));
+// Le trait est à la couleur de la Catégorie jusqu'à la dernière station atteinte, gris ensuite. La prochaine station
+// (la première pas encore atteinte) est marquée sur la ligne quand l'Élève a une page à faire.
+function ligneLecon(l, { ici = false } = {}) {
+  const objectifs = l.objectifs ?? [];
+  const acquis = l.maitrise?.palier === 'acquis';
+  const terminus = h('span', { className: `terminus${acquis ? ' allume' : ''}`, title: acquis ? `Maîtrise : ${l.maitrise.pourcentage} %` : undefined }, acquis ? 'Acquis ✓' : 'Acquis');
+  if (!objectifs.length) return h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Objectifs à venir'), terminus);
+  const dernier = objectifs.findLastIndex((o) => o.atteint);
+  const prochaine = ici ? objectifs.findIndex((o) => !o.atteint) : -1;
+  return h('div', { className: 'ligne', role: 'img', ariaLabel: `${resumeObjectifs(objectifs)}${acquis ? ', Leçon acquise' : ''}` },
+    objectifs.map((o, i) => [
+      i > 0 && h('span', { className: `troncon${i <= dernier ? ' fait' : ''}` }),
+      station(o, { title: `${o.texte} (${etatStation(o).libelle})`, className: `station ${etatStation(o).classe}${i === prochaine ? ' ici' : ''}` })]),
+    h('span', { className: `troncon${acquis ? ' fait' : ''}` }), terminus);
 }
 
 function badgeMaitrise(maitrise) {
-  if (!maitrise) return h('span', { className: 'maitrise' }, 'pas encore évalué');
+  if (!maitrise) return h('span', { className: 'maitrise' }, 'Pas encore évalué');
   const { classe, mot } = PALIERS_DE_MAITRISE[maitrise.palier];
   return h('span', { className: `maitrise ${classe}`, title: `Maîtrise : ${maitrise.pourcentage} %` }, mot);
 }
 
-async function ecranAccueil(profil) {
-  const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
-  const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
-  montrer(
-    h('h2', {}, `Salut ${profil.pseudo} !`),
-    recapitulatifSemaine(profil, rythme.recapitulatif),
-    carteRythme(rythme, badges),
-    carteRevisions(revisions.dues),
-    comptesARebours(lecons),
-    h('button', { onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau'),
-    lecons.length === 0 && h('p', {}, "Tu n'as pas encore de leçon."),
-    config.categories.filter((c) => parCategorie[c]).map((c) => [
-      h('h2', {}, c),
-      h('div', { className: 'grille' }, parCategorie[c].map((l) =>
-        h('button', { className: 'carte', onclick: () => (location.hash = `#/lecon/${l.id}`) }, l.titre,
-          h('span', { className: 'ligne-maitrise' }, l.niveauLecon && h('span', { className: 'niveau-lecon', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
-            l.mode === 'libre' && pastillesObjectifs(l.objectifs), badgeMaitrise(l.maitrise), recompensesLecon(l)),
-          objectifsRetenus(l.objectifs),
-          h('span', { className: 'continuer' }, `▶️ Continuer${l.mode === 'libre' && l.ensuite && !l.quizEnAttente ? ` : ${l.ensuite}` : ''}`),
-          h('small', {}, new Date(l.derniereActivite).toLocaleDateString('fr-BE'))))),
-    ]));
+// Ce que l'Élève trouvera en touchant Continuer : la page annoncée par le prof (Leçon libre), le quiz de la dernière
+// page s'il n'est pas fait, ou rien de plus.
+function prochaineStation(l) {
+  const texte = !l.pages?.length ? 'Ta première page'
+    : l.quizEnAttente ? 'Le quiz de ta page'
+      : l.mode === 'libre' && l.ensuite ? l.ensuite : null;
+  return texte && h('p', { className: 'prochaine' }, h('span', { className: 'libelle' }, 'Prochaine station : '), texte);
 }
 
-// Rythme (#75) : l'Objectif du jour et la Série de jours, calculés par le serveur (lib/rythme.js). Les messages parlent
-// de l'effort et de ce qui a été fait, jamais de l'Élève lui-même ni des autres Élèves ; aucun reproche.
-// La carte montre aussi le dernier Badge gagné et « Nouveau » (#95) ; la toucher ouvre Mes badges.
-function carteRythme({ objectifDuJour: o, serieDeJours }, { dernier, nouveaux } = {}) {
+const texteControle = (jours) => (jours === 0 ? "aujourd'hui" : jours === 1 ? 'demain' : `dans ${jours} jours`);
+const controleAVenir = (l) => Number.isInteger(l.joursAvantControle) && l.joursAvantControle >= 0;
+
+function carteLecon(l) {
+  const objectifs = l.objectifs ?? [];
+  const adresse = `#/lecon/${l.id}`;
+  return h('article', { className: 'lecon', style: `--ligne: var(--ligne-${cleCategorie(l.categorie)}, var(--ligne-autre))` },
+    h('div', { className: 'lecon-tete' },
+      l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
+      h('h4', {}, h('a', { href: adresse }, l.titre)),
+      l.maitrise?.palier !== 'acquis' && badgeMaitrise(l.maitrise)), // Acquis : dit par le terminus allumé, pas deux fois
+    ligneLecon(l, { ici: !!prochaineStation(l) }),
+    h('div', { className: 'lecon-bas' },
+      prochaineStation(l) ?? h('span', { className: 'prochaine' }),
+      controleAVenir(l) && h('span', { className: 'controle' }, `📅 Contrôle ${texteControle(l.joursAvantControle)}`),
+      l.terminee && h('span', { className: 'terminee' }, '🏁 Terminée'),
+      recompensesLecon(l),
+      h('a', { className: 'bouton', href: adresse }, 'Continuer')),
+    objectifs.length > 0 && h('details', { className: 'objectifs' },
+      h('summary', {}, h('span', { className: 'voir' }, 'Voir les Objectifs'), h('span', { className: 'cacher' }, 'Cacher les Objectifs')),
+      h('ul', {}, objectifs.map((o) => h('li', {}, station(o), h('span', {}, o.texte, h('small', {}, etatStation(o).libelle)))))));
+}
+
+async function ecranAccueil(profil) {
+  const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
+  retenirRecompenses(profil, badges);
+  barreNav(profil);
+  const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
+  montrer(
+    recapitulatifSemaine(profil, rythme.recapitulatif),
+    maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons),
+    h('div', { className: 'lecons-tete' },
+      h('h2', {}, 'Mes leçons'),
+      h('button', { className: 'bouton-nouvelle', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
+    lecons.length === 0 && h('div', { className: 'reseau-vide' },
+      h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Ton réseau est encore vide'), h('span', { className: 'terminus' }, 'Acquis')),
+      h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
+    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: `--ligne: var(--ligne-${cleCategorie(c)}, var(--ligne-autre))` },
+      h('h3', {}, c),
+      h('div', { className: 'lecons-grille' }, parCategorie[c].map(carteLecon)))));
+}
+
+// Ma semaine, comme la page de la semaine du journal de classe : du lundi au dimanche, un tampon par jour (vide,
+// pâle quand l'Élève a travaillé, plein quand l'Objectif du jour est atteint, 🛡️ quand un Joker l'a couvert), avec ce
+// qui a été gagné ce jour-là (Étoiles, Fusées, Paliers de Badge) et les contrôles prévus ; à côté, l'Objectif du jour,
+// la Série de jours (#75) et les Révisions du jour (#66). Aucun score.
+const JOURS_SEMAINE = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+const JOURS_ENTIERS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+const enJour = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const jourPlus = (jour, n) => { const d = new Date(`${jour}T12:00:00`); d.setDate(d.getDate() + n); return enJour(d); };
+function joursDeLaSemaine(aujourdhui) {
+  const lundi = jourPlus(aujourdhui, -((new Date(`${aujourdhui}T12:00:00`).getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => jourPlus(lundi, i));
+}
+const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atteint' };
+
+function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
+  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
+  const caseJour = (jour, i) => {
+    const j = parJour.get(jour) ?? jourSansRien(jour);
+    const futur = jour > aujourdhui;
+    const lecture = [JOURS_ENTIERS[i], jour === aujourdhui && "aujourd'hui", ETATS_JOUR[j.etat], j.joker && 'protégé par un joker'].filter(Boolean).join(', ');
+    return h('li', { className: `jour ${j.etat}${jour === aujourdhui ? ' aujourdhui' : ''}${futur ? ' futur' : ''}` },
+      h('span', { className: 'cache' }, lecture),
+      h('span', { className: 'nom', ariaHidden: 'true' }, JOURS_SEMAINE[i]),
+      h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), j.joker && h('span', { className: 'joker' }, '🛡️')),
+      (j.gains.etoiles > 0 || j.gains.fusees > 0) && h('span', { className: 'gains' },
+        j.gains.etoiles > 0 && h('span', { title: pluriel(j.gains.etoiles, 'Étoile') }, `⭐${j.gains.etoiles > 1 ? j.gains.etoiles : ''}`),
+        j.gains.fusees > 0 && h('span', { title: pluriel(j.gains.fusees, 'Fusée') }, `🚀${j.gains.fusees > 1 ? j.gains.fusees : ''}`)),
+      j.gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
+        j.gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
+      controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}` }, '📅')));
+  };
   const objectif = o.atteint
-    ? '🎯 Objectif du jour atteint : ton travail d’aujourd’hui compte !'
-    : `🎯 Objectif du jour : ${o.revisionsVisees} révisions (${o.revisions}/${o.revisionsVisees}) ou ${pluriel(o.pagesVisees, 'page')} de leçon`;
-  const jours = serieDeJours.jours
-    ? `🔥 ${pluriel(serieDeJours.jours, 'jour')} de suite à travailler${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
-    : '🌱 Chaque jour un peu, c’est comme ça qu’on retient';
-  return h('button', { className: `carte carte-rythme${o.atteint ? ' atteint' : ''}`, onclick: () => (location.hash = '#/badges') },
-    h('strong', {}, objectif),
-    h('small', {}, jours,
-      serieDeJours.jokers > 0 && h('span', { className: 'jokers', title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-    serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
-    h('small', { className: 'carte-badges' }, dernier ? [pastilleBadge(dernier), ` Dernier badge : ${nomEtPalier(dernier)}`] : '🏅 Mes badges',
-      nouveaux?.length > 0 && h('span', { className: 'nouveau' }, 'Nouveau')));
+    ? h('strong', {}, 'Objectif du jour atteint')
+    : h('strong', {}, `Objectif du jour : ${o.revisions}/${o.revisionsVisees} révisions ou ${pluriel(o.pagesVisees, 'page')}`);
+  const serie = serieDeJours.jours
+    ? `${pluriel(serieDeJours.jours, 'jour')} de suite${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
+    : 'Chaque jour un peu, c’est comme ça qu’on retient';
+  return h('section', { className: 'ma-semaine' },
+    h('div', { className: 'semaine-jours' },
+      h('div', { className: 'semaine-titre' },
+        h('h2', {}, `Salut ${profil.pseudo} !`),
+        h('a', { href: '#/badges' }, 'Mon calendrier et mes badges')),
+      h('ol', { className: 'jours' }, joursDeLaSemaine(aujourdhui).map(caseJour))),
+    h('div', { className: 'semaine-cote' },
+      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
+        h('small', {}, serie,
+          serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
+        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`)),
+      h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
+        h('strong', {}, 'Mes révisions du jour'),
+        h('small', {}, dues ? `${pluriel(dues, 'question')} à revoir` : 'Rien à revoir aujourd’hui'))));
 }
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
@@ -259,6 +346,8 @@ const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-
 // L'ouvrir efface « Nouveau » ; le mot d'accueil s'affiche à la première ouverture.
 async function ecranBadges(profil) {
   const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
+  barreNav(profil);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
@@ -350,21 +439,6 @@ function recapitulatifSemaine(profil, recap) {
     h('strong', {}, `📅 ${titre}`),
     faits && h('small', {}, `Tes efforts : ${faits}. C’est la régularité qui fait retenir.`));
   return carte;
-}
-
-// Carte « Mes révisions du jour » (#66) : le nombre de Questions dues, d'un geste vers l'écran de révision.
-const carteRevisions = (dues) => h('button', { className: `carte carte-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
-  h('strong', {}, '🧠 Mes révisions du jour'),
-  h('small', {}, dues ? `${pluriel(dues, 'question')} à revoir` : 'Rien à revoir aujourd’hui 🎉'));
-
-// Compte à rebours des contrôles (#68) : pour chaque Leçon de révision dont le contrôle est aujourd'hui ou à venir,
-// le nombre de jours restants (calculé par le serveur, voir lib/jour.js), le plus proche d'abord.
-const texteControle = (jours) => (jours === 0 ? "aujourd'hui" : jours === 1 ? 'demain' : `dans ${jours} jours`);
-function comptesARebours(lecons) {
-  const aVenir = lecons.filter((l) => Number.isInteger(l.joursAvantControle) && l.joursAvantControle >= 0).map((l) => ({ l, jours: l.joursAvantControle }))
-    .sort((a, b) => a.jours - b.jours);
-  return aVenir.length > 0 && h('ul', { className: 'comptes-a-rebours' }, aVenir.map(({ l, jours }) =>
-    h('li', {}, h('a', { href: `#/lecon/${l.id}` }, `📅 ${l.titre} : contrôle ${texteControle(jours)}`))));
 }
 
 // Révisions du jour (#66) : des séries courtes de Questions dues, toutes Leçons mélangées, affichées tout de suite avec

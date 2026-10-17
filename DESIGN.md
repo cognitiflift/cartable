@@ -273,7 +273,7 @@ Le monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des c
 
 Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par la préférence de l'appareil ; l'en-tête reste bleu nuit dans les deux.
 
-**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), la Séance (en-tête sur la ligne de la Leçon, bulle du prof, Retour de quiz, Rebond), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Révisions du jour, Vue parent, Profil, nouvelle Leçon, cadrage) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
+**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), la Séance (en-tête sur la ligne de la Leçon, bulle du prof, Retour de quiz, Rebond), Nouvelle leçon (Propositions et Cadrage), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Révisions du jour, Vue parent, Profil) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
 
 **Key Characteristics:**
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
@@ -310,7 +310,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Hachure** (`hachure`, `hachure-sombre`) : le fond clair entre les hachures des stations « à confirmer ».
 - **Encre noire** (`encre-noire`) : ne sert qu'à foncer une couleur de ligne (`color-mix`), jamais en aplat.
 - **Voie vide** (`troncon`) : les tronçons de ligne pas encore parcourus.
-- **Voile** (`voile`, `voile-sombre`) : le voile translucide posé sur la Page de leçon derrière une question du prof ou une attente, en Séance ; nuit à 50 % en clair, noir à 65 % en sombre.
+- **Voile** (`voile`, `voile-sombre`) : le voile translucide posé sur la Page de leçon derrière une question du prof ou une attente, en Séance, et sous la boîte de dialogue modale du Cadrage ; nuit à 50 % en clair, noir à 65 % en sombre.
 - **Station vide** (`station-vide`) : l'anneau des stations pas encore évaluées, les hachures « à confirmer », le contour des tampons vides et du terminus éteint.
 
 ### Named Rules
@@ -434,6 +434,12 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusées à droite en chiffres tabulaires), puis deux colonnes (une seule sous 900px) : le calendrier à gauche, la collection à droite.
 - **Calendrier :** une carte comme le bandeau de la semaine (18px, pose du bandeau), le mois en titre entre deux boutons secondaires ‹ ›, les noms de jours en label signalétique, puis un tampon de jour par date, le même que le bandeau (`tamponJour` dans `public/app.js`) : vide, futur, pâle, plein, 🛡️ Joker, aujourd'hui. Chaque jour est un bouton ; le jour touché est entouré d'un anneau `texte` détouré de la carte, comme « vous êtes ici », et son détail (Leçons, quiz, Révisions du jour, gains) s'affiche sous un filet pointillé. Aujourd'hui est montré à l'ouverture.
 - **Collection :** des cartes simples, la pastille du Badge à gauche, le nom, les Paliers obtenus avec leur date et la progression à côté ; un Badge pas encore obtenu est grisé.
+
+### Propositions et Cadrage (Nouvelle leçon)
+- **Proposition :** carte simple cliquable (14px, filet, pas d'ombre), dans une grille fluide (`minmax(min(100%, 17rem), 1fr)`). Elle porte la couleur de sa Catégorie par `--ligne`, seulement sur sa puce. Son type est dit en mots dans une cartouche de signalétique (Overpass 800, 0.74rem, capitales) : **Pour aller plus loin** (une suite) en aplat de ligne foncée, comme le cartouche de Niveau, puisqu'elle prolonge une ligne déjà ouverte ; **Nouveau sujet** en filet `station-vide`, texte `doux`, comme le terminus éteint. « 🎒 Au programme » est un mot gras à côté, sans pastille. Puis le titre (Overpass 800, 1.15rem), la Catégorie en `doux` derrière sa puce, et l'accroche.
+- **Les deux autres voies** (réviser une leçon de classe, apprendre ce que tu veux) : deux cartes simples côte à côte sous les Propositions (une seule colonne sur téléphone), titre en Headline, champs étiquetés, bouton plein de 2.75rem.
+- **Cadrage :** une boîte de dialogue modale native (`<dialog>`), carte de 18px à la pose de carte de ligne, posée sur le `voile`. « Question 1 sur 2 » en `doux`, la question en titre de section, les réponses en boutons secondaires empilés (2.75rem de haut, 12px), « ✕ » en bouton secondaire carré dans le coin. Échap ou « ✕ » annule et rend le focus à ce qui l'avait.
+- **Jamais de bande de couleur sur le côté d'une carte** pour dire un type : `test/style.test.js` refuse toute bordure latérale plus épaisse qu'un filet.
 
 ## Do's and Don'ts
 

@@ -88,12 +88,7 @@ typography:
 // Les écarts de public/style.css aux jetons, hérités des écrans pas encore redessinés (DESIGN.md, « Frontière
 // d'extension »). La liste ne peut que rétrécir : quand un écran revient aux jetons, retirer ses lignes ; une
 // exception qui ne correspond plus à rien fait échouer le test. N'en ajouter aucune : créer un jeton.
-const EXCEPTIONS = [
-  ...ecran('Nouvelle Leçon : cadrage', [
-    ['.cadrage', 'background', 'rgba(0,0,0,.45)'],
-    ['@media (prefers-color-scheme: dark) .cadrage', 'background', 'rgba(0,0,0,.75)'],
-  ]),
-];
+const EXCEPTIONS = [];
 
 function ecran(nom, ecarts) {
   return ecarts.map(([lieu, propriete, valeur]) => ({ ecran: nom, lieu, propriete, valeur }));
@@ -111,6 +106,34 @@ test('Style : les couleurs de DESIGN.md sont celles de public/style.css', async 
   const css = await lireStyle();
   assert.deepEqual(ecartsDesign(design, css), []);
 });
+
+test('Style : une bordure latérale épaisse (bande de couleur sur le côté d\'une carte) est signalée', () => {
+  const css = `.a { border-left: 4px solid var(--accent); } .b { border-inline-start: .25rem solid var(--ligne); }
+    .c { border-left: 1px solid var(--bord); } .d { border: 2px solid var(--accent); } .e { border-right-width: 3px; }
+    .chevron::before { border-right: 2px solid; border-bottom: 2px solid; }`;
+  assert.deepEqual(bordsLateraux(css), [
+    '.a { border-left: 4px solid var(--accent) } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
+    '.b { border-inline-start: .25rem solid var(--ligne) } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
+    '.e { border-right-width: 3px } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
+  ]);
+});
+
+test('Style : public/style.css n\'a aucune bordure latérale épaisse', async () => {
+  assert.deepEqual(bordsLateraux(await lireStyle()), []);
+});
+
+// Les bordures d'un seul côté (gauche, droite, début ou fin de ligne) plus épaisses qu'un filet : la bande de couleur
+// latérale qu'impeccable signale. Un filet de 1px reste permis, comme un trait de dessin qui tient sur deux côtés
+// voisins dans la même règle (le chevron de « Voir les Objectifs »).
+function bordsLateraux(css) {
+  const toutes = declarations(css);
+  const epaisse = (valeur) => [...valeur.matchAll(/(?<![\w.-])(\d*\.?\d+)(px|rem|em)\b/g)].some(([, n, unite]) => Number(n) * (unite === 'px' ? 1 : 16) > 1);
+  const dessin = (lieu) => toutes.some((d) => d.lieu === lieu && /^border-(top|bottom|block-start|block-end)(-width)?$/.test(d.propriete) && epaisse(d.valeur));
+  return toutes
+    .filter(({ propriete }) => /^border-(left|right|inline-start|inline-end)(-width)?$/.test(propriete))
+    .filter(({ lieu, valeur }) => epaisse(valeur) && !dessin(lieu))
+    .map(({ lieu, propriete, valeur }) => `${lieu} { ${propriete}: ${valeur} } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.`);
+}
 
 // Les déclarations d'une feuille de style, chacune avec son lieu : les préludes des blocs qui l'entourent
 // (« @media (prefers-color-scheme: dark) .lecon »). Assez pour public/style.css : commentaires, chaînes et

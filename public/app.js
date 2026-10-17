@@ -535,23 +535,26 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
   lecteur.readAsDataURL(fichier);
 });
 
-// Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, par-dessus l'écran.
-// L'Élève touche une réponse (« Je ne sais pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions
-// posées selon le mode viennent de la configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
+// Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, dans une carte en
+// boîte de dialogue modale (le reste de l'écran est inerte sous le voile). L'Élève touche une réponse (« Je ne sais
+// pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions posées selon le mode viennent de la
+// configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
 async function cadrer(mode) {
   const cadrage = {};
-  for (const cle of config.questionsCadrage[mode]) {
+  const cles = config.questionsCadrage[mode];
+  for (const [i, cle] of cles.entries()) {
     const { question, reponses } = config.cadrage[cle];
     cadrage[cle] = await new Promise((choisir) => {
-      const fermer = (valeur) => { calque.remove(); document.removeEventListener('keydown', echap); choisir(valeur); };
-      const echap = (e) => e.key === 'Escape' && fermer(null);
-      const calque = h('div', { className: 'cadrage' },
-        h('button', { className: 'secondaire annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'),
-        h('div', { className: 'bulle-prof' }, question),
-        h('div', { className: 'choix' }, Object.entries(reponses).map(([valeur, libelle]) =>
-          h('button', { onclick: () => fermer(valeur) }, libelle))));
-      document.addEventListener('keydown', echap);
+      const fermer = (valeur) => { calque.close(); calque.remove(); choisir(valeur); };
+      const calque = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
+        cles.length > 1 && h('p', { className: 'cadrage-etape' }, `Question ${i + 1} sur ${cles.length}`),
+        h('h2', { id: 'cadrage-question' }, question),
+        h('div', { className: 'cadrage-choix' }, Object.entries(reponses).map(([valeur, libelle], j) =>
+          h('button', { className: 'secondaire', autofocus: j === 0, onclick: () => fermer(valeur) }, libelle))),
+        h('button', { className: 'secondaire annuler', ariaLabel: 'Annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'));
+      calque.setAttribute('aria-labelledby', 'cadrage-question');
       app.append(calque);
+      calque.showModal();
     });
     if (cadrage[cle] === null) return null;
   }
@@ -559,7 +562,7 @@ async function cadrer(mode) {
 }
 
 function ecranNouvelleLecon(profil) {
-  const erreur = h('p', { className: 'erreur' });
+  const erreur = h('p', { className: 'erreur', role: 'status' });
   const boutons = [];
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
@@ -567,11 +570,12 @@ function ecranNouvelleLecon(profil) {
   // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
   const cadrages = new Map();
   const demarrer = async (corps, mode, cle) => {
+    const retour = document.activeElement;
     activer(false);
     erreur.textContent = '';
     if (!cadrages.has(cle)) {
       const reponses = await cadrer(mode);
-      if (!reponses) return activer(true); // Cadrage annulé : l'Élève revient à l'écran, rien n'est envoyé
+      if (!reponses) { activer(true); return retour?.focus(); } // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
       cadrages.set(cle, reponses);
     }
     const cadrage = cadrages.get(cle);
@@ -601,10 +605,15 @@ function ecranNouvelleLecon(profil) {
     if (!actif) return;
     const enPreparation = etat === 'en préparation';
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
-    const cartes = propositions.map((p) => h('button', { className: `carte ${p.type}`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
-      h('span', { className: 'type' }, p.type === 'suite' ? '➡️ Pour aller plus loin' : '✨ Nouveau sujet'),
-      p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme'),
-      p.titre, h('small', {}, p.categorie), h('span', { className: 'accroche' }, p.accroche)));
+    // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
+    // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
+    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: `--ligne: var(--ligne-${cleCategorie(p.categorie)}, var(--ligne-autre))`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
+      h('span', { className: 'proposition-tete' },
+        h('span', { className: 'cartouche-type' }, p.type === 'suite' ? 'Pour aller plus loin' : 'Nouveau sujet'),
+        p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
+      h('strong', { className: 'proposition-titre' }, p.titre),
+      h('span', { className: 'proposition-categorie' }, p.categorie),
+      p.accroche && h('span', { className: 'accroche' }, p.accroche)));
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
       autresIdees.disabled = true;
       // Un refus (génération déjà en cours) revient au même : on attend les Propositions qui se préparent.
@@ -614,7 +623,7 @@ function ecranNouvelleLecon(profil) {
     boutonsIdees = [...cartes, autresIdees];
     idees.replaceChildren(
       h('h2', {}, '🎲 Des idées pour toi'),
-      cartes.length > 0 && h('div', { className: 'grille' }, cartes),
+      cartes.length > 0 && h('div', { className: 'propositions' }, cartes),
       enPreparation
         ? h('p', { className: 'doux' }, cartes.length ? '⏳ Nouvelles idées en préparation…' : 'On prépare tes idées…')
         : autresIdees);
@@ -624,26 +633,27 @@ function ecranNouvelleLecon(profil) {
 
   montrer(
     idees,
-    h('h2', {}, '📄 Réviser une leçon de classe'),
-    h('form', { className: 'colonne', onsubmit: (ev) => {
-      ev.preventDefault();
-      demarrer(async () => ({
-        dateControle: dateControle.value || undefined,
-        fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-      }), 'revision', 'revision');
-    } },
-      h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
-      h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
-      boutons[1]),
-    h('h2', {}, '💡 Apprendre ce que tu veux'),
-    h('form', { className: 'colonne', onsubmit: (ev) => {
-      ev.preventDefault();
-      // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
-      const texte = sujet.value.trim();
-      if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
-      if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
-      demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
-    } }, sujet, boutons[0]),
+    h('div', { className: 'nouvelle-voies' },
+      h('section', { className: 'carte' }, h('h2', {}, '📄 Réviser une leçon de classe'),
+        h('form', { className: 'colonne', onsubmit: (ev) => {
+          ev.preventDefault();
+          demarrer(async () => ({
+            dateControle: dateControle.value || undefined,
+            fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
+          }), 'revision', 'revision');
+        } },
+        h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
+        h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
+        boutons[1])),
+      h('section', { className: 'carte' }, h('h2', {}, '💡 Apprendre ce que tu veux'),
+        h('form', { className: 'colonne', onsubmit: (ev) => {
+          ev.preventDefault();
+          // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+          const texte = sujet.value.trim();
+          if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
+          if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
+          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
+        } }, h('label', {}, 'Ce que tu veux apprendre', h('br'), sujet), boutons[0]))),
     erreur);
 }
 

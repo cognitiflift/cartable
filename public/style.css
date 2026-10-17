@@ -17,7 +17,7 @@
   --fond:#f2f4f8; --texte:#14182b; --doux:#4f566c; --carte:#fff; --bord:#dde1ea; --ombre:20 24 43;
   --nuit:#14182b; --sur-nuit:#fff; --sur-nuit-doux:#c3c8db;
   --accent:#2747c9; --sur-accent:#fff; --nouveau:#fbbf24; --sur-nouveau:#14182b; --retenu:#15803d; --sur-retenu:#fff; --station-vide:#80879a; --troncon:#dde1ea;
-  --station-atteinte:#fff; --hachure:#fff; --encre-noire:#000; --voile:#14182b8c;
+  --station-atteinte:#fff; --hachure:#fff; --encre-noire:#000; --voile:rgb(20 24 43 / .5);
   --rouge:#b42318; --orange:#a8530b; --vert:#15803d;
   --ligne-francais:#c2410c; --ligne-mathematiques:#2f6fed; --ligne-sciences:#0f8a6a; --ligne-histoire:#8a5a14;
   --ligne-geographie:#0e7490; --ligne-langues:#9333ea; --ligne-arts:#db2777; --ligne-autre:#4b5563;
@@ -26,7 +26,7 @@
 @media (prefers-color-scheme: dark) { :root {
   --fond:#0f1220; --texte:#e8eaf3; --doux:#a6acc2; --carte:#1a1e30; --bord:#2c3248; --ombre:0 0 0;
   --nuit:#14182b; --sur-nuit-doux:#a6acc2;
-  --accent:#8aa2ff; --sur-accent:#0f1220; --nouveau:#fcd34d; --sur-nouveau:#0f1220; --retenu:#34c463; --sur-retenu:#0f1220; --station-vide:#737a96; --troncon:#2f3550; --hachure:#d9dce6; --voile:#000000b3;
+  --accent:#8aa2ff; --sur-accent:#0f1220; --nouveau:#fcd34d; --sur-nouveau:#0f1220; --retenu:#34c463; --sur-retenu:#0f1220; --station-vide:#737a96; --troncon:#2f3550; --hachure:#d9dce6; --voile:rgb(0 0 0 / .65);
   --rouge:#f58b8b; --orange:#f5b14c; --vert:#5ad98a;
   --ligne-francais:#fb923c; --ligne-mathematiques:#7aa2ff; --ligne-sciences:#34d399; --ligne-histoire:#e0a75e;
   --ligne-geographie:#38bdf8; --ligne-langues:#c084fc; --ligne-arts:#f472b6; --ligne-autre:#9ca3af;
@@ -161,29 +161,44 @@ header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
 @media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 
-/* Séance : la zone de leçon remplit l'écran sous l'en-tête, quelle que soit sa hauteur. */
+/* Séance : l'en-tête situe l'Élève sur la ligne de sa Leçon (ligneLecon, à la couleur de sa Catégorie) avec le mot de
+   Maîtrise ; la zone de leçon remplit l'écran dessous, quelle que soit sa hauteur. */
 body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
-body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; }
-body:has(.seance) main > p { margin:0 0 .6rem; }
-.seance { position:relative; flex:1; min-height:0; border:1px solid var(--bord); border-radius:12px; overflow:hidden; background:var(--carte); }
+body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; gap:.6rem; padding-top:.8rem; padding-bottom:1rem; }
+.seance-tete { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); display:flex; align-items:center; flex-wrap:wrap; gap:.35rem 1rem; padding:.35rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
+@media (prefers-color-scheme: dark) { .seance-tete { --ligne-fonce:var(--ligne); } }
+.seance-tete .retour-accueil { display:inline-flex; align-items:center; min-height:2.6rem; font-weight:700; white-space:nowrap; }
+.seance-titre { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .7rem; min-width:0; }
+.seance-titre h2 { margin:0; font-size:1.3rem; line-height:1.2; text-wrap:balance; }
+.seance-titre .maitrise { margin-top:0; }
+.seance-tete .ligne { flex:1 1 14rem; min-width:min(100%, 12rem); max-width:28rem; }
+.seance-tete .fiche-ouvrir { min-height:2.6rem; }
+.seance-tete .erreur { flex-basis:100%; min-height:0; }
+.seance-tete .erreur:empty { display:none; }
+.seance { position:relative; flex:1; min-height:0; border:1px solid var(--bord); border-radius:14px; overflow:hidden; background:var(--carte); }
 .panneau { display:flex; flex-direction:column; height:100%; background:var(--carte); }
 .panneau select { margin:.4rem; } .panneau iframe { flex:1; border:0; }
 .fiche { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; background:var(--carte); }
 .fiche-barre { display:flex; align-items:center; gap:.6rem; padding:.4rem .6rem; border-bottom:1px solid var(--bord); }
 .fiche-barre button { margin-left:auto; } .fiche iframe { flex:1; border:0; }
 .revisions-defilement { flex:1; overflow-y:auto; padding:.8rem 1rem; }
-.seance-centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; padding:1.5rem; overflow-y:auto; }
-.seance-centre.voile { background:rgba(0,0,0,.45); }
-.bulle-prof { max-width:560px; padding:1.2rem 1.4rem; white-space:pre-wrap; font-size:1.15rem; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:16px; box-shadow:0 6px 24px rgba(0,0,0,.2); }
+.seance-centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:safe center; gap:1.2rem; padding:1.5rem; overflow-y:auto; }
+.seance-centre.voile { background:var(--voile); }
+/* Bulle du prof et Retour de quiz : des cartes posées sur la leçon, avec la pose légère des cartes de ligne. */
+.bulle-prof { max-width:560px; padding:1.2rem 1.4rem; white-space:pre-wrap; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
 .choix { display:flex; flex-wrap:wrap; justify-content:center; gap:.6rem; max-width:560px; }
-.choix button { padding:.7rem 1.2rem; font-size:1.05rem; border-radius:999px; }
-.apres-quiz { position:absolute; right:1rem; bottom:1rem; width:min(340px, calc(100% - 2rem)); display:flex; flex-direction:column; gap:.6rem; }
-.retour { position:relative; padding:.8rem 2.2rem .8rem 1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
-.retour .fermer { position:absolute; top:.4rem; right:.4rem; padding:0 .45rem; font-size:.8rem; line-height:1.6; }
-.action-suivante, .lecon-terminee { display:flex; flex-direction:column; align-items:center; padding:.7rem 1.4rem; font-size:1.15rem; font-weight:600; border-radius:999px; background:#2e9e5b; border-color:#2e9e5b; box-shadow:0 4px 14px rgba(0,0,0,.25); animation:pulsation 1.6s ease-in-out infinite; }
-.action-suivante small, .lecon-terminee small { font-size:.75rem; font-weight:400; opacity:.9; }
-.lecon-terminee { background:#d4a017; color:#fff; animation:none; }
-@keyframes pulsation { 50% { box-shadow:0 0 0 8px rgba(46,158,91,.25); } }
+.choix button { min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; }
+.apres-quiz { position:absolute; right:1rem; bottom:1rem; width:min(360px, calc(100% - 2rem)); display:flex; flex-direction:column; gap:.6rem; }
+.retour { position:relative; padding:.9rem 3.2rem .9rem 1.1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.retour .fermer { position:absolute; top:.35rem; right:.35rem; width:2.6rem; height:2.6rem; padding:0; line-height:1; }
+/* Rebond : la suite recommandée est un bouton plein (l'action), les autres Rebonds des boutons secondaires. */
+.apres-quiz > button { display:flex; flex-direction:column; align-items:center; gap:.1rem; min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; text-wrap:balance; }
+.action-suivante { font-weight:800; }
+.action-suivante small { font-size:.92rem; font-weight:400; opacity:.92; }
+.lecon-terminee { display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:1rem 1.25rem; text-align:center; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.lecon-terminee strong { font:800 1.3rem/1.2 var(--police-titre); letter-spacing:-.01em; }
+.lecon-terminee small { color:var(--doux); font-size:.92rem; font-weight:700; font-variant-numeric:tabular-nums; }
+@media (max-width: 640px) { .seance-tete { gap:.2rem .7rem; } .seance-titre h2 { font-size:1.15rem; } .seance-tete .ligne { order:5; flex-basis:100%; max-width:none; } }
 .etoiles, .fusees { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
 /* Nouvelle leçon . Propositions : cartes simples, puce de la Catégorie, type dit en mots dans une cartouche de

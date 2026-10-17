@@ -110,11 +110,12 @@ test('Style : les couleurs de DESIGN.md sont celles de public/style.css', async 
 test('Style : une bordure latérale épaisse (bande de couleur sur le côté d\'une carte) est signalée', () => {
   const css = `.a { border-left: 4px solid var(--accent); } .b { border-inline-start: .25rem solid var(--ligne); }
     .c { border-left: 1px solid var(--bord); } .d { border: 2px solid var(--accent); } .e { border-right-width: 3px; }
-    .chevron::before { border-right: 2px solid; border-bottom: 2px solid; }`;
+    .chevron::before { border-right: 2px solid; border-bottom: 2px solid; } .f { border-inline: 2px solid var(--ligne); }`;
   assert.deepEqual(bordsLateraux(css), [
     '.a { border-left: 4px solid var(--accent) } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
     '.b { border-inline-start: .25rem solid var(--ligne) } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
     '.e { border-right-width: 3px } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
+    '.f { border-inline: 2px solid var(--ligne) } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.',
   ]);
 });
 
@@ -122,16 +123,20 @@ test('Style : public/style.css n\'a aucune bordure latérale épaisse', async ()
   assert.deepEqual(bordsLateraux(await lireStyle()), []);
 });
 
-// Les bordures d'un seul côté (gauche, droite, début ou fin de ligne) plus épaisses qu'un filet : la bande de couleur
-// latérale qu'impeccable signale. Un filet de 1px reste permis, comme un trait de dessin qui tient sur deux côtés
+// Les bordures latérales épaisses : sur un côté (gauche, droite, début ou fin de ligne, ou les deux par border-inline)
+// et plus épaisses qu'un filet, la bande de couleur latérale qu'impeccable signale et que DESIGN.md exclut. Une même
+// règle pour l'appli et le Kit : un filet de 1px reste permis, comme un trait de dessin qui tient sur deux côtés
 // voisins dans la même règle (le chevron de « Voir les Objectifs »).
-function bordsLateraux(css) {
-  const toutes = declarations(css);
+function bordsLaterauxEpais(toutes) {
   const epaisse = (valeur) => [...valeur.matchAll(/(?<![\w.-])(\d*\.?\d+)(px|rem|em)\b/g)].some(([, n, unite]) => Number(n) * (unite === 'px' ? 1 : 16) > 1);
   const dessin = (lieu) => toutes.some((d) => d.lieu === lieu && /^border-(top|bottom|block-start|block-end)(-width)?$/.test(d.propriete) && epaisse(d.valeur));
   return toutes
-    .filter(({ propriete }) => /^border-(left|right|inline-start|inline-end)(-width)?$/.test(propriete))
-    .filter(({ lieu, valeur }) => epaisse(valeur) && !dessin(lieu))
+    .filter(({ propriete }) => /^border-(left|right|inline-start|inline-end|inline)(-width)?$/.test(propriete))
+    .filter(({ lieu, valeur }) => epaisse(valeur) && !dessin(lieu));
+}
+
+function bordsLateraux(css) {
+  return bordsLaterauxEpais(declarations(css))
     .map(({ lieu, propriete, valeur }) => `${lieu} { ${propriete}: ${valeur} } : bordure latérale épaisse, motif exclu par DESIGN.md. Dire le type par une cartouche ou par la ligne.`);
 }
 
@@ -302,12 +307,14 @@ test('Kit : une couleur en dur, une police littérale ou un jeton de l\'appli da
   ]);
 });
 
-test('Kit : une bordure latérale est signalée ; une bordure complète, basse ou retirée ne l\'est pas', () => {
+test('Kit : une bordure latérale épaisse est signalée ; un filet de 1px, une bordure complète, basse ou retirée ne l\'est pas', () => {
   const css = `.encart, aside { border-left: 5px solid var(--kit-accent); } .a { border-inline-start-width: 4px; }
-    .b { border-right: none; border-left: 0; } h2 { border-bottom: 3px solid var(--kit-accent-doux); } .c { border: 1px solid var(--kit-bord); }`;
+    .b { border-right: none; border-left: 0; } h2 { border-bottom: 3px solid var(--kit-accent-doux); } .c { border: 1px solid var(--kit-bord); }
+    .d { border-left: 1px solid var(--kit-bord); } .e { border-inline: .2rem solid var(--kit-accent); }`;
   assert.deepEqual(ecartsDuKit(css).map((e) => e.split('. ')[0]), [
-    '.encart, aside { border-left } : bordure latérale',
-    '.a { border-inline-start-width } : bordure latérale',
+    '.encart, aside { border-left: 5px solid var(--kit-accent) } : bordure latérale épaisse',
+    '.a { border-inline-start-width: 4px } : bordure latérale épaisse',
+    '.e { border-inline: .2rem solid var(--kit-accent) } : bordure latérale épaisse',
   ]);
 });
 
@@ -361,7 +368,7 @@ const JETONS_DU_KIT = {
 const FEUILLES_DU_KIT = ['base.css', 'quiz.css'];
 const lireKit = (feuille) => readFile(new URL(`../public/kit/v1/${feuille}`, import.meta.url), 'utf8');
 
-test('Kit : ses feuilles n\'emploient que ses variables --kit-* et n\'ont pas de bordure latérale', async () => {
+test('Kit : ses feuilles n\'emploient que ses variables --kit-* et n\'ont pas de bordure latérale épaisse', async () => {
   for (const feuille of FEUILLES_DU_KIT) assert.deepEqual(ecartsDuKit(await lireKit(feuille)), [], feuille);
 });
 
@@ -440,12 +447,13 @@ function policeParJetonDuKit(propriete, valeur) {
 // de l'appli (var(--fond)…), qu'une Page de leçon n'a pas.
 function ecartsDuKit(css) {
   const ecarts = [];
-  for (const { pile, lieu, propriete, valeur } of declarations(css)) {
+  const toutes = declarations(css);
+  for (const { lieu, propriete, valeur } of bordsLaterauxEpais(toutes)) {
+    ecarts.push(`${lieu} { ${propriete}: ${valeur} } : bordure latérale épaisse. DESIGN.md n'en a pas : mettre le bloc en valeur par son fond ou son filet complet.`);
+  }
+  for (const { pile, lieu, propriete, valeur } of toutes) {
     if (/^font(-family)?$/.test(propriete) && pile.at(-1) !== '@font-face' && !policeParJetonDuKit(propriete, valeur)) {
       ecarts.push(`${lieu} { ${propriete} } : police littérale « ${valeur} ». Utiliser var(--kit-police) ou var(--kit-police-titre).`);
-    }
-    if (/^border-(left|right|inline-start|inline-end|inline)(-width|-style)?$/.test(propriete) && !/^(none|0(px)?|hidden)$/i.test(valeur)) {
-      ecarts.push(`${lieu} { ${propriete} } : bordure latérale. DESIGN.md n'en a pas : mettre le bloc en valeur par son fond ou son filet complet.`);
     }
     if (estBlocDeJetonsDuKit(pile)) continue;
     for (const couleur of new Set(couleursLitterales(valeur))) {

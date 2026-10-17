@@ -22,6 +22,7 @@
   --palier-bronze:#9a5a24; --palier-argent:#6b7684; --palier-or:#9a7206; --palier-diamant:#1f7fb3; --palier-unique:#8e44ad;
   --ligne-francais:#c2410c; --ligne-mathematiques:#2f6fed; --ligne-sciences:#0f8a6a; --ligne-histoire:#8a5a14;
   --ligne-geographie:#0e7490; --ligne-langues:#9333ea; --ligne-arts:#db2777; --ligne-autre:#4b5563;
+  --ombre-carte:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); --ombre-bandeau:0 2px 10px rgb(var(--ombre) / .05);
   color-scheme:light dark; interpolate-size:allow-keywords;
 }
 @media (prefers-color-scheme: dark) { :root {
@@ -65,13 +66,14 @@ button.carte:hover { background:color-mix(in srgb, var(--texte) 4%, var(--carte)
 form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; }
 .erreur { color:var(--rouge); min-height:1.5em; }
 
-/* Accueil . Ma semaine : du lundi au dimanche, comme la page de la semaine du journal de classe. */
-.ma-semaine { display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 20rem); gap:1rem 2rem; align-items:center; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 2px 10px rgb(var(--ombre) / .05); }
+/* Accueil, Ma semaine : du lundi au dimanche, comme la page de la semaine du journal de classe. Un jour est un tampon
+   (.jour, .tampon), partagé avec le calendrier de Mes badges ; la colonne du jour (.jours > .jour) est au bandeau seul. */
+.ma-semaine { display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 20rem); gap:1rem 2rem; align-items:center; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
 .semaine-titre { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.2rem 1rem; margin-bottom:.7rem; }
 .semaine-titre h2 { margin:0; font-size:1.45rem; line-height:1.1; }
 .semaine-titre a { font-size:.9rem; font-weight:600; }
 .jours { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.35rem; }
-.jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; min-height:6.3rem; }
+.jours > .jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; min-height:6.3rem; }
 .jour.aujourdhui { background:color-mix(in srgb, var(--accent) 9%, transparent); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .jour .nom, .calendrier-grille .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
 .jour.aujourdhui .nom { color:var(--accent); }
@@ -94,7 +96,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .recapitulatif strong { display:block; }
 .recapitulatif .fermer { position:absolute; top:.5rem; right:.5rem; padding:.1rem .5rem; }
 @media (max-width: 860px) { .ma-semaine { grid-template-columns:1fr; } }
-@media (max-width: 520px) { .ma-semaine { padding:.8rem .7rem; gap:.6rem; } .semaine-titre { margin-bottom:.4rem; } .semaine-titre a { display:none; } .jours { gap:.15rem; } .jour { min-height:0; padding:.35rem 0; } .tampon { width:2rem; height:2rem; font-size:.9rem; } .gains { font-size:.72rem; flex-direction:column; align-items:center; gap:0; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.95rem; } .bouton-revisions { flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .lecons-tete { margin-top:1.4rem; } }
+@media (max-width: 520px) { .ma-semaine { padding:.8rem .7rem; gap:.6rem; } .semaine-titre { margin-bottom:.4rem; } .semaine-titre a { display:none; } .jours { gap:.15rem; } .jours > .jour { min-height:0; padding:.35rem 0; } .tampon { width:2rem; height:2rem; font-size:.9rem; } .gains { font-size:.72rem; flex-direction:column; align-items:center; gap:0; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.95rem; } .bouton-revisions { flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .lecons-tete { margin-top:1.4rem; } }
 
 /* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
 .lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }
@@ -107,8 +109,10 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .categorie h3 { display:flex; align-items:center; gap:.65rem; margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
 .categorie h3::before { content:""; width:1.4rem; height:1.4rem; border-radius:6px; background:var(--ligne); }
 .lecons-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1rem; }
-.lecon { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); display:flex; flex-direction:column; gap:.85rem; padding:1.05rem 1.25rem .5rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
-@media (prefers-color-scheme: dark) { .lecon { --ligne-fonce:var(--ligne); } }
+/* La ligne foncée : les surfaces pleines à la couleur de la ligne (Niveau, Continuer, cartouche « Pour aller plus loin »). */
+.lecon, .seance-tete, .proposition { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); }
+@media (prefers-color-scheme: dark) { .lecon, .seance-tete, .proposition { --ligne-fonce:var(--ligne); } }
+.lecon { display:flex; flex-direction:column; gap:.85rem; padding:1.05rem 1.25rem .5rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
 .lecon-tete { display:flex; align-items:flex-start; gap:.7rem; }
 .niveau { flex:none; margin-top:.15rem; padding:.36rem .5rem .26rem; border-radius:7px; background:var(--ligne-fonce); color:var(--sur-ligne); font:800 .78rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
 .lecon h4 { flex:1; min-width:0; margin:0; font:800 1.3rem/1.2 var(--police-titre); letter-spacing:-.01em; text-wrap:balance; }
@@ -167,8 +171,7 @@ header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
    Maîtrise ; la zone de leçon remplit l'écran dessous, quelle que soit sa hauteur. */
 body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
 body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; gap:.6rem; padding-top:.8rem; padding-bottom:1rem; }
-.seance-tete { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); display:flex; align-items:center; flex-wrap:wrap; gap:.35rem 1rem; padding:.35rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
-@media (prefers-color-scheme: dark) { .seance-tete { --ligne-fonce:var(--ligne); } }
+.seance-tete { display:flex; align-items:center; flex-wrap:wrap; gap:.35rem 1rem; padding:.35rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
 .seance-tete .retour-accueil { display:inline-flex; align-items:center; min-height:2.6rem; font-weight:700; white-space:nowrap; }
 .seance-titre { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .7rem; min-width:0; }
 .seance-titre h2 { margin:0; font-size:1.3rem; line-height:1.2; text-wrap:balance; }
@@ -187,27 +190,26 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .seance-centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:safe center; gap:1.2rem; padding:1.5rem; overflow-y:auto; }
 .seance-centre.voile { background:var(--voile); }
 /* Bulle du prof et Retour de quiz : des cartes posées sur la leçon, avec la pose légère des cartes de ligne. */
-.bulle-prof { max-width:560px; padding:1.2rem 1.4rem; white-space:pre-wrap; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.bulle-prof { max-width:560px; padding:1.2rem 1.4rem; white-space:pre-wrap; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
 .choix { display:flex; flex-wrap:wrap; justify-content:center; gap:.6rem; max-width:560px; }
 .choix button { min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; }
 .apres-quiz { position:absolute; right:1rem; bottom:1rem; width:min(360px, calc(100% - 2rem)); display:flex; flex-direction:column; gap:.6rem; }
-.retour { position:relative; padding:.9rem 3.2rem .9rem 1.1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.retour { position:relative; padding:.9rem 3.2rem .9rem 1.1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
 .retour .fermer { position:absolute; top:.35rem; right:.35rem; width:2.6rem; height:2.6rem; padding:0; line-height:1; }
 /* Rebond : la suite recommandée est un bouton plein (l'action), les autres Rebonds des boutons secondaires. */
 .apres-quiz > button { display:flex; flex-direction:column; align-items:center; gap:.1rem; min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; text-wrap:balance; }
 .action-suivante { font-weight:800; }
 .action-suivante small { font-size:.92rem; font-weight:400; opacity:.92; }
-.lecon-terminee { display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:1rem 1.25rem; text-align:center; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.lecon-terminee { display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:1rem 1.25rem; text-align:center; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
 .lecon-terminee strong { font:800 1.3rem/1.2 var(--police-titre); letter-spacing:-.01em; }
 .lecon-terminee small { color:var(--doux); font-size:.92rem; font-weight:700; font-variant-numeric:tabular-nums; }
 @media (max-width: 640px) { .seance-tete { gap:.2rem .7rem; } .seance-titre h2 { font-size:1.15rem; } .seance-tete .ligne { order:5; flex-basis:100%; max-width:none; } }
 .etoiles, .fusees { white-space:nowrap; } .etoiles .vide { color:var(--doux); }
 .doux { color:var(--doux); }
-/* Nouvelle leçon . Propositions : cartes simples, puce de la Catégorie, type dit en mots dans une cartouche de
+/* Nouvelle leçon, Propositions : cartes simples, puce de la Catégorie, type dit en mots dans une cartouche de
    signalétique, pleine à la couleur de la ligne pour une suite, en filet pour un sujet original. */
 .propositions { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap:1rem; margin-bottom:1rem; }
-.proposition { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
-@media (prefers-color-scheme: dark) { .proposition { --ligne-fonce:var(--ligne); } }
+.proposition { display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
 .proposition-tete { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .7rem; }
 .cartouche-type { padding:.36rem .5rem .22rem; border-radius:7px; border:.15rem solid var(--station-vide); color:var(--doux); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; }
 .proposition.suite .cartouche-type { background:var(--ligne-fonce); border-color:var(--ligne-fonce); color:var(--sur-ligne); }
@@ -218,13 +220,12 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .proposition .accroche { line-height:1.35; text-wrap:pretty; }
 /* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet choisi) : deux cartes côte à côte. */
 .nouvelle-voies { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap:1rem; margin-top:2.2rem; }
-.nouvelle-voies .carte { padding:1.05rem 1.25rem 1.25rem; }
 .nouvelle-voies h2 { margin:0 0 .8rem; font-size:1.45rem; line-height:1.1; }
 .nouvelle-voies form.colonne { max-width:none; }
 .nouvelle-voies input:not([type=date]) { width:100%; }
 .nouvelle-voies form.colonne > button { align-self:flex-start; min-height:2.75rem; padding-inline:1.4rem; border-radius:12px; }
 /* Cadrage : une carte en boîte de dialogue modale, posée sur le voile, réponses en boutons secondaires. */
-.cadrage { width:min(34rem, calc(100% - 2rem)); max-height:calc(100dvh - 2rem); overflow-y:auto; padding:1.4rem 1.5rem 1.5rem; border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
+.cadrage { width:min(34rem, calc(100% - 2rem)); max-height:calc(100dvh - 2rem); overflow-y:auto; padding:1.4rem 1.5rem 1.5rem; border-radius:18px; box-shadow:var(--ombre-carte); }
 .cadrage::backdrop { background:var(--voile); }
 .cadrage-etape { margin:0 3rem .35rem 0; font-size:.9rem; font-weight:700; color:var(--doux); }
 .cadrage h2 { margin:0 3rem 1rem 0; font-size:1.45rem; line-height:1.15; text-wrap:balance; }
@@ -245,7 +246,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .badge strong { display:block; margin-top:.3rem; }
 /* La collection de Mes badges : la pastille à gauche, le nom et les Paliers à côté, en cartes simples serrées. */
 .grille.badges { grid-template-columns:repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
-.grille.badges .badge { display:flex; align-items:flex-start; gap:.8rem; padding:.8rem 1rem; }
+.grille.badges .badge { display:flex; align-items:flex-start; gap:.8rem; }
 .grille.badges .badge strong { margin-top:.15rem; }
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 /* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
@@ -257,7 +258,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 @media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
 /* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
    entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */
-.mon-calendrier { display:flex; flex-direction:column; gap:.8rem; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:0 2px 10px rgb(var(--ombre) / .05); }
+.mon-calendrier { display:flex; flex-direction:column; gap:.8rem; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
 .calendrier-mois { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }
 .calendrier-mois strong { font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
 .calendrier-mois strong::first-letter { text-transform:uppercase; }
@@ -266,6 +267,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .calendrier-grille .nom { padding:.2rem 0 .35rem; }
 .calendrier-jour { display:grid; place-items:center; width:100%; min-height:2.9rem; padding:.2rem 0; border:0; border-radius:12px; background:transparent; color:inherit; font-weight:inherit; }
 .calendrier-jour:hover:not(:disabled) { background:color-mix(in srgb, var(--texte) 6%, transparent); }
+.calendrier-jour.aujourdhui:hover:not(:disabled) { background:color-mix(in srgb, var(--texte) 6%, color-mix(in srgb, var(--accent) 9%, transparent)); }
 .calendrier-jour:disabled { opacity:1; cursor:default; background:transparent; }
 .calendrier-jour.choisi .tampon { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .38rem var(--texte); }
 .calendrier-detail { display:flex; flex-direction:column; gap:.35rem; padding-top:.8rem; border-top:1px dashed var(--bord); line-height:1.35; }

@@ -194,6 +194,8 @@ const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
 // en sont les stations. L'état d'un Objectif se lit à la forme de sa station : vide (pas encore évalué), hachurée
 // (à confirmer), blanche (atteint), verte (Retenu). Le terminus « Acquis » s'allume au palier de Maîtrise Acquis.
 const cleCategorie = (categorie) => categorie.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+// La couleur de ligne d'une Catégorie, en style à poser sur ce qui la porte (carte, section, en-tête de Séance).
+const styleLigne = (categorie) => `--ligne: var(--ligne-${cleCategorie(categorie)}, var(--ligne-autre))`;
 const ETATS_STATION = [
   { cle: 'retenu', classe: 'retenue', libelle: 'Retenu' },
   { cle: 'atteint', classe: 'atteinte', libelle: 'atteint' },
@@ -247,7 +249,7 @@ const controleAVenir = (l) => Number.isInteger(l.joursAvantControle) && l.joursA
 function carteLecon(l) {
   const objectifs = l.objectifs ?? [];
   const adresse = `#/lecon/${l.id}`;
-  return h('article', { className: 'lecon', style: `--ligne: var(--ligne-${cleCategorie(l.categorie)}, var(--ligne-autre))` },
+  return h('article', { className: 'lecon', style: styleLigne(l.categorie) },
     h('div', { className: 'lecon-tete' },
       l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
       h('h4', {}, h('a', { href: adresse }, l.titre)),
@@ -278,7 +280,7 @@ async function ecranAccueil(profil) {
     lecons.length === 0 && h('div', { className: 'reseau-vide' },
       h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Ton réseau est encore vide'), h('span', { className: 'terminus' }, 'Acquis')),
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
-    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: `--ligne: var(--ligne-${cleCategorie(c)}, var(--ligne-autre))` },
+    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: styleLigne(c) },
       h('h3', {}, c),
       h('div', { className: 'lecons-grille' }, parCategorie[c].map(carteLecon)))));
 }
@@ -298,25 +300,27 @@ function joursDeLaSemaine(aujourdhui) {
 const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atteint' };
 
 // Un jour en tampon, seule façon de dessiner un jour : le bandeau de la semaine et le calendrier de Mes badges.
-// classeJour porte l'état (vide, pâle, plein), aujourd'hui et futur ; lectureJour le dit en mots, le tampon étant muet.
-const classeJour = (jour, j, aujourdhui) => `jour ${j.etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}`;
-const lectureJour = (nom, jour, j, aujourdhui) => [nom, jour === aujourdhui && "aujourd'hui", ETATS_JOUR[j.etat], j.joker && 'protégé par un joker'].filter(Boolean).join(', ');
-const tamponJour = (jour, j) => h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), j.joker && h('span', { className: 'joker' }, '🛡️'));
+// Une journée : { jour, etat, joker, gains… }, celle du calendrier du serveur ou jourSansRien. classeJour porte l'état
+// (vide, pâle, plein), aujourd'hui et futur ; lectureJour le dit en mots, le tampon étant muet.
+const classeJour = ({ jour, etat }, aujourdhui) => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}`;
+const lectureJour = (nom, { jour, etat, joker }, aujourdhui) => [nom, jour === aujourdhui && "aujourd'hui", ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
+const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), joker && h('span', { className: 'joker' }, '🛡️'));
 
 function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
-  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
   const caseJour = (jour, i) => {
-    const j = parJour.get(jour) ?? jourSansRien(jour);
-    return h('li', { className: classeJour(jour, j, aujourdhui) },
-      h('span', { className: 'cache' }, lectureJour(JOURS_ENTIERS[i], jour, j, aujourdhui)),
+    const journee = parJour.get(jour) ?? jourSansRien(jour);
+    const { gains } = journee;
+    return h('li', { className: classeJour(journee, aujourdhui) },
+      h('span', { className: 'cache' }, lectureJour(JOURS_ENTIERS[i], journee, aujourdhui)),
       h('span', { className: 'nom', ariaHidden: 'true' }, JOURS_SEMAINE[i]),
-      tamponJour(jour, j),
-      (j.gains.etoiles > 0 || j.gains.fusees > 0) && h('span', { className: 'gains' },
-        j.gains.etoiles > 0 && h('span', { title: pluriel(j.gains.etoiles, 'Étoile') }, `⭐${j.gains.etoiles > 1 ? j.gains.etoiles : ''}`),
-        j.gains.fusees > 0 && h('span', { title: pluriel(j.gains.fusees, 'Fusée') }, `🚀${j.gains.fusees > 1 ? j.gains.fusees : ''}`)),
-      j.gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
-        j.gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
+      tamponJour(journee),
+      (gains.etoiles > 0 || gains.fusees > 0) && h('span', { className: 'gains' },
+        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, `⭐${gains.etoiles > 1 ? gains.etoiles : ''}`),
+        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, `🚀${gains.fusees > 1 ? gains.fusees : ''}`)),
+      gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
+        gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
       controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}` }, '📅')));
   };
   const objectif = o.atteint
@@ -383,23 +387,23 @@ const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 
 const moisSuivant = (mois, n) => { const [a, m] = mois.split('-').map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
 function calendrierJours({ aujourdhui, jours }) {
-  const parJour = new Map(jours.map((j) => [j.jour, j]));
+  const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
   const premier = (jours[0]?.jour ?? aujourdhui).slice(0, 7);
   const dernier = aujourdhui.slice(0, 7);
   let mois = dernier;
   const bloc = h('section', { className: 'mon-calendrier', ariaLabel: 'Mon calendrier' });
-  const detail = (j) => {
-    const faits = [j.quiz && `${j.quiz} quiz`, j.revisions && pluriel(j.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
-    const gains = [j.gains.etoiles && `⭐ ${j.gains.etoiles}`, j.gains.fusees && `🚀 ${j.gains.fusees}`].filter(Boolean).join(' · ');
+  const detail = (journee) => {
+    const faits = [journee.quiz && `${journee.quiz} quiz`, journee.revisions && pluriel(journee.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
+    const gains = [journee.gains.etoiles && `⭐ ${journee.gains.etoiles}`, journee.gains.fusees && `🚀 ${journee.gains.fusees}`].filter(Boolean).join(' · ');
     return [
-      h('strong', {}, dateBadge(j.jour)),
-      j.lecons.length > 0 && h('p', {}, `📚 ${j.lecons.map((l) => l.titre).join(', ')}`),
+      h('strong', {}, dateBadge(journee.jour)),
+      journee.lecons.length > 0 && h('p', {}, `📚 ${journee.lecons.map((l) => l.titre).join(', ')}`),
       faits && h('p', {}, faits),
-      j.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
-      (gains || j.gains.paliers.length > 0) && h('p', {}, gains && `Gagné : ${gains} `,
-        j.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
-      !faits && !j.lecons.length && !j.joker && !gains && !j.gains.paliers.length && h('p', { className: 'doux' }, 'Rien ce jour-là.')];
+      journee.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
+      (gains || journee.gains.paliers.length > 0) && h('p', {}, gains && `Gagné : ${gains} `,
+        journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
+      !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, 'Rien ce jour-là.')];
   };
   const afficher = (choisi, focaliser = true) => {
     const [a, m] = mois.split('-').map(Number);
@@ -417,15 +421,15 @@ function calendrierJours({ aujourdhui, jours }) {
           JOURS_SEMAINE.map((d) => h('span', { className: 'nom', ariaHidden: 'true' }, d)),
           cases.map((jour) => {
             if (!jour) return h('span', {});
-            const j = duJour(jour);
+            const journee = duJour(jour);
             const nom = `${JOURS_ENTIERS[(new Date(`${jour}T12:00:00`).getDay() + 6) % 7]} ${Number(jour.slice(8))} ${MOIS[m - 1]}`;
             const bouton = h('button', {
-              className: `${classeJour(jour, j, aujourdhui)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
-              ariaLabel: lectureJour(nom, jour, j, aujourdhui),
+              className: `${classeJour(journee, aujourdhui)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
+              ariaLabel: lectureJour(nom, journee, aujourdhui),
               ariaPressed: String(jour === choisi),
               disabled: jour > aujourdhui,
               onclick: () => afficher(jour),
-            }, tamponJour(jour, j));
+            }, tamponJour(journee));
             if (jour === choisi) aFocaliser = bouton;
             return bouton;
           }))),
@@ -545,16 +549,16 @@ async function cadrer(mode) {
   for (const [i, cle] of cles.entries()) {
     const { question, reponses } = config.cadrage[cle];
     cadrage[cle] = await new Promise((choisir) => {
-      const fermer = (valeur) => { calque.close(); calque.remove(); choisir(valeur); };
-      const calque = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
+      const fermer = (valeur) => { boite.close(); boite.remove(); choisir(valeur); };
+      const boite = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
         cles.length > 1 && h('p', { className: 'cadrage-etape' }, `Question ${i + 1} sur ${cles.length}`),
         h('h2', { id: 'cadrage-question' }, question),
         h('div', { className: 'cadrage-choix' }, Object.entries(reponses).map(([valeur, libelle], j) =>
           h('button', { className: 'secondaire', autofocus: j === 0, onclick: () => fermer(valeur) }, libelle))),
         h('button', { className: 'secondaire annuler', ariaLabel: 'Annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'));
-      calque.setAttribute('aria-labelledby', 'cadrage-question');
-      app.append(calque);
-      calque.showModal();
+      boite.setAttribute('aria-labelledby', 'cadrage-question');
+      app.append(boite);
+      boite.showModal();
     });
     if (cadrage[cle] === null) return null;
   }
@@ -607,7 +611,7 @@ function ecranNouvelleLecon(profil) {
     if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
     // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
     // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
-    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: `--ligne: var(--ligne-${cleCategorie(p.categorie)}, var(--ligne-autre))`, disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
+    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
       h('span', { className: 'proposition-tete' },
         h('span', { className: 'cartouche-type' }, p.type === 'suite' ? 'Pour aller plus loin' : 'Nouveau sujet'),
         p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
@@ -714,7 +718,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   // En-tête de Séance : l'Élève est sur la ligne de sa Leçon, à la couleur de sa Catégorie, comme sur sa carte
   // d'accueil : Niveau, nom, mot de Maîtrise (Acquis : dit par le terminus allumé), puis la ligne et sa prochaine station.
   const afficherEntete = () => {
-    entete.style.setProperty('--ligne', `var(--ligne-${cleCategorie(lecon.categorie ?? '')}, var(--ligne-autre))`);
+    entete.style.cssText = styleLigne(lecon.categorie);
     entete.replaceChildren(...garder([
       h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
       h('div', { className: 'seance-titre' },

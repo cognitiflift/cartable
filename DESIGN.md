@@ -353,14 +353,14 @@ Le rythme vertical : 2.2rem avant « Mes leçons », 1.4rem entre Catégories, 1
 
 ## Elevation & Depth
 
-Le système est plat, avec un soupçon de pose : les cartes de ligne et le bandeau de la semaine reposent sur le fond gris froid grâce à leur bordure `bord` et à une ombre ambiante très diffuse teintée de bleu nuit (`--ombre: 20 24 43`, noir en sombre). Aucun autre élément n'a d'ombre portée, hormis les cartes de Séance posées sur la Page de leçon, qui reprennent la même pose. La profondeur sur la ligne est faite de halos : le terminus et la station « vous êtes ici » sont détourés d'un anneau à la couleur de la carte, qui les découpe du trait.
+Le système est plat, avec un soupçon de pose : les cartes de ligne et le bandeau de la semaine reposent sur le fond gris froid grâce à leur bordure `bord` et à une ombre ambiante très diffuse teintée de bleu nuit (`--ombre: 20 24 43`, noir en sombre). Il n'y a que deux poses, déclarées en variables sur le `:root` de `public/style.css` : `--ombre-carte` et `--ombre-bandeau`. Hors des cartes de ligne et du bandeau, seuls trois éléments en portent une : les cartes de Séance posées sur la Page de leçon et la boîte de dialogue du Cadrage prennent la pose de carte de ligne, le calendrier de Mes badges la pose du bandeau. Les cartes simples n'en ont pas. La profondeur sur la ligne est faite de halos : le terminus et la station « vous êtes ici » sont détourés d'un anneau à la couleur de la carte, qui les découpe du trait.
 
 ### Shadow Vocabulary
-- **Pose de carte de ligne** (`box-shadow: 0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon, et en Séance les cartes posées sur la Page de leçon (bulle du prof, Retour de quiz, Leçon terminée).
-- **Pose du bandeau** (`box-shadow: 0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine.
+- **Pose de carte de ligne** (`--ombre-carte` : `0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon, en Séance les cartes posées sur la Page de leçon (bulle du prof, Retour de quiz, Leçon terminée), et le Cadrage de Nouvelle leçon.
+- **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine et le calendrier de Mes badges.
 - **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station.
 - **Découpe du terminus** (`box-shadow: 0 0 0 .2rem var(--carte)`) : sépare le cartouche du trait.
-- **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau.
+- **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau et le calendrier.
 
 ### Named Rules
 **La règle de la pose légère.** Les ombres sont ambiantes et teintées de nuit, jamais décalées ni dures ; un élément ne monte pas au survol, il change de teinte.
@@ -394,7 +394,7 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 ### Cards / Containers
 - **Corner Style:** 18px (carte de ligne, bandeau), 14px (carte simple).
 - **Background:** `carte` sur `fond`.
-- **Shadow Strategy:** pose légère (voir Elevation & Depth) pour la carte de ligne et le bandeau ; les cartes simples n'ont que leur filet.
+- **Shadow Strategy:** pose légère (voir Elevation & Depth) pour la carte de ligne, le bandeau, les cartes de Séance, le Cadrage et le calendrier ; les cartes simples n'ont que leur filet.
 - **Border:** 1px `bord`.
 - **Internal Padding:** 1.05rem 1.25rem 0.5rem pour la carte de ligne (0.95rem 1rem 0.4rem sous 640px), 1rem pour la carte simple.
 

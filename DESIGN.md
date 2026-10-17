@@ -18,6 +18,9 @@ colors:
   sur-retenu: "#ffffff"
   station-vide: "#80879a"
   troncon: "#dde1ea"
+  station-atteinte: "#ffffff"
+  hachure: "#ffffff"
+  encre-noire: "#000000"
   rouge: "#b42318"
   orange: "#a8530b"
   vert: "#15803d"
@@ -43,6 +46,7 @@ colors:
   sur-retenu-sombre: "#0f1220"
   station-vide-sombre: "#737a96"
   troncon-sombre: "#2f3550"
+  hachure-sombre: "#d9dce6"
   rouge-sombre: "#f58b8b"
   orange-sombre: "#f5b14c"
   vert-sombre: "#5ad98a"
@@ -163,7 +167,7 @@ components:
     backgroundColor: "{colors.texte-sombre}"
     textColor: "{colors.fond-sombre}"
   bouton-ligne:
-    backgroundColor: "color-mix(in srgb, var(--ligne) 82%, #000)"
+    backgroundColor: "color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))"
     textColor: "{colors.sur-accent}"
     rounded: "{rounded.bouton}"
     padding: "0.55rem 1.15rem"
@@ -172,7 +176,7 @@ components:
     backgroundColor: "color-mix(in srgb, var(--ligne) 22%, var(--carte))"
     textColor: "{colors.texte-sombre}"
   compteur-etoiles:
-    backgroundColor: "rgb(255 255 255 / 0.12)"
+    backgroundColor: "color-mix(in srgb, var(--sur-nuit) 12%, transparent)"
     textColor: "{colors.sur-nuit}"
     rounded: "{rounded.pilule}"
     padding: "0.3rem 0.9rem"
@@ -223,7 +227,7 @@ components:
     rounded: "{rounded.terminus}"
     padding: "0.42rem 0.6rem 0.32rem"
   niveau:
-    backgroundColor: "color-mix(in srgb, var(--ligne) 82%, #000)"
+    backgroundColor: "color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))"
     textColor: "{colors.sur-accent}"
     typography: "{typography.label-niveau}"
     rounded: "{rounded.niveau}"
@@ -276,7 +280,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Bleu nuit de la marque** (`nuit`) : l'en-tête dans les deux thèmes, et le bouton « Apprendre quelque chose de nouveau ». Le texte dessus est `sur-nuit`, le texte secondaire `sur-nuit-doux`.
 
 ### Secondary
-- **Couleurs de ligne** (`ligne-francais`, `ligne-mathematiques`, `ligne-sciences`, `ligne-histoire`, `ligne-geographie`, `ligne-langues`, `ligne-arts`, `ligne-autre`, et leurs variantes `-sombre`) : la Catégorie d'une Leçon. Elles sont identiques à celles des Catégories du Kit (`public/kit/v1/quiz.css`), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. En clair, les surfaces pleines (bouton Continuer, cartouche de Niveau) utilisent la ligne foncée (`color-mix(in srgb, var(--ligne) 82%, #000)`) avec du texte blanc ; en sombre, la ligne elle-même avec du texte `fond-sombre`.
+- **Couleurs de ligne** (`ligne-francais`, `ligne-mathematiques`, `ligne-sciences`, `ligne-histoire`, `ligne-geographie`, `ligne-langues`, `ligne-arts`, `ligne-autre`, et leurs variantes `-sombre`) : la Catégorie d'une Leçon. Elles sont identiques à celles des Catégories du Kit (`public/kit/v1/quiz.css`), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. En clair, les surfaces pleines (bouton Continuer, cartouche de Niveau) utilisent la ligne foncée (`color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))`) avec du texte `sur-accent` (blanc) ; en sombre, la ligne elle-même avec du texte `sur-accent-sombre`.
 
 ### Tertiary
 - **Vert Retenu** (`retenu`) : ce qui tient en mémoire. Station Retenue, terminus allumé, pastille « Acquis ✓ ».
@@ -289,6 +293,9 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Encre nuit** (`texte`) : le texte, et l'anneau des stations atteintes en clair.
 - **Gris doux** (`doux`) : texte secondaire, libellés (« Prochaine station : »), noms de jours, terminus éteint.
 - **Filet** (`bord`) : bordures des cartes et des champs, séparateur pointillé des Objectifs.
+- **Blanc de station** (`station-atteinte`) : le cœur blanc des stations atteintes, et leur anneau en sombre ; blanc dans les deux thèmes.
+- **Hachure** (`hachure`, `hachure-sombre`) : le fond clair entre les hachures des stations « à confirmer ».
+- **Encre noire** (`encre-noire`) : ne sert qu'à foncer une couleur de ligne (`color-mix`), jamais en aplat.
 - **Voie vide** (`troncon`) : les tronçons de ligne pas encore parcourus.
 - **Station vide** (`station-vide`) : l'anneau des stations pas encore évaluées, les hachures « à confirmer », le contour des tampons vides et du terminus éteint.
 
@@ -356,7 +363,7 @@ Le trait de ligne est une barre de 0.55rem d'épaisseur, coupée en tronçons en
 Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Shape:** coins doux (10px de base ; 12px pour les boutons d'accueil et Continuer).
 - **Bouton plein :** fond `accent`, texte `sur-accent`, graisse 700. Au survol, l'accent se mélange de 12 % d'encre ; transition de fond 0.15s.
-- **Bouton secondaire :** fond `carte`, filet `bord`, texte `texte`, graisse 600 ; au survol, 6 % d'encre. Dans l'en-tête, il devient transparent avec un filet blanc à 32 % et un survol blanc à 10 %.
+- **Bouton secondaire :** fond `carte`, filet `bord`, texte `texte`, graisse 600 ; au survol, 6 % d'encre. Dans l'en-tête, il devient transparent avec un filet `sur-nuit` à 32 % et un survol `sur-nuit` à 10 %.
 - **Continuer (bouton de ligne) :** fond de la ligne foncée, texte blanc, graisse 800, 2.75rem de haut ; au survol, `brightness(1.1)` ; à l'appui, descend d'1px. En sombre, il devient un aplat de ligne à 22 % sur la carte, cerclé de 2px de couleur de ligne, texte `texte`.
 - **Apprendre quelque chose de nouveau :** fond `nuit`, texte `sur-nuit` ; en sombre, il s'inverse (fond `texte-sombre`, texte `fond-sombre`).
 - **Révisions du jour :** bouton plein à deux lignes (titre fort, détail en petit) quand des Questions sont dues, secondaire sinon.
@@ -364,7 +371,7 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Désactivé :** opacité 0.5.
 
 ### Chips
-- **Compteur d'Étoiles :** pilule blanche à 12 % sur la nuit (20 % au survol), ⭐ et total en chiffres tabulaires 800 ; ouvre Mes badges.
+- **Compteur d'Étoiles :** pilule `sur-nuit` à 12 % sur la nuit (20 % au survol), ⭐ et total en chiffres tabulaires 800 ; ouvre Mes badges.
 - **Nouveau :** pilule `nouveau`, 0.75rem, graisse 700.
 - **Acquis ✓ :** pilule `retenu` sur le mot de Maîtrise (en-tête de la Séance). Sur une carte de ligne, une Leçon acquise ne le dit qu'une fois : par le terminus allumé, qui porte la Maîtrise en infobulle.
 - **Niveau :** cartouche de ligne foncée, capitales Overpass.
@@ -386,8 +393,8 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 ### La ligne et ses stations
 La signature du système. Le trait est à la couleur de la Catégorie jusqu'à la dernière station atteinte, en `troncon` ensuite ; le dernier tronçon jusqu'au terminus ne se colore que quand la Leçon est Acquise.
 - **Pas encore évaluée :** petit cercle vide (1.15rem), fond `carte`, anneau fin `station-vide`.
-- **À confirmer :** cercle hachuré à 45° de `station-vide` sur blanc, anneau fin `station-vide`.
-- **Atteinte :** cercle blanc (1.5rem) à anneau épais d'encre `texte` (blanc en sombre).
+- **À confirmer :** cercle hachuré à 45° de `station-vide` sur `hachure`, anneau fin `station-vide`.
+- **Atteinte :** cercle `station-atteinte` (1.5rem) à anneau épais d'encre `texte` (`station-atteinte` en sombre).
 - **Retenue :** cercle plein `retenu`.
 - **Vous êtes ici :** la prochaine station est entourée d'un anneau à la couleur de ligne, détouré de la carte.
 - **Terminus :** cartouche « ACQUIS » en label signalétique, filet `station-vide`, texte `doux` ; allumé, il devient un aplat `retenu` « ACQUIS ✓ ».

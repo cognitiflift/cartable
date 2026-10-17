@@ -413,6 +413,7 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 
 ### Propositions et Cadrage (Nouvelle leçon)
 - **Proposition :** carte simple cliquable (14px, filet, pas d'ombre), dans une grille fluide (`minmax(min(100%, 17rem), 1fr)`). Elle porte la couleur de sa Catégorie par `--ligne`, seulement sur sa puce. Son type est dit en mots dans une cartouche de signalétique (Overpass 800, 0.74rem, capitales) : **Pour aller plus loin** (une suite) en aplat de ligne foncée, comme le cartouche de Niveau, puisqu'elle prolonge une ligne déjà ouverte ; **Nouveau sujet** en filet `station-vide`, texte `doux`, comme le terminus éteint. « 🎒 Au programme » est un mot gras à côté, sans pastille. Puis le titre (Overpass 800, 1.15rem), la Catégorie en `doux` derrière sa puce, et l'accroche.
+- **Les deux autres voies** (réviser une leçon de classe, apprendre ce que tu veux) : deux cartes simples côte à côte sous les Propositions (une seule colonne sur téléphone), titre en Headline, champs étiquetés, bouton plein de 2.75rem.
 - **Cadrage :** une boîte de dialogue modale native (`<dialog>`), carte de 18px à la pose de carte de ligne, posée sur le `voile`. « Question 1 sur 2 » en `doux`, la question en titre de section, les réponses en boutons secondaires empilés (2.75rem de haut, 12px), « ✕ » en bouton secondaire carré dans le coin. Échap ou « ✕ » annule et rend le focus à ce qui l'avait.
 - **Jamais de bande de couleur sur le côté d'une carte** pour dire un type : `test/style.test.js` refuse toute bordure latérale plus épaisse qu'un filet.
 

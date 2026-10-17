@@ -544,7 +544,7 @@ async function cadrer(mode) {
 }
 
 function ecranNouvelleLecon(profil) {
-  const erreur = h('p', { className: 'erreur' });
+  const erreur = h('p', { className: 'erreur', role: 'status' });
   const boutons = [];
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
@@ -615,26 +615,27 @@ function ecranNouvelleLecon(profil) {
 
   montrer(
     idees,
-    h('h2', {}, '📄 Réviser une leçon de classe'),
-    h('form', { className: 'colonne', onsubmit: (ev) => {
-      ev.preventDefault();
-      demarrer(async () => ({
-        dateControle: dateControle.value || undefined,
-        fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-      }), 'revision', 'revision');
-    } },
-      h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
-      h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
-      boutons[1]),
-    h('h2', {}, '💡 Apprendre ce que tu veux'),
-    h('form', { className: 'colonne', onsubmit: (ev) => {
-      ev.preventDefault();
-      // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
-      const texte = sujet.value.trim();
-      if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
-      if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
-      demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
-    } }, sujet, boutons[0]),
+    h('div', { className: 'nouvelle-voies' },
+      h('section', { className: 'carte' }, h('h2', {}, '📄 Réviser une leçon de classe'),
+        h('form', { className: 'colonne', onsubmit: (ev) => {
+          ev.preventDefault();
+          demarrer(async () => ({
+            dateControle: dateControle.value || undefined,
+            fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
+          }), 'revision', 'revision');
+        } },
+        h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
+        h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
+        boutons[1])),
+      h('section', { className: 'carte' }, h('h2', {}, '💡 Apprendre ce que tu veux'),
+        h('form', { className: 'colonne', onsubmit: (ev) => {
+          ev.preventDefault();
+          // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+          const texte = sujet.value.trim();
+          if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
+          if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
+          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
+        } }, h('label', {}, 'Ce que tu veux apprendre', h('br'), sujet), boutons[0]))),
     erreur);
 }
 

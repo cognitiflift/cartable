@@ -199,6 +199,13 @@ body:has(.seance) main > p { margin:0 0 .6rem; }
 .proposition-categorie { display:inline-flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:600; color:var(--doux); }
 .proposition-categorie::before { content:""; flex:none; width:1rem; height:1rem; border-radius:6px; background:var(--ligne); }
 .proposition .accroche { line-height:1.35; text-wrap:pretty; }
+/* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet choisi) : deux cartes côte à côte. */
+.nouvelle-voies { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap:1rem; margin-top:2.2rem; }
+.nouvelle-voies .carte { padding:1.05rem 1.25rem 1.25rem; }
+.nouvelle-voies h2 { margin:0 0 .8rem; font-size:1.45rem; line-height:1.1; }
+.nouvelle-voies form.colonne { max-width:none; }
+.nouvelle-voies input:not([type=date]) { width:100%; }
+.nouvelle-voies form.colonne > button { align-self:flex-start; min-height:2.75rem; padding-inline:1.4rem; border-radius:12px; }
 /* Cadrage : une carte en boîte de dialogue modale, posée sur le voile, réponses en boutons secondaires. */
 .cadrage { width:min(34rem, calc(100% - 2rem)); max-height:calc(100dvh - 2rem); overflow-y:auto; padding:1.4rem 1.5rem 1.5rem; border-radius:18px; box-shadow:0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05); }
 .cadrage::backdrop { background:var(--voile); }

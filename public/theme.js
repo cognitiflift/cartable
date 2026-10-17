@@ -2,13 +2,18 @@
 // Script classique, chargé dans <head> après les feuilles de style : il s'applique avant le premier rendu, sans flash.
 // Se range dans globalThis.cartableTheme pour app.js et les tests.
 (() => {
-  const THEMES = ['auto', 'clair', 'sombre'];
+  // Chaque thème : son nom dans le bouton, son icône et le color-scheme qu'il pose. L'ordre est celui du bouton.
+  const THEMES = {
+    auto: { nom: 'automatique, comme l\'appareil', icone: '🌗', schema: '' }, // '' : celui des feuilles, light dark
+    clair: { nom: 'clair', icone: '☀️', schema: 'light' },
+    sombre: { nom: 'sombre', icone: '🌙', schema: 'dark' },
+  };
   const CLE = 'theme'; // distincte de « pseudo » : changer d'Élève ne l'efface pas
 
   const lire = (stockage) => {
     try {
       const theme = stockage?.getItem(CLE);
-      return THEMES.includes(theme) ? theme : 'auto';
+      return Object.hasOwn(THEMES, theme) ? theme : 'auto';
     } catch { return 'auto'; } // stockage indisponible (navigation privée, bloqué)
   };
   const retenir = (stockage, theme) => {
@@ -20,40 +25,36 @@
   // vraie ; l'automatique leur rend leur texte d'origine, donc la préférence de l'appareil, même changée en cours de route.
   const PREFERENCE = /\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)/g;
   const TOUJOURS = '(min-width: 0)', JAMAIS = '(not (min-width: 0))';
-  const origines = new WeakMap(); // règle @media → son texte d'origine
+  const origines = new WeakMap(); // porteur d'une condition → son texte d'origine
   const forcer = (texte, theme) => texte.replace(PREFERENCE, (_, schema) => ((schema === 'dark') === (theme === 'sombre') ? TOUJOURS : JAMAIS));
 
-  const parcourir = (regles, theme) => {
-    for (const regle of regles) {
-      if (regle.styleSheet) parcourirFeuille(regle.styleSheet, theme); // @import
-      if (regle.media && regle.cssRules) {
-        if (!origines.has(regle)) origines.set(regle, regle.media.mediaText);
-        const origine = origines.get(regle);
-        const texte = theme === 'auto' ? origine : forcer(origine, theme);
-        if (regle.media.mediaText !== texte) regle.media.mediaText = texte;
-      }
-      if (regle.cssRules) parcourir(regle.cssRules, theme);
+  // Porteurs d'une condition : règle @media, règle @import, feuille entière (<link media>, <style media>).
+  const parcourir = (noeud, theme) => {
+    if (noeud.media) {
+      if (!origines.has(noeud)) origines.set(noeud, noeud.media.mediaText);
+      const origine = origines.get(noeud);
+      const texte = theme === 'auto' ? origine : forcer(origine, theme);
+      if (noeud.media.mediaText !== texte) noeud.media.mediaText = texte;
     }
-  };
-  const parcourirFeuille = (feuille, theme) => {
+    if (noeud.styleSheet) parcourir(noeud.styleSheet, theme); // feuille d'un @import
     let regles;
-    try { regles = feuille.cssRules; } catch { return; } // feuille d'une autre origine : illisible
-    parcourir(regles, theme);
+    try { regles = noeud.cssRules; } catch { return; } // feuille d'une autre origine : illisible
+    for (const regle of regles ?? []) parcourir(regle, theme);
   };
 
   // color-scheme suit aussi le choix : contrôles natifs, barres de défilement, et le prefers-color-scheme des iframes.
   const appliquer = (doc, theme) => {
-    doc.documentElement.style.colorScheme = { auto: '', clair: 'light', sombre: 'dark' }[theme];
-    for (const feuille of doc.styleSheets) parcourirFeuille(feuille, theme);
+    doc.documentElement.style.colorScheme = THEMES[theme].schema;
+    for (const feuille of doc.styleSheets) parcourir(feuille, theme);
   };
 
   // Le bouton de l'en-tête : un clic passe au thème suivant ; son nom dit le thème courant et l'action.
-  const suivant = (theme) => THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
-  const NOMS = { auto: 'automatique, comme l\'appareil', clair: 'clair', sombre: 'sombre' };
-  const libelle = (theme) => `Thème : ${NOMS[theme]}. ${suivant(theme) === 'auto' ? 'Revenir au thème automatique' : `Passer au thème ${NOMS[suivant(theme)]}`}`;
-  const ICONES = { auto: '🌗', clair: '☀️', sombre: '🌙' };
+  const ordre = Object.keys(THEMES);
+  const suivant = (theme) => ordre[(ordre.indexOf(theme) + 1) % ordre.length];
+  const libelle = (theme) => `Thème : ${THEMES[theme].nom}. ${suivant(theme) === 'auto' ? 'Revenir au thème automatique' : `Passer au thème ${THEMES[suivant(theme)].nom}`}`;
+  const icone = (theme) => THEMES[theme].icone;
 
-  globalThis.cartableTheme = { lire, retenir, appliquer, suivant, libelle, ICONES };
+  globalThis.cartableTheme = { lire, retenir, appliquer, suivant, libelle, icone };
 
   if (typeof document === 'undefined') return;
   const stockage = (() => { try { return localStorage; } catch { return undefined; } })();
@@ -64,11 +65,12 @@
     try { if (cadre.contentDocument) appliquer(cadre.contentDocument, actuel); } catch { /* autre origine */ }
   };
   document.addEventListener('load', (ev) => { if (ev.target.tagName === 'IFRAME') appliquerAuCadre(ev.target); }, true);
+  // Dans la page : le thème courant, et le passage au suivant (retenu, appliqué à la page et à ses iframes).
   globalThis.cartableTheme.courant = () => actuel;
-  globalThis.cartableTheme.choisir = (theme) => {
-    actuel = theme;
-    retenir(stockage, theme);
-    appliquer(document, theme);
+  globalThis.cartableTheme.basculer = () => {
+    actuel = suivant(actuel);
+    retenir(stockage, actuel);
+    appliquer(document, actuel);
     document.querySelectorAll('iframe').forEach(appliquerAuCadre);
   };
   appliquer(document, actuel);

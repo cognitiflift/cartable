@@ -46,8 +46,7 @@ h2 { margin-top:1.5rem; font-family:var(--police-titre); font-weight:800; letter
 header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.65rem clamp(1rem, 3vw, 2rem); background:var(--nuit); color:var(--sur-nuit); }
 @media (prefers-color-scheme: dark) { header { border-bottom:1px solid var(--bord); } }
 header h1 { margin:0; font:800 1.35rem/1 var(--police-titre); letter-spacing:-.01em; } header h1 a { color:inherit; text-decoration:none; }
-.entete-droite { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
-#nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
+.entete-droite, #nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
 #nav .qui { color:var(--sur-nuit-doux); margin:0 .3rem 0 .4rem; }
 @media (max-width: 899px) { #nav .age { display:none; } }
 header button.secondaire { background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }

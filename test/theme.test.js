@@ -78,6 +78,19 @@ test('Thème clair forcé puis automatique : les règles sombres s\'éteignent, 
   assert.equal(f.clair.media.mediaText, '(prefers-color-scheme:light)');
 });
 
+test('Thème forcé : aussi les conditions d\'un @import et d\'une feuille entière (<link media>, <style media>)', () => {
+  const { appliquer } = globalThis.cartableTheme;
+  const importee = { cssRules: [] };
+  const importe = { media: { mediaText: '(prefers-color-scheme: dark)' }, styleSheet: importee };
+  const feuille = { media: { mediaText: 'screen and (prefers-color-scheme: dark)' }, cssRules: [importe] };
+  const doc = { documentElement: { style: {} }, styleSheets: [feuille] };
+  appliquer(doc, 'clair');
+  assert.equal(importe.media.mediaText, JAMAIS);
+  assert.equal(feuille.media.mediaText, `screen and ${JAMAIS}`);
+  appliquer(doc, 'auto');
+  assert.equal(feuille.media.mediaText, 'screen and (prefers-color-scheme: dark)');
+});
+
 test('Bouton de thème : automatique → clair → sombre → automatique, un nom qui dit le thème courant et l\'action', () => {
   const { suivant, libelle } = globalThis.cartableTheme;
   assert.deepEqual(['auto', 'clair', 'sombre'].map(suivant), ['clair', 'sombre', 'auto']);

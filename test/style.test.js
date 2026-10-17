@@ -89,17 +89,6 @@ typography:
 // d'extension »). La liste ne peut que rétrécir : quand un écran revient aux jetons, retirer ses lignes ; une
 // exception qui ne correspond plus à rien fait échouer le test. N'en ajouter aucune : créer un jeton.
 const EXCEPTIONS = [
-  ...ecran('Séance', [
-    ['.seance-centre.voile', 'background', 'rgba(0,0,0,.45)'],
-    ['.bulle-prof', 'box-shadow', 'rgba(0,0,0,.2)'],
-    ['.retour', 'box-shadow', 'rgba(0,0,0,.25)'],
-    ['.action-suivante, .lecon-terminee', 'background', '#2e9e5b'],
-    ['.action-suivante, .lecon-terminee', 'border-color', '#2e9e5b'],
-    ['.action-suivante, .lecon-terminee', 'box-shadow', 'rgba(0,0,0,.25)'],
-    ['.lecon-terminee', 'background', '#d4a017'],
-    ['.lecon-terminee', 'color', '#fff'],
-    ['@keyframes pulsation 50%', 'box-shadow', 'rgba(46,158,91,.25)'],
-  ]),
   ...ecran('Nouvelle Leçon : cadrage', [
     ['.cadrage', 'background', 'rgba(0,0,0,.45)'],
     ['@media (prefers-color-scheme: dark) .cadrage', 'background', 'rgba(0,0,0,.75)'],

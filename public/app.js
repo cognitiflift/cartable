@@ -58,6 +58,19 @@ function barreNav(profil) {
   }
 }
 
+// Bouton de thème de l'en-tête (public/theme.js) : à tous les écrans, choix de l'Élève compris, hors de la nav.
+const boutonTheme = document.getElementById('bouton-theme');
+const afficherBoutonTheme = () => {
+  const { courant, libelle, ICONES } = window.cartableTheme;
+  boutonTheme.replaceChildren(h('span', { ariaHidden: 'true' }, ICONES[courant()]));
+  boutonTheme.ariaLabel = boutonTheme.title = libelle(courant());
+};
+boutonTheme.addEventListener('click', () => {
+  window.cartableTheme.choisir(window.cartableTheme.suivant(window.cartableTheme.courant()));
+  afficherBoutonTheme();
+});
+afficherBoutonTheme();
+
 async function ecranChoix() {
   barreNav(null);
   const eleves = await api('eleves');

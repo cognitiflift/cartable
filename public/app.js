@@ -450,7 +450,7 @@ function recapitulatifSemaine(profil, recap) {
   const faits = [recap.revisions && pluriel(recap.revisions, 'révision'), recap.pages && pluriel(recap.pages, 'page') + ' de leçon',
     recap.joursAtteints && `Objectif du jour atteint ${recap.joursAtteints === 1 ? 'un jour' : `${recap.joursAtteints} jours`}`].filter(Boolean).join(' · ');
   const carte = h('div', { className: 'carte recapitulatif' },
-    h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => {
+    h('button', { className: 'secondaire fermer', title: 'Fermer', ariaLabel: 'Fermer le retour', onclick: () => {
       try { localStorage.setItem(cleRecapitulatif(profil, recap), '1'); } catch { /* stockage indisponible */ }
       carte.remove();
     } }, '✕'),
@@ -647,13 +647,13 @@ function ecranNouvelleLecon(profil) {
     erreur);
 }
 
-// Libellé du bouton vert de chaque Rebond ; le serveur ne reçoit que l'action.
+// Libellé du bouton de chaque Rebond ; le serveur ne reçoit que l'action.
 // L'Étape suivante montre le titre de la page annoncée par le prof, s'il est connu.
 const LIBELLES_REBOND = { revoir: '🔁 Revoir', defi: '🏆 Défi', suivante: '➡️ Étape suivante', reviser: '📚 Réviser', commencer: '🚀 Commencer' };
 const libelleRebond = (action, ensuite) => (action === 'suivante' && ensuite ? `${LIBELLES_REBOND.suivante} : ${ensuite}` : LIBELLES_REBOND[action]);
 
 // Séance sans saisie libre : la page de leçon en plein écran. Une question du prof s'affiche au centre avec ses
-// Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton vert de la suite recommandée.
+// Réponses proposées ; après un quiz, son retour s'affiche au-dessus du bouton de la suite recommandée.
 // Tout se déduit du dernier message du prof.
 // `pageDemandee` : Page de leçon à ouvrir d'abord (lien d'une Révision du jour), sinon la dernière. `apercu` : ouverte
 // depuis la vue parent, elle n'est pas notée comme une ouverture par l'Élève (indicateurs, #78).
@@ -661,10 +661,10 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   let lecon = await api(`eleves/${profil.slug}/lecons/${id}${apercu ? '' : '?ouverture=1'}`);
   let attente = null; // { texte, centre } pendant que le prof travaille
   let retourFerme = false;
-  const erreur = h('span', { className: 'erreur' });
-  const entete = h('span', {});
+  const erreur = h('span', { className: 'erreur', role: 'alert' });
+  const entete = h('div', { className: 'seance-tete' });
   const panneau = h('div', { className: 'panneau' });
-  const calque = h('div', {}); // question, attente ou retour de quiz, par-dessus la leçon
+  const calque = h('div', { ariaLive: 'polite' }); // question, attente ou retour de quiz, par-dessus la leçon, annoncés
   const fiche = h('div', { className: 'fiche', style: 'display:none' }); // Ma fiche, par-dessus tout le reste
   // Révisions du jour faites pendant que le prof prépare la suite (#49, US4), dans leur propre calque, comme Ma fiche :
   // elles ne bougent pas quand la page arrive, une barre le signale et ramène à la Leçon.
@@ -699,10 +699,22 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       cadre);
     fiche.style.display = '';
   };
-  const boutonFiche = h('button', { className: 'secondaire', onclick: ouvrirFiche }, '📋 Ma fiche');
+  const boutonFiche = h('button', { className: 'secondaire fiche-ouvrir', onclick: ouvrirFiche }, '📋 Ma fiche');
 
-  const afficherEntete = () => entete.replaceChildren(...garder([` · ${lecon.titre} `, badgeMaitrise(lecon.maitrise),
-    lecon.references.length > 0 && [' ', boutonFiche]]));
+  // En-tête de Séance : l'Élève est sur la ligne de sa Leçon, à la couleur de sa Catégorie, comme sur sa carte
+  // d'accueil : Niveau, nom, mot de Maîtrise (Acquis : dit par le terminus allumé), puis la ligne et sa prochaine station.
+  const afficherEntete = () => {
+    entete.style.setProperty('--ligne', `var(--ligne-${cleCategorie(lecon.categorie ?? '')}, var(--ligne-autre))`);
+    entete.replaceChildren(...garder([
+      h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
+      h('div', { className: 'seance-titre' },
+        lecon.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${lecon.niveauLecon}`),
+        h('h2', {}, lecon.titre),
+        lecon.maitrise?.palier !== 'acquis' && badgeMaitrise(lecon.maitrise)),
+      ligneLecon(lecon, { ici: true }),
+      lecon.references.length > 0 && boutonFiche,
+      erreur]));
+  };
   // Le panneau n'est reconstruit que si les pages changent : l'iframe garde sinon sa position (et son quiz).
   const afficherPanneau = () => {
     panneau.style.display = lecon.pages.length ? '' : 'none';
@@ -736,7 +748,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
           h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
-          ? [h('div', { className: 'lecon-terminee' }, '🏆 Leçon terminée', h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
+          ? [h('div', { className: 'lecon-terminee' }, h('strong', {}, '🏆 Leçon terminée'), h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]
           : lecon.rebondsProposes.map((r) => h('button', { className: 'action-suivante', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite), h('small', {}, prof.retourQuiz.pretest ? 'Pré-test : hors score' : `Quiz : ${score} %`))));
     } else if (prof && (prof.choix || !lecon.pages.length)) {
@@ -785,7 +797,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   afficherEntete();
   afficher();
   montrer(
-    h('p', {}, h('a', { href: '#/' }, '← Mes leçons'), entete, ' ', erreur),
+    entete,
     h('div', { className: 'seance' }, panneau, calque, fiche, revisions));
 }
 

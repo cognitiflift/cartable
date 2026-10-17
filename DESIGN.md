@@ -271,7 +271,7 @@ Cartable se lit comme le plan d'un réseau de transport en commun (la STIB bruxe
 
 Le monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des cartes blanches posées à peine au-dessus du fond, une typographie de signalétique (Overpass) pour les titres et les noms de ligne, une police conçue pour la lisibilité (Atkinson Hyperlegible Next) pour tout le texte. La couleur est réservée au sens : la couleur de ligne dit la Catégorie, le bleu de l'accent dit l'action et aujourd'hui, le vert dit ce qui est Retenu, le jaune dit ce qui est nouveau. Il convient autant à un enfant de 8 ans qu'à un adulte : rien n'y est infantilisant, rien n'y est compétitif.
 
-Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par la préférence de l'appareil ; l'en-tête reste bleu nuit dans les deux.
+Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par le bouton de thème de l'en-tête : automatique (la préférence de l'appareil, par défaut), clair ou sombre. Le choix vaut pour l'appareil, pas pour un Élève : retenu dans le stockage de l'appareil, il s'applique dès le choix de l'Élève, avant le premier rendu, et jusque dans les Pages de leçon en iframe. L'en-tête reste bleu nuit dans les deux.
 
 **Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), la Séance (en-tête sur la ligne de la Leçon, bulle du prof, Retour de quiz, Rebond), Nouvelle leçon (Propositions et Cadrage), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Révisions du jour, Vue parent, Profil) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
 
@@ -349,7 +349,7 @@ Le bandeau de la semaine est une grille de deux colonnes : les sept jours (une g
 
 Les cartes de ligne d'une Catégorie forment une grille fluide (`minmax(min(100%, 31rem), 1fr)`, écart 1rem) : deux colonnes sur grand écran, une sur tablette en portrait et sur téléphone. Toutes les cartes ont la même anatomie : tête (Niveau, nom, mot de Maîtrise), ligne, pied (prochaine station, contrôle, récompenses, Continuer), puis le dépliant des Objectifs.
 
-Le rythme vertical : 2.2rem avant « Mes leçons », 1.4rem entre Catégories, 1rem entre cartes, 0.85rem entre les rangs d'une carte. L'en-tête masque l'âge sous 900px, le pseudo sous 640px et le nom « Cartable » sous 480px, en gardant toujours le compteur d'Étoiles, Profil et Changer.
+Le rythme vertical : 2.2rem avant « Mes leçons », 1.4rem entre Catégories, 1rem entre cartes, 0.85rem entre les rangs d'une carte. L'en-tête masque l'âge sous 900px, le pseudo sous 640px et le nom « Cartable » sous 480px, en gardant toujours le compteur d'Étoiles, Profil, Changer et le bouton de thème.
 
 ## Elevation & Depth
 
@@ -379,6 +379,7 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Bouton plein :** fond `accent`, texte `sur-accent`, graisse 700. Au survol, l'accent se mélange de 12 % d'encre ; transition de fond 0.15s.
 - **Bouton secondaire :** fond `carte`, filet `bord`, texte `texte`, graisse 600 ; au survol, 6 % d'encre. Dans l'en-tête, il devient transparent avec un filet `sur-nuit` à 32 % et un survol `sur-nuit` à 10 %.
 - **Continuer (bouton de ligne) :** fond de la ligne foncée, texte blanc, graisse 800, 2.75rem de haut ; au survol, `brightness(1.1)` ; à l'appui, descend d'1px. En sombre, il devient un aplat de ligne à 22 % sur la carte, cerclé de 2px de couleur de ligne, texte `texte`.
+- **Thème (en-tête) :** bouton secondaire de l'en-tête réduit à son icône (🌗 automatique, ☀️ clair, 🌙 sombre) ; un clic passe d'automatique à clair, à sombre, puis revient à automatique. Son nom accessible (et son infobulle) dit le thème courant et l'action : « Thème : clair. Passer au thème sombre ».
 - **Apprendre quelque chose de nouveau :** fond `nuit`, texte `sur-nuit` ; en sombre, il s'inverse (fond `texte-sombre`, texte `fond-sombre`).
 - **Révisions du jour :** bouton plein à deux lignes (titre fort, détail en petit) quand des Questions sont dues, secondaire sinon.
 - **Rebond (Séance) :** la suite recommandée après un quiz est un bouton plein à deux lignes (action en 800, score du quiz en petit), 12px, 2.75rem de haut ; les autres Rebonds sont des boutons secondaires. Aucun bouton ne pulse.
@@ -399,11 +400,11 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Internal Padding:** 1.05rem 1.25rem 0.5rem pour la carte de ligne (0.95rem 1rem 0.4rem sous 640px), 1rem pour la carte simple.
 
 ### Inputs / Fields
-- **Style:** fond `carte`, filet 1px `bord`, coins 10px, padding 0.5rem 0.8rem, police héritée. Les contrôles natifs suivent le thème (`color-scheme: light dark`).
+- **Style:** fond `carte`, filet 1px `bord`, coins 10px, padding 0.5rem 0.8rem, police héritée. Les contrôles natifs suivent le thème (`color-scheme: light dark` en automatique, `light` ou `dark` quand il est choisi).
 - **Focus:** l'anneau de focus commun (3px `accent`).
 
 ### Navigation
-- **En-tête :** bande bleu nuit pleine largeur, « 🎒 Cartable » à gauche, puis à droite le compteur d'Étoiles, le pseudo et le niveau en `sur-nuit-doux`, et les boutons secondaires Mon profil et Changer. En sombre, un filet `bord` le sépare du contenu.
+- **En-tête :** bande bleu nuit pleine largeur, « 🎒 Cartable » à gauche, puis à droite le compteur d'Étoiles, le pseudo et le niveau en `sur-nuit-doux`, les boutons secondaires Mon profil et Changer, puis le bouton de thème, à tous les écrans (choix de l'Élève compris). En sombre, un filet `bord` le sépare du contenu.
 
 ### La ligne et ses stations
 La signature du système. Le trait est à la couleur de la Catégorie jusqu'à la dernière station atteinte, en `troncon` ensuite ; le dernier tronçon jusqu'au terminus ne se colore que quand la Leçon est Acquise.

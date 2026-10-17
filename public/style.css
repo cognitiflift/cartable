@@ -2,7 +2,9 @@
    sont les stations. En-tête bleu nuit, fond gris froid, cartes blanches ; Overpass (signalétique) pour les titres,
    Atkinson Hyperlegible Next pour le texte, servies par l'appli (licence SIL OFL). Thème clair et sombre (contrôles
    natifs compris), choisi par l'appli elle-même : quiz.css du Kit, chargé pour les Révisions du jour, pose le même
-   color-scheme et n'ajoute que des variables --kit-* et des règles .kit-*. Couleurs de ligne : celles des Catégories
+   color-scheme et n'ajoute que des variables --kit-* et des règles .kit-*. Le sombre ne s'écrit qu'une fois, sous
+   @media (prefers-color-scheme: dark) : le bouton de thème (theme.js) force ces conditions en clair ou en sombre,
+   l'automatique les laisse à l'appareil. Couleurs de ligne : celles des Catégories
    du Kit (kit/v1/quiz.css), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. */
 @font-face { font-family:"Atkinson Hyperlegible Next"; font-weight:200 800; font-display:swap; src:url(/polices/atkinson-latin.woff2) format("woff2");
   unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
@@ -44,7 +46,7 @@ h2 { margin-top:1.5rem; font-family:var(--police-titre); font-weight:800; letter
 header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.65rem clamp(1rem, 3vw, 2rem); background:var(--nuit); color:var(--sur-nuit); }
 @media (prefers-color-scheme: dark) { header { border-bottom:1px solid var(--bord); } }
 header h1 { margin:0; font:800 1.35rem/1 var(--police-titre); letter-spacing:-.01em; } header h1 a { color:inherit; text-decoration:none; }
-#nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
+.entete-droite, #nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
 #nav .qui { color:var(--sur-nuit-doux); margin:0 .3rem 0 .4rem; }
 @media (max-width: 899px) { #nav .age { display:none; } }
 header button.secondaire { background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
@@ -163,7 +165,7 @@ details.objectifs li small { display:block; color:var(--doux); font-size:.82rem;
 .reseau-vide { margin-top:1rem; padding:1.5rem; background:var(--carte); border:1px dashed var(--bord); border-radius:18px; --ligne:var(--ligne-autre); }
 .reseau-vide p { margin:.8rem 0 0; color:var(--doux); }
 header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
-@media (max-width: 480px) { header { padding-inline:.75rem; gap:.5rem; } header h1 .nom-appli { display:none; } #nav { gap:.35rem; } header button.secondaire { padding:.45rem .6rem; font-size:.9rem; } .compteur-etoiles { padding:.3rem .7rem; } }
+@media (max-width: 480px) { header { padding-inline:.75rem; gap:.5rem; } header h1 .nom-appli { display:none; } .entete-droite, #nav { gap:.35rem; } header button.secondaire { padding:.45rem .6rem; font-size:.9rem; } .compteur-etoiles { padding:.3rem .7rem; } }
 @media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 

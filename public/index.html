@@ -6,11 +6,16 @@
   <title>Cartable</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="/kit/v1/quiz.css">
+  <!-- Thème choisi sur l'appareil : appliqué ici, une fois les feuilles chargées et avant le premier rendu. -->
+  <script src="theme.js"></script>
 </head>
 <body>
   <header>
     <h1><a href="#/" aria-label="Cartable, accueil">🎒 <span class="nom-appli">Cartable</span></a></h1>
-    <nav id="nav"></nav>
+    <div class="entete-droite">
+      <nav id="nav"></nav>
+      <button id="bouton-theme" class="secondaire" type="button"></button>
+    </div>
   </header>
   <main id="app"></main>
   <script type="module" src="app.js"></script>

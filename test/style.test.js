@@ -271,3 +271,178 @@ function ecartsDesign(design, css) {
   }
   return ecarts;
 }
+
+// Le Kit (public/kit/v1/base.css et quiz.css) : une Page de leçon ne charge pas public/style.css, alors le Kit garde
+// ses variables --kit-*, mais leurs valeurs sont les jetons de DESIGN.md (#111). Ses jetons se définissent sur :root
+// et [data-categorie="…"], en clair et en sombre ; ses polices sont var(--kit-police) et var(--kit-police-titre).
+
+test('Kit : une couleur en dur, une police littérale ou un jeton de l\'appli dans une règle est signalé ; ses jetons et ses polices ne le sont pas', () => {
+  const css = `:root { --kit-fond:#f2f4f8; --kit-police:"Atkinson Hyperlegible Next", system-ui, sans-serif; }
+    [data-categorie="arts"] { --kit-accent:#db2777; }
+    :root, [data-categorie] { --kit-accent-doux: color-mix(in srgb, var(--kit-accent) 12%, var(--kit-carte)); }
+    @media (prefers-color-scheme: dark) { :root { --kit-fond:#0f1220; } [data-categorie="arts"] { --kit-accent:#f472b6; } }
+    @font-face { font-family:"Overpass"; src:url(/polices/overpass-latin.woff2) format("woff2"); }
+    body { font: 18px/1.65 var(--kit-police); } h1 { font-family: var(--kit-police-titre); } .kit-trou { font: inherit; }
+    .kit-lecture { color: #fff; } .kit-quiz { font-family: system-ui; } .kit-x { color: var(--fond); }`;
+  assert.deepEqual(ecartsDuKit(css).map((e) => e.split('. ')[0]), [
+    '.kit-lecture { color } : couleur en dur #fff',
+    '.kit-quiz { font-family } : police littérale « system-ui »',
+    '.kit-x { color } : jeton de l\'appli var(--fond), absent d\'une Page de leçon',
+  ]);
+});
+
+test('Kit : une bordure latérale est signalée ; une bordure complète, basse ou retirée ne l\'est pas', () => {
+  const css = `.encart, aside { border-left: 5px solid var(--kit-accent); } .a { border-inline-start-width: 4px; }
+    .b { border-right: none; border-left: 0; } h2 { border-bottom: 3px solid var(--kit-accent-doux); } .c { border: 1px solid var(--kit-bord); }`;
+  assert.deepEqual(ecartsDuKit(css).map((e) => e.split('. ')[0]), [
+    '.encart, aside { border-left } : bordure latérale',
+    '.a { border-inline-start-width } : bordure latérale',
+  ]);
+});
+
+test('Kit : les valeurs --kit-* sont les jetons de DESIGN.md, Catégories comprises, en clair et en sombre', () => {
+  const design = `---
+colors:
+  fond: "#f2f4f8"
+  accent: "#2747c9"
+  ligne-arts: "#db2777"
+  ligne-sciences: "#0f8a6a"
+  fond-sombre: "#0f1220"
+  accent-sombre: "#8aa2ff"
+  ligne-arts-sombre: "#f472b6"
+  ligne-sciences-sombre: "#34d399"
+typography:
+  display:
+    fontFamily: "Overpass, Atkinson Hyperlegible Next, system-ui, sans-serif"
+  body:
+    fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
+---`;
+  const accord = `:root { --kit-fond:#F2F4F8; --kit-accent:#2747c9; --kit-police:"Atkinson Hyperlegible Next", system-ui, sans-serif;
+      --kit-police-titre:"Overpass", "Atkinson Hyperlegible Next", system-ui, sans-serif; color-scheme: light dark; }
+    [data-categorie="arts"] { --kit-accent:#db2777; } [data-categorie="sciences"] { --kit-accent:#0f8a6a; }
+    :root, [data-categorie] { --kit-accent-doux: color-mix(in srgb, var(--kit-accent) 12%, var(--kit-fond)); }
+    @media (prefers-color-scheme: dark) { :root { --kit-fond:#0f1220; --kit-accent:#8aa2ff; }
+      [data-categorie="arts"] { --kit-accent:#f472b6; } [data-categorie="sciences"] { --kit-accent:#34d399; } }`;
+  assert.deepEqual(ecartsKitDesign(design, accord, { 'kit-fond': 'fond', 'kit-accent': 'accent' }), []);
+
+  const desaccord = `:root { --kit-fond:#fbf8f3; --kit-accent:#2747c9; --kit-rose:#ff00aa; --kit-police: system-ui; }
+    [data-categorie="arts"] { --kit-accent:#db2777; }
+    @media (prefers-color-scheme: dark) { :root { --kit-accent:#8aa2ff; } [data-categorie="arts"] { --kit-accent:#ff0000; } }`;
+  assert.deepEqual(ecartsKitDesign(design, desaccord, { 'kit-fond': 'fond', 'kit-accent': 'accent' }), [
+    '--kit-fond (clair) vaut #fbf8f3, le jeton fond de DESIGN.md vaut #f2f4f8.',
+    '--kit-rose (clair) vaut #ff00aa, et ne correspond à aucun jeton de DESIGN.md.',
+    '--kit-accent de [data-categorie="arts"] (sombre) vaut #ff0000, le jeton ligne-arts-sombre de DESIGN.md vaut #f472b6.',
+    '--kit-police vaut « system-ui », DESIGN.md (typography body) dit « Atkinson Hyperlegible Next, system-ui, sans-serif ».',
+    '--kit-police-titre : absent, DESIGN.md (typography display) dit « Overpass, Atkinson Hyperlegible Next, system-ui, sans-serif ».',
+    '--kit-fond : absent du :root sombre, DESIGN.md a fond-sombre (#0f1220).',
+    'ligne-sciences : aucun [data-categorie="sciences"] ne définit --kit-accent en clair.',
+    'ligne-sciences-sombre : aucun [data-categorie="sciences"] ne définit --kit-accent en sombre.',
+  ]);
+});
+
+// Le jeton de DESIGN.md que vaut chaque variable --kit-* du :root du Kit.
+const JETONS_DU_KIT = {
+  'kit-fond': 'fond', 'kit-texte': 'texte', 'kit-doux': 'doux', 'kit-carte': 'carte', 'kit-bord': 'bord',
+  'kit-accent': 'accent', 'kit-sur-accent': 'sur-accent', 'kit-encre-noire': 'encre-noire',
+  'kit-juste': 'vert', 'kit-faux': 'rouge',
+};
+
+const FEUILLES_DU_KIT = ['base.css', 'quiz.css'];
+const lireKit = (feuille) => readFile(new URL(`../public/kit/v1/${feuille}`, import.meta.url), 'utf8');
+
+test('Kit : ses feuilles n\'emploient que ses variables --kit-* et n\'ont pas de bordure latérale', async () => {
+  for (const feuille of FEUILLES_DU_KIT) assert.deepEqual(ecartsDuKit(await lireKit(feuille)), [], feuille);
+});
+
+test('Kit : ses variables --kit-* valent les jetons de DESIGN.md, Catégories et polices comprises', async () => {
+  const design = await readFile(new URL('../DESIGN.md', import.meta.url), 'utf8');
+  const css = (await Promise.all(FEUILLES_DU_KIT.map(lireKit))).join('\n');
+  assert.deepEqual(ecartsKitDesign(design, css, JETONS_DU_KIT), []);
+});
+
+// Les polices du front matter de DESIGN.md (bloc typography) : le fontFamily d'un style (« body », « display »).
+function policeDuDesign(design, style) {
+  const entete = design.split(/^---$/m)[1] ?? '';
+  return entete.match(new RegExp(`^  ${style}:\\n(?:    .*\\n)*?    fontFamily:\\s*"([^"]*)"`, 'm'))?.[1];
+}
+
+const memePolice = (a, b) => a.replace(/["']/g, '').split(',').map((s) => s.trim()).join(', ') === b;
+
+// Les désaccords entre les jetons du Kit et ceux de DESIGN.md. `correspondances` dit quel jeton de DESIGN.md vaut
+// chaque variable --kit-* du :root (« kit-fond » → « fond ») ; --kit-accent de [data-categorie="x"] vaut « ligne-x ».
+// En sombre, la variable vaut « nom-sombre » si DESIGN.md l'a, sinon « nom ». Chaque Catégorie de DESIGN.md a son
+// [data-categorie] dans les deux thèmes, et les polices sont celles des styles body et display.
+function ecartsKitDesign(design, css, correspondances) {
+  const couleurs = couleursDuDesign(design);
+  const ecarts = [];
+  const definis = { clair: new Map(), sombre: new Map() };
+  for (const { pile, propriete, valeur } of declarations(css)) {
+    if (!estBlocDeJetonsDuKit(pile) || !propriete.startsWith('--kit-') || couleursLitterales(valeur).join() !== valeur) continue;
+    const theme = pile.length === 2 ? 'sombre' : 'clair';
+    const selecteur = pile.at(-1);
+    const categorie = selecteur.match(/^\[data-categorie="([\w-]+)"\]$/)?.[1];
+    const variable = propriete.slice(2);
+    const nom = categorie && variable === 'kit-accent' ? `ligne-${categorie}` : selecteur === ':root' ? correspondances[variable] : undefined;
+    const ou = categorie ? `${propriete} de ${selecteur} (${theme})` : `${propriete} (${theme})`;
+    definis[theme].set(`${selecteur} ${variable}`, valeur);
+    if (!nom) { ecarts.push(`${ou} vaut ${valeur}, et ne correspond à aucun jeton de DESIGN.md.`); continue; }
+    const jeton = theme === 'sombre' && couleurs.has(`${nom}-sombre`) ? `${nom}-sombre` : nom;
+    if (!couleurs.has(jeton)) ecarts.push(`${ou} vaut ${valeur}, le jeton ${jeton} n'est pas dans DESIGN.md.`);
+    else if (!memeCouleur(valeur, couleurs.get(jeton))) ecarts.push(`${ou} vaut ${valeur}, le jeton ${jeton} de DESIGN.md vaut ${couleurs.get(jeton)}.`);
+  }
+
+  const polices = new Map(declarations(css).filter(({ pile }) => pile.length === 1 && pile[0] === ':root').map((d) => [d.propriete, d.valeur]));
+  for (const [variable, style] of [['--kit-police', 'body'], ['--kit-police-titre', 'display']]) {
+    const attendue = policeDuDesign(design, style);
+    if (!polices.has(variable)) ecarts.push(`${variable} : absent, DESIGN.md (typography ${style}) dit « ${attendue} ».`);
+    else if (!memePolice(polices.get(variable), attendue)) ecarts.push(`${variable} vaut « ${polices.get(variable)} », DESIGN.md (typography ${style}) dit « ${attendue} ».`);
+  }
+
+  for (const [variable, nom] of Object.entries(correspondances)) {
+    if (!definis.clair.has(`:root ${variable}`)) ecarts.push(`--${variable} : absent du :root clair, DESIGN.md a ${nom} (${couleurs.get(nom)}).`);
+    if (couleurs.has(`${nom}-sombre`) && !definis.sombre.has(`:root ${variable}`)) ecarts.push(`--${variable} : absent du :root sombre, DESIGN.md a ${nom}-sombre (${couleurs.get(`${nom}-sombre`)}).`);
+  }
+  for (const nom of couleurs.keys()) {
+    const m = nom.match(/^ligne-([\w-]+?)(-sombre)?$/);
+    if (!m) continue;
+    const theme = m[2] ? 'sombre' : 'clair';
+    if (!definis[theme].has(`[data-categorie="${m[1]}"] kit-accent`)) ecarts.push(`${nom} : aucun [data-categorie="${m[1]}"] ne définit --kit-accent en ${theme}.`);
+  }
+  return ecarts;
+}
+
+// Les blocs de définition des jetons du Kit : :root et [data-categorie…] (seuls ou ensemble), en clair et en sombre.
+function estBlocDeJetonsDuKit(pile) {
+  const selecteur = /^(:root|\[data-categorie(="[\w-]+")?\])(, ?(:root|\[data-categorie(="[\w-]+")?\]))*$/;
+  return (pile.length === 1 && selecteur.test(pile[0]))
+    || (pile.length === 2 && /^@media \(prefers-color-scheme: ?dark\)$/.test(pile[0]) && selecteur.test(pile[1]));
+}
+
+// font-family vaut une variable de police du Kit ; le raccourci font s'achève sur l'une d'elles.
+function policeParJetonDuKit(propriete, valeur) {
+  if (MOTS_CLES_CSS.test(valeur)) return true;
+  const fin = valeur.match(/(^|\s)var\(--kit-police(-titre)?\)$/);
+  return Boolean(fin) && (propriete === 'font' || fin.index === 0);
+}
+
+// Les écarts d'une feuille du Kit à ses jetons : couleurs en dur et polices littérales hors de ses jetons, et jetons
+// de l'appli (var(--fond)…), qu'une Page de leçon n'a pas.
+function ecartsDuKit(css) {
+  const ecarts = [];
+  for (const { pile, lieu, propriete, valeur } of declarations(css)) {
+    if (/^font(-family)?$/.test(propriete) && pile.at(-1) !== '@font-face' && !policeParJetonDuKit(propriete, valeur)) {
+      ecarts.push(`${lieu} { ${propriete} } : police littérale « ${valeur} ». Utiliser var(--kit-police) ou var(--kit-police-titre).`);
+    }
+    if (/^border-(left|right|inline-start|inline-end|inline)(-width|-style)?$/.test(propriete) && !/^(none|0(px)?|hidden)$/i.test(valeur)) {
+      ecarts.push(`${lieu} { ${propriete} } : bordure latérale. DESIGN.md n'en a pas : mettre le bloc en valeur par son fond ou son filet complet.`);
+    }
+    if (estBlocDeJetonsDuKit(pile)) continue;
+    for (const couleur of new Set(couleursLitterales(valeur))) {
+      ecarts.push(`${lieu} { ${propriete} } : couleur en dur ${couleur}. Utiliser une variable --kit-* dont la valeur est un jeton de DESIGN.md.`);
+    }
+    for (const [jeton] of valeur.matchAll(/var\(--(?!kit-)[\w-]+\)/g)) {
+      ecarts.push(`${lieu} { ${propriete} } : jeton de l'appli ${jeton}, absent d'une Page de leçon. Utiliser une variable --kit-*.`);
+    }
+  }
+  return ecarts;
+}

@@ -73,8 +73,9 @@ test('Retour de quiz : annonce la Fusée gagnée, rien sans nouvelle Fusée', ()
 test('Retour de quiz : le Dépassement est salué dès une question bonus réussie, encouragé sinon, absent sans questions bonus', () => {
   assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 2, total: 3 } }), /🚀 Dépassement réussi : 2 questions bonus sur 3 !/);
   assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 1, total: 3 } }), /🚀 1 question bonus réussie sur 3 : bravo d'avoir poussé plus loin !/);
-  assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 1, total: 1 } }), /🚀 1 question bonus réussie sur 1 : bravo d'avoir poussé plus loin !/);
+  assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 1, total: 1 } }), /🚀 Dépassement réussi : 1 question bonus sur 1 !/);
   assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 0, total: 2 } }), /🚀 Les questions bonus allaient plus loin que la leçon : elles ne comptent pas dans ton score\./);
+  assert.match(texteRetourQuiz({ score: 70, action: 'suivante', bonus: { reussies: 0, total: 1 } }), /🚀 La question bonus allait plus loin que la leçon : elle ne compte pas dans ton score\./);
   assert.doesNotMatch(texteRetourQuiz({ score: 70, action: 'suivante' }), /🚀/);
 });
 

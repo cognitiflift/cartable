@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT } from '../lib/agent.js';
 import path from 'node:path';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
@@ -204,6 +204,50 @@ test('consignes : en mathématiques, exemple résolu, puis étapes retirées une
   assert.match(maths, /"etapes"/);
   assert.match(maths, /erreurs fréquentes/);
   assert.match(maths, /jamais au clavier/);
+});
+
+test('consignes : quiz proportionné à la page, une question comptée par idée-clé, de 3 à 6, rappel actif et visuel compris', () => {
+  const lignes = consignesLecon(profil).split('\n');
+  const nombre = lignes.find((l) => l.startsWith('Nombre de questions'));
+  assert.ok(nombre, lignes.join('\n'));
+  assert.match(nombre, /une question comptée par idée-clé de la page/);
+  assert.match(nombre, /entre 3 et 6/);
+  assert.match(nombre, /rappel actif et la question sur le visuel font partie de ce nombre/);
+  assert.match(nombre, /une même question peut remplir les deux/);
+  assert.match(nombre, /pas[^.]*tous les formats/);
+  assert.match(nombre, /pas interrogée deux fois[^.]*Révisions du jour/);
+  assert.match(nombre, /chaque Objectif[^.]*au moins une question comptée/i);
+  // Les obligations de rappel actif et de visuel renvoient au nombre, sans s'y ajouter.
+  assert.match(lignes.find((l) => l.startsWith('Rappel actif')), /parmi les questions comptées/);
+  assert.match(lignes.find((l) => l.startsWith('Visuels')), /parmi les questions comptées/);
+});
+
+test('consignes : le Dépassement demande 1 question bonus, partout où il est demandé ; plus jamais « 2 ou 3 questions bonus »', () => {
+  const avecDepassement = [
+    consignesLecon(profil),
+    consigneRebond('commencer', { mode: 'revision' }),
+    consigneRebond('reviser', { mode: 'revision' }),
+    consigneRebond('reviser', { mode: 'libre' }),
+  ];
+  for (const consigne of avecDepassement) assert.match(consigne, /1 question bonus/, consigne);
+  const toutes = [
+    ...avecDepassement,
+    ...Object.keys(REBONDS).flatMap((action) => [consigneRebond(action, { mode: 'libre' }), consigneRebond(action, { mode: 'revision' })]),
+    consignePremierTour('libre'),
+    consignePremierTour('revision'),
+  ];
+  for (const consigne of toutes) assert.doesNotMatch(consigne, /2 ou 3 questions bonus|questions bonus \(🚀\) hors score/, consigne);
+});
+
+test('consignes : Revoir, une question par question ratée, reformulée, entre 2 et 6 ; Défi, plus difficile sans plus de questions', () => {
+  assert.match(REBONDS.revoir.consigne, /une question par question ratée du dernier quiz \(hors bonus\), reformulée, entre 2 et 6/);
+  assert.match(REBONDS.revoir.consigne, /pas de Dépassement/);
+  assert.match(REBONDS.defi.consigne, /entre 3 et 6 questions comptées/);
+  assert.match(REBONDS.defi.consigne, /pas plus de questions/);
+});
+
+test('consigne du premier tour : le Pré-test garde ses trois questions', () => {
+  for (const mode of ['libre', 'revision']) assert.match(consignePremierTour(mode), /de trois questions/);
 });
 
 test('Préambule de relais : la session neuve reçoit l\'état de la Leçon et la consigne de relire les fichiers de teach', () => {

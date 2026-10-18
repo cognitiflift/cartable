@@ -228,7 +228,7 @@ Il affiche les questions dans leur format, mélange les réponses (ou les mots, 
 
 ## Figure
 
-Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Mets-le dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source et licence). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur chaque question du quiz qui oblige à la regarder (voir « Format du quiz ») : l'élève peut la revoir depuis la question. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… ») : le bouton « Revoir » le reprend.
+Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre, extrait de texte), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Mets-le dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source et licence). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur chaque question du quiz qui oblige à la regarder (voir « Format du quiz ») : l'élève peut la revoir depuis la question. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… », « Texte… ») : le bouton « Revoir » le reprend.
 
 ```html
 <figure class="kit-figure" id="stromboli">
@@ -241,6 +241,20 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 ```
 
 - Schéma, frise ou carte : dessine un `<svg>` dans la figure, à la place de `<img>`. Rien à déclarer. Trace ses textes et ses traits en `currentColor` (`fill="currentColor"`, `stroke="currentColor"`) : ils prennent la couleur du texte et restent lisibles en mode sombre.
+- Extrait de texte (poème, passage d'un livre, document d'histoire) quand c'est lui qu'on étudie : mets-le dans un `<blockquote>` à la place de `<img>`, un `<p>` par paragraphe ou par strophe, un `<br>` à la fin de chaque vers. Il garde la légende et le crédit (auteur, œuvre, date). La lecture à voix haute le lit vers par vers, sans le crédit. Ajout compatible de la version 1.
+
+```html
+<figure class="kit-figure" id="verlaine">
+  <blockquote>
+    <p>Le ciel est, par-dessus le toit,<br>Si bleu, si calme !<br>Un arbre, par-dessus le toit,<br>Berce sa palme.</p>
+  </blockquote>
+  <figcaption>
+    Le poète regarde le ciel depuis sa prison.
+    <small class="kit-credit">Paul Verlaine, « Le ciel est, par-dessus le toit… », Sagesse, 1881</small>
+  </figcaption>
+</figure>
+```
+
 - Photo trouvée en ligne (de préférence Wikimedia Commons ou le site d'un musée, jamais une adresse devinée) : cite dans `src` l'adresse directe du fichier image, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
 
 ```json
@@ -261,7 +275,7 @@ Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou
 
 Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
 
-Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases complètes, dans des blocs (`<p>`, titres, listes, `<figcaption>`, `<aside>`) : ce sont eux qui sont lus, dans l'ordre. Le quiz, les crédits des figures (`kit-credit`), les schémas `<svg>` et ce qui est caché ne sont pas lus ; les émojis non plus.
+Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases complètes, dans des blocs (`<p>`, titres, listes, `<figcaption>`, `<aside>`, l'extrait de texte `<blockquote>` d'une figure) : ce sont eux qui sont lus, dans l'ordre. Le quiz, les crédits des figures (`kit-credit`), les schémas `<svg>` et ce qui est caché ne sont pas lus ; les émojis non plus.
 
 L'appli transmet le réglage à la page dans son adresse (`…/0002-le-magma.html?lecture=1`). Ajout compatible de la version 1 : une page déjà écrite avec le Kit en profite sans changement.
 

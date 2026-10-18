@@ -77,6 +77,9 @@
 .kit-revoir .kit-quiz-figure { margin: .5rem 0 0; padding: .8rem; border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-fond); text-align: center; }
 .kit-revoir .kit-quiz-figure[hidden] { display: none; }
 .kit-revoir .kit-quiz-figure img, .kit-revoir .kit-quiz-figure svg { display: block; max-width: 100%; height: auto; max-height: 40vh; width: auto; margin: 0 auto; border-radius: 8px; }
+.kit-revoir .kit-quiz-figure blockquote { margin: 0 auto; max-width: 34rem; padding: .4rem .6rem; text-align: left; font-size: 1.05rem; line-height: 1.7; text-wrap: pretty; }
+.kit-revoir .kit-quiz-figure blockquote p { margin: 0; }
+.kit-revoir .kit-quiz-figure blockquote p + p { margin-top: .9rem; }
 .kit-revoir .kit-quiz-figure figcaption { margin-top: .6rem; font-size: .95rem; text-align: left; }
 .kit-revoir .kit-quiz-figure .kit-credit { display: block; margin-top: .2rem; color: var(--kit-doux); font-size: .8rem; }
 .kit-quiz-question.kit-bonus { border-style: dashed; border-color: var(--kit-accent); }

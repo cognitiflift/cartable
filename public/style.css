@@ -284,7 +284,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .collection { padding:1rem 1.25rem .4rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
 .collection ul { list-style:none; margin:0; padding:0; }
 .collection li + li, .collection h4 { border-top:1px dashed var(--bord); }
-.collection h4 { margin:0; padding:1rem 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.collection h4 { margin:0; padding:1rem 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; color:var(--doux); }
 .badge-tete { display:flex; align-items:flex-start; gap:.8rem; }
 .badge-tete .pastille-badge { flex:none; }
 .badge-tete strong { display:block; margin-top:.2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
@@ -306,10 +306,10 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 /* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
-.totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.totaux-recompenses { margin:0; font-size:1.2rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
 .badges-corps > * { min-width:0; }
-.collection h3 { margin:0 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.collection h3 { margin:0 0 .2rem; font:800 1.45rem/1.1 var(--police-titre); letter-spacing:-.005em; }
 @media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
 /* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
    entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */
@@ -325,6 +325,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .calendrier-jour.aujourdhui:hover:not(:disabled) { background:color-mix(in srgb, var(--texte) 6%, color-mix(in srgb, var(--accent) 9%, transparent)); }
 .calendrier-jour:disabled { opacity:1; cursor:default; background:transparent; }
 .calendrier-jour.choisi .tampon { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .38rem var(--texte); }
+.calendrier-jour.aujourdhui.choisi { box-shadow:none; } /* aujourd'hui choisi : la teinte et l'anneau suffisent */
 .calendrier-detail { display:flex; flex-direction:column; gap:.35rem; padding-top:.8rem; border-top:1px dashed var(--bord); line-height:1.35; }
 .calendrier-detail strong { font-size:1.05rem; }
 .calendrier-detail p { margin:0; }

@@ -175,17 +175,16 @@ function* jetons(html) {
   }
 }
 
-// Copie de la figure du Kit (`<figure class="kit-figure" id="<id>">`) d'une Page de leçon, passée par la liste
-// blanche ; null si la page n'a pas de figure du Kit avec cet id.
-export function extraireFigure(html, id) {
-  if (typeof html !== 'string' || typeof id !== 'string' || !id) return null;
+// Figures du Kit (`<figure class="kit-figure">`) de `html` qui satisfont `choisir(attributs)`, dans l'ordre de la page,
+// lues mais pas encore passées par la liste blanche (copieSure). Une figure dans une figure fait partie de la première.
+function* figuresBrutes(html, choisir) {
   const pile = [];
   let racine = null;
   for (const j of jetons(html)) {
     if (!racine) {
-      if (j.ouvre?.toLowerCase() === 'figure' && j.attributs.id === id && /(^|\s)kit-figure(\s|$)/.test(j.attributs.class ?? '')) {
+      if (j.ouvre?.toLowerCase() === 'figure' && /(^|\s)kit-figure(\s|$)/.test(j.attributs.class ?? '') && choisir(j.attributs)) {
         racine = { balise: 'figure', attributs: j.attributs, enfants: [] };
-        pile.push(racine);
+        if (j.ferme) { yield racine; racine = null; } else pile.push(racine);
       }
       continue;
     }
@@ -201,12 +200,27 @@ export function extraireFigure(html, id) {
     } else if (j.fin) {
       const k = pile.map((n) => n.balise.toLowerCase()).lastIndexOf(j.fin);
       if (k >= 0) pile.length = k;
-      if (!pile.length) break;
+      if (!pile.length) { yield racine; racine = null; }
     }
   }
-  if (!racine) return null;
-  const { id: _, ...attributs } = racine.attributs; // l'id resterait en double dans l'écran qui montre la copie
-  return nettoyerFigure({ ...racine, attributs });
+  if (racine) yield racine; // figure jamais fermée : ce qui en a été lu
+}
+
+// Copie passée par la liste blanche, sans l'id, qui resterait en double dans l'écran qui montre la copie.
+const copieSure = ({ attributs: { id: _, ...attributs }, ...racine }) => nettoyerFigure({ ...racine, attributs });
+
+// Copie de la figure du Kit (`<figure class="kit-figure" id="<id>">`) d'une Page de leçon, passée par la liste
+// blanche ; null si la page n'a pas de figure du Kit avec cet id.
+export function extraireFigure(html, id) {
+  if (typeof html !== 'string' || typeof id !== 'string' || !id) return null;
+  for (const racine of figuresBrutes(html, (a) => a.id === id)) return copieSure(racine);
+  return null;
+}
+
+// Copies de toutes les figures du Kit d'une Page de leçon, avec ou sans id, passées par la liste blanche (ticket #127 :
+// les pages d'avant le lien `figure` n'ont pas d'id sur leurs figures).
+export function figuresDuKit(html) {
+  return typeof html === 'string' ? [...figuresBrutes(html, () => true)].map(copieSure) : [];
 }
 
 // Copie dont les images rapatriées ont une autre adresse : `adresse(src)` (l'appli sert les images de la Leçon

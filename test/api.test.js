@@ -2611,6 +2611,40 @@ test('Révisions du jour : une Question qui désigne une figure de sa page en ga
   assert.equal(revue.figure.enfants.find((e) => e.balise === 'img').attributs.src, `/fichiers/${slug}/${lecon.id}/images/cratere.png`);
 });
 
+test('Révisions du jour : une Question d\'avant le lien `figure` qui renvoie à un visuel retrouve la seule figure de sa page, sinon n\'est plus servie (#127)', async () => {
+  const { slug, lecons } = await eleveRevisions('Revis-Raccroche', 2);
+  const fig = (legende) => `<figure class="kit-figure"><svg viewBox="0 0 10 10"><path d="M0 0 L10 10"/></svg><figcaption>${legende}</figcaption></figure>`;
+  const dir = (l) => path.join(eleves, slug, 'lecons', l.id);
+  const lire = async (l) => (await appel(`/api/eleves/${slug}/lecons/${l.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  const avant = await lire(lecons[1]);
+  // Les deux Leçons : q1 renvoie au schéma, comme une Question écrite avant le lien `figure`. Une figure dans la
+  // première page, deux dans la seconde.
+  for (const [i, l] of lecons.entries()) {
+    const fichier = path.join(dir(l), 'questions.json');
+    const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+    banque['0002-volcans.html#q1'].contenu.enonce = 'Regarde le schéma : où sort la lave ?';
+    await fs.writeFile(fichier, JSON.stringify(banque));
+    await fs.writeFile(path.join(dir(l), 'lessons', '0002-volcans.html'), `${fig('Volcan')}${i ? fig('Autre') : ''}<p>Fin</p>`);
+  }
+  const [une, deux] = [await lire(lecons[0]), await lire(lecons[1])];
+  assert.equal(une.questions.find((q) => q.id === 'q1').contenu.figure.enfants.at(-1).enfants[0], 'Volcan');
+  // Écartée : sa mémoire et la Maîtrise de la Leçon ne changent pas.
+  const ecartee = deux.questions.find((q) => q.id === 'q1');
+  assert.equal(ecartee.contenu.figure, undefined);
+  const memoire = ({ rappel, prochaineRevision, journal }) => ({ rappel, prochaineRevision, journal });
+  assert.deepEqual(memoire(ecartee), memoire(avant.questions.find((q) => q.id === 'q1')));
+  assert.deepEqual(deux.maitrise, avant.maitrise);
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  const servies = data.questions.map((q) => `${q.lecon}/${q.id}`).sort();
+  assert.deepEqual(servies, [`${lecons[0].id}/q1`, `${lecons[0].id}/q2`, `${lecons[1].id}/q2`].sort());
+  assert.ok(data.questions.find((q) => q.lecon === lecons[0].id && q.id === 'q1').figure);
+  // Relancée (une autre lecture), rien ne change : la Banque n'est pas réécrite.
+  const fichiers = await Promise.all(lecons.map((l) => fs.readFile(path.join(dir(l), 'questions.json'), 'utf8')));
+  await lire(lecons[0]);
+  await lire(lecons[1]);
+  assert.deepEqual(await Promise.all(lecons.map((l) => fs.readFile(path.join(dir(l), 'questions.json'), 'utf8'))), fichiers);
+});
+
 // Formats de rappel actif (spec #48, ticket #70) : texte à trous et remettre dans l'ordre, dans la Banque et les
 // Révisions du jour, avec crédit partiel. Le corps envoyé est celui que le Kit lui-même construit.
 const quizRappel = {

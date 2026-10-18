@@ -2572,6 +2572,45 @@ test('Révisions du jour : une Question avec une image la garde dans la Leçon e
   assert.deepEqual(variante.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
 });
 
+test('Révisions du jour : une Question qui désigne une figure de sa page en garde une copie sûre, servie dépliée (#126)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Figure', 1);
+  const quiz = structuredClone(quizBanque);
+  quiz.questions[0].figure = 'volcan';
+  quiz.questions[1].figure = 'absente';
+  const page = path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html');
+  const figure = '<figure class="kit-figure" id="volcan"><svg viewBox="0 0 10 10" onload="alert(1)"><script>alert(2)</script>'
+    + '<path d="M0 10 L5 0 L10 10" stroke="currentColor" fill="none"/></svg><img src="../images/cratere.png" alt="Cratère">'
+    + '<img src="https://pirate.example/x.png" alt="distante"><figcaption>Schéma du volcan <span class="kit-credit">Arno</span></figcaption></figure>';
+  await fs.writeFile(page, `${figure}<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const questions = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  const copie = questions.find((q) => q.id === 'q1').contenu.figure;
+  assert.deepEqual(copie.enfants.map((e) => e.balise), ['svg', 'img', 'figcaption']);
+  assert.doesNotMatch(JSON.stringify(copie), /alert|script|onload|pirate/);
+  // Une figure introuvable dans la page n'est pas gardée : la Question reste, sans figure.
+  assert.equal(questions.find((q) => q.id === 'q2').contenu.figure, undefined);
+  // La figure de la page change : la copie la suit au quiz suivant, sans être une réécriture de la Question (variantes
+  // gardées). Puis la page disparaît : la copie reste, la révision se fait sans la page.
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  banque['0002-volcans.html#q1'].variantes = [{ enonce: 'Par où la lave sort-elle ?', reponses: ['Le cratère', 'Les racines'], bonne: 0, explication: '' }];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+  await fs.writeFile(page, `<figure class="kit-figure" id="volcan"><figcaption>Autre</figcaption></figure><script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions.find((q) => q.id === 'q1');
+  assert.equal(q1.variantes.length, 1);
+  assert.deepEqual(q1.variantes[0].figure, q1.contenu.figure);
+  await fs.rm(page);
+  // En révision, servie avec sa copie, dont les images ont l'adresse du fichier de la Leçon servi par l'appli.
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  const servie = data.questions.find((q) => q.id === 'q1');
+  assert.equal(servie.figure.enfants.find((e) => e.balise === 'figcaption').enfants[0], 'Autre');
+  await fs.writeFile(page, `${figure}<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const revue = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
+  assert.equal(revue.figure.enfants.find((e) => e.balise === 'img').attributs.src, `/fichiers/${slug}/${lecon.id}/images/cratere.png`);
+});
+
 // Formats de rappel actif (spec #48, ticket #70) : texte à trous et remettre dans l'ordre, dans la Banque et les
 // Révisions du jour, avec crédit partiel. Le corps envoyé est celui que le Kit lui-même construit.
 const quizRappel = {

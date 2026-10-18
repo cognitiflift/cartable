@@ -32,3 +32,16 @@ test('Variantes : celles d\'un QCM restent sans type (QCM implicite, comme avant
   assert.equal(Object.hasOwn(v, 'type'), false);
   assert.equal(Object.hasOwn(demandeDeVariantes({ 'p#q1': { contenu: qcm } }, ['p#q1'])[0], 'type'), false);
 });
+
+test('Variantes : celles d\'une Question avec figure la gardent, et le prof en reçoit la légende comme description (#126)', () => {
+  const figure = { balise: 'figure', attributs: { class: 'kit-figure' }, enfants: [
+    { balise: 'svg', attributs: { viewBox: '0 0 10 10' }, enfants: [] },
+    { balise: 'figcaption', attributs: {}, enfants: ['Schéma du  volcan ', { balise: 'span', attributs: { class: 'kit-credit' }, enfants: ['Arno'] }] },
+  ] };
+  const qcm = { enonce: 'Regarde le schéma : où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, explication: '', objectifs: [1], figure };
+  const [v] = lireVariantes([{ enonce: 'Sur le schéma, par où la lave sort-elle ?', reponses: ['Les racines', 'Le cratère'], bonne: 1, explication: '' }], qcm);
+  assert.deepEqual(v.figure, figure);
+  assert.equal(demandeDeVariantes({ 'p#q1': { contenu: qcm } }, ['p#q1'])[0].figure, 'Schéma du volcan');
+  const sansLegende = { ...qcm, figure: { ...figure, enfants: [figure.enfants[0]] } };
+  assert.equal(demandeDeVariantes({ 'p#q1': { contenu: sansLegende } }, ['p#q1'])[0].figure, 'une figure sans légende');
+});

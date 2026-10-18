@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, fuseesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -103,6 +103,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   lignes.push(...consigneQuestionsFragiles(lecon.questions));
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   lignes.push(...consigneQuestionsIgnorees(lecon.questionsIgnorees));
+  lignes.push(...consigneSchemasAReprendre(lecon.schemasAReprendre));
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
   }
@@ -175,7 +176,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 }
 
 // Fin d'un tour du prof, dont les fichiers sont déjà dans la Leçon (`pagesAvant` : ses pages avant le tour) : images,
-// questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
+// questions ignorées, schémas à reprendre, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
 // Une Leçon libre qui avait des Objectifs et en a davantage après le tour a été élargie (le prof a ajouté des Objectifs
 // à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
 // L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :
@@ -196,7 +197,13 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
     return [];
   });
   const questionsIgnorees = [...(premier ? lecon.questionsIgnorees : []), ...ignorees];
-  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees }, cout });
+  // Schémas SVG mal lisibles des pages écrites par ce tour (ticket #134) : signalés de même, la page n'est pas touchée.
+  const schemas = await store.schemasAReprendreDepuis(slug, id, pagesAvant).catch((e) => {
+    console.error(`Schémas de ${id} : ${e.message}`);
+    return [];
+  });
+  const schemasAReprendre = [...(premier ? lecon.schemasAReprendre : []), ...schemas];
+  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre }, cout });
   relancerPropositions(slug);
   const apres = await store.lireLecon(slug, id);
   if (apres.mode === 'libre' && lecon.objectifs.length > 0 && apres.objectifs.length > lecon.objectifs.length) {

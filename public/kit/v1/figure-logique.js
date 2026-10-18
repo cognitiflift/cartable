@@ -227,6 +227,12 @@ export function figuresDuKit(html) {
   return typeof html === 'string' ? [...figuresBrutes(html, () => true)].map(copieSure) : [];
 }
 
+// Figures du Kit d'une Page de leçon telles que la page les écrit, sans liste blanche : pour les examiner (attributs
+// `style` compris, voir lib/schemas.js), jamais pour les rendre.
+export function figuresLuesDuKit(html) {
+  return typeof html === 'string' ? [...figuresBrutes(html, () => true)] : [];
+}
+
 // Adresse sous laquelle l'appli sert l'image rapatriée `src` (`../images/<fichier>`) de la Leçon `lecon` de l'Élève
 // `eleve` (server.js) ; acceptée par la liste blanche (IMAGE_SERVIE_RE).
 export const adresseDImageServie = (eleve, lecon, src) =>

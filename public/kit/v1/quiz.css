@@ -63,6 +63,22 @@
 .kit-quiz-question legend { float: left; width: 100%; padding: 0; margin-bottom: .4rem; font-weight: 600; }
 .kit-quiz-question legend + * { clear: both; }
 .kit-quiz-image { display: block; max-width: 100%; max-height: 40vh; width: auto; margin: 0 auto .6rem; border-radius: 8px; }
+/* Revoir la figure (spec #123) : sous l'énoncé, un bouton secondaire de DESIGN.md (filet, 600, 10px), qui déplie sur
+   place une copie de la figure de la page et la replie ; ouvert, il prend un filet accent (comme « Les deux autres
+   voies »). La copie est une carte simple sur le fond, dans la carte de la question ; ses règles sont ici et non dans
+   base.css, pour que les Révisions du jour de l'appli la montrent aussi. */
+.kit-revoir { margin-bottom: .6rem; }
+.kit-revoir-bouton {
+  display: block; min-height: 2.6rem; font: inherit; font-weight: 600; padding: .4rem .9rem; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--kit-bord); background: var(--kit-carte); color: var(--kit-texte);
+}
+.kit-revoir-bouton:hover { border-color: var(--kit-accent); }
+.kit-revoir-bouton[aria-expanded="true"] { border-color: var(--kit-accent); }
+.kit-revoir .kit-quiz-figure { margin: .5rem 0 0; padding: .8rem; border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-fond); text-align: center; }
+.kit-revoir .kit-quiz-figure[hidden] { display: none; }
+.kit-revoir .kit-quiz-figure img, .kit-revoir .kit-quiz-figure svg { display: block; max-width: 100%; height: auto; max-height: 40vh; width: auto; margin: 0 auto; border-radius: 8px; }
+.kit-revoir .kit-quiz-figure figcaption { margin-top: .6rem; font-size: .95rem; text-align: left; }
+.kit-revoir .kit-quiz-figure .kit-credit { display: block; margin-top: .2rem; color: var(--kit-doux); font-size: .8rem; }
 .kit-quiz-question.kit-bonus { border-style: dashed; border-color: var(--kit-accent); }
 .kit-quiz-reponses { display: flex; flex-direction: column; gap: .5rem; margin-top: .4rem; }
 .kit-quiz-reponse {

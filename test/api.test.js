@@ -1678,6 +1678,13 @@ test('Visuels : consigne du prof (visuel qui explique, légende, source et licen
   assert.match(doc, /images\.json/);
   assert.match(doc, /currentColor/);
   assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure/);
+  // Spec #123 : un id sur chaque figure, `figure` sur chaque question qui oblige à la regarder, plus de « ci-dessus ».
+  for (const texte of [args, doc]) {
+    assert.match(texte, /<figure class="kit-figure" id="/);
+    assert.match(texte, /"figure": "/);
+    assert.match(texte, /ci-dessus/);
+  }
+  assert.match(doc, /`figure` l'emporte/);
 });
 
 test('Visuels : une image déclarée est rapatriée dans la Leçon et son adresse réécrite dans la page', () => avecServeurImages(async (serveurImages) => {

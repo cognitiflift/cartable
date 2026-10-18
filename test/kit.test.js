@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lireQuiz, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
 
 const quiz = {
   objectifs: [1],
@@ -122,6 +122,46 @@ test('Kit : une question peut porter une image (adresse et texte alternatif), é
   assert.deepEqual(image({ src: 'https://upload.wikimedia.org/a.png', alt: 'Un volcan' }), { src: 'https://upload.wikimedia.org/a.png', alt: 'Un volcan' });
   const malformees = [undefined, 'cratere.png', { src: '../images/a.png' }, { src: 'data:image/png;base64,AAAA', alt: 'x' }, { src: '/etc/passwd', alt: 'x' }, { src: '../images/../etat.json', alt: 'x' }];
   for (const malformee of malformees) assert.equal(image(malformee), undefined, JSON.stringify(malformee));
+});
+
+test('Kit : une question peut désigner une figure de la page par son id, écartée seule si elle est mal formée', () => {
+  const q = (champs) => ({ id: 'q1', type: 'qcm', enonce: 'Regarde le schéma : où sort la lave ?', reponses: ['Le cratère', 'Les racines'], bonne: 0, explication: '', ...champs });
+  const lue = (champs) => lireQuiz({ questions: [q(champs)] }).questions[0];
+  assert.equal(lue({ figure: ' schema-volcan ' }).figure, 'schema-volcan');
+  assert.equal(lue({ figure: 'fig_2' }).figure, 'fig_2');
+  const malformees = [undefined, '', '  ', 42, { id: 'x' }, '2-volcan', 'a b', 'a"b', '#volcan', 'x'.repeat(101)];
+  for (const malformee of malformees) {
+    const question = lue({ figure: malformee });
+    assert.equal(Object.hasOwn(question, 'figure'), false, JSON.stringify(malformee));
+    assert.equal(question.enonce, 'Regarde le schéma : où sort la lave ?');
+  }
+  // Une page d'avant, sans figure : la question est lue comme avant.
+  assert.equal(Object.hasOwn(lue({}), 'figure'), false);
+  // `image` et `figure` restent lues toutes deux : c'est au rendu que la figure l'emporte (repli sur l'image si la
+  // figure est introuvable dans la page).
+  const lesDeux = lue({ figure: 'volcan', image: { src: '../images/a.png', alt: 'Un volcan' } });
+  assert.equal(lesDeux.figure, 'volcan');
+  assert.deepEqual(lesDeux.image, { src: '../images/a.png', alt: 'Un volcan' });
+});
+
+test('Kit : le bouton « Revoir » dit ce qu’on revoit quand la figure le laisse savoir, sinon « Revoir »', () => {
+  const cas = [
+    [{ legende: 'Schéma du volcan : la lave monte par la cheminée.', visuel: 'svg' }, '👁 Revoir le schéma'],
+    [{ legende: 'Le Stromboli en éruption (photo).', visuel: 'img' }, '👁 Revoir la photo'],
+    [{ legende: 'La frise des rois de France', visuel: 'svg' }, '👁 Revoir la frise'],
+    [{ legende: 'CARTE des fleuves de France', visuel: 'svg' }, '👁 Revoir la carte'],
+    [{ legende: 'Le schema sans accent', visuel: 'svg' }, '👁 Revoir le schéma'],
+    // Le premier nom de visuel de la légende l'emporte.
+    [{ legende: 'Ce tableau de Magritte, sur la carte postale', visuel: 'img' }, '👁 Revoir le tableau'],
+    // Un mot qui en contient un autre n'est pas un nom de visuel (« cartes » oui, « cartable » non).
+    [{ legende: 'Le cartable de Zoé', visuel: 'img' }, '👁 Revoir l’image'],
+    [{ legende: 'Les cartes du jeu', visuel: 'svg' }, '👁 Revoir la carte'],
+    [{ legende: 'Ronsard, 1545', visuel: 'blockquote' }, '👁 Revoir le texte'],
+    [{ legende: 'Le cycle de l’eau', visuel: 'svg' }, '👁 Revoir'],
+    [{ legende: '', visuel: null }, '👁 Revoir'],
+    [{}, '👁 Revoir'],
+  ];
+  for (const [figure, attendu] of cas) assert.equal(libelleRevoir(figure), attendu, JSON.stringify(figure));
 });
 
 // Formats de rappel actif (spec #48, ticket #70) : texte à trous avec banque de mots, remettre dans l'ordre.

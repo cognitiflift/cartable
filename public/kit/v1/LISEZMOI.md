@@ -76,11 +76,12 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
   - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score. Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
-  - `image` (facultatif) : `{ "src": "…", "alt": "…" }`, une image propre à la question, affichée sous l'énoncé, et aussi quand l'élève la retrouve en révision. Même règle que pour une figure : photo distante déclarée dans `images.json` (l'appli la rapatrie et réécrit `src` en `../images/…`), `alt` qui dit ce qu'on voit. Une image mal formée est ignorée, la question reste. Pour un schéma en SVG, utilise plutôt la figure de la page.
+  - `image` (facultatif) : `{ "src": "…", "alt": "…" }`, une image propre à la question, affichée sous l'énoncé, et aussi quand l'élève la retrouve en révision. Même règle que pour une figure : photo distante déclarée dans `images.json` (l'appli la rapatrie et réécrit `src` en `../images/…`), `alt` qui dit ce qu'on voit. Une image mal formée est ignorée, la question reste. Pour un schéma en SVG, utilise plutôt la figure de la page, avec `figure`.
+  - `figure` (facultatif) : l'`id` d'une figure du Kit de la même page (voir « Figure »), par exemple `"figure": "schema-volcan"`. Mets-le sur chaque question qui oblige à regarder ce visuel : sous l'énoncé, un bouton « 👁 Revoir le schéma » (ou « Revoir la photo », « Revoir la carte »… d'après la légende, sinon « Revoir ») déplie une copie de la figure et de sa légende, puis la replie, sans faire défiler la page. Plusieurs questions peuvent désigner la même figure. Un `id` mal formé, ou qui ne désigne aucune figure du Kit de la page, est ignoré : la question s'affiche sans bouton. Si une question porte à la fois `image` et `figure`, `figure` l'emporte : l'image ne s'affiche que si la figure est introuvable. L'énoncé nomme le visuel (« Regarde le schéma… ») et ne dit jamais « ci-dessus » : la question revient aussi en révision, loin de la page.
 
 Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
-Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, la `figure` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
 
 ## Formats de rappel actif
 
@@ -227,13 +228,13 @@ Il affiche les questions dans leur format, mélange les réponses (ou les mots, 
 
 ## Figure
 
-Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Mets-le dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source et licence).
+Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Mets-le dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source et licence). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur chaque question du quiz qui oblige à la regarder (voir « Format du quiz ») : l'élève peut la revoir depuis la question. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… ») : le bouton « Revoir » le reprend.
 
 ```html
-<figure class="kit-figure">
+<figure class="kit-figure" id="stromboli">
   <img src="https://upload.wikimedia.org/wikipedia/commons/…/Volcan.jpg" alt="Le Stromboli en éruption, de nuit">
   <figcaption>
-    Le Stromboli projette de la lave par son cratère.
+    Photo : le Stromboli projette de la lave par son cratère.
     <small class="kit-credit">Wikimedia Commons, Jean Dupont, CC BY-SA 4.0</small>
   </figcaption>
 </figure>

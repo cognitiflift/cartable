@@ -7,6 +7,7 @@ import { lireQuiz, messageScore } from './quiz-logique.js';
 import { el, rendreQuestion } from './question.js';
 import { lectureActivee } from './lecture-logique.js';
 import { ajouterLecturePage } from './lecture.js';
+import { copieDeFigure } from './figure.js';
 
 function demarrer() {
   // Lecture à voix haute (#76), si le Profil de l'Élève l'active : un bouton pour la page, un par question.
@@ -56,6 +57,8 @@ function demarrer() {
     zone.append(rendreQuestion(q, {
       legende: q.bonus ? '🚀 Bonus · ' : `${++numero}. `,
       lecture,
+      // Figure de la page désignée par la question (spec #123) : une copie par question ; un id introuvable est ignoré.
+      figure: copieDeFigure(document, q.figure),
       quandCorrigee: ({ choisie, sur }) => {
         choix[q.id] = choisie;
         if (typeof sur === 'boolean') confiance[q.id] = sur;

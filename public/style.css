@@ -298,7 +298,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .ligne-badge .troncon.fait { background:var(--doux); }
 .ligne-badge .troncon.en-cours { background:linear-gradient(90deg, var(--doux) var(--avance), var(--troncon) var(--avance)); }
 .ligne-badge .station.atteinte { border-color:var(--palier); }
-.ligne-badge .station.ici { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--palier); }
+.ligne-badge .station.ici { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--doux); } /* le Palier visé : halo neutre, la couleur reste au Palier gagné */
 .station-nom { position:absolute; top:calc(100% + .5rem); left:50%; transform:translateX(-50%); display:grid; justify-items:center; color:var(--doux); font-size:.92rem; line-height:1.25; white-space:nowrap; }
 .station.atteinte .station-nom { color:var(--texte); font-weight:700; }
 .station-nom small { font-weight:400; color:var(--doux); }

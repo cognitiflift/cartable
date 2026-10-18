@@ -2733,6 +2733,15 @@ test('Formats de rappel actif : la consigne demande au moins une question de rap
   }
 });
 
+test('Remettre dans l\'ordre : le Kit le réserve aux suites à un seul ordre juste, une fois par quiz au plus, hors Pré-test', async () => {
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  const section = doc.slice(doc.indexOf('### Remettre dans l\'ordre'), doc.indexOf('### Exemple à étapes'));
+  assert.match(section, /un seul ordre est juste et vérifiable dans la page/);
+  assert.match(section, /liste de conseils[^\n]*"classer"[^\n]*"associer"/);
+  assert.match(section, /au plus une question "ordre" par quiz/i);
+  assert.match(section, /pas dans le Pré-test/i);
+});
+
 // Mathématiques (spec #48, ticket #73) : exemple travaillé à étapes à compléter.
 const quizEtapes = {
   objectifs: [1],

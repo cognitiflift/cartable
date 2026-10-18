@@ -109,7 +109,11 @@ Pour le vocabulaire et les définitions. L'élève complète la phrase en toucha
 
 ### Remettre dans l'ordre : `"type": "ordre"`
 
-Pour les étapes d'un processus, les événements d'une histoire ou les mots d'une phrase. Le Kit mélange les éléments ; l'élève les remet dans l'ordre en les déplaçant.
+Seulement pour une suite dont **un seul ordre est juste et vérifiable dans la page** : une chronologie datée, les événements d'un récit, les étapes d'un processus ou d'une méthode où chaque étape dépend de la précédente. Le Kit mélange les éléments ; l'élève les remet dans l'ordre en les déplaçant.
+
+- Jamais pour une liste de conseils, de gestes ou d'options dont l'ordre se discute (« ce qu'on peut faire quand son frère embête ») : l'élève serait compté faux pour un ordre qui se défend. Prends alors `"classer"` ou `"associer"`, ou un QCM « que fais-tu d'abord ? ».
+- Au plus une question "ordre" par quiz, et pas dans chaque quiz : varie les formats d'une page à l'autre de la Leçon. Une question "ordre" ne reprend pas les mêmes éléments qu'une question "ordre" d'une page précédente.
+- Pas dans le Pré-test : pour trois questions à deviner, prends un QCM ou `"classer"`.
 
 ```json
 {

@@ -36,6 +36,22 @@ export function colonnesPropositions(nombre, maximum) {
   return 1;
 }
 
+// Confirmation des photos ou PDF choisis pour « Réviser une leçon de classe », d'après leurs noms dans l'ordre choisi.
+export function confirmationFichiers(noms) {
+  return `${noms.length} ${noms.length > 1 ? 'pages' : 'page'} : ${noms.join(', ')}`;
+}
+
+// Messages de validation des deux voies, dits par l'appli à côté du formulaire, à la place de la bulle du navigateur.
+export const FICHIERS_MANQUANTS = 'Choisis au moins une photo ou un PDF de ta leçon';
+
+// Message pour le sujet tapé (espaces autour ignorés, comme le serveur), ou `null` s'il convient.
+export function messageSujet(texte, sujetMax) {
+  const sujet = texte.trim();
+  if (!sujet) return 'Dis-moi ce que tu veux apprendre';
+  if (sujet.length > sujetMax) return `Ton sujet est trop long (${sujetMax} caractères au plus)`;
+  return null;
+}
+
 // Question du Cadrage telle que l'écran la pose (#118). `question` est celle que le serveur sert pour `cle` ;
 // avec un `sujet` connu (sujet tapé ou titre d'une Proposition), elle le nomme. En révision d'une leçon de classe,
 // le sujet n'est pas encore connu : la question reste celle du serveur. Les réponses et les valeurs ne changent pas.

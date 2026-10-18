@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage } from '../public/nouvelle-lecon-texte.js';
+import { confirmationFichiers, messageSujet, FICHIERS_MANQUANTS } from '../public/nouvelle-lecon-texte.js';
 
 test('Idées prêtes avec des cartes : aucun texte d\'état, « D\'autres idées » proposé', () => {
   assert.deepEqual(sectionIdees({ etat: 'prêtes', nombreCartes: 4 }), { autresIdees: true });
@@ -79,6 +80,32 @@ test('Grille : de 2 à 10 Propositions (réglage du Profil), aucune carte seule 
       if (colonnes > 1) assert.ok(!rangees(nombre, colonnes).includes(1), `${nombre} cartes sur ${colonnes} colonnes`);
     }
   }
+});
+
+test('Confirmation des fichiers : une seule page, avec son nom', () => {
+  assert.equal(confirmationFichiers(['cahier.jpg']), '1 page : cahier.jpg');
+});
+
+test('Confirmation des fichiers : plusieurs pages, leur nombre puis leurs noms dans l\'ordre choisi', () => {
+  assert.equal(confirmationFichiers(['page1.jpg', 'page2.jpg', 'lecon.pdf']), '3 pages : page1.jpg, page2.jpg, lecon.pdf');
+});
+
+test('Sujet vide ou fait d\'espaces : « Dis-moi ce que tu veux apprendre »', () => {
+  assert.equal(messageSujet('', 80), 'Dis-moi ce que tu veux apprendre');
+  assert.equal(messageSujet('   ', 80), 'Dis-moi ce que tu veux apprendre');
+});
+
+test('Sujet trop long : le message donne la longueur maximale', () => {
+  assert.equal(messageSujet('a'.repeat(81), 80), 'Ton sujet est trop long (80 caractères au plus)');
+});
+
+test('Sujet correct, même à la longueur maximale : aucun message', () => {
+  assert.equal(messageSujet('les volcans', 80), null);
+  assert.equal(messageSujet(` ${'a'.repeat(80)} `, 80), null);
+});
+
+test('Révision sans fichier : un message qui demande au moins une photo ou un PDF, en tutoiement', () => {
+  assert.equal(FICHIERS_MANQUANTS, 'Choisis au moins une photo ou un PDF de ta leçon');
 });
 
 // Cadrage (#118) : la question nomme le sujet quand il est connu ; les questions du serveur restent la référence.

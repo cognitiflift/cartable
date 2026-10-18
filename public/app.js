@@ -2,6 +2,7 @@ import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage } from '/nouvelle-lecon-texte.js';
+import { confirmationFichiers, messageSujet, FICHIERS_MANQUANTS } from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -617,10 +618,19 @@ function ecranNouvelleLecon(profil) {
     }
   };
 
-  const sujet = h('input', { required: true, maxLength: config.sujetMax, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
-  const fichiers = h('input', { type: 'file', required: true, multiple: true, accept: '.pdf,image/*' });
+  // Pas de validation native (bulle du navigateur, pas forcément en français) : l'appli dit ses messages, à côté du formulaire.
+  const sujet = h('input', { id: 'sujet', placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
+  const fichiers = h('input', { id: 'fichiers', type: 'file', multiple: true, accept: '.pdf,image/*' });
   const dateControle = h('input', { type: 'date' });
-  boutons.push(h('button', {}, 'Commencer'), h('button', {}, 'Réviser'));
+  const erreurRevision = h('p', { className: 'erreur', role: 'alert' });
+  const erreurSujet = h('p', { className: 'erreur', role: 'alert' });
+  // Après le choix des photos, l'écran confirme les pages prises.
+  const pagesChoisies = h('p', { className: 'doux', role: 'status' });
+  fichiers.onchange = () => {
+    pagesChoisies.textContent = fichiers.files.length ? confirmationFichiers([...fichiers.files].map((f) => f.name)) : '';
+    erreurRevision.textContent = '';
+  };
+  boutons.push(h('button', {}, "C'est parti"), h('button', {}, 'Réviser'));
 
   // Propositions préparées en arrière-plan : on les lit sans attendre l'agent, et on revient voir tant qu'elles se préparent.
   const idees = h('div', {});
@@ -675,29 +685,56 @@ function ecranNouvelleLecon(profil) {
     app.removeEventListener('focusin', memoriser, true);
   };
 
+  // Les deux autres voies sont repliées sous les Propositions : un bouton secondaire déplie son formulaire,
+  // un seul à la fois, et le même bouton le replie.
+  const voies = [
+    { id: 'voie-revision', libelle: '📄 Réviser une leçon de classe', champ: fichiers,
+      formulaire: h('form', { className: 'colonne', noValidate: true, onsubmit: (ev) => {
+        ev.preventDefault();
+        if (!fichiers.files.length) return (erreurRevision.textContent = FICHIERS_MANQUANTS);
+        erreurRevision.textContent = '';
+        demarrer(async () => ({
+          dateControle: dateControle.value || undefined,
+          fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
+        }), 'revision', 'revision');
+      } },
+      h('label', { htmlFor: 'fichiers' }, 'Photos ou PDF de ta leçon (plusieurs pages possibles)'), fichiers, pagesChoisies,
+      h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
+      boutons[1], erreurRevision) },
+    { id: 'voie-sujet', libelle: '💡 Un sujet à moi', champ: sujet,
+      formulaire: h('form', { className: 'colonne', noValidate: true, onsubmit: (ev) => {
+        ev.preventDefault();
+        // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+        const message = messageSujet(sujet.value, config.sujetMax);
+        erreurSujet.textContent = message ?? '';
+        if (message) return sujet.focus();
+        const texte = sujet.value.trim();
+        demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`, texte);
+      } }, h('label', { htmlFor: 'sujet' }, 'Ce que tu veux apprendre'), sujet, boutons[0], erreurSujet) },
+  ];
+  for (const voie of voies) {
+    voie.bouton = h('button', { className: 'secondaire', ariaExpanded: 'false', onclick: () => deplier(voie) }, voie.libelle);
+    voie.bouton.setAttribute('aria-controls', voie.id);
+    voie.panneau = h('section', { id: voie.id, className: 'carte voie', hidden: true, ariaLabel: voie.libelle }, voie.formulaire);
+  }
+  const deplier = (choisie) => {
+    for (const voie of voies) {
+      const ouverte = voie === choisie && voie.panneau.hidden;
+      voie.panneau.hidden = !ouverte;
+      voie.bouton.ariaExpanded = String(ouverte);
+      if (ouverte) voie.champ.focus();
+    }
+  };
+
+  document.title = 'Une nouvelle ligne · Cartable';
   montrer(
+    h('div', { className: 'nouvelle-tete' },
+      h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
+      h('h2', {}, 'Une nouvelle ligne')),
     idees,
     h('div', { className: 'nouvelle-voies' },
-      h('section', { className: 'carte' }, h('h2', {}, '📄 Réviser une leçon de classe'),
-        h('form', { className: 'colonne', onsubmit: (ev) => {
-          ev.preventDefault();
-          demarrer(async () => ({
-            dateControle: dateControle.value || undefined,
-            fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-          }), 'revision', 'revision');
-        } },
-        h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
-        h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
-        boutons[1])),
-      h('section', { className: 'carte' }, h('h2', {}, '💡 Apprendre ce que tu veux'),
-        h('form', { className: 'colonne', onsubmit: (ev) => {
-          ev.preventDefault();
-          // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
-          const texte = sujet.value.trim();
-          if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
-          if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
-          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`, texte);
-        } }, h('label', {}, 'Ce que tu veux apprendre', h('br'), sujet), boutons[0]))),
+      h('div', { className: 'voies-boutons' }, voies.map((v) => v.bouton)),
+      voies.map((v) => v.panneau)),
     erreur);
 }
 
@@ -859,6 +896,7 @@ async function route() {
   quitterEcran();
   arreterLecture(); // une lecture à voix haute des Révisions du jour s'arrête en changeant d'écran
   quitterEcran = () => {};
+  document.title = 'Cartable'; // un écran qui a son propre titre le pose lui-même
   try {
     config ??= await api('config');
     const [, page, id, sousPage] = location.hash.split('/');

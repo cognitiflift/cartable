@@ -52,6 +52,22 @@ export function messageSujet(texte, sujetMax) {
   return null;
 }
 
+// Carte d'attente, pendant que le prof prépare la Leçon après le Cadrage. `sujet` : sujet tapé ou titre de la
+// Proposition, s'il est connu ; `mode` : 'libre' ou 'revision' (le sujet ne se connaît qu'après la lecture du document).
+// Renvoie { titre, duree, ensuite } ; la suite annoncée est le Pré-test, dans les deux modes.
+export function carteAttente({ sujet, mode }) {
+  const nom = sujet?.trim();
+  const titre = mode === 'revision' ? 'Ton prof lit ta leçon de classe et la prépare…'
+    : nom ? `Ton prof prépare « ${nom} »…` : 'Ton prof prépare ta leçon…';
+  return { titre, duree: 'Ça peut prendre quelques minutes.', ensuite: 'Ensuite : quelques questions pour deviner ce que tu sais déjà.' };
+}
+
+// Carte d'erreur, à la place de la carte d'attente quand la préparation échoue : le message du serveur, en mots simples,
+// ou un message qui dit quoi faire quand il n'en donne pas. Renvoie { titre, message }.
+export function carteErreur({ message }) {
+  return { titre: "Ta leçon n'a pas pu se préparer", message: message?.trim() || "Ce n'est pas de ta faute. Tu peux réessayer, ou choisir autre chose." };
+}
+
 // Question du Cadrage telle que l'écran la pose (#118). `question` est celle que le serveur sert pour `cle` ;
 // avec un `sujet` connu (sujet tapé ou titre d'une Proposition), elle le nomme. En révision d'une leçon de classe,
 // le sujet n'est pas encore connu : la question reste celle du serveur. Les réponses et les valeurs ne changent pas.

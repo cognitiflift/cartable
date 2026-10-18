@@ -252,6 +252,22 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .cadrage-choix { display:flex; flex-direction:column; gap:.5rem; }
 .cadrage-choix button { min-height:2.75rem; padding:.6rem 1rem; border-radius:12px; text-align:left; }
 .cadrage .annuler { position:absolute; top:.9rem; right:.9rem; width:2.75rem; height:2.75rem; padding:0; }
+/* Attente du prof : une carte posée au centre sur le voile, à la pose de carte de ligne, jamais rouge. La nouvelle
+   ligne y est « en travaux » et ses pointillés avancent tant que le prof prépare. La carte d'erreur prend sa place. */
+.nouvelle-voile { position:fixed; inset:0; z-index:10; display:flex; padding:1rem; overflow-y:auto; background:var(--voile); }
+.nouvelle-voile[hidden] { display:none; }
+.carte-attente { display:flex; flex-direction:column; gap:.8rem; width:min(34rem, 100%); margin:auto; padding:1.4rem 1.5rem 1.5rem; border-radius:18px; box-shadow:var(--ombre-carte); }
+.carte-attente:focus { outline:none; }
+.carte-attente h2 { margin:0; font-size:1.45rem; line-height:1.15; text-wrap:balance; overflow-wrap:anywhere; }
+.carte-attente p { margin:0; }
+.carte-attente .ligne { margin:.2rem 0; }
+.carte-attente .ligne.en-travaux::before { animation:travaux-avancent 1.4s linear infinite; }
+@keyframes travaux-avancent { to { background-position:1.5rem 0; } }
+.attente-ensuite { font-weight:700; }
+.attente-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1.2rem; margin-top:.3rem; }
+.attente-actions button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }
+.attente-actions .retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
+.carte-attente.echec h2 { color:var(--rouge); }
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }

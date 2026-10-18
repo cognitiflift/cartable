@@ -176,7 +176,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 }
 
 // Fin d'un tour du prof, dont les fichiers sont déjà dans la Leçon (`pagesAvant` : ses pages avant le tour) : images,
-// questions ignorées, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
+// questions ignorées, schémas à reprendre, réponse et coût enregistrés. Sert aussi à la page préparée retenue.
 // Une Leçon libre qui avait des Objectifs et en a davantage après le tour a été élargie (le prof a ajouté des Objectifs
 // à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
 // L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :

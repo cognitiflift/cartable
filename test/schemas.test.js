@@ -53,6 +53,20 @@ test('Schémas : une couleur fill ou stroke en dur est relevée ; currentColor, 
   }
 });
 
+test('Schémas : un schéma haut est rétréci par la hauteur maximale de la figure (70 % d\'un écran de 640 px)', () => {
+  assert.deepEqual(raisons(page('<svg viewBox="0 0 340 600"><text font-size="16" fill="currentColor">Haut</text></svg>')), ['texte-trop-petit']);
+  assert.deepEqual(raisons(page('<svg viewBox="0 0 340 440"><text font-size="16" fill="currentColor">Assez court</text></svg>')), []);
+});
+
+test('Schémas : une couleur en dur cachée derrière un dégradé, un repli de var() ou la couleur de currentColor est relevée', () => {
+  for (const svg of [
+    '<defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/></linearGradient></defs><rect fill="url(#g)"/>',
+    '<rect fill="var(--kit-accent, red)"/>',
+  ]) assert.deepEqual(raisons(page(`<svg viewBox="0 0 300 200">${svg}</svg>`)), ['couleur-en-dur'], svg);
+  assert.deepEqual(raisons(page('<svg viewBox="0 0 300 200" color="red"><rect fill="currentColor"/></svg>')), ['couleur-en-dur']);
+  assert.deepEqual(raisons(page('<svg viewBox="0 0 300 200"><stop stop-color="var(--kit-accent)"/></svg>')), []);
+});
+
 test('Schémas : un SVG hors d\'une figure du Kit n\'est pas examiné ; les figures sans id gardent leur rang', () => {
   assert.deepEqual(problemesDesSchemas('<svg viewBox="0 0 640 200"><text font-size="8" fill="#d33" font-family="serif">x</text></svg>'), []);
   assert.deepEqual(problemesDesSchemas('<figure><svg viewBox="0 0 640 200"><text font-size="8">x</text></svg></figure>'), []);

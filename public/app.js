@@ -1,6 +1,7 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import { sectionIdees, ECHEC_LECTURE } from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -610,15 +611,16 @@ function ecranNouvelleLecon(profil) {
 
   // Propositions préparées en arrière-plan : on les lit sans attendre l'agent, et on revient voir tant qu'elles se préparent.
   const idees = h('div', {});
+  // Un seul texte d'état, gardé d'un affichage à l'autre : il n'est annoncé que quand il change, pas à chaque relecture.
+  const etatIdees = h('p', { className: 'doux', role: 'status' });
   let minuteur, actif = true;
   // Les anciennes Propositions restent affichées et cliquables pendant qu'on en prépare de nouvelles.
   const afficherPropositions = async () => {
     clearTimeout(minuteur);
     let etat, propositions;
-    try { ({ etat, propositions } = await api(`eleves/${profil.slug}/propositions`)); } catch { return idees.replaceChildren(); }
+    try { ({ etat, propositions } = await api(`eleves/${profil.slug}/propositions`)); } catch { etat = ECHEC_LECTURE; propositions = []; }
     if (!actif) return;
-    const enPreparation = etat === 'en préparation';
-    if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
+    if (etat === 'en préparation') minuteur = setTimeout(afficherPropositions, 3000);
     // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
     // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
     const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
@@ -634,13 +636,16 @@ function ecranNouvelleLecon(profil) {
       await api(`eleves/${profil.slug}/propositions`, { method: 'POST' }).catch(() => {});
       afficherPropositions();
     } }, "🔄 D'autres idées");
-    boutonsIdees = [...cartes, autresIdees];
-    idees.replaceChildren(
+    // Ce que la section dit vient du module des textes ; tous ses enfants passent par `garder`, jamais de « false ».
+    const section = sectionIdees({ etat, nombreCartes: cartes.length });
+    if (etatIdees.textContent !== (section.texte ?? '')) etatIdees.textContent = section.texte ?? '';
+    etatIdees.hidden = !section.texte;
+    boutonsIdees = section.autresIdees ? [...cartes, autresIdees] : cartes;
+    idees.replaceChildren(...garder([
       h('h2', {}, '🎲 Des idées pour toi'),
       cartes.length > 0 && h('div', { className: 'propositions' }, cartes),
-      enPreparation
-        ? h('p', { className: 'doux' }, cartes.length ? '⏳ Nouvelles idées en préparation…' : 'On prépare tes idées…')
-        : autresIdees);
+      etatIdees,
+      section.autresIdees && autresIdees]));
   };
   afficherPropositions();
   quitterEcran = () => { actif = false; clearTimeout(minuteur); };

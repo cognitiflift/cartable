@@ -328,6 +328,13 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .calendrier-detail { display:flex; flex-direction:column; gap:.35rem; padding-top:.8rem; border-top:1px dashed var(--bord); line-height:1.35; }
 .calendrier-detail strong { font-size:1.05rem; }
 .calendrier-detail p { margin:0; }
+.jour.avant .tampon { border-color:transparent; color:color-mix(in srgb, var(--doux) 75%, var(--carte)); }
+.calendrier-legende { display:flex; flex-wrap:wrap; gap:.3rem 1rem; margin:.7rem 0 0; color:var(--doux); font-size:.92rem; }
+.calendrier-legende .jour { display:inline-flex; align-items:center; gap:.4rem; }
+.calendrier-legende .tampon { width:1.15rem; height:1.15rem; }
+.calendrier-legende .tampon .joker { top:-.35rem; right:-.5rem; }
+.calendrier-legende .jour.vide { gap:.8rem; }
+.accueil-badges { margin:0 0 1rem; font-weight:700; }
 .calendrier-detail { overflow-wrap:anywhere; }
 .lecons-du-jour { list-style:none; margin:0; padding:0; display:grid; gap:.15rem; }
 .gains-du-jour { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .8rem; }

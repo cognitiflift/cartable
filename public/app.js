@@ -320,9 +320,12 @@ const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atte
 // Un jour en tampon, seule façon de dessiner un jour : le bandeau de la semaine et le calendrier de Mes badges.
 // Une journée : { jour, etat, joker, gains… }, celle du calendrier du serveur ou jourSansRien. classeJour porte l'état
 // (vide, pâle, plein), aujourd'hui et futur ; lectureJour le dit en mots, le tampon étant muet.
-const classeJour = ({ jour, etat }, aujourdhui) => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}`;
-const lectureJour = (nom, { jour, etat, joker }, aujourdhui) => [nom, jour === aujourdhui && "aujourd'hui", ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
-const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), joker && h('span', { className: 'joker' }, '🛡️'));
+// `debut` (calendrier de Mes badges) : le premier Jour de l'Élève ; un jour d'avant est neutre (« avant »), sans le
+// contour en tirets d'un jour vide, pour ne pas se lire comme un jour manqué.
+const classeJour = ({ jour, etat }, aujourdhui, debut = '') => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}${jour < debut ? ' avant' : ''}`;
+const lectureJour = (nom, { jour, etat, joker }, aujourdhui, debut = '') => [nom, jour === aujourdhui && "aujourd'hui", jour < debut ? 'avant ton premier jour' : ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
+// Sans `jour`, un tampon muet : la légende du calendrier.
+const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'));
 
 function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
@@ -365,7 +368,9 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
 const pastilleBadge = ({ emoji, palier }, attrs = {}) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore', ...attrs }, emoji);
-const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+// L'année n'est écrite que quand ce n'est pas celle d'aujourd'hui.
+const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE',
+  { day: 'numeric', month: 'long', ...(jour.slice(0, 4) !== String(new Date().getFullYear()) && { year: 'numeric' }) });
 const dateCourte = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' });
 
 // La ligne d'un Badge : ses Paliers en sont les stations (`station`), cerclées de la couleur de leur Palier une fois
@@ -409,7 +414,7 @@ async function ecranBadges(profil) {
       h('h2', {}, 'Mes badges'),
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
         `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`)),
-    accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
+    accueil && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
     h('div', { className: 'badges-corps' },
       calendrierJours(calendrier),
       h('section', { className: 'collection', ariaLabel: 'Ma collection' },
@@ -437,7 +442,8 @@ const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], 
 function calendrierJours({ aujourdhui, jours }) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
-  const premier = (jours[0]?.jour ?? aujourdhui).slice(0, 7);
+  const debut = jours[0]?.jour ?? aujourdhui; // premier jour de l'Élève dans le calendrier
+  const premier = debut.slice(0, 7);
   const dernier = aujourdhui.slice(0, 7);
   let mois = dernier;
   const bloc = h('section', { className: 'mon-calendrier', ariaLabel: 'Mon calendrier' });
@@ -475,15 +481,18 @@ function calendrierJours({ aujourdhui, jours }) {
             const journee = duJour(jour);
             const nom = `${JOURS_ENTIERS[(new Date(`${jour}T12:00:00`).getDay() + 6) % 7]} ${Number(jour.slice(8))} ${MOIS[m - 1]}`;
             const bouton = h('button', {
-              className: `${classeJour(journee, aujourdhui)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
-              ariaLabel: lectureJour(nom, journee, aujourdhui),
+              className: `${classeJour(journee, aujourdhui, debut)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
+              ariaLabel: lectureJour(nom, journee, aujourdhui, debut),
               ariaPressed: String(jour === choisi),
-              disabled: jour > aujourdhui,
+              disabled: jour > aujourdhui || jour < debut,
               onclick: () => afficher(jour),
             }, tamponJour(journee));
             if (jour === choisi) aFocaliser = bouton;
             return bouton;
-          }))),
+          })),
+        h('p', { className: 'calendrier-legende' },
+          [['pale', 'travaillé'], ['plein', 'Objectif du jour atteint'], ['vide', 'joker', true]].map(([etat, mot, joker]) =>
+            h('span', { className: `jour ${etat}` }, tamponJour({ joker }), mot)))),
       h('div', { className: 'calendrier-detail', ariaLive: 'polite' },
         choisi ? detail(duJour(choisi)) : h('p', { className: 'doux' }, 'Touche un jour pour voir ce que tu as fait et gagné.')));
     if (focaliser) aFocaliser?.focus();

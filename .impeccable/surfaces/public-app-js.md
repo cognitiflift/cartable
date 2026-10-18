@@ -22,7 +22,7 @@ OWN-WORLD: plan du réseau STIB. En-tête bleu nuit (#14182b) ; fond gris clair 
 
 STORY: l'Élève voit ses lignes, repère celle où il en était, lit sa prochaine station et touche Continuer. Il voit sa semaine tamponnée et son total d'Étoiles sans qu'ils lui volent la vedette.
 
-FIRST VIEWPORT: en-tête bleu nuit : 🎒 Cartable, puis à droite le badge ⭐ total (→ Mes badges), Profil et Changer. Dessous, le bandeau de la semaine, lundi→dimanche : un tampon par jour (vide, pâle, plein, 🛡️), avec les ⭐ 🚀 et Badges du jour ; à droite, l'Objectif du jour, la série et les Révisions du jour (bouton plein s'il y a des Questions dues). Puis « Mes leçons » et, à droite, « ✨ Apprendre quelque chose de nouveau ». Puis les Catégories en cartes de ligne, deux colonnes sur grand écran : nom de la Leçon, palier de Maîtrise, ligne et stations, terminus, prochaine station, Étoiles et Fusées, Continuer, déplier les Objectifs.
+FIRST VIEWPORT: en-tête bleu nuit : 🎒 Cartable, puis à droite le badge ⭐ total (→ Mes badges), Profil et Changer. Dessous, le bandeau de la semaine, lundi→dimanche : un tampon par jour (vide, pâle, plein, 🛡️), avec les ⭐ 🚀 et Badges du jour ; à droite, l'Objectif du jour, la série et les Révisions du jour (contour accent et pastille de compte s'il y a des Questions dues). Puis « Mes leçons » et, à droite, « ✨ Apprendre quelque chose de nouveau ». Puis les Catégories en cartes de ligne, deux colonnes sur grand écran : nom de la Leçon, palier de Maîtrise, ligne et stations, terminus, prochaine station, Étoiles et Fusées, Continuer, déplier les Objectifs.
 
 FORM: Plan du réseau, rang 1 de ma liste ordonnée (pick), avec ce que l'utilisateur a repris du Journal de classe (rang 3, tiré au sort) : le bandeau de la semaine. seed:bb990adead01b302
 

@@ -134,18 +134,18 @@
       },
       "accent": {
         "role": "primary",
-        "displayName": "Bleu de l'accent",
-        "canonical": "#2747c9",
-        "oklch": "oklch(46.5% 0.204 266.9)",
+        "displayName": "Indigo de l'accent",
+        "canonical": "#262a7a",
+        "oklch": "oklch(33.7% 0.133 274.5)",
         "tonalRamp": [
-          "#010133",
-          "#080477",
-          "#1529ac",
-          "#2e50d3",
-          "#4b75fa",
-          "#7fa1f9",
-          "#b3c9fb",
-          "#e7eeff"
+          "#060032",
+          "#191565",
+          "#323a8b",
+          "#505db1",
+          "#7181d9",
+          "#96a7fe",
+          "#c3cefe",
+          "#eef1fe"
         ]
       },
       "sur-accent": {
@@ -542,18 +542,18 @@
       },
       "accent-sombre": {
         "role": "primary",
-        "displayName": "Bleu de l'accent (sombre)",
-        "canonical": "#8aa2ff",
-        "oklch": "oklch(73.3% 0.138 271.7)",
+        "displayName": "Indigo de l'accent (sombre)",
+        "canonical": "#b9c3ff",
+        "oklch": "oklch(83.0% 0.085 277.0)",
         "tonalRamp": [
-          "#040130",
-          "#131466",
-          "#2a378a",
-          "#4758ae",
-          "#667bd4",
-          "#879efb",
-          "#b7c7fc",
-          "#e9eefe"
+          "#070031",
+          "#1c185f",
+          "#373b83",
+          "#565da9",
+          "#7781d1",
+          "#9ba6f9",
+          "#c5cefe",
+          "#eef1fe"
         ]
       },
       "sur-accent-sombre": {
@@ -1026,7 +1026,7 @@
       "refersTo": "bouton-plein",
       "description": "L'action principale d'un écran (Révisions du jour quand des Questions sont dues).",
       "html": "<button class=\"ds-bouton\">Mes révisions du jour</button>",
-      "css": ".ds-bouton{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:700;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--accent,#2747c9);background:var(--accent,#2747c9);color:var(--sur-accent,#fff);cursor:pointer;transition:background .15s}.ds-bouton:hover{background:color-mix(in srgb,var(--accent,#2747c9) 88%,var(--texte,#14182b))}.ds-bouton:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+      "css": ".ds-bouton{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:700;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--accent,#262a7a);background:var(--accent,#262a7a);color:var(--sur-accent,#fff);cursor:pointer;transition:background .15s}.ds-bouton:hover{background:color-mix(in srgb,var(--accent,#262a7a) 88%,var(--texte,#14182b))}.ds-bouton:focus-visible{outline:3px solid var(--accent,#262a7a);outline-offset:2px}"
     },
     {
       "name": "Bouton secondaire",
@@ -1034,7 +1034,7 @@
       "refersTo": "bouton-secondaire",
       "description": "Les actions de second rang, et les boutons de l'en-tête (variante sur nuit).",
       "html": "<button class=\"ds-secondaire\">Mon profil</button>",
-      "css": ".ds-secondaire{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--bord,#dde1ea);background:var(--carte,#fff);color:var(--texte,#14182b);cursor:pointer;transition:background .15s}.ds-secondaire:hover{background:color-mix(in srgb,var(--texte,#14182b) 6%,var(--carte,#fff))}.ds-secondaire:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+      "css": ".ds-secondaire{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--bord,#dde1ea);background:var(--carte,#fff);color:var(--texte,#14182b);cursor:pointer;transition:background .15s}.ds-secondaire:hover{background:color-mix(in srgb,var(--texte,#14182b) 6%,var(--carte,#fff))}.ds-secondaire:focus-visible{outline:3px solid var(--accent,#262a7a);outline-offset:2px}"
     },
     {
       "name": "Continuer (bouton de ligne)",
@@ -1042,15 +1042,23 @@
       "refersTo": "bouton-ligne",
       "description": "Le bouton Continuer d'une carte de ligne, à la couleur foncée de sa Catégorie.",
       "html": "<a class=\"ds-bouton-ligne\" href=\"#\" style=\"--ligne:#2f6fed\">Continuer</a>",
-      "css": ".ds-bouton-ligne{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem 1.15rem;border-radius:12px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-weight:800;text-decoration:none;transition:filter .15s,transform .15s}.ds-bouton-ligne:hover{filter:brightness(1.1)}.ds-bouton-ligne:active{transform:translateY(1px)}.ds-bouton-ligne:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+      "css": ".ds-bouton-ligne{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem 1.15rem;border-radius:12px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-weight:800;text-decoration:none;transition:filter .15s,transform .15s}.ds-bouton-ligne:hover{filter:brightness(1.1)}.ds-bouton-ligne:active{transform:translateY(1px)}.ds-bouton-ligne:focus-visible{outline:3px solid var(--accent,#262a7a);outline-offset:2px}"
     },
     {
       "name": "Apprendre quelque chose de nouveau",
       "kind": "button",
       "refersTo": "bouton-nouvelle",
-      "description": "L'appel à ouvrir une nouvelle Leçon, en bleu nuit de la marque.",
-      "html": "<button class=\"ds-nouvelle\">Apprendre quelque chose de nouveau</button>",
-      "css": ".ds-nouvelle{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:700;padding:.7rem 1.1rem;border-radius:12px;border:1px solid #14182b;background:#14182b;color:#fff;cursor:pointer;transition:background .15s}.ds-nouvelle:hover{background:color-mix(in srgb,#14182b 85%,#fff)}.ds-nouvelle:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+      "description": "Une action en retrait : texte accent, sans fond ni filet ; pleine seulement quand le réseau est vide.",
+      "html": "<button class=\"ds-nouvelle\">✨ Apprendre quelque chose de nouveau</button>",
+      "css": ".ds-nouvelle{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;font-weight:700;padding:.7rem 1.1rem;border-radius:12px;border:1px solid transparent;background:transparent;color:var(--accent,#262a7a);cursor:pointer;transition:background .15s}.ds-nouvelle:hover{background:color-mix(in srgb,var(--accent,#262a7a) 8%,transparent)}.ds-nouvelle:focus-visible{outline:3px solid var(--accent,#262a7a);outline-offset:2px}"
+    },
+    {
+      "name": "Révisions du jour avec pastille de compte",
+      "kind": "button",
+      "refersTo": "pastille-compte",
+      "description": "Contour accent de 2px quand des Questions sont dues, le compte en pastille accent au bout du titre ; jamais plein.",
+      "html": "<button class=\"ds-revisions\"><strong>Mes révisions du jour <span class=\"ds-compte\">3</span></strong><small>à revoir aujourd’hui</small></button>",
+      "css": ".ds-revisions{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;display:flex;flex-direction:column;align-items:flex-start;gap:.05rem;width:18rem;padding:.7rem 1rem;border-radius:12px;border:2px solid var(--accent,#262a7a);background:var(--carte,#fff);color:var(--texte,#14182b);text-align:left;cursor:pointer}.ds-revisions strong{display:flex;align-items:center;gap:.5rem;width:100%}.ds-revisions small{font-weight:400}.ds-compte{margin-left:auto;min-width:1.6rem;padding:.1rem .5rem;border-radius:999px;background:var(--accent,#262a7a);color:var(--sur-accent,#fff);font-size:.85rem;text-align:center;font-variant-numeric:tabular-nums}"
     },
     {
       "name": "Champ",
@@ -1058,7 +1066,7 @@
       "refersTo": "champ",
       "description": "Champ de saisie ou liste de choix (Profil, Vue parent).",
       "html": "<input class=\"ds-champ\" placeholder=\"Pseudo\">",
-      "css": ".ds-champ{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--bord,#dde1ea);background:var(--carte,#fff);color:var(--texte,#14182b)}.ds-champ:focus-visible{outline:3px solid var(--accent,#2747c9);outline-offset:2px}"
+      "css": ".ds-champ{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--bord,#dde1ea);background:var(--carte,#fff);color:var(--texte,#14182b)}.ds-champ:focus-visible{outline:3px solid var(--accent,#262a7a);outline-offset:2px}"
     },
     {
       "name": "En-tête",
@@ -1066,7 +1074,7 @@
       "refersTo": "en-tete",
       "description": "La bande bleu nuit commune : marque, compteur d'Étoiles, Élève, Profil, Changer et le bouton de thème (automatique, clair, sombre).",
       "html": "<header class=\"ds-tete\"><strong class=\"ds-marque\">🎒 Cartable</strong><nav class=\"ds-nav\"><a class=\"ds-etoiles\" href=\"#\"><span aria-hidden=\"true\">⭐</span> 12 <span class=\"ds-nouveau\">Nouveau</span></a><span class=\"ds-qui\">Robin · Primaire 6</span><button class=\"ds-tete-btn\">Mon profil</button><button class=\"ds-tete-btn\">Changer</button><button class=\"ds-tete-btn\" aria-label=\"Thème : automatique, comme l'appareil. Passer au thème clair\" title=\"Thème : automatique, comme l'appareil. Passer au thème clair\"><span aria-hidden=\"true\">🌗</span></button></nav></header>",
-      "css": ".ds-tete{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 1.5rem;background:#14182b;color:#fff}.ds-marque{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.35rem;line-height:1;letter-spacing:-.01em}.ds-nav{display:flex;align-items:center;gap:.5rem}.ds-qui{color:#c3c8db;margin:0 .3rem}.ds-etoiles{display:inline-flex;align-items:center;gap:.35rem;min-height:2.6rem;padding:.3rem .9rem;border-radius:999px;background:rgb(255 255 255/.12);color:#fff;font-weight:800;font-variant-numeric:tabular-nums;text-decoration:none;transition:background .15s}.ds-etoiles:hover{background:rgb(255 255 255/.2)}.ds-nouveau{padding:0 .45rem;font-size:.75rem;font-weight:700;border-radius:999px;background:#fbbf24;color:#14182b}.ds-tete-btn{font:inherit;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid rgb(255 255 255/.32);background:transparent;color:#fff;cursor:pointer}.ds-tete-btn:hover{background:rgb(255 255 255/.1)}.ds-tete-btn:focus-visible,.ds-etoiles:focus-visible{outline:3px solid #8aa2ff;outline-offset:2px}"
+      "css": ".ds-tete{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 1.5rem;background:#14182b;color:#fff}.ds-marque{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.35rem;line-height:1;letter-spacing:-.01em}.ds-nav{display:flex;align-items:center;gap:.5rem}.ds-qui{color:#c3c8db;margin:0 .3rem}.ds-etoiles{display:inline-flex;align-items:center;gap:.35rem;min-height:2.6rem;padding:.3rem .9rem;border-radius:999px;background:rgb(255 255 255/.12);color:#fff;font-weight:800;font-variant-numeric:tabular-nums;text-decoration:none;transition:background .15s}.ds-etoiles:hover{background:rgb(255 255 255/.2)}.ds-nouveau{padding:0 .45rem;font-size:.75rem;font-weight:700;border-radius:999px;background:#fbbf24;color:#14182b}.ds-tete-btn{font:inherit;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid rgb(255 255 255/.32);background:transparent;color:#fff;cursor:pointer}.ds-tete-btn:hover{background:rgb(255 255 255/.1)}.ds-tete-btn:focus-visible,.ds-etoiles:focus-visible{outline:3px solid #b9c3ff;outline-offset:2px}"
     },
     {
       "name": "Pastilles",
@@ -1082,7 +1090,7 @@
       "refersTo": "carte-ligne",
       "description": "Une Leçon : Niveau, nom, Maîtrise, la ligne et ses stations, le terminus, la prochaine station et Continuer.",
       "html": "<article class=\"ds-lecon\" style=\"--ligne:#2f6fed\"><div class=\"ds-lt\"><span class=\"ds-niveau\">Niveau 5</span><h4 class=\"ds-h\">Les fractions</h4><span class=\"ds-m\">Bien en tête</span></div><div class=\"ds-ligne\"><span class=\"ds-st ds-ret\"></span><span class=\"ds-tr ds-fait\"></span><span class=\"ds-st ds-att\"></span><span class=\"ds-tr ds-fait\"></span><span class=\"ds-st ds-conf ds-ici\"></span><span class=\"ds-tr\"></span><span class=\"ds-st ds-vide\"></span><span class=\"ds-tr\"></span><span class=\"ds-term\">Acquis</span></div><div class=\"ds-bas\"><p class=\"ds-p\"><span class=\"ds-lib\">Prochaine station : </span>Le quiz de ta page</p><a class=\"ds-go\" href=\"#\">Continuer</a></div></article>",
-      "css": ".ds-lecon{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;line-height:1.5;color:#14182b;display:flex;flex-direction:column;gap:.85rem;padding:1.05rem 1.25rem 1rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 1px 2px rgb(20 24 43/.06),0 6px 18px rgb(20 24 43/.05);max-width:34rem}.ds-lt{display:flex;align-items:flex-start;gap:.7rem}.ds-niveau{flex:none;margin-top:.15rem;padding:.36rem .5rem .26rem;border-radius:7px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.78rem;line-height:1;text-transform:uppercase;letter-spacing:.04em}.ds-h{flex:1;margin:0;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.3rem;line-height:1.2;letter-spacing:-.01em}.ds-m{margin-top:.2rem;font-size:.9rem;font-weight:800;color:#15803d}.ds-ligne{display:flex;align-items:center;min-height:2.3rem}.ds-tr{flex:1;min-width:.6rem;height:.55rem;margin:0 -.1rem;background:#dde1ea}.ds-fait{background:var(--ligne)}.ds-st{position:relative;z-index:1;flex:none;width:1.5rem;height:1.5rem;border-radius:50%;box-sizing:border-box}.ds-vide{width:1.15rem;height:1.15rem;margin:0 .175rem;background:#fff;border:.18rem solid #80879a}.ds-conf{background:repeating-linear-gradient(45deg,#80879a 0 .1rem,#fff .1rem .32rem);border:.18rem solid #80879a}.ds-att{background:#fff;border:.3rem solid #14182b}.ds-ret{background:#15803d;border:.3rem solid #15803d}.ds-ici{box-shadow:0 0 0 .2rem #fff,0 0 0 .42rem var(--ligne)}.ds-term{position:relative;z-index:1;flex:none;padding:.42rem .6rem .32rem;border-radius:8px;border:.18rem solid #80879a;background:#fff;color:#4f566c;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;box-shadow:0 0 0 .2rem #fff}.ds-bas{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1rem}.ds-p{flex:1 1 12rem;margin:0;line-height:1.3}.ds-lib{color:#4f566c;font-weight:600}.ds-go{display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem 1.15rem;border-radius:12px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-weight:800;text-decoration:none;transition:filter .15s}.ds-go:hover{filter:brightness(1.1)}.ds-go:focus-visible{outline:3px solid #2747c9;outline-offset:2px}"
+      "css": ".ds-lecon{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;font-size:17px;line-height:1.5;color:#14182b;display:flex;flex-direction:column;gap:.85rem;padding:1.05rem 1.25rem 1rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 1px 2px rgb(20 24 43/.06),0 6px 18px rgb(20 24 43/.05);max-width:34rem}.ds-lt{display:flex;align-items:flex-start;gap:.7rem}.ds-niveau{flex:none;margin-top:.15rem;padding:.36rem .5rem .26rem;border-radius:7px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.78rem;line-height:1;text-transform:uppercase;letter-spacing:.04em}.ds-h{flex:1;margin:0;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.3rem;line-height:1.2;letter-spacing:-.01em}.ds-m{margin-top:.2rem;font-size:.9rem;font-weight:800;color:#15803d}.ds-ligne{display:flex;align-items:center;min-height:2.3rem}.ds-tr{flex:1;min-width:.6rem;height:.55rem;margin:0 -.1rem;background:#dde1ea}.ds-fait{background:var(--ligne)}.ds-st{position:relative;z-index:1;flex:none;width:1.5rem;height:1.5rem;border-radius:50%;box-sizing:border-box}.ds-vide{width:1.15rem;height:1.15rem;margin:0 .175rem;background:#fff;border:.18rem solid #80879a}.ds-conf{background:repeating-linear-gradient(45deg,#80879a 0 .1rem,#fff .1rem .32rem);border:.18rem solid #80879a}.ds-att{background:#fff;border:.3rem solid #14182b}.ds-ret{background:#15803d;border:.3rem solid #15803d}.ds-ici{box-shadow:0 0 0 .2rem #fff,0 0 0 .42rem var(--ligne)}.ds-term{position:relative;z-index:1;flex:none;padding:.42rem .6rem .32rem;border-radius:8px;border:.18rem solid #80879a;background:#fff;color:#4f566c;font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;box-shadow:0 0 0 .2rem #fff}.ds-bas{display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1rem}.ds-p{flex:1 1 12rem;margin:0;line-height:1.3}.ds-lib{color:#4f566c;font-weight:600}.ds-go{display:inline-flex;align-items:center;min-height:2.75rem;padding:.55rem 1.15rem;border-radius:12px;background:color-mix(in srgb,var(--ligne) 82%,#000);color:#fff;font-weight:800;text-decoration:none;transition:filter .15s}.ds-go:hover{filter:brightness(1.1)}.ds-go:focus-visible{outline:3px solid #262a7a;outline-offset:2px}"
     },
     {
       "name": "Bandeau de la semaine",
@@ -1090,7 +1098,7 @@
       "refersTo": "ma-semaine",
       "description": "Du lundi au dimanche : tampons vide, pâle, plein, futur, avec le jour courant cerclé.",
       "html": "<ol class=\"ds-jours\"><li class=\"ds-j\"><span class=\"ds-n\">lun</span><span class=\"ds-t\">12</span></li><li class=\"ds-j ds-pale\"><span class=\"ds-n\">mar</span><span class=\"ds-t\">13</span></li><li class=\"ds-j ds-plein\"><span class=\"ds-n\">mer</span><span class=\"ds-t\">14<span class=\"ds-jk\">🛡️</span></span></li><li class=\"ds-j ds-plein ds-auj\"><span class=\"ds-n\">jeu</span><span class=\"ds-t\">15</span><span class=\"ds-g\">⭐2 🚀</span></li><li class=\"ds-j ds-fut\"><span class=\"ds-n\">ven</span><span class=\"ds-t\">16</span></li></ol>",
-      "css": ".ds-jours{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;list-style:none;margin:0;padding:1rem;display:grid;grid-template-columns:repeat(5,4.5rem);gap:.35rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 2px 10px rgb(20 24 43/.05);width:max-content}.ds-j{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.45rem .15rem .5rem;border-radius:12px;min-height:6.3rem}.ds-n{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;color:#4f566c}.ds-t{position:relative;display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:50%;border:2px dashed #80879a;font-weight:800;font-variant-numeric:tabular-nums;color:#4f566c;box-sizing:border-box}.ds-pale .ds-t{border:2px solid transparent;background:color-mix(in srgb,#2747c9 22%,#fff);color:#14182b}.ds-plein .ds-t{border:2px solid #2747c9;background:#2747c9;color:#fff}.ds-fut .ds-t{border-style:dotted}.ds-auj{background:color-mix(in srgb,#2747c9 9%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,#2747c9 45%,transparent)}.ds-auj .ds-n{color:#2747c9}.ds-jk{position:absolute;top:-.45rem;right:-.55rem;font-size:.8rem}.ds-g{font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}"
+      "css": ".ds-jours{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;list-style:none;margin:0;padding:1rem;display:grid;grid-template-columns:repeat(5,4.5rem);gap:.35rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 2px 10px rgb(20 24 43/.05);width:max-content}.ds-j{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.45rem .15rem .5rem;border-radius:12px;min-height:6.3rem}.ds-n{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;color:#4f566c}.ds-t{position:relative;display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:50%;border:2px dashed #80879a;font-weight:800;font-variant-numeric:tabular-nums;color:#4f566c;box-sizing:border-box}.ds-pale .ds-t{border:2px solid transparent;background:color-mix(in srgb,#262a7a 22%,#fff);color:#14182b}.ds-plein .ds-t{border:2px solid #262a7a;background:#262a7a;color:#fff}.ds-fut .ds-t{border-style:dotted}.ds-auj{background:color-mix(in srgb,#262a7a 9%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,#262a7a 45%,transparent)}.ds-auj .ds-n{color:#262a7a}.ds-jk{position:absolute;top:-.45rem;right:-.55rem;font-size:.8rem}.ds-g{font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}"
     }
   ],
   "narrative": {

@@ -298,7 +298,8 @@ async function ecranAccueil(profil) {
     maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons),
     h('div', { className: 'lecons-tete' },
       h('h2', {}, 'Mes leçons'),
-      h('button', { className: 'secondaire bouton-nouvelle', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
+      // Une action en retrait, sauf quand le réseau est vide : c'est alors la seule chose à faire, et le seul bouton plein.
+      h('button', { className: lecons.length ? 'bouton-nouvelle' : 'bouton-nouvelle plein', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
     lecons.length === 0 && h('div', { className: 'reseau-vide' },
       h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Ton réseau est encore vide'), h('span', { className: 'terminus' }, 'Acquis')),
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
@@ -365,9 +366,11 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
         h('small', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
         serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`)),
+      // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
-        h('strong', {}, 'Mes révisions du jour'),
-        h('small', {}, dues ? `${pluriel(dues, 'question')} à revoir` : 'Rien à revoir aujourd’hui'))));
+        h('strong', {}, 'Mes révisions du jour',
+          dues > 0 && h('span', { className: 'compte' }, String(dues), h('span', { className: 'cache' }, dues > 1 ? ' questions' : ' question'))),
+        h('small', {}, dues ? 'à revoir aujourd’hui' : 'Rien à revoir aujourd’hui'))));
 }
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.

@@ -30,6 +30,10 @@ img, svg, video { max-width: 100%; height: auto; }
 /* Figure : un visuel qui explique, sa légende et son crédit (source, licence). Une carte simple de DESIGN.md. */
 .kit-figure { margin: 1.5rem 0; background: var(--kit-carte); border: 1px solid var(--kit-bord); border-radius: 14px; padding: .8rem; text-align: center; }
 .kit-figure img, .kit-figure svg { display: block; margin: 0 auto; border-radius: 8px; max-height: 70vh; width: auto; }
+/* Extrait de texte (poème, passage, document) : le texte lui-même, aligné à gauche, un peu plus grand, sur la carte. */
+.kit-figure blockquote { margin: 0 auto; max-width: 34rem; padding: .4rem .6rem; text-align: left; font-size: 1.05rem; line-height: 1.7; text-wrap: pretty; }
+.kit-figure blockquote p { margin: 0; }
+.kit-figure blockquote p + p { margin-top: .9rem; }
 .kit-figure figcaption { margin-top: .6rem; font-size: .95rem; text-align: left; }
 .kit-credit { display: block; margin-top: .2rem; color: var(--kit-doux); font-size: .8rem; }
 /* Encart (« 🚀 Pour aller plus loin ») : une carte teintée de la couleur de la Catégorie, cerclée de cette couleur,

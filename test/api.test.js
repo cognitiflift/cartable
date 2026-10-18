@@ -1680,6 +1680,17 @@ test('Visuels : consigne du prof (visuel qui explique, légende, source et licen
   assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure/);
 });
 
+test('Visuels : un extrait de texte (poème, passage, document) peut être le visuel d\'une figure, consigne et LISEZMOI à l\'appui', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les poèmes' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.match(args, /extrait de texte/);
+  assert.match(args, /<blockquote>/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /extrait de texte/i);
+  assert.match(doc, /<figure class="kit-figure">\s*<blockquote>\s*<p>[^<]+<br>/);
+  assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure blockquote/);
+});
+
 test('Visuels : une image déclarée est rapatriée dans la Leçon et son adresse réécrite dans la page', () => avecServeurImages(async (serveurImages) => {
   const distante = `${serveurImages}/tableau.png`;
   const lecon = await avecPageImages({

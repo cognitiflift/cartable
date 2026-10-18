@@ -54,6 +54,18 @@ export function morceaux(texte, max = MORCEAU_MAX) {
 
 // Phrase terminée par un point, sauf si elle finit déjà par une ponctuation.
 const phrase = (t) => (/[.?!…:]$/.test(t.trim()) ? t.trim() : `${t.trim()}.`);
+
+// Ce que lecture.js met à la place d'un <br> avant de lire un bloc : la fin d'un vers (ou d'une ligne) d'un extrait
+// de texte. Un séparateur de ligne Unicode, qu'on ne trouve pas dans les blancs du HTML.
+export const FIN_DE_VERS = ' ';
+
+// Texte lu d'un bloc de la page (paragraphe, titre, vers d'un extrait…), d'après son texte brut : sans blancs en trop,
+// lu comme une phrase (un titre aussi) ; chaque vers finit par une pause (une virgule s'il n'a pas de ponctuation).
+export function texteDeBloc(brut) {
+  const vers = String(brut ?? '').split(FIN_DE_VERS).map((v) => v.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (!vers.length) return '';
+  return [...vers.slice(0, -1).map((v) => (/[.?!…:;,]$/.test(v) ? v : `${v},`)), phrase(vers.at(-1))].join(' ');
+}
 // Propositions lues dans l'ordre alphabétique : ni l'ordre écrit par le prof (souvent la bonne réponse d'abord, ou
 // l'ordre attendu), ni le mélange de l'écran, qui change d'une fois à l'autre.
 const triees = (textes) => [...textes].sort((a, b) => a.localeCompare(b, 'fr'));

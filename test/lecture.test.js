@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lectureActivee, choisirVoix, texteDeQuestion, morceaux } from '../public/kit/v1/lecture-logique.js';
+import { lectureActivee, choisirVoix, texteDeQuestion, morceaux, texteDeBloc, FIN_DE_VERS } from '../public/kit/v1/lecture-logique.js';
 import { lireQuiz, corriger } from '../public/kit/v1/quiz-logique.js';
 
 const questions = lireQuiz({
@@ -68,4 +68,14 @@ test('Lecture à voix haute : le texte est lu par phrases courtes, sans les émo
   assert.deepEqual(morceaux('Un. Deux. Trois.', 30), ['Un. Deux. Trois.']);
   assert.deepEqual(morceaux('une phrase bien trop longue pour un seul morceau', 20), ['une phrase bien trop', 'longue pour un seul', 'morceau']);
   assert.deepEqual(morceaux(' 🚀 \n '), []);
+});
+
+test('Lecture à voix haute : un bloc de la page se lit comme une phrase, un extrait en vers avec une pause à chaque vers', () => {
+  assert.equal(texteDeBloc('  Le magma\n  monte '), 'Le magma monte.');
+  assert.equal(texteDeBloc('Les volcans'), 'Les volcans.'); // un titre se lit comme une phrase
+  assert.equal(texteDeBloc('Où va la lave ?'), 'Où va la lave ?');
+  // Les vers d'un extrait de texte, séparés par <br> (FIN_DE_VERS) : jamais collés, une pause à la fin de chacun.
+  const strophe = ['Le ciel est, par-dessus le toit,', '\n  Si bleu, si calme !', 'Un arbre, par-dessus le toit', 'Berce sa palme.'].join(FIN_DE_VERS);
+  assert.equal(texteDeBloc(strophe), 'Le ciel est, par-dessus le toit, Si bleu, si calme ! Un arbre, par-dessus le toit, Berce sa palme.');
+  assert.equal(texteDeBloc(` ${FIN_DE_VERS} \n `), '');
 });

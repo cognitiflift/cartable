@@ -155,13 +155,13 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Capacité de la mémoire de travail et charge cognitive
 
-**Ce qu'il dit.** La mémoire de travail ne tient qu'environ quatre éléments à la fois. Tout ce qui l'occupe sans servir l'apprentissage (charge extrinsèque, comme une interface nouvelle à comprendre) en retire autant à la matière.
+**Ce qu'il dit.** La mémoire de travail ne tient qu'environ quatre éléments à la fois. Ce qui l'occupe sans servir l'apprentissage, comme une interface nouvelle à comprendre, en retire autant à la matière (théorie de la charge cognitive).
 
 **Référence.**
 - Cowan, N. (2001). The magical number 4 in short-term memory: A reconsideration of mental storage capacity. *Behavioral and Brain Sciences*, 24(1), 87–114. doi:[10.1017/S0140525X01003922](https://doi.org/10.1017/S0140525X01003922)
 - Sweller, J. (1988). Cognitive load during problem solving: Effects on learning. *Cognitive Science*, 12(2), 257–285. doi:[10.1207/s15516709cog1202_4](https://doi.org/10.1207/s15516709cog1202_4)
 
-**Solidité.** Méta-analyse ou consensus pour une capacité limitée de la mémoire de travail (Cowan 2001). Heuristique tirée d'un cadre pour la borne de 3 à 6 questions comptées par page, qui suppose qu'une page tient en 3 à 5 idées, et pour le coût de chaque nouveau format de question.
+**Solidité.** Méta-analyse ou consensus pour une capacité limitée de la mémoire de travail (Cowan 2001, revue de nombreuses études ; la valeur de quatre éléments reste discutée). Heuristique tirée d'un cadre pour la théorie de la charge cognitive (Sweller 1988, étude isolée à l'origine d'un cadre largement repris) appliquée aux quiz. Heuristique tirée d'un cadre pour la borne de 3 à 6 questions comptées par page, qui suppose qu'une page tient en 3 à 5 idées, et pour le coût de chaque nouveau format de question.
 
 **Où dans Cartable.** Consigne « Nombre de questions » du prof : une question comptée par idée-clé, entre 3 et 6, sans chercher à couvrir tous les formats (`lib/agent.js`, ticket #128).
 
@@ -284,10 +284,10 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | 3 **Jokers** par semaine | `lib/rythme.js` | Aucun cadre, hypothèse à mesurer. |
 | **Pré-test** de trois questions | `lib/agent.js` | L'effet du pré-test ne dit pas combien de questions poser. Aucun cadre, hypothèse à mesurer. |
 | **Dépassement réussi** à `min(2, total)` questions bonus : la valeur 2 gardée pour les anciennes pages à 2 ou 3 questions bonus | `lib/store.js`, `CONTEXT.md` | Aucun cadre, hypothèse à mesurer. |
-| Au moins 2 questions en **Revoir**, même après une seule question ratée | `lib/agent.js` | La correction suivie d'un nouveau test porte sur chaque erreur, pas sur ce minimum. Aucun cadre, hypothèse à mesurer. |
+| Au moins 2 et au plus 6 questions en **Revoir**, quel que soit le nombre de questions ratées | `lib/agent.js` | La correction suivie d'un nouveau test porte sur chaque erreur, pas sur ces bornes. Aucun cadre, hypothèse à mesurer. |
 | Quiz plus courts (3 à 6 questions comptées) sans Questions moins bien retenues | `lib/agent.js`, ticket #128 | Conséquence attendue des cadres ci-dessus, non mesurée : à vérifier avec les journaux. |
 | **Variantes** écrites après deux réponses à une Question | ADR 0006 | Varier la formulation est une difficulté désirable, mais le moment choisi n'a pas de cadre. Hypothèse à mesurer. |
-| Moins de questions « réfléchis puis dévoile » que d'autres | `lib/agent.js` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
+| Moins de questions « réfléchis puis dévoile » que d'autres (1 au plus sur un quiz de 3 ou 4 questions comptées, 2 sur 5 ou 6) | `lib/agent.js`, `public/kit/v1/LISEZMOI.md` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
 
 ## Écarts relevés
 

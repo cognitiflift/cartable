@@ -1025,7 +1025,7 @@ test('Dépassement : le prof reçoit la consigne de l\'encart et des questions b
   const libre = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les aurores' })).data;
   const argsLibre = await fs.readFile(path.join(dossier, `args-${libre.id}`), 'utf8');
   assert.match(argsLibre, /🚀 Pour aller plus loin/);
-  assert.match(argsLibre, /2 ou 3 questions bonus/);
+  assert.match(argsLibre, /1 question bonus/);
   assert.match(argsLibre, /"bonus": true/); // question bonus déclarée au Kit
 
   const pdf = Buffer.from('%PDF-1.4 faux').toString('base64');
@@ -1934,7 +1934,8 @@ const corpsBanque = (page, autres = {}) => ({
   questions: [
     { id: 'q1', enonce: 'Où sort la lave ?', choisie: 'Par le cratère', bonne: 'Par le cratère', juste: true, bonus: false, objectifs: [1], sur: false },
     { id: 'q2', enonce: 'Le magma, c’est…', choisie: 'Je ne sais pas', bonne: 'De la roche fondue', juste: false, jeNeSaisPas: true, bonus: false, objectifs: [2] },
-    { id: 'b1', enonce: 'Le plus grand volcan ?', choisie: 'Olympus Mons', bonne: 'Olympus Mons', juste: true, bonus: true, objectifs: [1] },
+    // Question bonus ratée : réussie, la seule question bonus du quiz rapporterait une Fusée (#128).
+    { id: 'b1', enonce: 'Le plus grand volcan ?', choisie: 'Etna', bonne: 'Olympus Mons', juste: false, bonus: true, objectifs: [1] },
   ],
   ...autres,
 });

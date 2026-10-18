@@ -149,12 +149,19 @@ test('Historique des Propositions : vide au départ, les titres de chaque lot s\
   await assert.rejects(store.lireHistoriquePropositions('personne'), { status: 404 });
 });
 
-test('Dépassement réussi : au moins 2 questions bonus réussies, quel que soit le total', () => {
+test('Dépassement réussi : autant de questions bonus réussies que min(2, total) ; un ancien résultat sans total en demande 2', () => {
+  // Une page à 1 question bonus (#128) rapporte sa Fusée quand elle est réussie.
+  assert.equal(depassementReussi({ reussies: 1, total: 1 }), true);
+  assert.equal(depassementReussi({ reussies: 0, total: 1 }), false);
+  // Les anciennes pages à 2 ou 3 questions bonus gardent la règle : au moins 2.
   assert.equal(depassementReussi({ reussies: 2, total: 3 }), true);
   assert.equal(depassementReussi({ reussies: 3, total: 3 }), true);
   assert.equal(depassementReussi({ reussies: 2, total: 2 }), true);
   assert.equal(depassementReussi({ reussies: 1, total: 3 }), false);
-  assert.equal(depassementReussi({ reussies: 1, total: 1 }), false);
+  assert.equal(depassementReussi({ reussies: 1, total: 2 }), false);
+  assert.equal(depassementReussi({ reussies: 1 }), false);
+  assert.equal(depassementReussi({ reussies: 2 }), true);
+  assert.equal(depassementReussi({ reussies: 0, total: 0 }), false);
   assert.equal(depassementReussi(undefined), false);
 });
 

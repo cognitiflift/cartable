@@ -65,7 +65,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
 
 - `objectifs` : numéros des Objectifs (de lesson.json) que couvre le quiz par défaut.
 - `pretest` (facultatif) : `true` pour le quiz du Pré-test (la page « Devine ! » de trois questions, au début d'une Leçon). Le Kit le signale à l'appli, qui le garde hors score. Indique pour chaque question les Objectifs qu'elle couvre : ceux réussis au Pré-test seront « à confirmer ».
-- `questions` : la liste, dans l'ordre d'affichage (questions bonus à la fin). Pour chaque question :
+- `questions` : la liste, dans l'ordre d'affichage (question bonus à la fin) : une question comptée dans le score par idée-clé de la page, entre 3 et 6 (trois pour un Pré-test), plus la question bonus du Dépassement. Pour chaque question :
   - `id` : identifiant court, unique dans la page et stable (`q1`, `q2`, `b1`…).
   - `type` : le format de la question, `"qcm"` par défaut ; les autres formats sont décrits plus bas (« Formats de rappel actif »).
   - `enonce` : la question (ou la consigne : « Complète la phrase. », « Remets les étapes dans l'ordre. »).
@@ -74,7 +74,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
     - `bonne` : index (à partir de 0) de la bonne réponse dans `reponses`.
   - Pour les autres formats : leurs champs propres, décrits plus bas.
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
-  - `bonus` (facultatif) : `true` pour une question bonus 🚀 du Dépassement, hors score. Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
+  - `bonus` (facultatif) : `true` pour la question bonus 🚀 du Dépassement, hors score. Une page qui a un Dépassement en a 1, sur son encart « Pour aller plus loin » ; la réussir rapporte une Fusée (les anciennes pages à 2 ou 3 questions bonus en demandent 2 réussies). Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
   - `image` (facultatif) : `{ "src": "…", "alt": "…" }`, une image propre à la question, affichée sous l'énoncé, et aussi quand l'élève la retrouve en révision. Même règle que pour une figure : photo distante déclarée dans `images.json` (l'appli la rapatrie et réécrit `src` en `../images/…`), `alt` qui dit ce qu'on voit. Une image mal formée est ignorée, la question reste. Pour un schéma en SVG, utilise plutôt la figure de la page, avec `figure`.
   - `figure` (facultatif) : l'`id` d'une figure du Kit de la même page (voir « Figure »), par exemple `"figure": "schema-volcan"`. Mets-le sur chaque question qui oblige à regarder ce visuel : sous l'énoncé, un bouton « 👁 Revoir le schéma » (ou « Revoir la photo », « Revoir la carte »… d'après la légende, sinon « Revoir ») déplie une copie de la figure et de sa légende, puis la replie, sans faire défiler la page. Plusieurs questions peuvent désigner la même figure. Un `id` mal formé, ou qui ne désigne aucune figure du Kit de la page, est ignoré : la question s'affiche sans bouton. Si une question porte à la fois `image` et `figure`, `figure` l'emporte : l'image ne s'affiche que si la figure est introuvable. L'énoncé nomme le visuel (« Regarde le schéma… ») et ne dit jamais « ci-dessus » : la question revient aussi en révision, loin de la page.
@@ -165,7 +165,7 @@ L'élève essaie de se rappeler la réponse **dans sa tête**, la dévoile, puis
 - `reponse` : la réponse attendue, courte, montrée quand l'élève la dévoile.
 - Points : « je l'avais » = juste (1), « à moitié » = 0,5, « je ne l'avais pas » = faux (0).
 - Pas de Confiance ni de « Je ne sais pas » : ce que l'élève dit de son souvenir les remplace. Notes de mémoire (FSRS) qui en découlent : « je l'avais » → « bien » (comme juste et sûr), « à moitié » → « difficile » (comme un crédit partiel ou un juste pas sûr), « je ne l'avais pas » → « à revoir ».
-- Rien ne vérifie la réponse : ces questions restent **moins nombreuses que les autres questions comptées dans le score** (2 sur 5, 3 sur 7…). Celles en trop (les dernières du quiz) sont ignorées et te sont signalées. Les questions bonus ne sont pas limitées.
+- Rien ne vérifie la réponse : ces questions restent **moins nombreuses que les autres questions comptées dans le score** (1 au plus sur un quiz de 3 ou 4, 2 sur 5 ou 6). Celles en trop (les dernières du quiz) sont ignorées et te sont signalées. Les questions bonus ne sont pas limitées.
 
 ### Choisis la meilleure explication : `"type": "explication"`
 

@@ -86,7 +86,7 @@ Ce que l'Élève indique après chaque réponse d'un quiz, avant de voir la corr
 _Avoid_: certitude, assurance, auto-évaluation (réservé à « Tu en sais déjà… » du Cadrage)
 
 **Dépassement**:
-Ce qui va un tout petit peu au-delà du contenu d'une Leçon pour éveiller la curiosité de l'Élève : un encart « Pour aller plus loin » dans la Page de leçon et 2 ou 3 questions bonus dans son quiz. Pour une Leçon de révision, il est signalé comme hors du Document source. Distinct du **Défi**, qui reste sur le même contenu, en plus difficile. Il est **réussi** quand l'Élève réussit au moins 2 questions bonus sur 3 dans un même quiz ; il rapporte alors une Fusée.
+Ce qui va un tout petit peu au-delà du contenu d'une Leçon pour éveiller la curiosité de l'Élève : un encart « Pour aller plus loin » dans la Page de leçon et 1 question bonus dans son quiz. Pour une Leçon de révision, il est signalé comme hors du Document source. Distinct du **Défi**, qui reste sur le même contenu, en plus difficile. Il est **réussi** quand l'Élève réussit sa question bonus ; les anciennes pages à 2 ou 3 questions bonus en demandent 2 réussies dans un même quiz. Il rapporte alors une Fusée.
 
 **Réponse proposée**:
 Réponse que l'agent soumet à l'Élève quand il lui pose une question (2 à 4 ; l'Élève choisit la plus proche), toujours complétée par « Je ne sais pas ». N'entre pas dans la Maîtrise.
@@ -158,7 +158,7 @@ _Avoid_: niveau tout court (confusion avec Niveau de scolarité), étape
 Récompenses de l'effort, acquises pour toujours et indépendantes de la Maîtrise, gagnées de trois façons. Une Leçon de révision en a trois : une pour un quiz ordinaire réussi (80 % ou plus), une pour son premier Dépassement réussi, une pour un Défi réussi (la Leçon terminée). Une Leçon libre en rapporte une par Page de leçon dont le quiz est réussi (80 % ou plus), sans maximum. Une Révision du jour menée jusqu'au bout en rapporte une, au plus une par jour ; celle-ci appartient à l'Élève, pas à une Leçon. Jamais pour le Pré-test, ni pour Réviser une Leçon libre.
 
 **Fusée**:
-Récompense d'un Dépassement réussi (🚀), une au plus par Page de leçon, en Leçon libre comme en Leçon de révision, acquise pour toujours. Refaire le quiz d'une même page n'en rapporte pas une deuxième. Jamais pour le Pré-test, ni pour Réviser une Leçon libre (les nouvelles pages créées en Révisant une Leçon de révision en rapportent).
+Récompense d'un Dépassement réussi (🚀) : sa question bonus réussie, ou 2 questions bonus sur les anciennes pages qui en ont 2 ou 3. Une au plus par Page de leçon, en Leçon libre comme en Leçon de révision, acquise pour toujours. Refaire le quiz d'une même page n'en rapporte pas une deuxième. Jamais pour le Pré-test, ni pour Réviser une Leçon libre (les nouvelles pages créées en Révisant une Leçon de révision en rapportent).
 _Avoid_: rocket, bonus (désigne les questions du Dépassement)
 
 **Réviser**:

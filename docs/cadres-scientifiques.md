@@ -16,7 +16,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Effet du test et rappel actif
 
-**Ce qu'il dit.** Se tester sur une matière la fait mieux retenir à long terme que la relire, même sans retour. Retrouver soi-même une réponse (rappel, production) retient mieux que la reconnaître parmi d'autres, surtout quand une correction suit ; la correction réduit aussi ce qu'un QCM peut faire retenir de faux.
+**Ce qu'il dit.** Se tester sur une matière la fait mieux retenir à long terme que la relire, même sans retour. Retrouver soi-même une réponse (rappel, production) retient mieux que la reconnaître parmi d'autres, surtout quand une correction suit ; la correction réduit aussi ce qu'un QCM peut faire retenir de faux, et un nouveau test sur l'erreur corrigée la fait retenir. L'effet profite surtout à ce qui a été testé : il se transfère peu à ce qui ne l'a pas été.
 
 **Référence.**
 - Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. *Psychological Science*, 17(3), 249–255. doi:[10.1111/j.1467-9280.2006.01693.x](https://doi.org/10.1111/j.1467-9280.2006.01693.x)
@@ -26,10 +26,12 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 - Slamecka, N. J., & Graf, P. (1978). The generation effect: Delineation of a phenomenon. *Journal of Experimental Psychology: Human Learning and Memory*, 4(6), 592–604. doi:[10.1037/0278-7393.4.6.592](https://doi.org/10.1037/0278-7393.4.6.592)
 - Kang, S. H. K., McDermott, K. B., & Roediger, H. L. (2007). Test format and corrective feedback modify the effect of testing on long-term retention. *European Journal of Cognitive Psychology*, 19(4–5), 528–558. doi:[10.1080/09541440601056620](https://doi.org/10.1080/09541440601056620)
 - Butler, A. C., & Roediger, H. L. (2008). Feedback enhances the positive effects and reduces the negative effects of multiple-choice testing. *Memory & Cognition*, 36(3), 604–616. doi:[10.3758/MC.36.3.604](https://doi.org/10.3758/MC.36.3.604)
+- Pashler, H., Cepeda, N. J., Wixted, J. T., & Rohrer, D. (2005). When does feedback facilitate learning of words? *Journal of Experimental Psychology: Learning, Memory, and Cognition*, 31(1), 3–8. doi:[10.1037/0278-7393.31.1.3](https://doi.org/10.1037/0278-7393.31.1.3)
+- Pan, S. C., & Rickard, T. C. (2018). Transfer of test-enhanced learning: Meta-analytic review and synthesis. *Psychological Bulletin*, 144(7), 710–756. doi:[10.1037/bul0000151](https://doi.org/10.1037/bul0000151)
 
-**Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007). Heuristique tirée d'un cadre pour les formats de **rappel actif** de Cartable : l'Élève y retrouve la réponse, mais en touchant des éléments donnés (mots à placer parmi des intrus, ordre, association), ce qui les rapproche de la reconnaissance ; seul « réfléchis puis dévoile » est un rappel sans indice, noté par l'Élève lui-même. Leur supériorité sur le QCM n'est pas mesurée.
+**Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Méta-analyse ou consensus pour le faible transfert à ce qui n'a pas été testé (Pan & Rickard 2018). Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007). Heuristique tirée d'un cadre pour les formats de **rappel actif** de Cartable : l'Élève y retrouve la réponse, mais en touchant des éléments donnés (mots à placer parmi des intrus, ordre, association), ce qui les rapproche de la reconnaissance ; seul « réfléchis puis dévoile » est un rappel sans indice, noté par l'Élève lui-même. Leur supériorité sur le QCM n'est pas mesurée.
 
-**Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006.
+**Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; une question comptée par idée-clé de la page, chaque Objectif du quiz couvert, et en **Revoir** une question reformulée par question ratée (consigne « Nombre de questions » et Rebonds, `lib/agent.js`, ticket #128) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006.
 
 ### Espacement et réapprentissage espacé
 
@@ -45,7 +47,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour l'espacement (Cepeda et al. 2006). Étude isolée pour la forme de la courbe d'oubli telle que citée ici : Murre & Dros (2015) répliquent Ebbinghaus sur un seul sujet, mais le résultat est classique. Étude isolée (quelques expériences du même groupe) pour le réapprentissage espacé.
 
-**Où dans Cartable.** **Révision du jour**, état de mémoire de la **Question**, **Maîtrise** qui baisse avec le temps, **Retenu** (stabilité d'au moins 5 jours des Questions qui couvrent l'Objectif, ou, sans Question, deux succès à au moins 24 heures d'écart), **Leçon terminée** qui continue d'être révisée ; ADR 0003 (mise à jour spec #46) et ADR 0006.
+**Où dans Cartable.** **Révision du jour**, état de mémoire de la **Question**, **Maîtrise** qui baisse avec le temps, **Retenu** (stabilité d'au moins 5 jours des Questions qui couvrent l'Objectif, ou, sans Question, deux succès à au moins 24 heures d'écart), **Leçon terminée** qui continue d'être révisée ; ADR 0003 (mise à jour spec #46) et ADR 0006. Une idée n'est pas interrogée deux fois sur la même **Page de leçon** : les Révisions du jour la reposent, espacée (consigne « Nombre de questions », `lib/agent.js`, ticket #128).
 
 ### Entrelacement
 
@@ -124,7 +126,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Heuristique tirée d'un cadre : c'est un cadre qui regroupe des effets, chacun avec sa propre preuve (effet du test, espacement, entrelacement). Une difficulté n'est désirable que si l'Élève peut la surmonter.
 
-**Où dans Cartable.** Principe produit « Ce qui reste compte plus que la réussite du moment » (`PRODUCT.md`) ; **Retenu**, **Pré-test**, **Défi**, **Variantes** des Questions, **Maîtrise** qui baisse avec le temps.
+**Où dans Cartable.** Principe produit « Ce qui reste compte plus que la réussite du moment » (`PRODUCT.md`) ; **Retenu**, **Pré-test**, **Défi** (plus difficile, avec le même nombre de questions : ticket #128), **Variantes** des Questions, **Maîtrise** qui baisse avec le temps.
 
 ### Découpage en segments et principe multimédia (Mayer)
 
@@ -149,7 +151,41 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus (Rey 2012 ; Sundararajan & Adesope 2020), effet modeste.
 
-**Où dans Cartable.** Interdiction des images seulement décoratives (consigne « Visuels », `lib/agent.js`) ; le **Dépassement** est un contenu hors du propos, mis à part en fin de page et hors score (voir « Écarts relevés »).
+**Où dans Cartable.** Interdiction des images seulement décoratives (consigne « Visuels », `lib/agent.js`) ; le **Dépassement** est un contenu hors du propos, mis à part en fin de page et hors score, réduit à 1 question bonus pour limiter ce contenu à côté (ticket #128 ; voir « Écarts relevés »).
+
+### Capacité de la mémoire de travail et charge cognitive
+
+**Ce qu'il dit.** La mémoire de travail ne tient qu'environ quatre éléments à la fois. Tout ce qui l'occupe sans servir l'apprentissage (charge extrinsèque, comme une interface nouvelle à comprendre) en retire autant à la matière.
+
+**Référence.**
+- Cowan, N. (2001). The magical number 4 in short-term memory: A reconsideration of mental storage capacity. *Behavioral and Brain Sciences*, 24(1), 87–114. doi:[10.1017/S0140525X01003922](https://doi.org/10.1017/S0140525X01003922)
+- Sweller, J. (1988). Cognitive load during problem solving: Effects on learning. *Cognitive Science*, 12(2), 257–285. doi:[10.1207/s15516709cog1202_4](https://doi.org/10.1207/s15516709cog1202_4)
+
+**Solidité.** Méta-analyse ou consensus pour une capacité limitée de la mémoire de travail (Cowan 2001). Heuristique tirée d'un cadre pour la borne de 3 à 6 questions comptées par page, qui suppose qu'une page tient en 3 à 5 idées, et pour le coût de chaque nouveau format de question.
+
+**Où dans Cartable.** Consigne « Nombre de questions » du prof : une question comptée par idée-clé, entre 3 et 6, sans chercher à couvrir tous les formats (`lib/agent.js`, ticket #128).
+
+### Traitement approprié au transfert
+
+**Ce qu'il dit.** Un test fait mieux retenir quand il sollicite le même traitement que l'apprentissage : la forme de la question compte autant que son contenu.
+
+**Référence.**
+- Morris, C. D., Bransford, J. D., & Franks, J. J. (1977). Levels of processing versus transfer appropriate processing. *Journal of Verbal Learning and Verbal Behavior*, 16(5), 519–533. doi:[10.1016/S0022-5371(77)80016-9](https://doi.org/10.1016/S0022-5371(77)80016-9)
+
+**Solidité.** Étude isolée pour l'expérience fondatrice, devenue un cadre largement repris. Heuristique tirée d'un cadre pour le choix d'un format selon ce qu'il vérifie le mieux.
+
+**Où dans Cartable.** Formats de rappel actif choisis selon le contenu, sans obligation de les couvrir tous (`FORMATS_RAPPEL_ACTIF` et consigne « Nombre de questions », `lib/agent.js`, ticket #128).
+
+### Curiosité et manque d'information
+
+**Ce qu'il dit.** La curiosité naît d'un manque d'information perçu : savoir qu'on ne sait pas quelque chose, sans le savoir encore. Une petite ouverture suffit à la provoquer.
+
+**Référence.**
+- Loewenstein, G. (1994). The psychology of curiosity: A review and reinterpretation. *Psychological Bulletin*, 116(1), 75–98. doi:[10.1037/0033-2909.116.1.75](https://doi.org/10.1037/0033-2909.116.1.75)
+
+**Solidité.** Heuristique tirée d'un cadre : une revue théorique, appliquée ici à une question bonus.
+
+**Où dans Cartable.** **Dépassement** : un encart « Pour aller plus loin » et 1 question bonus 🚀, hors score (`lib/agent.js`, ticket #128).
 
 ### Zone proximale de développement
 
@@ -247,7 +283,9 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | **Objectif du jour** : 5 réponses ou une Page de leçon | `CONTEXT.md` | Aucun cadre, hypothèse à mesurer. |
 | 3 **Jokers** par semaine | `lib/rythme.js` | Aucun cadre, hypothèse à mesurer. |
 | **Pré-test** de trois questions | `lib/agent.js` | L'effet du pré-test ne dit pas combien de questions poser. Aucun cadre, hypothèse à mesurer. |
-| **Dépassement** : 2 ou 3 questions bonus, réussi à 2 sur 3 | `CONTEXT.md`, ADR 0003 | Aucun cadre, hypothèse à mesurer. |
+| **Dépassement réussi** à `min(2, total)` questions bonus : la valeur 2 gardée pour les anciennes pages à 2 ou 3 questions bonus | `lib/store.js`, `CONTEXT.md` | Aucun cadre, hypothèse à mesurer. |
+| Au moins 2 questions en **Revoir**, même après une seule question ratée | `lib/agent.js` | La correction suivie d'un nouveau test porte sur chaque erreur, pas sur ce minimum. Aucun cadre, hypothèse à mesurer. |
+| Quiz plus courts (3 à 6 questions comptées) sans Questions moins bien retenues | `lib/agent.js`, ticket #128 | Conséquence attendue des cadres ci-dessus, non mesurée : à vérifier avec les journaux. |
 | **Variantes** écrites après deux réponses à une Question | ADR 0006 | Varier la formulation est une difficulté désirable, mais le moment choisi n'a pas de cadre. Hypothèse à mesurer. |
 | Moins de questions « réfléchis puis dévoile » que d'autres | `lib/agent.js` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
 

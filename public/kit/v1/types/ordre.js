@@ -1,5 +1,5 @@
-// Kit v1 — type `ordre` (spec #48, ticket #70) : remettre dans l'ordre les étapes d'un processus, les événements d'une
-// histoire ou les mots d'une phrase. Le Kit les montre mélangés ; l'Élève les déplace en touchant (ou en glissant).
+// Kit v1 — type `ordre` (spec #48, ticket #70) : remettre dans l'ordre une suite dont un seul ordre est juste (une
+// chronologie, les événements d'un récit, les étapes d'un processus : ticket #130). Le Kit les montre mélangés ; l'Élève les déplace en touchant (ou en glissant).
 // Écrit par le prof : { elements: [texte…] }, de 3 à 10 éléments tous différents, dans le BON ordre.
 // Réponse de l'Élève : les index des éléments (dans `elements`) dans l'ordre qu'il propose.
 // Crédit partiel : part des éléments à leur place exacte. Un ordre mélangé au hasard n'en place qu'un en moyenne : un

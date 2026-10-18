@@ -176,6 +176,17 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Où dans Cartable.** Formats de rappel actif choisis selon le contenu, sans obligation de les couvrir tous (`FORMATS_RAPPEL_ACTIF` et consigne « Nombre de questions », `lib/agent.js`, ticket #128).
 
+### Une seule bonne réponse par question
+
+**Ce qu'il dit.** Une question de quiz n'a qu'une seule bonne réponse, que l'enseignement permet de reconnaître sans ambiguïté : une deuxième réponse défendable fait compter faux un élève qui sait, et le score ne mesure plus ce qu'il a appris.
+
+**Référence.**
+- Haladyna, T. M., Downing, S. M., & Rodriguez, M. C. (2002). A review of multiple-choice item-writing guidelines for classroom assessment. *Applied Measurement in Education*, 15(3), 309–333. doi:[10.1207/S15324818AME1503_5](https://doi.org/10.1207/S15324818AME1503_5)
+
+**Solidité.** Méta-analyse ou consensus pour la règle dans un QCM (revue des manuels et des études sur la rédaction des questions). Heuristique tirée d'un cadre pour sa transposition à « remettre dans l'ordre », où l'ordre entier est la réponse.
+
+**Où dans Cartable.** « ordre » réservé aux suites dont un seul ordre est juste et vérifiable dans la page, jamais pour une liste de conseils ou de gestes, avec « classer », « associer » ou un QCM « que fais-tu d'abord ? » à la place (`FORMATS_RAPPEL_ACTIF`, `lib/agent.js`, et `public/kit/v1/LISEZMOI.md`, ticket #130).
+
 ### Curiosité et manque d'information
 
 **Ce qu'il dit.** La curiosité naît d'un manque d'information perçu : savoir qu'on ne sait pas quelque chose, sans le savoir encore. Une petite ouverture suffit à la provoquer.
@@ -287,6 +298,10 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | Au moins 2 et au plus 6 questions en **Revoir**, quel que soit le nombre de questions ratées | `lib/agent.js` | La correction suivie d'un nouveau test porte sur chaque erreur, pas sur ces bornes. Aucun cadre, hypothèse à mesurer. |
 | Quiz plus courts (3 à 6 questions comptées) sans Questions moins bien retenues | `lib/agent.js`, ticket #128 | Conséquence attendue des cadres ci-dessus, non mesurée : à vérifier avec les journaux. |
 | **Variantes** écrites après deux réponses à une Question | ADR 0006 | Varier la formulation est une difficulté désirable, mais le moment choisi n'a pas de cadre. Hypothèse à mesurer. |
+| Au plus une question « ordre » par quiz, pas dans chaque quiz, et formats variés d'une page à l'autre de la **Leçon** | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, ticket #130 | Aucun cadre, hypothèse à mesurer. |
+| Pas de question « ordre » dans le **Pré-test** (QCM ou « classer » à la place) | `consignePremierTour`, `lib/agent.js`, ticket #130 | L'effet du pré-test ne dit rien du format des questions. Aucun cadre, hypothèse à mesurer. |
+| Une question « ordre » ne reprend pas les éléments d'une question « ordre » d'une page précédente | `lib/agent.js`, ticket #130 | Proche de « une idée n'est pas interrogée deux fois sur la même page » (espacement), mais la règle porte sur des pages voisines, pas sur l'intervalle. Aucun cadre, hypothèse à mesurer. |
+| « ordre » retiré de la tête de la liste des formats donnée au prof, pour que l'ordre de la liste ne pousse pas à le choisir | `FORMATS_RAPPEL_ACTIF`, `lib/agent.js`, ticket #130 | Aucun cadre, hypothèse à mesurer (constaté dans les Leçons : « ordre » dans 10 quiz sur 14). |
 | Moins de questions « réfléchis puis dévoile » que d'autres (1 au plus sur un quiz de 3 ou 4 questions comptées, 2 sur 5 ou 6) | `lib/agent.js`, `public/kit/v1/LISEZMOI.md` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
 | Photo obligatoire pour un sujet réel (objet, lieu, personne ou œuvre) : premier **Visuel** de la page | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, ticket #129 | Le principe multimédia soutient mots + image, pas la photo plutôt que le schéma. Aucun cadre, hypothèse à mesurer. Deux mesures à noter : le **Coût d'un tour** de type page avant et après le changement, et la part des pages sur un sujet réel qui ont bien une photo, sur les 10 prochaines pages concernées. |
 | Photo prise dans une source déjà consultée pour vérifier les faits, dans le même WebFetch | `lib/agent.js`, ticket #129 | Décision de coût, aucun cadre. Mesurée par le **Coût d'un tour** (ligne précédente). |

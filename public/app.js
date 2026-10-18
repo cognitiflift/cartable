@@ -1,7 +1,7 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
-import { sectionIdees, ECHEC_LECTURE, carteAttente, carteErreur } from '/nouvelle-lecon-texte.js';
+import { sectionIdees, ECHEC_LECTURE, questionCadrage, carteAttente, carteErreur } from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -553,17 +553,19 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
 // Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, dans une carte en
 // boîte de dialogue modale (le reste de l'écran est inerte sous le voile). L'Élève touche une réponse (« Je ne sais
 // pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions posées selon le mode viennent de la
-// configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
-async function cadrer(mode) {
+// configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer. Avec un `sujet` connu (sujet tapé
+// ou titre d'une Proposition), la question le nomme (#118) ; en révision, il n'est pas encore connu.
+async function cadrer(mode, sujet) {
   const cadrage = {};
   const cles = config.questionsCadrage[mode];
   for (const [i, cle] of cles.entries()) {
     const { question, reponses } = config.cadrage[cle];
+    const posee = questionCadrage({ cle, question, sujet });
     cadrage[cle] = await new Promise((choisir) => {
       const fermer = (valeur) => { boite.close(); boite.remove(); choisir(valeur); };
       const boite = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
         cles.length > 1 && h('p', { className: 'cadrage-etape' }, `Question ${i + 1} sur ${cles.length}`),
-        h('h2', { id: 'cadrage-question' }, question),
+        h('h2', { id: 'cadrage-question' }, posee),
         h('div', { className: 'cadrage-choix' }, Object.entries(reponses).map(([valeur, libelle], j) =>
           h('button', { className: 'secondaire', autofocus: j === 0, onclick: () => fermer(valeur) }, libelle))),
         h('button', { className: 'secondaire annuler', ariaLabel: 'Annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'));
@@ -583,14 +585,21 @@ function ecranNouvelleLecon(profil) {
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
   // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
   // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
-  // `quoi` : { sujet, categorie } connus avant la préparation (sujet tapé, ou titre et Catégorie d'une Proposition).
+  // `quoi` : { sujet, categorie } connus avant la préparation (sujet tapé, ou titre et Catégorie d'une Proposition) ;
+  // la question du Cadrage et la carte d'attente nomment le sujet, absent en révision.
   const cadrages = new Map();
+  // Ce que l'Élève a touché en dernier, pour lui rendre le focus après un Cadrage annulé. Mémorisé au toucher :
+  // sur iPad Safari, toucher un bouton ne lui donne pas le focus et l'élément actif du document vaut le corps de la page.
+  let touche = null;
+  const memoriser = (e) => { touche = e.target.closest?.('button, input, select, textarea, a') ?? touche; };
+  app.addEventListener('pointerdown', memoriser, true);
+  app.addEventListener('focusin', memoriser, true);
   const demarrer = async (corps, mode, cle, quoi = {}) => {
-    const retour = document.activeElement;
+    const retour = touche;
     activer(false);
     erreur.textContent = '';
     if (!cadrages.has(cle)) {
-      const reponses = await cadrer(mode);
+      const reponses = await cadrer(mode, quoi.sujet);
       if (!reponses) { activer(true); return retour?.focus(); } // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
       cadrages.set(cle, reponses);
     }
@@ -696,7 +705,11 @@ function ecranNouvelleLecon(profil) {
       section.autresIdees && autresIdees]));
   };
   afficherPropositions();
-  quitterEcran = () => { actif = false; clearTimeout(minuteur); };
+  quitterEcran = () => {
+    actif = false; clearTimeout(minuteur);
+    app.removeEventListener('pointerdown', memoriser, true);
+    app.removeEventListener('focusin', memoriser, true);
+  };
 
   montrer(
     idees,

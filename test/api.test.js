@@ -1698,7 +1698,7 @@ test('Visuels : photo du sujet réel en premier visuel, prise dans une source d�
     assert.match(texte, /processus, une chronologie, une méthode ou une notion abstraite/);
     assert.match(texte, /même WebFetch/);
     assert.match(texte, /jamais une adresse devinée/);
-    assert.match(texte, /auteur/);
+    assert.match(texte, /source, auteur, et licence ou copyright/);
     assert.match(texte, /copyright/);
     assert.match(texte, /Pré-test[^.]*pas de photo obligatoire/);
     assert.doesNotMatch(texte, /libres? de droits|images? libres?|photos? libres?/);
@@ -1754,9 +1754,11 @@ test('Visuels : une adresse morte, un fichier qui n\'est pas une image ou une ad
   assert.ok(signale.includes(`${serveurImages}/page.png (0002-images.html) : fichier qui n'est pas une image`));
   assert.ok(signale.includes(`${serveurImages}/texte.txt (0002-images.html) : fichier qui n'est pas une image`));
   assert.ok(signale.includes('file:///etc/passwd (0002-images.html) : adresse qui n\'est pas en HTTP(S)'));
-  // #129 : une autre photo d'abord ; le schéma SVG seulement faute de photo qui marche, et la légende le dit.
-  assert.match(signale, /par une autre photo qui marche/);
+  // #129 : sur un sujet réel, une autre photo d'abord ; le schéma SVG seulement faute de photo qui marche, et la
+  // légende le dit. Sur une autre page, le message reste le même.
+  assert.match(signale, /œuvre réels, remplace-la par une autre photo/);
   assert.match(signale, /schéma SVG[^.]*aucune photo qui marche[^.]*la légende le dit/);
+  assert.match(signale, /par une autre image qui marche \(déclarée dans images\.json\) ou par un schéma SVG/);
   await message(lecon, 'ok');
   assert.doesNotMatch(await args(), /Images retirées/);
 }));

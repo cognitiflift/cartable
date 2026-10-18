@@ -269,7 +269,7 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 ]
 ```
 
-Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre photo qui marche. Sur une page qui porte sur un sujet réel, un schéma SVG n'est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
+Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre image qui marche ou par un schéma SVG. Sur une page qui porte sur un sujet réel, remplace-la par une autre photo : un schéma SVG n'y est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
 
 ## Lecture à voix haute
 

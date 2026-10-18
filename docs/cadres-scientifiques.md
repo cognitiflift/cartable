@@ -289,6 +289,8 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | **Variantes** écrites après deux réponses à une Question | ADR 0006 | Varier la formulation est une difficulté désirable, mais le moment choisi n'a pas de cadre. Hypothèse à mesurer. |
 | Moins de questions « réfléchis puis dévoile » que d'autres (1 au plus sur un quiz de 3 ou 4 questions comptées, 2 sur 5 ou 6) | `lib/agent.js`, `public/kit/v1/LISEZMOI.md` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
 | Photo obligatoire pour un sujet réel (objet, lieu, personne ou œuvre) : premier **Visuel** de la page | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, ticket #129 | Le principe multimédia soutient mots + image, pas la photo plutôt que le schéma. Aucun cadre, hypothèse à mesurer. Deux mesures à noter : le **Coût d'un tour** de type page avant et après le changement, et la part des pages sur un sujet réel qui ont bien une photo, sur les 10 prochaines pages concernées. |
+| Photo prise dans une source déjà consultée pour vérifier les faits, dans le même WebFetch | `lib/agent.js`, ticket #129 | Décision de coût, aucun cadre. Mesurée par le **Coût d'un tour** (ligne précédente). |
+| **Pré-test** exempté de la photo du sujet réel | `lib/agent.js`, ticket #129 | Le Pré-test n'enseigne pas. Aucun cadre, hypothèse sans mesure prévue. |
 
 ## Écarts relevés
 

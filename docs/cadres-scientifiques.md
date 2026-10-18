@@ -161,7 +161,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour l'effet (Schneider et al. 2018). Heuristique tirée d'un cadre pour la règle d'un seul élément clé par schéma.
 
-**Où dans Cartable.** Repère « Couleurs » des schémas SVG : `var(--kit-accent)` pour un seul élément clé, reconnaissable aussi sans la couleur (consigne « Visuels », `lib/agent.js` ; section « Figure », `public/kit/v1/LISEZMOI.md` ; ticket #134).
+**Où dans Cartable.** Repère « Couleurs » des schémas SVG : `var(--kit-accent)` pour un seul élément clé, reconnaissable aussi sans la couleur (consigne « Visuels », `lib/agent.js` ; section « Figure », `public/kit/v1/LISEZMOI.md` ; ticket #134). Un seul bouton plein sur l'accueil de l'Élève, le Continuer de la **Leçon** en tête, les autres actions en contour (heuristique tirée d'un cadre : la méta-analyse porte sur des supports d'apprentissage, pas sur des boutons ; `ecranAccueil`, `public/app.js`, ticket #141).
 
 ### Détails séduisants
 
@@ -326,6 +326,7 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | Une question « ordre » ne reprend pas les éléments d'une question « ordre » d'une page précédente | `lib/agent.js`, ticket #130 | Proche de « une idée n'est pas interrogée deux fois sur la même page » (espacement), mais la règle porte sur des pages voisines, pas sur l'intervalle. Aucun cadre, hypothèse à mesurer. |
 | « ordre » retiré de la tête de la liste des formats donnée au prof, pour que l'ordre de la liste ne pousse pas à le choisir | `FORMATS_RAPPEL_ACTIF`, `lib/agent.js`, ticket #130 | Aucun cadre, hypothèse à mesurer (constaté dans les Leçons : « ordre » dans 10 quiz sur 14). |
 | Moins de questions « réfléchis puis dévoile » que d'autres (1 au plus sur un quiz de 3 ou 4 questions comptées, 2 sur 5 ou 6) | `lib/agent.js`, `public/kit/v1/LISEZMOI.md` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
+| Leçon la plus récente en tête : sur l'accueil, la **Leçon** à la dernière activité la plus récente passe au-dessus des Catégories (« Tu en étais là »), et son Continuer est le seul bouton plein | `ecranAccueil`, `public/app.js`, ticket #141 | Le seul bouton plein relève du signalement (ci-dessus) ; le choix de la Leçon la plus récente, plutôt que celle dont des Questions sont dues ou dont un contrôle approche, n'en découle pas. Aucun cadre, hypothèse à mesurer (part des Séances lancées depuis la Leçon en tête). |
 | Photo obligatoire pour un sujet réel (objet, lieu, personne ou œuvre) : premier **Visuel** de la page | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, ticket #129 | Le principe multimédia soutient mots + image, pas la photo plutôt que le schéma. Aucun cadre, hypothèse à mesurer. Deux mesures à noter : le **Coût d'un tour** de type page avant et après le changement, et la part des pages sur un sujet réel qui ont bien une photo, sur les 10 prochaines pages concernées. |
 | Photo prise dans une source déjà consultée pour vérifier les faits, dans le même WebFetch | `lib/agent.js`, ticket #129 | Décision de coût, aucun cadre. Mesurée par le **Coût d'un tour** (ligne précédente). |
 | **Pré-test** exempté de la photo du sujet réel | `lib/agent.js`, ticket #129 | Le Pré-test n'enseigne pas. Aucun cadre, hypothèse sans mesure prévue. |

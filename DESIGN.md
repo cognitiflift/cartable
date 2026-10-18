@@ -171,22 +171,25 @@ components:
     rounded: "{rounded.champ}"
     padding: "0.5rem 0.8rem"
   bouton-nouvelle:
-    backgroundColor: "{colors.nuit}"
-    textColor: "{colors.sur-nuit}"
+    backgroundColor: "{colors.carte}"
+    textColor: "{colors.texte}"
     rounded: "{rounded.bouton}"
     padding: "0.7rem 1.1rem"
-  bouton-nouvelle-sombre:
-    backgroundColor: "{colors.texte-sombre}"
-    textColor: "{colors.fond-sombre}"
   bouton-ligne:
+    backgroundColor: "{colors.carte}"
+    textColor: "{colors.texte}"
+    rounded: "{rounded.bouton}"
+    padding: "0.55rem 1.15rem"
+    height: "2.75rem"
+  bouton-ligne-plein:
     backgroundColor: "color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))"
     textColor: "{colors.sur-accent}"
     rounded: "{rounded.bouton}"
     padding: "0.55rem 1.15rem"
     height: "2.75rem"
-  bouton-ligne-sombre:
-    backgroundColor: "color-mix(in srgb, var(--ligne) 22%, var(--carte))"
-    textColor: "{colors.texte-sombre}"
+  bouton-ligne-plein-sombre:
+    backgroundColor: "var(--ligne)"
+    textColor: "{colors.sur-accent-sombre}"
   compteur-etoiles:
     backgroundColor: "color-mix(in srgb, var(--sur-nuit) 12%, transparent)"
     textColor: "{colors.sur-nuit}"
@@ -279,7 +282,7 @@ Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes 
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
 - Quatre états de station lisibles sans légende : vide, hachurée, blanche, verte.
 - Bandeau lundi→dimanche à tampons, discret à côté des Leçons.
-- Bleu nuit pour la marque et l'appel « nouveau », bleu accent pour l'action, vert pour ce qui tient.
+- Bleu nuit pour la marque, bleu accent pour l'action, vert pour ce qui tient ; un seul bouton plein par écran.
 - Overpass 800 en signalétique, Atkinson Hyperlegible Next pour lire, chiffres tabulaires.
 - Plat par défaut, ombres douces teintées de nuit, aucun relief dur.
 
@@ -288,11 +291,11 @@ Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes 
 Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 ### Primary
-- **Bleu de l'accent** (`accent`, `accent-sombre` en sombre) : l'action et le présent. Boutons pleins, tampon du jour plein ou pâle, cadre du jour courant, liens, anneau de focus (3px), sélection de texte (30 %).
-- **Bleu nuit de la marque** (`nuit`) : l'en-tête dans les deux thèmes, et le bouton « Apprendre quelque chose de nouveau ». Le texte dessus est `sur-nuit`, le texte secondaire `sur-nuit-doux`.
+- **Bleu de l'accent** (`accent`, `accent-sombre` en sombre) : l'action et le présent. Boutons pleins, contour des Révisions du jour quand des Questions sont dues, tampon du jour plein ou pâle, cadre du jour courant, liens, anneau de focus (3px), sélection de texte (30 %).
+- **Bleu nuit de la marque** (`nuit`) : l'en-tête dans les deux thèmes. Le texte dessus est `sur-nuit`, le texte secondaire `sur-nuit-doux`.
 
 ### Secondary
-- **Couleurs de ligne** (`ligne-francais`, `ligne-mathematiques`, `ligne-sciences`, `ligne-histoire`, `ligne-geographie`, `ligne-langues`, `ligne-arts`, `ligne-autre`, et leurs variantes `-sombre`) : la Catégorie d'une Leçon. Elles sont identiques à celles des Catégories du Kit (`public/kit/v1/quiz.css`), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. En clair, les surfaces pleines (bouton Continuer, cartouche de Niveau) utilisent la ligne foncée (`color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))`) avec du texte `sur-accent` (blanc) ; en sombre, la ligne elle-même avec du texte `sur-accent-sombre`.
+- **Couleurs de ligne** (`ligne-francais`, `ligne-mathematiques`, `ligne-sciences`, `ligne-histoire`, `ligne-geographie`, `ligne-langues`, `ligne-arts`, `ligne-autre`, et leurs variantes `-sombre`) : la Catégorie d'une Leçon. Elles sont identiques à celles des Catégories du Kit (`public/kit/v1/quiz.css`), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. En clair, les surfaces pleines (Continuer de la Leçon en tête, cartouche de Niveau) utilisent la ligne foncée (`color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))`) avec du texte `sur-accent` (blanc) ; en sombre, la ligne elle-même avec du texte `sur-accent-sombre`.
 
 ### Tertiary
 - **Vert Retenu** (`retenu`) : ce qui tient en mémoire. Station Retenue, terminus allumé, pastille « Acquis ✓ ».
@@ -314,7 +317,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Station vide** (`station-vide`) : l'anneau des stations pas encore évaluées, les hachures « à confirmer », le contour des tampons vides et du terminus éteint.
 
 ### Named Rules
-**La règle de la couleur de ligne.** La couleur d'une Catégorie n'appartient qu'à ses Leçons : le trait parcouru, la puce de la Catégorie, le cartouche de Niveau, le bouton Continuer et l'anneau « vous êtes ici ». Elle ne sert jamais à autre chose, et ses valeurs se changent dans une nouvelle version du Kit, jamais ici seul.
+**La règle de la couleur de ligne.** La couleur d'une Catégorie n'appartient qu'à ses Leçons : le trait parcouru, la puce de la Catégorie, le cartouche de Niveau, le bouton Continuer (plein ou son contour) et l'anneau « vous êtes ici » (station ou carte de la Leçon en tête). Elle ne sert jamais à autre chose, et ses valeurs se changent dans une nouvelle version du Kit, jamais ici seul.
 
 **La règle du vert qui tient.** Un aplat vert signifie Retenu ou Acquis, rien d'autre. Le vert des mots de Maîtrise reste du texte.
 
@@ -343,13 +346,13 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 ## Layout
 
-Une colonne centrée de 1200px au plus, avec une marge latérale fluide (`clamp(1rem, 3vw, 2rem)`), partagée par l'en-tête et le contenu. L'accueil se lit de haut en bas : le bandeau de la semaine, puis l'en-tête « Mes leçons » avec le bouton « Apprendre quelque chose de nouveau » aligné à droite, puis une section par Catégorie.
+Une colonne centrée de 1200px au plus, avec une marge latérale fluide (`clamp(1rem, 3vw, 2rem)`), partagée par l'en-tête et le contenu. L'accueil se lit de haut en bas : le bandeau de la semaine, puis l'en-tête « Mes leçons » avec le bouton « Apprendre quelque chose de nouveau » aligné à droite, puis « Tu en étais là » : la Leçon à la dernière activité la plus récente, seule et sur toute la largeur, sa carte cerclée « vous êtes ici » et son Continuer plein. Viennent ensuite une section par Catégorie, sans cette Leçon (une Catégorie qui n'avait qu'elle disparaît).
 
 Le bandeau de la semaine est une grille de deux colonnes : les sept jours (une grille de 7 colonnes égales) et, à droite, une colonne de 16 à 20rem pour l'Objectif du jour, la série et les Révisions du jour. Sous 860px, la colonne passe dessous ; sous 520px, le bandeau se resserre (tampons de 2rem, gains empilés, lien du calendrier masqué).
 
 Les cartes de ligne d'une Catégorie forment une grille fluide (`minmax(min(100%, 31rem), 1fr)`, écart 1rem) : deux colonnes sur grand écran, une sur tablette en portrait et sur téléphone. Toutes les cartes ont la même anatomie : tête (Niveau, nom, mot de Maîtrise), ligne, pied (prochaine station, contrôle, récompenses, Continuer), puis le dépliant des Objectifs.
 
-Le rythme vertical : 2.2rem avant « Mes leçons », 1.4rem entre Catégories, 1rem entre cartes, 0.85rem entre les rangs d'une carte. L'en-tête masque l'âge sous 900px, le pseudo sous 640px et le nom « Cartable » sous 480px, en gardant toujours le compteur d'Étoiles, Profil, Changer et le bouton de thème.
+Le rythme vertical : 2.2rem avant « Mes leçons », 2.2rem sous la Leçon en tête, 1.4rem entre Catégories, 1rem entre cartes, 0.85rem entre les rangs d'une carte. L'en-tête masque l'âge sous 900px, le pseudo sous 640px et le nom « Cartable » sous 480px, en gardant toujours le compteur d'Étoiles, Profil, Changer et le bouton de thème.
 
 ## Elevation & Depth
 
@@ -358,7 +361,7 @@ Le système est plat, avec un soupçon de pose : les cartes de ligne et le bande
 ### Shadow Vocabulary
 - **Pose de carte de ligne** (`--ombre-carte` : `0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon, en Séance les cartes posées sur la Page de leçon (bulle du prof, Retour de quiz, Leçon terminée), le Cadrage et la carte d'attente de Nouvelle leçon.
 - **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine et le calendrier de Mes badges.
-- **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station.
+- **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station. La carte de la Leçon en tête prend le même anneau, détouré du `fond` (`0 0 0 .2rem var(--fond), 0 0 0 .42rem var(--ligne)`), en plus de sa pose.
 - **Découpe du terminus** (`box-shadow: 0 0 0 .2rem var(--carte)`) : sépare le cartouche du trait.
 - **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau et le calendrier.
 
@@ -378,10 +381,10 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Shape:** coins doux (10px de base ; 12px pour les boutons d'accueil et Continuer).
 - **Bouton plein :** fond `accent`, texte `sur-accent`, graisse 700. Au survol, l'accent se mélange de 12 % d'encre ; transition de fond 0.15s.
 - **Bouton secondaire :** fond `carte`, filet `bord`, texte `texte`, graisse 600 ; au survol, 6 % d'encre. Dans l'en-tête, il devient transparent avec un filet `sur-nuit` à 32 % et un survol `sur-nuit` à 10 %.
-- **Continuer (bouton de ligne) :** fond de la ligne foncée, texte blanc, graisse 800, 2.75rem de haut ; au survol, `brightness(1.1)` ; à l'appui, descend d'1px. En sombre, il devient un aplat de ligne à 22 % sur la carte, cerclé de 2px de couleur de ligne, texte `texte`.
+- **Continuer (bouton de ligne) :** contour de 2px de la ligne foncée (la ligne en sombre) sur la `carte`, texte `texte`, graisse 800, 2.75rem de haut ; au survol, un fond de ligne à 12 % ; à l'appui, descend d'1px. **Sur la Leçon en tête seulement**, il est plein : fond de la ligne foncée, texte `sur-accent` (en sombre, la ligne elle-même et `sur-accent-sombre`), au survol `brightness(1.1)`. C'est le seul bouton plein de l'accueil.
 - **Thème (en-tête) :** bouton secondaire de l'en-tête réduit à son icône (🌗 automatique, ☀️ clair, 🌙 sombre) ; un clic passe d'automatique à clair, à sombre, puis revient à automatique. Son nom accessible (et son infobulle) dit le thème courant et l'action : « Thème : clair. Passer au thème sombre ».
-- **Apprendre quelque chose de nouveau :** fond `nuit`, texte `sur-nuit` ; en sombre, il s'inverse (fond `texte-sombre`, texte `fond-sombre`).
-- **Révisions du jour :** bouton plein à deux lignes (titre fort, détail en petit) quand des Questions sont dues, secondaire sinon.
+- **Apprendre quelque chose de nouveau :** bouton secondaire de 12px.
+- **Révisions du jour :** bouton à deux lignes (titre fort, détail en petit) : contour de 2px `accent` sur la `carte`, texte `texte`, quand des Questions sont dues ; secondaire sinon.
 - **Rebond (Séance) :** la suite recommandée après un quiz est un bouton plein à deux lignes (action en 800, score du quiz en petit), 12px, 2.75rem de haut ; les autres Rebonds sont des boutons secondaires. Aucun bouton ne pulse.
 - **Focus :** anneau de 3px `accent`, décalé de 2px, sur tout élément.
 - **Désactivé :** opacité 0.5.

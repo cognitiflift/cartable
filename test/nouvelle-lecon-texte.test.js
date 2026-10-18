@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sectionIdees, ECHEC_LECTURE } from '../public/nouvelle-lecon-texte.js';
+import { sectionIdees, ECHEC_LECTURE, carteAttente, carteErreur } from '../public/nouvelle-lecon-texte.js';
 
 test('Idées prêtes avec des cartes : aucun texte d\'état, « D\'autres idées » proposé', () => {
   assert.deepEqual(sectionIdees({ etat: 'prêtes', nombreCartes: 4 }), { autresIdees: true });
@@ -41,5 +41,43 @@ test('Section d\'idées : jamais `false`, `null` ni vide, et toujours un texte q
         assert.ok(section.texte.trim().length > 0, `${etat}, ${nombreCartes} cartes`);
       }
     }
+  }
+});
+
+const DUREE = 'Ça peut prendre quelques minutes.';
+const ENSUITE = 'Ensuite : quelques questions pour deviner ce que tu sais déjà.';
+
+test('Attente avec un sujet connu : la carte nomme le sujet, annonce la durée et le Pré-test', () => {
+  assert.deepEqual(carteAttente({ sujet: 'Les volcans', mode: 'libre' }), {
+    titre: 'Ton prof prépare « Les volcans »…', duree: DUREE, ensuite: ENSUITE,
+  });
+});
+
+test('Attente avec un sujet tapé entouré d\'espaces : le sujet est nommé sans eux', () => {
+  assert.equal(carteAttente({ sujet: '  la conjugaison du futur ', mode: 'libre' }).titre, 'Ton prof prépare « la conjugaison du futur »…');
+});
+
+test('Attente sans sujet connu : un titre qui ne nomme rien', () => {
+  assert.deepEqual(carteAttente({ mode: 'libre' }), { titre: 'Ton prof prépare ta leçon…', duree: DUREE, ensuite: ENSUITE });
+  assert.equal(carteAttente({ sujet: '   ', mode: 'libre' }).titre, 'Ton prof prépare ta leçon…');
+});
+
+test('Attente en révision : le prof lit d\'abord la leçon de classe, le sujet n\'est pas encore connu', () => {
+  assert.deepEqual(carteAttente({ mode: 'revision' }), {
+    titre: 'Ton prof lit ta leçon de classe et la prépare…', duree: DUREE, ensuite: ENSUITE,
+  });
+});
+
+test('Erreur de préparation : un titre simple et le message du serveur', () => {
+  assert.deepEqual(carteErreur({ message: "Cette idée n'est plus proposée" }), {
+    titre: "Ta leçon n'a pas pu se préparer", message: "Cette idée n'est plus proposée",
+  });
+});
+
+test('Erreur sans message du serveur : un message qui dit quoi faire, jamais vide', () => {
+  for (const message of [undefined, '', '  ']) {
+    assert.deepEqual(carteErreur({ message }), {
+      titre: "Ta leçon n'a pas pu se préparer", message: "Ce n'est pas de ta faute. Tu peux réessayer, ou choisir autre chose.",
+    });
   }
 });

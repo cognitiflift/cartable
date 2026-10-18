@@ -19,3 +19,19 @@ export function sectionIdees({ etat, nombreCartes }) {
   if (nombreCartes === 0) return { texte: `Pas d'idée pour l'instant. ${QUOI_FAIRE}`, autresIdees: true };
   return { autresIdees: true };
 }
+
+// Carte d'attente, pendant que le prof prépare la Leçon après le Cadrage. `sujet` : sujet tapé ou titre de la
+// Proposition, s'il est connu ; `mode` : 'libre' ou 'revision' (le sujet ne se connaît qu'après la lecture du document).
+// Renvoie { titre, duree, ensuite } ; la suite annoncée est le Pré-test, dans les deux modes.
+export function carteAttente({ sujet, mode }) {
+  const nom = sujet?.trim();
+  const titre = mode === 'revision' ? 'Ton prof lit ta leçon de classe et la prépare…'
+    : nom ? `Ton prof prépare « ${nom} »…` : 'Ton prof prépare ta leçon…';
+  return { titre, duree: 'Ça peut prendre quelques minutes.', ensuite: 'Ensuite : quelques questions pour deviner ce que tu sais déjà.' };
+}
+
+// Carte d'erreur, à la place de la carte d'attente quand la préparation échoue : le message du serveur, en mots simples,
+// ou un message qui dit quoi faire quand il n'en donne pas. Renvoie { titre, message }.
+export function carteErreur({ message }) {
+  return { titre: "Ta leçon n'a pas pu se préparer", message: message?.trim() || "Ce n'est pas de ta faute. Tu peux réessayer, ou choisir autre chose." };
+}

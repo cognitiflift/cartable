@@ -1,7 +1,7 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
-import { sectionIdees, ECHEC_LECTURE } from '/nouvelle-lecon-texte.js';
+import { sectionIdees, ECHEC_LECTURE, carteAttente, carteErreur } from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -583,8 +583,9 @@ function ecranNouvelleLecon(profil) {
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
   // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
   // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
+  // `quoi` : { sujet, categorie } connus avant la préparation (sujet tapé, ou titre et Catégorie d'une Proposition).
   const cadrages = new Map();
-  const demarrer = async (corps, mode, cle) => {
+  const demarrer = async (corps, mode, cle, quoi = {}) => {
     const retour = document.activeElement;
     activer(false);
     erreur.textContent = '';
@@ -593,15 +594,62 @@ function ecranNouvelleLecon(profil) {
       if (!reponses) { activer(true); return retour?.focus(); } // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
       cadrages.set(cle, reponses);
     }
-    const cadrage = cadrages.get(cle);
-    erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
+    preparer(corps, mode, cle, quoi, retour);
+  };
+
+  // Attente du prof : une carte posée au centre sur le voile, le reste de l'écran inerte dessous. Si la préparation
+  // échoue, une carte d'erreur prend sa place ; « Réessayer » reprend les réponses du Cadrage gardées, sans le reposer.
+  const voile = h('div', { className: 'nouvelle-voile', hidden: true });
+  const poser = (carte) => {
+    for (const el of app.children) if (el !== voile) el.inert = true;
+    voile.replaceChildren(carte);
+    voile.hidden = false;
+  };
+  const lever = () => {
+    voile.hidden = true;
+    voile.replaceChildren();
+    for (const el of app.children) el.inert = false;
+  };
+  const preparer = async (corps, mode, cle, quoi, retour) => {
+    attendre({ ...quoi, mode });
     try {
-      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage } });
-      location.hash = `#/lecon/${lecon.id}`;
+      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage: cadrages.get(cle) } });
+      // L'Élève a pu revenir à « Mes leçons » : la Leçon y est déjà et finit de se préparer, on ne l'y ramène pas de force.
+      if (actif) location.hash = `#/lecon/${lecon.id}`;
     } catch (e) {
-      erreur.textContent = e.message;
-      activer(true);
+      if (!actif) return;
+      // Une coupure du réseau ou une réponse illisible n'a pas de message en français : le module des textes en donne un.
+      echouer(e instanceof TypeError || e instanceof SyntaxError ? undefined : e.message, () => preparer(corps, mode, cle, quoi, retour), retour);
     }
+  };
+  // L'attente est un état (jamais rouge) : la carte, région d'état, est remplie après sa pose pour être annoncée.
+  // La nouvelle ligne y est « en travaux », dessinée par `ligneLecon`, à la couleur de sa Catégorie quand elle est connue.
+  const attendre = ({ sujet, categorie, mode }) => {
+    const { titre, duree, ensuite } = carteAttente({ sujet, mode });
+    const carte = h('section', { className: 'carte carte-attente', role: 'status', tabIndex: -1, style: categorie ? styleLigne(categorie) : '--ligne: var(--ligne-autre)' });
+    poser(carte);
+    requestAnimationFrame(() => {
+      carte.replaceChildren(
+        h('h2', {}, titre),
+        ligneLecon({ objectifs: [] }),
+        h('p', { className: 'doux' }, duree),
+        h('p', { className: 'attente-ensuite' }, ensuite),
+        h('div', { className: 'attente-actions' }, h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons')));
+      carte.focus();
+    });
+  };
+  // L'erreur est une alerte, à la place de la carte d'attente : le message du serveur, puis de quoi repartir.
+  const echouer = (message, reessayer, retour) => {
+    const { titre, message: texte } = carteErreur({ message });
+    const bouton = h('button', { onclick: () => { lever(); reessayer(); } }, 'Réessayer');
+    poser(h('section', { className: 'carte carte-attente echec', role: 'alert' },
+      h('h2', {}, titre),
+      h('p', {}, texte),
+      h('div', { className: 'attente-actions' },
+        bouton,
+        h('button', { className: 'secondaire', onclick: () => { lever(); activer(true); retour?.focus(); } }, 'Retour aux idées'),
+        h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'))));
+    bouton.focus();
   };
 
   const sujet = h('input', { required: true, maxLength: config.sujetMax, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
@@ -623,7 +671,7 @@ function ecranNouvelleLecon(profil) {
     if (etat === 'en préparation') minuteur = setTimeout(afficherPropositions, 3000);
     // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
     // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
-    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
+    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`, { sujet: p.titre, categorie: p.categorie }) },
       h('span', { className: 'proposition-tete' },
         h('span', { className: 'cartouche-type' }, p.type === 'suite' ? 'Pour aller plus loin' : 'Nouveau sujet'),
         p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
@@ -671,9 +719,10 @@ function ecranNouvelleLecon(profil) {
           const texte = sujet.value.trim();
           if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
           if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
-          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
+          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`, { sujet: texte });
         } }, h('label', {}, 'Ce que tu veux apprendre', h('br'), sujet), boutons[0]))),
-    erreur);
+    erreur,
+    voile);
 }
 
 // Libellé du bouton de chaque Rebond ; le serveur ne reçoit que l'action.

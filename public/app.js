@@ -207,6 +207,9 @@ const recompensesLecon = (l) => h('span', { className: 'etoiles' },
 const retourAccueil = () => h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons');
 
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+// Espaces insécables du français autour des guillemets et devant : ; ? !, pour qu'un retour à la ligne n'en isole
+// jamais un (« Dire « stop » calmement », « Troie : mythe ou réalité ? »). Le texte vient du prof ou de l'Élève.
+const insecables = (texte) => texte.replace(/« /g, '«\u00a0').replace(/ ([»:;?!])/g, '\u00a0$1');
 
 // Accueil : chaque Leçon est une ligne du réseau, à la couleur de sa Catégorie (celle du Kit), et ses Objectifs
 // en sont les stations. L'état d'un Objectif se lit à la forme de sa station : vide (pas encore évalué), hachurée
@@ -258,7 +261,7 @@ function prochaineStation(l) {
   const texte = !l.pages?.length ? 'Ta première page'
     : l.quizEnAttente ? 'Le quiz de ta page'
       : l.mode === 'libre' && l.ensuite ? l.ensuite : null;
-  return texte && h('p', { className: 'prochaine' }, h('span', { className: 'libelle' }, 'Prochaine station : '), texte);
+  return texte && h('p', { className: 'prochaine' }, h('span', { className: 'libelle' }, 'Prochaine station\u00a0: '), insecables(texte));
 }
 
 const texteControle = (jours) => (jours === 0 ? "aujourd'hui" : jours === 1 ? 'demain' : `dans ${jours} jours`);
@@ -272,7 +275,7 @@ function carteLecon(l, { enTete = false } = {}) {
   return h('article', { className: `lecon${enTete ? ' en-tete' : ''}`, style: styleLigne(l.categorie) },
     h('div', { className: 'lecon-tete' },
       l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
-      h('h4', {}, h('a', { href: adresse }, l.titre)),
+      h('h4', {}, h('a', { href: adresse }, insecables(l.titre))),
       l.maitrise?.palier !== 'acquis' && badgeMaitrise(l.maitrise)), // Acquis : dit par le terminus allumé, pas deux fois
     ligneLecon(l, { ici: !!prochaineStation(l) }),
     h('div', { className: 'lecon-bas' },
@@ -306,9 +309,10 @@ async function ecranAccueil(profil) {
     enTete && h('section', { className: 'categorie reprise', style: styleLigne(enTete.categorie) },
       h('h3', {}, 'Tu en étais là', h('span', { className: 'reprise-categorie' }, `· ${enTete.categorie}`)),
       carteLecon(enTete, { enTete: true })),
-    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: styleLigne(c) },
-      h('h3', {}, c),
-      h('div', { className: 'lecons-grille' }, parCategorie[c].map(carteLecon)))));
+    h('div', { className: 'reseau' }, config.categories.filter((c) => parCategorie[c]).map((c) => h('section', {
+      className: `categorie${parCategorie[c].length > 1 ? ' etendue' : ''}`, style: styleLigne(c) },
+    h('h3', {}, c),
+    h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l)))))));
 }
 
 // Ma semaine, comme la page de la semaine du journal de classe : du lundi au dimanche, un tampon par jour (vide,

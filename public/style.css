@@ -127,6 +127,12 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .lecon.en-tete { box-shadow:0 0 0 .2rem var(--fond), 0 0 0 .42rem var(--ligne), var(--ombre-carte); }
 .lecon.en-tete h4 { font-size:1.45rem; }
 .lecons-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1rem; }
+/* Le réseau : sur la même grille que les cartes, une Catégorie à une seule Leçon prend une colonne, pour que deux
+   Catégories à une Leçon qui se suivent partagent un rang au lieu de laisser chacune une demi-rangée vide ; une
+   Catégorie à plusieurs Leçons prend toute la largeur. L'ordre des Catégories ne change pas. */
+.reseau { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1.4rem 1rem; }
+.reseau > .categorie { margin-top:0; }
+.reseau > .categorie.etendue { grid-column:1 / -1; }
 /* La ligne foncée : les surfaces pleines à la couleur de la ligne (Niveau, Continuer, cartouche « Prolonge ta ligne »). */
 .lecon, .seance-tete, .proposition { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); }
 @media (prefers-color-scheme: dark) { .lecon, .seance-tete, .proposition { --ligne-fonce:var(--ligne); } }

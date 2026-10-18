@@ -68,16 +68,11 @@ export function carteErreur({ message }) {
   return { titre: "Ta leçon n'a pas pu se préparer", message: message?.trim() || "Ce n'est pas de ta faute. Tu peux réessayer, ou choisir autre chose." };
 }
 
-// Question du Cadrage telle que l'écran la pose (#118). `question` est celle que le serveur sert pour `cle` ;
-// avec un `sujet` connu (sujet tapé ou titre d'une Proposition), elle le nomme. En révision d'une leçon de classe,
-// le sujet n'est pas encore connu : la question reste celle du serveur. Les réponses et les valeurs ne changent pas.
-const QUESTIONS_AVEC_SUJET = {
-  pourquoi: (sujet) => `Pourquoi veux-tu apprendre « ${sujet} » ?`,
-  deja: (sujet) => `Sur « ${sujet} », tu en sais déjà…`,
-};
-
-export function questionCadrage({ cle, question, sujet }) {
+// Question du Cadrage telle que l'écran la pose (#118). `question` et `avecSujet` sont servies par la configuration
+// (lib/cadrage.js) : la question seule, et sa tournure qui nomme le sujet (`{sujet}`). Avec un `sujet` connu (sujet tapé
+// ou titre d'une Proposition), la question le nomme. En révision d'une leçon de classe, le sujet n'est pas encore
+// connu : la question reste celle du serveur. Les réponses et les valeurs ne changent pas.
+export function questionCadrage({ question, avecSujet, sujet }) {
   const nom = sujet?.trim();
-  const avecSujet = QUESTIONS_AVEC_SUJET[cle];
-  return nom && avecSujet ? avecSujet(nom) : question;
+  return nom && avecSujet ? avecSujet.replaceAll('{sujet}', () => nom) : question;
 }

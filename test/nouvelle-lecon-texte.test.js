@@ -149,25 +149,30 @@ test('Erreur sans message du serveur : un message qui dit quoi faire, jamais vid
 
 // Cadrage (#118) : la question nomme le sujet quand il est connu ; les questions du serveur restent la référence.
 test('Cadrage d\'un sujet connu : « Pourquoi ? » nomme le sujet', () => {
-  assert.equal(questionCadrage({ cle: 'pourquoi', question: 'Pourquoi ?', sujet: 'Les volcans' }),
+  assert.equal(questionCadrage({ question: 'Pourquoi ?', avecSujet: 'Pourquoi veux-tu apprendre « {sujet} » ?', sujet: 'Les volcans' }),
     'Pourquoi veux-tu apprendre « Les volcans » ?');
 });
 
 test('Cadrage d\'un sujet connu : « Tu en sais déjà… » nomme le sujet', () => {
-  assert.equal(questionCadrage({ cle: 'deja', question: 'Tu en sais déjà…', sujet: 'Les volcans' }),
+  assert.equal(questionCadrage({ question: 'Tu en sais déjà…', avecSujet: 'Sur « {sujet} », tu en sais déjà…', sujet: 'Les volcans' }),
     'Sur « Les volcans », tu en sais déjà…');
 });
 
 test('Cadrage d\'une révision, sujet pas encore connu : la question du serveur, inchangée', () => {
-  assert.equal(questionCadrage({ cle: 'deja', question: 'Tu en sais déjà…' }), 'Tu en sais déjà…');
-  assert.equal(questionCadrage({ cle: 'deja', question: 'Tu en sais déjà…', sujet: '   ' }), 'Tu en sais déjà…');
+  assert.equal(questionCadrage({ question: 'Tu en sais déjà…', avecSujet: 'Sur « {sujet} », tu en sais déjà…' }), 'Tu en sais déjà…');
+  assert.equal(questionCadrage({ question: 'Tu en sais déjà…', avecSujet: 'Sur « {sujet} », tu en sais déjà…', sujet: '   ' }), 'Tu en sais déjà…');
 });
 
 test('Cadrage : un sujet tapé avec des espaces autour est nommé sans eux', () => {
-  assert.equal(questionCadrage({ cle: 'pourquoi', question: 'Pourquoi ?', sujet: '  la conjugaison du futur ' }),
+  assert.equal(questionCadrage({ question: 'Pourquoi ?', avecSujet: 'Pourquoi veux-tu apprendre « {sujet} » ?', sujet: '  la conjugaison du futur ' }),
     'Pourquoi veux-tu apprendre « la conjugaison du futur » ?');
 });
 
-test('Cadrage : une question inconnue du module reste celle du serveur, même avec un sujet', () => {
-  assert.equal(questionCadrage({ cle: 'autre', question: 'Une autre question ?', sujet: 'Les volcans' }), 'Une autre question ?');
+test('Cadrage : une question sans tournure avec sujet reste celle du serveur, même avec un sujet', () => {
+  assert.equal(questionCadrage({ question: 'Une autre question ?', sujet: 'Les volcans' }), 'Une autre question ?');
+});
+
+test('Cadrage : un sujet tapé avec « $ » est nommé tel quel', () => {
+  assert.equal(questionCadrage({ question: 'Pourquoi ?', avecSujet: 'Pourquoi veux-tu apprendre « {sujet} » ?', sujet: 'les $& et les $1' }),
+    'Pourquoi veux-tu apprendre « les $& et les $1 » ?');
 });

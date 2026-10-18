@@ -1,8 +1,10 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
-import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur } from '/nouvelle-lecon-texte.js';
-import { confirmationFichiers, messageSujet, FICHIERS_MANQUANTS } from '/nouvelle-lecon-texte.js';
+import {
+  sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
+  confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
+} from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -199,6 +201,9 @@ async function ecranParent(profil) {
 // (voir morceauxRecompensesLecon).
 const recompensesLecon = (l) => h('span', { className: 'etoiles' },
   morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
+
+// Lien « ← Mes leçons » des en-têtes d'écran et de la carte d'attente.
+const retourAccueil = () => h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons');
 
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
 
@@ -561,7 +566,7 @@ async function cadrer(mode, sujet) {
   const cles = config.questionsCadrage[mode];
   for (const [i, cle] of cles.entries()) {
     const { question, reponses } = config.cadrage[cle];
-    const posee = questionCadrage({ cle, question, sujet });
+    const posee = questionCadrage({ question, avecSujet: config.cadrageAvecSujet?.[cle], sujet });
     cadrage[cle] = await new Promise((choisir) => {
       const fermer = (valeur) => { boite.close(); boite.remove(); choisir(valeur); };
       const boite = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
@@ -583,56 +588,22 @@ async function cadrer(mode, sujet) {
 // aucune carte seule sur la dernière rangée.
 const colonnesGrille = (nombre) => [2, 3, 4].map((maximum) => `--colonnes-${maximum}: ${colonnesPropositions(nombre, maximum)}`).join('; ');
 
-function ecranNouvelleLecon(profil) {
-  const boutons = [];
-  let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
-  const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
-  // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
-  // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
-  // `quoi` : { sujet, categorie } connus avant la préparation (sujet tapé, ou titre et Catégorie d'une Proposition) ;
-  // la question du Cadrage et la carte d'attente nomment le sujet, absent en révision.
-  const cadrages = new Map();
-  // Ce que l'Élève a touché en dernier, pour lui rendre le focus après un Cadrage annulé. Mémorisé au toucher :
-  // sur iPad Safari, toucher un bouton ne lui donne pas le focus et l'élément actif du document vaut le corps de la page.
-  let touche = null;
-  const memoriser = (e) => { touche = e.target.closest?.('button, input, select, textarea, a') ?? touche; };
-  app.addEventListener('pointerdown', memoriser, true);
-  app.addEventListener('focusin', memoriser, true);
-  const demarrer = async (corps, mode, cle, quoi = {}) => {
-    const retour = touche;
-    activer(false);
-    if (!cadrages.has(cle)) {
-      const reponses = await cadrer(mode, quoi.sujet);
-      if (!reponses) { activer(true); return retour?.focus(); } // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
-      cadrages.set(cle, reponses);
-    }
-    preparer(corps, mode, cle, quoi, retour);
-  };
-
-  // Attente du prof : une carte posée au centre sur le voile, le reste de l'écran inerte dessous. Si la préparation
-  // échoue, une carte d'erreur prend sa place ; « Réessayer » reprend les réponses du Cadrage gardées, sans le reposer.
-  const voile = h('div', { className: 'nouvelle-voile', hidden: true });
+// Voile d'attente de l'écran Nouvelle leçon : une carte posée au centre, le reste de l'écran inerte dessous, barre de
+// navigation comprise. Pendant que le prof prépare la Leçon, la carte d'attente ; si la préparation échoue, une carte
+// d'erreur prend sa place, avec « Réessayer » et « Retour aux idées ». `lever` retire la carte et rend l'écran actif ;
+// l'écran l'appelle aussi en le quittant, pour ne pas laisser la barre de navigation inerte.
+function voileAttente() {
+  const element = h('div', { className: 'nouvelle-voile', hidden: true });
+  const dessous = () => [...app.children, nav].filter((el) => el !== element);
   const poser = (carte) => {
-    for (const el of app.children) if (el !== voile) el.inert = true;
-    voile.replaceChildren(carte);
-    voile.hidden = false;
+    for (const el of dessous()) el.inert = true;
+    element.replaceChildren(carte);
+    element.hidden = false;
   };
   const lever = () => {
-    voile.hidden = true;
-    voile.replaceChildren();
-    for (const el of app.children) el.inert = false;
-  };
-  const preparer = async (corps, mode, cle, quoi, retour) => {
-    attendre({ ...quoi, mode });
-    try {
-      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage: cadrages.get(cle) } });
-      // L'Élève a pu revenir à « Mes leçons » : la Leçon y est déjà et finit de se préparer, on ne l'y ramène pas de force.
-      if (actif) location.hash = `#/lecon/${lecon.id}`;
-    } catch (e) {
-      if (!actif) return;
-      // Une coupure du réseau ou une réponse illisible n'a pas de message en français : le module des textes en donne un.
-      echouer(e instanceof TypeError || e instanceof SyntaxError ? undefined : e.message, () => preparer(corps, mode, cle, quoi, retour), retour);
-    }
+    element.hidden = true;
+    element.replaceChildren();
+    for (const el of dessous()) el.inert = false;
   };
   // L'attente est un état (jamais rouge) : la carte, région d'état, est remplie après sa pose pour être annoncée.
   // La nouvelle ligne y est « en travaux », dessinée par `ligneLecon`, à la couleur de sa Catégorie quand elle est connue.
@@ -646,12 +617,13 @@ function ecranNouvelleLecon(profil) {
         ligneLecon({ objectifs: [] }),
         h('p', { className: 'doux' }, duree),
         h('p', { className: 'attente-ensuite' }, ensuite),
-        h('div', { className: 'attente-actions' }, h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons')));
+        h('div', { className: 'attente-actions' }, retourAccueil()));
       carte.focus();
     });
   };
   // L'erreur est une alerte, à la place de la carte d'attente : le message du serveur, puis de quoi repartir.
-  const echouer = (message, reessayer, retour) => {
+  // `reessayer` et `revenir` sont appelés une fois la carte levée.
+  const echouer = ({ message, reessayer, revenir }) => {
     const { titre, message: texte } = carteErreur({ message });
     const bouton = h('button', { onclick: () => { lever(); reessayer(); } }, 'Réessayer');
     poser(h('section', { className: 'carte carte-attente echec', role: 'alert' },
@@ -659,9 +631,66 @@ function ecranNouvelleLecon(profil) {
       h('p', {}, texte),
       h('div', { className: 'attente-actions' },
         bouton,
-        h('button', { className: 'secondaire', onclick: () => { lever(); activer(true); retour?.focus(); } }, 'Retour aux idées'),
-        h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'))));
+        h('button', { className: 'secondaire', onclick: () => { lever(); revenir(); } }, 'Retour aux idées'),
+        retourAccueil())));
     bouton.focus();
+  };
+  return { element, attendre, echouer, lever };
+}
+
+function ecranNouvelleLecon(profil) {
+  const boutons = [];
+  let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
+  const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
+  // Réponses du Cadrage par démarrage (`cle`) : après une erreur du serveur, réessayer les garde sans le reposer.
+  const cadrages = new Map();
+  // Ce que l'Élève a touché en dernier, pour lui rendre le focus après un Cadrage annulé ou « Retour aux idées ».
+  // Mémorisé au toucher : sur iPad Safari, toucher un bouton ne lui donne pas le focus et l'élément actif du document
+  // vaut le corps de la page.
+  let touche = null;
+  const memoriser = (e) => { touche = e.target.closest?.('button, input, select, textarea, a') ?? touche; };
+  app.addEventListener('pointerdown', memoriser, true);
+  app.addEventListener('focusin', memoriser, true);
+  // Les cartes de Propositions sont redessinées par la relecture des idées pendant le Cadrage ou l'attente : on retrouve
+  // la carte touchée par sa clé de démarrage (`data-cle`), et à défaut le titre de la section d'idées.
+  const rendreFocus = (element) => {
+    const cle = element?.dataset?.cle;
+    const cible = cle ? idees.querySelector(`[data-cle="${CSS.escape(cle)}"]`) : element;
+    (cible?.isConnected ? cible : idees.querySelector('h2'))?.focus();
+  };
+
+  // Un démarrage : `cle`, ce que l'Élève démarre (`proposition:<titre>`, `sujet:<texte>` ou `revision`) ; `mode`,
+  // 'libre' ou 'revision', pour les questions du Cadrage ; `envoi()`, le corps de la requête sans le Cadrage ;
+  // `sujet` et `categorie`, connus avant la préparation (sujet tapé, ou titre et Catégorie d'une Proposition), que la
+  // question du Cadrage et la carte d'attente nomment, absents en révision.
+  const demarrer = async (demarrage) => {
+    const retour = touche;
+    const revenir = () => { activer(true); rendreFocus(retour); };
+    activer(false);
+    if (!cadrages.has(demarrage.cle)) {
+      const reponses = await cadrer(demarrage.mode, demarrage.sujet);
+      if (!reponses) return revenir(); // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
+      cadrages.set(demarrage.cle, reponses);
+    }
+    preparer(demarrage, revenir);
+  };
+
+  const voile = voileAttente();
+  const preparer = async (demarrage, revenir) => {
+    voile.attendre(demarrage);
+    try {
+      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await demarrage.envoi()), cadrage: cadrages.get(demarrage.cle) } });
+      // L'Élève a pu revenir à « Mes leçons » : la Leçon y est déjà et finit de se préparer, on ne l'y ramène pas de force.
+      if (actif) location.hash = `#/lecon/${lecon.id}`;
+    } catch (e) {
+      if (!actif) return;
+      // Une coupure du réseau ou une réponse illisible n'a pas de message en français : le module des textes en donne un.
+      voile.echouer({
+        message: e instanceof TypeError || e instanceof SyntaxError ? undefined : e.message,
+        reessayer: () => preparer(demarrage, revenir),
+        revenir,
+      });
+    }
   };
 
   // Pas de validation native (bulle du navigateur, pas forcément en français) : l'appli dit ses messages, à côté du formulaire.
@@ -692,19 +721,22 @@ function ecranNouvelleLecon(profil) {
     if (etat === 'en préparation') minuteur = setTimeout(afficherPropositions, 3000);
     // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
     // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
-    // Le nom accessible se limite au titre et au type ; la Catégorie, « Au programme » et l'accroche complète
-    // (coupée à 2 lignes à l'écran) en sont la description.
+    // Le nom accessible se limite au titre et au type ; l'accroche complète (coupée à 2 lignes à l'écran) en est la
+    // description. La Catégorie et « Au programme » restent visibles sur la carte.
     const cartes = propositions.map((p, i) => {
       const id = (partie) => `proposition-${i}-${partie}`;
-      const carte = h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`, { sujet: p.titre, categorie: p.categorie }) },
+      const cle = `proposition:${p.titre}`;
+      const carte = h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled,
+        onclick: () => demarrer({ cle, mode: 'libre', envoi: async () => ({ proposition: p.titre }), sujet: p.titre, categorie: p.categorie }) },
         h('span', { className: 'proposition-tete' },
           h('span', { className: 'cartouche-type', id: id('type') }, cartoucheProposition(p.type)),
-          p.auProgramme && h('span', { className: 'au-programme', id: id('programme') }, '🎒 Au programme')),
+          p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
         h('strong', { className: 'proposition-titre', id: id('titre') }, p.titre),
-        h('span', { className: 'proposition-categorie', id: id('categorie') }, p.categorie),
+        h('span', { className: 'proposition-categorie' }, p.categorie),
         p.accroche && h('span', { className: 'accroche', id: id('accroche') }, p.accroche));
       carte.setAttribute('aria-labelledby', `${id('titre')} ${id('type')}`);
-      carte.setAttribute('aria-describedby', ['categorie', p.auProgramme && 'programme', p.accroche && 'accroche'].filter(Boolean).map(id).join(' '));
+      carte.dataset.cle = cle;
+      if (p.accroche) carte.setAttribute('aria-describedby', id('accroche'));
       return carte;
     });
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
@@ -719,7 +751,7 @@ function ecranNouvelleLecon(profil) {
     etatIdees.hidden = !section.texte;
     boutonsIdees = section.autresIdees ? [...cartes, autresIdees] : cartes;
     idees.replaceChildren(...garder([
-      h('h2', {}, '🎲 Des idées pour toi'),
+      h('h2', { tabIndex: -1 }, '🎲 Des idées pour toi'),
       cartes.length > 0 && h('div', { className: 'propositions', style: colonnesGrille(cartes.length) }, cartes),
       etatIdees,
       section.autresIdees && autresIdees]));
@@ -727,6 +759,7 @@ function ecranNouvelleLecon(profil) {
   afficherPropositions();
   quitterEcran = () => {
     actif = false; clearTimeout(minuteur);
+    voile.lever(); // la barre de navigation, hors de l'écran, ne reste pas inerte
     app.removeEventListener('pointerdown', memoriser, true);
     app.removeEventListener('focusin', memoriser, true);
   };
@@ -739,10 +772,10 @@ function ecranNouvelleLecon(profil) {
         ev.preventDefault();
         if (!fichiers.files.length) return (erreurRevision.textContent = FICHIERS_MANQUANTS);
         erreurRevision.textContent = '';
-        demarrer(async () => ({
+        demarrer({ cle: 'revision', mode: 'revision', envoi: async () => ({
           dateControle: dateControle.value || undefined,
           fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-        }), 'revision', 'revision');
+        }) });
       } },
       h('label', { htmlFor: 'fichiers' }, 'Photos ou PDF de ta leçon (plusieurs pages possibles)'), fichiers, pagesChoisies,
       h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
@@ -755,7 +788,7 @@ function ecranNouvelleLecon(profil) {
         erreurSujet.textContent = message ?? '';
         if (message) return sujet.focus();
         const texte = sujet.value.trim();
-        demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`, { sujet: texte });
+        demarrer({ cle: `sujet:${texte}`, mode: 'libre', envoi: async () => ({ sujet: texte }), sujet: texte });
       } }, h('label', { htmlFor: 'sujet' }, 'Ce que tu veux apprendre'), sujet, boutons[0], erreurSujet) },
   ];
   for (const voie of voies) {
@@ -775,13 +808,13 @@ function ecranNouvelleLecon(profil) {
   document.title = 'Une nouvelle ligne · Cartable';
   montrer(
     h('div', { className: 'nouvelle-tete' },
-      h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
+      retourAccueil(),
       h('h2', {}, 'Une nouvelle ligne')),
     idees,
     h('div', { className: 'nouvelle-voies' },
       h('div', { className: 'voies-boutons' }, voies.map((v) => v.bouton)),
       voies.map((v) => v.panneau)),
-    voile);
+    voile.element);
 }
 
 // Libellé du bouton de chaque Rebond ; le serveur ne reçoit que l'action.
@@ -843,7 +876,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   const afficherEntete = () => {
     entete.style.cssText = styleLigne(lecon.categorie);
     entete.replaceChildren(...garder([
-      h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
+      retourAccueil(),
       h('div', { className: 'seance-titre' },
         lecon.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${lecon.niveauLecon}`),
         h('h2', {}, lecon.titre),

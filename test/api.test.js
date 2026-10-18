@@ -1578,6 +1578,11 @@ test('Cadrage : questions et réponses fermées servies par la configuration, av
   assert.equal(cadrage.pourquoi.reponses.controle, 'Pour un contrôle');
 });
 
+test('Cadrage : la configuration sert aussi chaque question telle qu\'elle se pose quand le sujet est connu', async () => {
+  const { cadrageAvecSujet } = (await appel('/api/config')).data;
+  assert.deepEqual(cadrageAvecSujet, { pourquoi: 'Pourquoi veux-tu apprendre « {sujet} » ?', deja: 'Sur « {sujet} », tu en sais déjà…' });
+});
+
 test('Cadrage : valeurs inconnues refusées (400) sans créer de Leçon ; Cadrage absent accepté', async () => {
   const avant = await nombreDeLecons('zoe-test');
   assert.equal((await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les comètes', cadrage: { pourquoi: 'pour rire' } })).status, 400);

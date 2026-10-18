@@ -103,7 +103,8 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 
 /* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
 .lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }
-.lecons-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
+/* Titres Display des en-têtes d'écran (Mes leçons, Mes badges, Nouvelle leçon) */
+.lecons-tete h2, .badges-tete h2, .nouvelle-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
 .lecons-tete button { padding:.7rem 1.1rem; border-radius:12px; }
 .bouton-nouvelle { background:var(--nuit); border-color:var(--nuit); color:var(--sur-nuit); }
 .bouton-nouvelle:hover { background:color-mix(in srgb, var(--nuit) 85%, var(--sur-nuit)); }
@@ -167,7 +168,7 @@ details.objectifs li small { display:block; color:var(--doux); font-size:.82rem;
 .reseau-vide p { margin:.8rem 0 0; color:var(--doux); }
 header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
 @media (max-width: 480px) { header { padding-inline:.75rem; gap:.5rem; } header h1 .nom-appli { display:none; } .entete-droite, #nav { gap:.35rem; } header button.secondaire { padding:.45rem .6rem; font-size:.9rem; } .compteur-etoiles { padding:.3rem .7rem; } }
-@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
+@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2, .nouvelle-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 
 /* Séance : l'en-tête situe l'Élève sur la ligne de sa Leçon (ligneLecon, à la couleur de sa Catégorie) avec le mot de
@@ -175,7 +176,9 @@ header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
 body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
 body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; gap:.6rem; padding-top:.8rem; padding-bottom:1rem; }
 .seance-tete { display:flex; align-items:center; flex-wrap:wrap; gap:.35rem 1rem; padding:.35rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
-.seance-tete .retour-accueil { display:inline-flex; align-items:center; min-height:2.6rem; font-weight:700; white-space:nowrap; }
+/* Lien « ← Mes leçons » des en-têtes (Séance, Nouvelle leçon, carte d'attente) */
+.retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
+.seance-tete .retour-accueil { min-height:2.6rem; white-space:nowrap; }
 .seance-titre { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .7rem; min-width:0; }
 .seance-titre h2 { margin:0; font-size:1.3rem; line-height:1.2; text-wrap:balance; }
 .seance-titre .maitrise { margin-top:0; }
@@ -229,9 +232,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .proposition .accroche { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; line-height:1.35; text-wrap:pretty; }
 /* Cadre de Nouvelle leçon : « ← Mes leçons » comme en Séance, puis le titre d'écran en Display. */
 .nouvelle-tete { display:flex; flex-direction:column; align-items:flex-start; gap:.1rem; margin:.4rem 0 .3rem; }
-.nouvelle-tete .retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
-.nouvelle-tete h2 { margin:0; font-size:2rem; line-height:1.1; text-wrap:balance; }
-@media (max-width: 640px) { .nouvelle-tete h2 { font-size:1.6rem; } }
+.nouvelle-tete h2 { text-wrap:balance; }
 /* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet à moi) : repliées sous les Propositions,
    deux boutons secondaires qui déplient chacun leur formulaire dans une carte, un seul à la fois. */
 .nouvelle-voies { display:flex; flex-direction:column; align-items:flex-start; gap:1rem; margin-top:2.2rem; }
@@ -266,7 +267,6 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .attente-ensuite { font-weight:700; }
 .attente-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1.2rem; margin-top:.3rem; }
 .attente-actions button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }
-.attente-actions .retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
 .carte-attente.echec h2 { color:var(--rouge); }
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
@@ -287,7 +287,6 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 /* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
-.badges-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
 .totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
 .collection h3 { margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }

@@ -9,7 +9,7 @@ import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
-import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, questionsDuMode } from './lib/cadrage.js';
+import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, QUESTIONS_AVEC_SUJET, questionsDuMode } from './lib/cadrage.js';
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
@@ -526,7 +526,7 @@ async function api(req, res, segments) {
   const [r1, slug, r2, id, r3] = segments;
   const m = req.method;
   const maintenant = maintenantDe(req.headers); // lu une fois par requête (lib/horloge.js)
-  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT, cadrage: QUESTIONS_CADRAGE, questionsCadrage: { libre: questionsDuMode('libre'), revision: questionsDuMode('revision') }, sujetMax: SUJET_MAX });
+  if (r1 === 'config' && m === 'GET') return json(res, 200, { niveaux: NIVEAUX, categories: CATEGORIES, nombrePropositionsDefaut: NOMBRE_PROPOSITIONS_DEFAUT, modeles: MODELES, modeleDefaut: MODELE_DEFAUT, cadrage: QUESTIONS_CADRAGE, cadrageAvecSujet: QUESTIONS_AVEC_SUJET, questionsCadrage: { libre: questionsDuMode('libre'), revision: questionsDuMode('revision') }, sujetMax: SUJET_MAX });
   if (r1 !== 'eleves') throw new HttpError(404, 'Introuvable');
 
   if (!slug) {

@@ -1722,6 +1722,8 @@ test('Visuels : la photo est l\'image de partage déjà réduite de la source (o
     // La règle vaut pour tout site : aucun n'y est nommé comme cas particulier.
     assert.doesNotMatch(photo, /Wikimedia|Commons/);
   }
+  // L'exemple de figure du LISEZMOI, que le prof recopie, ne cite pas un fichier original de Commons.
+  assert.doesNotMatch(figureDoc, /upload\.wikimedia\.org|Wikimedia Commons/);
 });
 
 test('Visuels : un extrait de texte (poème, passage, document) peut être le visuel d\'une figure, consigne et LISEZMOI à l\'appui', async () => {

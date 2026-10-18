@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT, FORMATS_RAPPEL_ACTIF } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT, FORMATS_RAPPEL_ACTIF, consigneImagesRetirees } from '../lib/agent.js';
 import path from 'node:path';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
@@ -379,4 +379,14 @@ test('consignes : « ordre » réservé aux suites à un seul ordre juste, au pl
 
 test('consigne du premier tour : pas de question « ordre » dans le Pré-test, plutôt un QCM ou « classer »', () => {
   for (const mode of ['libre', 'revision']) assert.match(consignePremierTour(mode), /pas de question "ordre" dans le Pré-test[^.]*QCM ou "classer"/i);
+});
+
+test('Images retirées : une image trop lourde se remplace par l\'image de partage réduite de sa source, les autres comme avant (#139)', () => {
+  const lourde = consigneImagesRetirees([{ url: 'https://exemple.org/original.jpg', page: '0003-arc.html', raison: 'image trop lourde' }]).join('\n');
+  assert.match(lourde, /https:\/\/exemple\.org\/original\.jpg \(0003-arc\.html\) : image trop lourde/);
+  assert.match(lourde, /trop lourde[^\n]*image de partage[^\n]*og:image[^\n]*jamais le fichier original/);
+
+  const morte = consigneImagesRetirees([{ url: 'https://exemple.org/x.png', page: '0002.html', raison: 'adresse morte (erreur 404)' }]).join('\n');
+  assert.doesNotMatch(morte, /image de partage/);
+  assert.match(morte, /par une autre image qui marche \(déclarée dans images\.json\) ou par un schéma SVG/);
 });

@@ -468,13 +468,26 @@ function calendrierJours({ aujourdhui, jours }) {
     const nombre = new Date(a, m, 0).getDate();
     const cases = [...Array(decalage).fill(null), ...Array.from({ length: nombre }, (_, i) => `${mois}-${String(i + 1).padStart(2, '0')}`)];
     let aFocaliser = null;
+    // Un seul arrêt de tabulation dans la grille : le jour choisi, sinon aujourd'hui, sinon le premier jour touchable
+    // du mois ; les flèches passent d'un jour à l'autre (et d'un mois à l'autre), comme un calendrier natif.
+    const touchable = (jour) => jour && jour >= debut && jour <= aujourdhui;
+    const arret = [choisi, aujourdhui].find((j) => cases.includes(j) && touchable(j)) ?? cases.find(touchable);
+    const deplacer = (e) => {
+      const pas = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+      if (!pas || !e.target.value) return;
+      e.preventDefault();
+      const cible = jourPlus(e.target.value, pas);
+      if (!touchable(cible)) return;
+      mois = cible.slice(0, 7);
+      afficher(cible);
+    };
     bloc.replaceChildren(
       h('div', { className: 'calendrier-jours' },
         h('div', { className: 'calendrier-mois' },
           h('button', { className: 'secondaire', ariaLabel: 'Mois précédent', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(); } }, '‹'),
-          h('strong', {}, `${MOIS[m - 1]} ${a}`),
+          h('h3', {}, `${MOIS[m - 1]} ${a}`),
           h('button', { className: 'secondaire', ariaLabel: 'Mois suivant', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(); } }, '›')),
-        h('div', { className: 'calendrier-grille' },
+        h('div', { className: 'calendrier-grille', role: 'group', ariaLabel: `${MOIS[m - 1]} ${a}`, onkeydown: deplacer },
           JOURS_SEMAINE.map((d) => h('span', { className: 'nom', ariaHidden: 'true' }, d)),
           cases.map((jour) => {
             if (!jour) return h('span', {});
@@ -484,7 +497,9 @@ function calendrierJours({ aujourdhui, jours }) {
               className: `${classeJour(journee, aujourdhui, debut)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
               ariaLabel: lectureJour(nom, journee, aujourdhui, debut),
               ariaPressed: String(jour === choisi),
-              disabled: jour > aujourdhui || jour < debut,
+              disabled: !touchable(jour),
+              tabIndex: jour === arret ? 0 : -1,
+              value: jour,
               onclick: () => afficher(jour),
             }, tamponJour(journee));
             if (jour === choisi) aFocaliser = bouton;

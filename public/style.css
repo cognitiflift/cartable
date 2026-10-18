@@ -315,8 +315,8 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
    entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */
 .mon-calendrier { display:flex; flex-direction:column; gap:.8rem; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
 .calendrier-mois { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }
-.calendrier-mois strong { font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
-.calendrier-mois strong::first-letter { text-transform:uppercase; }
+.calendrier-mois h3 { margin:0; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.calendrier-mois h3::first-letter { text-transform:uppercase; }
 .calendrier-mois button { min-width:2.75rem; min-height:2.75rem; font-size:1.2rem; line-height:1; }
 .calendrier-grille { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.15rem; justify-items:center; }
 .calendrier-grille .nom { padding:.2rem 0 .35rem; }
@@ -339,4 +339,4 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .lecons-du-jour { list-style:none; margin:0; padding:0; display:grid; gap:.15rem; }
 .gains-du-jour { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .8rem; }
 .calendrier-detail .gain-badge { display:inline-flex; align-items:center; gap:.35rem; }
-@media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.6rem; } .badges-tete h2 { font-size:1.6rem; } }
+@media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.75rem; } .badges-tete h2 { font-size:1.6rem; } }

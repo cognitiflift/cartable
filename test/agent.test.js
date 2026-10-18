@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT, FORMATS_RAPPEL_ACTIF } from '../lib/agent.js';
 import path from 'node:path';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
@@ -364,11 +364,10 @@ test('Préambule de relais : après un Pré-test, ses résultats par question et
 // « Remettre dans l'ordre » (#130) : réservé aux suites à un seul ordre juste, une fois par quiz au plus, hors Pré-test.
 test('consignes : « ordre » réservé aux suites à un seul ordre juste, au plus une fois par quiz, et pas en tête des formats', () => {
   const rappel = consignesLecon(profil).split('\n').find((l) => l.startsWith('Rappel actif'));
-  assert.ok(rappel);
-  const formats = rappel.slice(rappel.indexOf('selon le contenu : ')).split(' ; ');
-  assert.doesNotMatch(formats[0], /"ordre"/);
-  const ordre = formats.find((f) => f.includes('"ordre"'));
-  assert.ok(ordre, rappel);
+  assert.ok(rappel.includes(FORMATS_RAPPEL_ACTIF.join(' ; ')), rappel);
+  assert.doesNotMatch(FORMATS_RAPPEL_ACTIF[0], /"ordre"/);
+  const ordre = FORMATS_RAPPEL_ACTIF.find((f) => f.startsWith('"ordre"'));
+  assert.ok(ordre, FORMATS_RAPPEL_ACTIF.join('\n'));
   assert.match(ordre, /un seul ordre est juste et vérifiable dans la page/);
   assert.match(ordre, /chronologie datée/);
   assert.match(ordre, /jamais[^;]*liste de conseils/i);

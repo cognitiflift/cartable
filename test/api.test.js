@@ -1670,7 +1670,7 @@ const lirePage = async (lecon, page) => (await fetch(`${base}/fichiers/zoe-test/
 test('Visuels : consigne du prof (visuel qui explique, légende, source et licence, question du quiz, manifeste) et figure du Kit documentée', async () => {
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les tableaux' })).data;
   const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
-  for (const attendu of [/au moins un visuel/, /légende/, /licence/, /au moins une question du quiz/, /décorati/, /Wikimedia Commons/, /SVG/, /currentColor/, /images\.json/, /kit-figure/]) {
+  for (const attendu of [/au moins un visuel/, /légende/, /licence/, /au moins une question du quiz/, /décorati/, /image de partage/, /SVG/, /currentColor/, /images\.json/, /kit-figure/]) {
     assert.match(args, attendu);
   }
   const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
@@ -1703,6 +1703,27 @@ test('Visuels : photo du sujet réel en premier visuel, prise dans une source d�
     assert.match(texte, /Pré-test[^.]*pas de photo obligatoire/);
     assert.doesNotMatch(texte, /libres? de droits|images? libres?|photos? libres?/);
   }
+});
+
+test('Visuels : la photo est l\'image de partage déjà réduite de la source (og:image), sur tout site, jamais le fichier original (#139)', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les arcs-en-ciel' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  const figureDoc = doc.slice(doc.indexOf('## Figure'), doc.indexOf('## Lecture à voix haute'));
+  for (const texte of [args, figureDoc]) {
+    const photo = texte.slice(texte.search(/Pour une photo|Photo : prends-la/), texte.indexOf('Une œuvre protégée'));
+    assert.match(photo, /image de partage/);
+    assert.match(photo, /og:image/);
+    assert.match(photo, /twitter:image/);
+    assert.match(photo, /jamais le fichier original/);
+    assert.match(photo, /« Fichier : »/);
+    assert.match(photo, /telle qu'elle est affichée dans la page/);
+    assert.doesNotMatch(photo, /adresse directe du fichier de son image principale/);
+    // La règle vaut pour tout site : aucun n'y est nommé comme cas particulier.
+    assert.doesNotMatch(photo, /Wikimedia|Commons/);
+  }
+  // L'exemple de figure du LISEZMOI, que le prof recopie, ne cite pas un fichier original de Commons.
+  assert.doesNotMatch(figureDoc, /upload\.wikimedia\.org|Wikimedia Commons/);
 });
 
 test('Visuels : un extrait de texte (poème, passage, document) peut être le visuel d\'une figure, consigne et LISEZMOI à l\'appui', async () => {

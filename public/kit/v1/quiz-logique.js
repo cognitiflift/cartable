@@ -133,6 +133,7 @@ function examinerQuestion(q) {
   // Un énoncé qui commence par 🚀 marque une question bonus, même sans `bonus: true` (oubli constaté du prof) : elle
   // reste hors score. Le 🚀 est retiré de l'énoncé, le Kit l'affiche lui-même.
   const fusee = ROCKET.test(enonce);
+  const figure = figureValide(q.figure);
   return {
     question: {
       id,
@@ -143,7 +144,7 @@ function examinerQuestion(q) {
       bonus: q.bonus === true || fusee,
       ...(Array.isArray(q.objectifs) && { objectifs: numeros(q.objectifs) }),
       ...(imageValide(q.image) && { image: imageValide(q.image) }),
-      ...(figureValide(q.figure) && { figure: figureValide(q.figure) }),
+      ...(figure && { figure }),
     },
   };
 }

@@ -9,7 +9,7 @@ import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
 import { compterJustes } from './public/kit/v1/quiz-logique.js';
-import { avecAdressesDImages } from './public/kit/v1/figure-logique.js';
+import { avecAdressesDImages, adresseDImageServie } from './public/kit/v1/figure-logique.js';
 import { validerCadrage, promptCadrage, QUESTIONS_CADRAGE, QUESTIONS_AVEC_SUJET, questionsDuMode } from './lib/cadrage.js';
 import { rapatrierImages, imagesASignaler } from './lib/images.js';
 import { maintenantDe } from './lib/horloge.js';
@@ -381,9 +381,9 @@ function varierQuestions(slug, id) {
 
 // Images d'une Question servie hors de sa Page de leçon (Révisions du jour) : son image (US25) et celles de la copie
 // de sa figure (#126). Leur adresse relative à la page (`../images/<fichier>`, voir lib/banque.js) devient celle du
-// fichier de la Leçon servi sous /fichiers.
+// fichier de la Leçon servi sous /fichiers, encodée, et telle que la liste blanche de la figure l'accepte.
 const avecAdresseDImage = (slug, q) => {
-  const adresse = (src) => `/fichiers/${slug}/${q.lecon}/images/${path.basename(src)}`;
+  const adresse = (src) => adresseDImageServie(slug, q.lecon, src);
   return {
     ...q,
     ...(q.image && { image: { ...q.image, src: adresse(q.image.src) } }),

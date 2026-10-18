@@ -52,7 +52,8 @@ const ESTSVG = new Set(Object.keys(SVG));
 
 // Valeur d'attribut sûre pour cet attribut, ou null. Une adresse n'est gardée que pour une image rapatriée (`src`) ou
 // une référence interne au dessin (`href="#…"`, `url(#…)`) ; rien qui puisse appeler du code ou charger du dehors.
-const IMAGE_SERVIE_RE = /^\/fichiers\/[\w-]+\/[\w-]+\/images\/[\w-]+(\.[\w-]+)*$/;
+// Une image servie a l'adresse que donne adresseDImageServie : Élève et Leçon encodés (%XX), fichier rapatrié.
+const IMAGE_SERVIE_RE = /^\/fichiers\/[\w%-]+\/[\w%-]+\/images\/[\w-]+(\.[\w-]+)*$/;
 const REFERENCE_RE = /^#[A-Za-z][\w-]*$/;
 const URL_INTERNE_RE = /^url\(\s*#[A-Za-z][\w-]*\s*\)$/;
 function valeurSure(balise, nom, valeur) {
@@ -62,6 +63,9 @@ function valeurSure(balise, nom, valeur) {
   if (nom === 'href') return REFERENCE_RE.test(v) ? v : null;
   if (nom === 'class') return v.split(/\s+/).filter((c) => /^kit-[\w-]+$/.test(c)).join(' ') || null;
   if (nom === 'id') return /^[A-Za-z][\w-]*$/.test(v) ? v : null;
+  if (nom === 'title' || nom === 'aria-label') return v; // du texte, jamais lu comme du CSS ni une adresse
+  // Un échappement CSS (`\75 rl(` pour `url(`) contournerait les vérifications qui suivent : refusé.
+  if (v.includes('\\')) return null;
   // Une valeur de présentation peut citer une adresse (fill="url(…)") : seulement une référence interne.
   const compacte = v.replace(/[\s\u0000-\u001f]+/g, '').toLowerCase();
   if (/url\(/.test(compacte) && !URL_INTERNE_RE.test(v.trim())) return null;
@@ -223,6 +227,11 @@ export function figuresDuKit(html) {
   return typeof html === 'string' ? [...figuresBrutes(html, () => true)].map(copieSure) : [];
 }
 
+// Adresse sous laquelle l'appli sert l'image rapatriée `src` (`../images/<fichier>`) de la Leçon `lecon` de l'Élève
+// `eleve` (server.js) ; acceptée par la liste blanche (IMAGE_SERVIE_RE).
+export const adresseDImageServie = (eleve, lecon, src) =>
+  `/fichiers/${encodeURIComponent(eleve)}/${encodeURIComponent(lecon)}/images/${String(src).split('/').pop()}`;
+
 // Copie dont les images rapatriées ont une autre adresse : `adresse(src)` (l'appli sert les images de la Leçon
 // ailleurs que la page, voir server.js).
 export function avecAdressesDImages(copie, adresse) {
@@ -241,16 +250,28 @@ export function legendeDeFigure(copie) {
   return legende ? texte(legende).replace(/\s+/g, ' ').trim() : '';
 }
 
+// Les ids du dessin (marqueurs, dégradés…) d'une figure construite dans la page de l'appli, et les références qui les
+// citent, prennent un préfixe propre à chaque rendu : ils ne heurtent ni les ids de l'appli, ni ceux d'une autre copie.
+let rendus = 0;
+const REFERENCES_ARIA = new Set(['aria-labelledby', 'aria-describedby']);
+function prefixer(nom, valeur, prefixe) {
+  if (nom === 'id') return prefixe + valeur;
+  if (REFERENCES_ARIA.has(nom)) return valeur.split(/\s+/).filter(Boolean).map((id) => prefixe + id).join(' ');
+  if (nom === 'href') return `#${prefixe}${valeur.slice(1)}`;
+  return URL_INTERNE_RE.test(valeur.trim()) ? valeur.trim().replace(/^url\(\s*#([\w-]+)\s*\)$/, `url(#${prefixe}$1)`) : valeur;
+}
+
 // Élément construit dans `doc` d'après une copie (repassée par la liste blanche), sans jamais interpréter de balisage :
 // une figure du Kit (`kit-figure kit-quiz-figure`) prête pour revoirFigure (figure.js) ; null si la copie n'en est pas une.
 export function construireFigure(doc, copie) {
   const propre = nettoyerFigure(copie);
   if (!propre) return null;
+  const prefixe = `kit-dessin-${++rendus}-`;
   const construire = (n, dansSvg) => {
     if (typeof n === 'string') return doc.createTextNode(n);
     const enSvg = dansSvg || n.balise === 'svg';
     const e = doc.createElementNS(enSvg ? SVG_NS : HTML_NS, n.balise);
-    for (const [nom, valeur] of Object.entries(n.attributs)) if (nom !== 'id' || enSvg) e.setAttribute(nom, valeur);
+    for (const [nom, valeur] of Object.entries(n.attributs)) if (nom !== 'id' || enSvg) e.setAttribute(nom, prefixer(nom, valeur, prefixe));
     e.append(...n.enfants.map((c) => construire(c, enSvg)));
     return e;
   };

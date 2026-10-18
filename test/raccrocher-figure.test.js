@@ -72,14 +72,26 @@ test('Raccrocher les figures : la relancer ne change plus rien (même Banque, ri
   assert.equal(raccrocherFigures(sansRien, PAGES), sansRien);
 });
 
-test('Raccrocher les figures : une Question écartée puis rejouée au quiz reprend sa page et sera réexaminée', () => {
+const QUIZ = (figure) => ({ objectifs: [1], questions: [{ id: 'q1', type: 'qcm', enonce: 'Que contient la case B ?', reponses: ['a', 'b'], bonne: 0, explication: 'x', ...(figure && { figure }) }] });
+const rejouer = (avant, quiz, page = 'deux.html') =>
+  ajouterReponsesDuQuiz(avant, { page, quiz, html: PAGES[page], resultats: [{ id: 'q1', juste: true }], date: '2026-10-02T10:00:00.000Z' });
+
+test('Raccrocher les figures : une Question écartée puis rejouée au quiz reprend sa page, revient en Révision et n\'est plus réexaminée', () => {
   const ecartee = raccrocherFigures(banque(), PAGES);
-  const quiz = { objectifs: [1], questions: [{ id: 'q1', type: 'qcm', enonce: 'Que contient la case B ?', reponses: ['a', 'b'], bonne: 0, explication: 'x', figure: 'grille' }] };
-  const html = '<figure class="kit-figure" id="grille"><figcaption>Grille</figcaption></figure>';
-  const apres = ajouterReponsesDuQuiz(ecartee, { page: 'deux.html', quiz, html, resultats: [{ id: 'q1', juste: true }], date: '2026-10-02T10:00:00.000Z' });
-  assert.equal(apres['deux.html#q1'].horsRevision, undefined);
-  assert.equal(apres['deux.html#q1'].journal.length, 2);
-  assert.ok(apres['deux.html#q1'].contenu.figure);
+  const apres = rejouer(ecartee, QUIZ());
+  const q = apres['deux.html#q1'];
+  assert.equal(q.horsRevision, undefined);
+  assert.equal(q.journal.length, 2);
+  assert.equal(raccrocherFigures(apres, PAGES)['deux.html#q1'], q);
+  assert.ok(!pagesARaccrocher(apres).includes('deux.html'));
+});
+
+test('Raccrocher les figures : une Question entrée par le quiz depuis le lien `figure` n\'est jamais examinée, même sans figure', () => {
+  for (const page of ['une.html', 'deux.html', 'zero.html']) {
+    const apres = rejouer({}, QUIZ(), page);
+    assert.equal(raccrocherFigures(apres, PAGES), apres, page);
+    assert.deepEqual(pagesARaccrocher(apres), [], page);
+  }
 });
 
 test('Raccrocher les figures : seules les pages des Questions encore à examiner sont à lire', () => {

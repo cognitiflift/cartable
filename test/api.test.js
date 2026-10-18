@@ -2617,12 +2617,15 @@ test('Révisions du jour : une Question d\'avant le lien `figure` qui renvoie à
   const dir = (l) => path.join(eleves, slug, 'lecons', l.id);
   const lire = async (l) => (await appel(`/api/eleves/${slug}/lecons/${l.id}`, 'GET', undefined, le(LENDEMAIN))).data;
   const avant = await lire(lecons[1]);
-  // Les deux Leçons : q1 renvoie au schéma, comme une Question écrite avant le lien `figure`. Une figure dans la
-  // première page, deux dans la seconde.
+  // Les deux Leçons : q1 renvoie au schéma, et a été écrite avant le lien `figure` (sans `lienFigure`). Une figure
+  // dans la première page, deux dans la seconde. q2, entrée par le quiz depuis ce lien, n'est pas examinée.
   for (const [i, l] of lecons.entries()) {
     const fichier = path.join(dir(l), 'questions.json');
     const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+    assert.equal(banque['0002-volcans.html#q1'].lienFigure, true);
+    delete banque['0002-volcans.html#q1'].lienFigure;
     banque['0002-volcans.html#q1'].contenu.enonce = 'Regarde le schéma : où sort la lave ?';
+    banque['0002-volcans.html#q2'].contenu.enonce = 'Sur la carte, où est le volcan ?';
     await fs.writeFile(fichier, JSON.stringify(banque));
     await fs.writeFile(path.join(dir(l), 'lessons', '0002-volcans.html'), `${fig('Volcan')}${i ? fig('Autre') : ''}<p>Fin</p>`);
   }

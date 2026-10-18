@@ -1687,6 +1687,24 @@ test('Visuels : consigne du prof (visuel qui explique, légende, source et licen
   assert.match(doc, /`figure` l'emporte/);
 });
 
+test('Visuels : photo du sujet réel en premier visuel, prise dans une source déjà consultée, crédit avec copyright, Pré-test exempté (#129)', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'Troie' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  const figureDoc = doc.slice(doc.indexOf('## Figure'), doc.indexOf('## Lecture à voix haute'));
+  for (const texte of [args, figureDoc]) {
+    assert.match(texte, /objet, un lieu, une personne ou une œuvre réels/);
+    assert.match(texte, /premier visuel est une photo de ce sujet/);
+    assert.match(texte, /processus, une chronologie, une méthode ou une notion abstraite/);
+    assert.match(texte, /même WebFetch/);
+    assert.match(texte, /jamais une adresse devinée/);
+    assert.match(texte, /auteur/);
+    assert.match(texte, /copyright/);
+    assert.match(texte, /Pré-test[^.]*pas de photo obligatoire/);
+    assert.doesNotMatch(texte, /libres? de droits|images? libres?|photos? libres?/);
+  }
+});
+
 test('Visuels : un extrait de texte (poème, passage, document) peut être le visuel d\'une figure, consigne et LISEZMOI à l\'appui', async () => {
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les poèmes' })).data;
   const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
@@ -1736,6 +1754,9 @@ test('Visuels : une adresse morte, un fichier qui n\'est pas une image ou une ad
   assert.ok(signale.includes(`${serveurImages}/page.png (0002-images.html) : fichier qui n'est pas une image`));
   assert.ok(signale.includes(`${serveurImages}/texte.txt (0002-images.html) : fichier qui n'est pas une image`));
   assert.ok(signale.includes('file:///etc/passwd (0002-images.html) : adresse qui n\'est pas en HTTP(S)'));
+  // #129 : une autre photo d'abord ; le schéma SVG seulement faute de photo qui marche, et la légende le dit.
+  assert.match(signale, /par une autre photo qui marche/);
+  assert.match(signale, /schéma SVG[^.]*aucune photo qui marche[^.]*la légende le dit/);
   await message(lecon, 'ok');
   assert.doesNotMatch(await args(), /Images retirées/);
 }));

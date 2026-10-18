@@ -228,7 +228,7 @@ Il affiche les questions dans leur format, mélange les réponses (ou les mots, 
 
 ## Figure
 
-Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre, extrait de texte), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Mets-le dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source et licence). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur chaque question du quiz qui oblige à la regarder (voir « Format du quiz ») : l'élève peut la revoir depuis la question. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… », « Texte… ») : le bouton « Revoir » le reprend.
+Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre, extrait de texte), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Quand la page porte sur un objet, un lieu, une personne ou une œuvre réels (le site de Troie, un volcan, un tableau, un fossile, un personnage historique), son premier visuel est une photo de ce sujet ; un schéma peut s'y ajouter en second visuel. Pour un processus, une chronologie, une méthode ou une notion abstraite, choisis un schéma, une frise, une carte, un arbre ou un extrait. Le Pré-test, sans contenu à enseigner, n'a pas de photo obligatoire (une de ses questions peut toujours avoir une `image`). Mets le visuel dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source, auteur, et licence ou copyright). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur chaque question du quiz qui oblige à la regarder (voir « Format du quiz ») : l'élève peut la revoir depuis la question. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… », « Texte… ») : le bouton « Revoir » le reprend.
 
 ```html
 <figure class="kit-figure" id="stromboli">
@@ -255,7 +255,7 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 </figure>
 ```
 
-- Photo trouvée en ligne (de préférence Wikimedia Commons ou le site d'un musée, jamais une adresse devinée) : cite dans `src` l'adresse directe du fichier image, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
+- Photo : prends-la dans une source que tu consultes déjà pour vérifier les faits (article Wikipédia, notice d'un musée ou d'une institution). Demande dans le même WebFetch l'adresse directe du fichier de son image principale, sa source, son auteur et sa licence ou son copyright ; fais un autre WebFetch (Wikimedia Commons, site d'un musée) seulement si cette source n'a pas d'image, et jamais une adresse devinée. Une œuvre protégée se montre aussi en photo : l'usage est familial, privé et éducatif, et le crédit cite toujours la source, l'auteur et la licence ou le copyright. Cite dans `src` l'adresse directe du fichier image, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
 
 ```json
 [
@@ -269,7 +269,7 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 ]
 ```
 
-Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la.
+Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre photo qui marche. Sur une page qui porte sur un sujet réel, un schéma SVG n'est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
 
 ## Lecture à voix haute
 

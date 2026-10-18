@@ -99,6 +99,10 @@ Court message affiché aussitôt après un quiz de page, avec le **Rebond** : l'
 Composants servis par l'appli elle-même à toute nouvelle Page de leçon : le quiz et le style de base (lisibilité, couleur de la Catégorie, mode sombre). L'agent n'y écrit que les questions, sous forme de données ; il garde la liberté d'ajouter à sa Leçon des composants propres au sujet.
 _Avoid_: composants (seul : ambigu avec ceux de la Leçon), bibliothèque
 
+**Visuel**:
+Ce qui, dans la figure d'une Page de leçon, porte une information du contenu (photo, schéma, frise, carte, arbre, extrait de texte), jamais seulement décoratif. Quand la page porte sur un objet, un lieu, une personne ou une œuvre réels, son premier Visuel est une photo de ce sujet, avec sa source et son copyright.
+_Avoid_: illustration (suggère le décor), image tout court (désigne aussi l'image propre à une question du quiz, hors figure)
+
 **Coût d'un tour**:
 Ce que consomme un appel à l'agent (tokens et coût indicatif), avec le type de tâche qui l'a demandé ; cumulé par Leçon et par Élève. Indicateur relatif : avec l'abonnement Pro, il se mesure en quota partagé, pas en argent dépensé.
 _Avoid_: prix, facture

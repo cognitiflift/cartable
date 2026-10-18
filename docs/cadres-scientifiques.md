@@ -138,7 +138,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour la segmentation (Rey et al. 2019) et le principe multimédia (synthèses de Mayer). Heuristique tirée d'un cadre pour leur application à des Pages de leçon écrites par un agent.
 
-**Où dans Cartable.** Consigne « Visuels » du prof : un visuel qui explique, jamais seulement décoratif, et une question qui oblige à le regarder (`lib/agent.js`) ; **Page de leçon** choisie une à une, une Question à la fois dans la **Révision du jour** ; figure du **Kit** avec légende.
+**Où dans Cartable.** Consigne « Visuels » du prof : un visuel qui explique, jamais seulement décoratif, et une question qui oblige à le regarder (`lib/agent.js`), une photo du sujet comme premier **Visuel** quand la page porte sur un objet, un lieu, une personne ou une œuvre réels (ticket #129 ; le choix de la photo plutôt que du schéma n'en découle pas, voir « Décisions sans fondement écrit ») ; **Page de leçon** choisie une à une, une Question à la fois dans la **Révision du jour** ; figure du **Kit** avec légende.
 
 ### Détails séduisants
 
@@ -288,6 +288,7 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | Quiz plus courts (3 à 6 questions comptées) sans Questions moins bien retenues | `lib/agent.js`, ticket #128 | Conséquence attendue des cadres ci-dessus, non mesurée : à vérifier avec les journaux. |
 | **Variantes** écrites après deux réponses à une Question | ADR 0006 | Varier la formulation est une difficulté désirable, mais le moment choisi n'a pas de cadre. Hypothèse à mesurer. |
 | Moins de questions « réfléchis puis dévoile » que d'autres (1 au plus sur un quiz de 3 ou 4 questions comptées, 2 sur 5 ou 6) | `lib/agent.js`, `public/kit/v1/LISEZMOI.md` | Aucun cadre, hypothèse à mesurer (l'autonotation de l'Élève n'est pas vérifiée). |
+| Photo obligatoire pour un sujet réel (objet, lieu, personne ou œuvre) : premier **Visuel** de la page | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, ticket #129 | Le principe multimédia soutient mots + image, pas la photo plutôt que le schéma. Aucun cadre, hypothèse à mesurer. Deux mesures à noter : le **Coût d'un tour** de type page avant et après le changement, et la part des pages sur un sujet réel qui ont bien une photo, sur les 10 prochaines pages concernées. |
 
 ## Écarts relevés
 

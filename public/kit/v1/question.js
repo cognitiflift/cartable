@@ -3,8 +3,9 @@
 // L'Élève répond (selon le format de la question, voir rendus/), dit s'il est sûr (Confiance), puis voit la correction
 // et l'explication ; « Je ne sais pas » est corrigé tout de suite, sans Confiance. Ce fichier ne contient que ce qui
 // est commun à tous les formats ; ce qui est propre à chacun est dans rendus/<type>.js (registre : rendus/index.js).
-import { corriger, estPartiel, typeDe, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
+import { corriger, estPartiel, typeDe, libelleRevoir, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
 import { el } from './dom.js';
+import { descriptionFigure, revoirFigure } from './figure.js';
 import { RENDUS } from './rendus/index.js';
 import { boutonLecture } from './lecture.js';
 import { texteDeQuestion } from './lecture-logique.js';
@@ -24,8 +25,10 @@ const messageCorrection = (correction) => {
 // ce qui précède l'énoncé (numéro, « 🚀 Bonus · »…). `quandCorrigee({ choisie, sur })` est appelé une fois, à la
 // correction : `choisie` = réponse de l'Élève propre au type (index de la réponse avant mélange pour un QCM), ou
 // JE_NE_SAIS_PAS ; `sur` = Confiance (absente après « Je ne sais pas »). `lecture` : bouton « 🔊 » qui lit la question
-// (lecture à voix haute du Profil, #76), puis aussi sa correction une fois corrigée.
-export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false } = {}) {
+// (lecture à voix haute du Profil, #76), puis aussi sa correction une fois corrigée. `figure` (spec #123) : la copie de
+// la figure que désigne la question (figure.js), repliée sous l'énoncé derrière un bouton « 👁 Revoir… », ou montrée
+// d'office avec `figureDepliee` ; elle prend la place de l'image de la question, qui ne s'affiche que sans figure.
+export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false, figure = null, figureDepliee = false } = {}) {
   let correction = null;
   const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
   // Confiance : après la réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
@@ -77,12 +80,13 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
     corrigerQuestion();
   });
   if (!souvenirDeclare) rendu.zone.append(neSaisPas);
-  const image = q.image && el('img', { className: 'kit-quiz-image', src: q.image.src, alt: q.image.alt });
-  image?.addEventListener('error', () => image.remove(), { once: true });
+  const revoir = figure && revoirFigure(figure, { libelle: libelleRevoir(descriptionFigure(figure)), deplie: figureDepliee });
+  const image = !revoir && q.image && el('img', { className: 'kit-quiz-image', src: q.image.src, alt: q.image.alt });
+  if (image) image.addEventListener('error', () => image.remove(), { once: true });
   return el('fieldset', { className: `kit-quiz-question kit-quiz-${typeDe(q)}${q.bonus ? ' kit-bonus' : ''}` },
     el('legend', {}, legende, q.enonce),
     lecture ? boutonLecture(() => texteDeQuestion(q, correction), { titre: 'Lire la question à voix haute' }) : null,
-    image,
+    revoir || image || null,
     rendu.zone,
     demande,
     retour);

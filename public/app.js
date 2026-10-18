@@ -1,4 +1,5 @@
 import { rendreQuestion } from '/kit/v1/question.js';
+import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 import {
@@ -533,6 +534,9 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
         h('p', { className: 'revision-origine' }, h('small', {}, `${q.titreLecon} · question ${i} sur ${questions.length} · `, lien)),
         rendreQuestion(q, {
           lecture: profil.lectureVoixHaute,
+          // Copie de la figure de sa page (#126), dépliée d'office : reconstruite élément par élément, sans balisage.
+          figure: construireFigure(document, q.figure),
+          figureDepliee: true,
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });

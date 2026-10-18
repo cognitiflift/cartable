@@ -1678,6 +1678,24 @@ test('Visuels : consigne du prof (visuel qui explique, légende, source et licen
   assert.match(doc, /images\.json/);
   assert.match(doc, /currentColor/);
   assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure/);
+  // Spec #123 : un id sur chaque figure, `figure` sur chaque question qui oblige à la regarder, plus de « ci-dessus ».
+  for (const texte of [args, doc]) {
+    assert.match(texte, /<figure class="kit-figure" id="/);
+    assert.match(texte, /"figure": "/);
+    assert.match(texte, /ci-dessus/);
+  }
+  assert.match(doc, /`figure` l'emporte/);
+});
+
+test('Visuels : un extrait de texte (poème, passage, document) peut être le visuel d\'une figure, consigne et LISEZMOI à l\'appui', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les poèmes' })).data;
+  const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
+  assert.match(args, /extrait de texte/);
+  assert.match(args, /<blockquote>/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /extrait de texte/i);
+  assert.match(doc, /<figure class="kit-figure"[^>]*>\s*<blockquote>\s*<p>[^<]+<br>/);
+  assert.match(await (await fetch(`${base}/kit/v1/base.css`)).text(), /\.kit-figure blockquote/);
 });
 
 test('Visuels : une image déclarée est rapatriée dans la Leçon et son adresse réécrite dans la page', () => avecServeurImages(async (serveurImages) => {
@@ -2552,6 +2570,82 @@ test('Révisions du jour : une Question avec une image la garde dans la Leçon e
   await fs.writeFile(fichier, JSON.stringify(banque));
   const [variante] = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions.find((q) => q.id === 'q1').variantes;
   assert.deepEqual(variante.image, { src: '../images/cratere.png', alt: 'Le cratère du Stromboli' });
+});
+
+test('Révisions du jour : une Question qui désigne une figure de sa page en garde une copie sûre, servie dépliée (#126)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Revis-Figure', 1);
+  const quiz = structuredClone(quizBanque);
+  quiz.questions[0].figure = 'volcan';
+  quiz.questions[1].figure = 'absente';
+  const page = path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-volcans.html');
+  const figure = '<figure class="kit-figure" id="volcan"><svg viewBox="0 0 10 10" onload="alert(1)"><script>alert(2)</script>'
+    + '<path d="M0 10 L5 0 L10 10" stroke="currentColor" fill="none"/></svg><img src="../images/cratere.png" alt="Cratère">'
+    + '<img src="https://pirate.example/x.png" alt="distante"><figcaption>Schéma du volcan <span class="kit-credit">Arno</span></figcaption></figure>';
+  await fs.writeFile(page, `${figure}<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const questions = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions;
+  const copie = questions.find((q) => q.id === 'q1').contenu.figure;
+  assert.deepEqual(copie.enfants.map((e) => e.balise), ['svg', 'img', 'figcaption']);
+  assert.doesNotMatch(JSON.stringify(copie), /alert|script|onload|pirate/);
+  // Une figure introuvable dans la page n'est pas gardée : la Question reste, sans figure.
+  assert.equal(questions.find((q) => q.id === 'q2').contenu.figure, undefined);
+  // La figure de la page change : la copie la suit au quiz suivant, sans être une réécriture de la Question (variantes
+  // gardées). Puis la page disparaît : la copie reste, la révision se fait sans la page.
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  banque['0002-volcans.html#q1'].variantes = [{ enonce: 'Par où la lave sort-elle ?', reponses: ['Le cratère', 'Les racines'], bonne: 0, explication: '' }];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+  await fs.writeFile(page, `<figure class="kit-figure" id="volcan"><figcaption>Autre</figcaption></figure><script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data.questions.find((q) => q.id === 'q1');
+  assert.equal(q1.variantes.length, 1);
+  assert.deepEqual(q1.variantes[0].figure, q1.contenu.figure);
+  await fs.rm(page);
+  // En révision, servie avec sa copie, dont les images ont l'adresse du fichier de la Leçon servi par l'appli.
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  const servie = data.questions.find((q) => q.id === 'q1');
+  assert.equal(servie.figure.enfants.find((e) => e.balise === 'figcaption').enfants[0], 'Autre');
+  await fs.writeFile(page, `${figure}<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(BANQUE_DATE));
+  const revue = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
+  assert.equal(revue.figure.enfants.find((e) => e.balise === 'img').attributs.src, `/fichiers/${slug}/${lecon.id}/images/cratere.png`);
+});
+
+test('Révisions du jour : une Question d\'avant le lien `figure` qui renvoie à un visuel retrouve la seule figure de sa page, sinon n\'est plus servie (#127)', async () => {
+  const { slug, lecons } = await eleveRevisions('Revis-Raccroche', 2);
+  const fig = (legende) => `<figure class="kit-figure"><svg viewBox="0 0 10 10"><path d="M0 0 L10 10"/></svg><figcaption>${legende}</figcaption></figure>`;
+  const dir = (l) => path.join(eleves, slug, 'lecons', l.id);
+  const lire = async (l) => (await appel(`/api/eleves/${slug}/lecons/${l.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  const avant = await lire(lecons[1]);
+  // Les deux Leçons : q1 renvoie au schéma, et a été écrite avant le lien `figure` (sans `lienFigure`). Une figure
+  // dans la première page, deux dans la seconde. q2, entrée par le quiz depuis ce lien, n'est pas examinée.
+  for (const [i, l] of lecons.entries()) {
+    const fichier = path.join(dir(l), 'questions.json');
+    const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+    assert.equal(banque['0002-volcans.html#q1'].lienFigure, true);
+    delete banque['0002-volcans.html#q1'].lienFigure;
+    banque['0002-volcans.html#q1'].contenu.enonce = 'Regarde le schéma : où sort la lave ?';
+    banque['0002-volcans.html#q2'].contenu.enonce = 'Sur la carte, où est le volcan ?';
+    await fs.writeFile(fichier, JSON.stringify(banque));
+    await fs.writeFile(path.join(dir(l), 'lessons', '0002-volcans.html'), `${fig('Volcan')}${i ? fig('Autre') : ''}<p>Fin</p>`);
+  }
+  const [une, deux] = [await lire(lecons[0]), await lire(lecons[1])];
+  assert.equal(une.questions.find((q) => q.id === 'q1').contenu.figure.enfants.at(-1).enfants[0], 'Volcan');
+  // Écartée : sa mémoire et la Maîtrise de la Leçon ne changent pas.
+  const ecartee = deux.questions.find((q) => q.id === 'q1');
+  assert.equal(ecartee.contenu.figure, undefined);
+  const memoire = ({ rappel, prochaineRevision, journal }) => ({ rappel, prochaineRevision, journal });
+  assert.deepEqual(memoire(ecartee), memoire(avant.questions.find((q) => q.id === 'q1')));
+  assert.deepEqual(deux.maitrise, avant.maitrise);
+  const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+  const servies = data.questions.map((q) => `${q.lecon}/${q.id}`).sort();
+  assert.deepEqual(servies, [`${lecons[0].id}/q1`, `${lecons[0].id}/q2`, `${lecons[1].id}/q2`].sort());
+  assert.ok(data.questions.find((q) => q.lecon === lecons[0].id && q.id === 'q1').figure);
+  // Relancée (une autre lecture), rien ne change : la Banque n'est pas réécrite.
+  const fichiers = await Promise.all(lecons.map((l) => fs.readFile(path.join(dir(l), 'questions.json'), 'utf8')));
+  await lire(lecons[0]);
+  await lire(lecons[1]);
+  assert.deepEqual(await Promise.all(lecons.map((l) => fs.readFile(path.join(dir(l), 'questions.json'), 'utf8'))), fichiers);
 });
 
 // Formats de rappel actif (spec #48, ticket #70) : texte à trous et remettre dans l'ordre, dans la Banque et les

@@ -3,12 +3,15 @@
 // validation, avec les mêmes limites, pour le quiz affiché et pour le résultat enregistré.
 //
 // Données écrites par le prof dans la Page de leçon (voir LISEZMOI.md) :
-//   { objectifs: [n…], pretest?, questions: [{ id, type, enonce, …champs du type, explication, bonus?, objectifs?, image? }] }
+//   { objectifs: [n…], pretest?, questions: [{ id, type, enonce, …champs du type, explication, bonus?, objectifs?, image?, figure? }] }
 // `type` (spec #48) : `qcm` (par défaut), `trous`, `ordre`… ; chaque type a sa validation et sa correction dans
 // types/<type>.js, inscrites dans types/index.js. Un type inconnu ou une question mal formée est ignoré à l'affichage
 // (le quiz reste utilisable) et signalé au prof au tour suivant (questionsIgnorees).
 // `image` (ajout compatible de la v1, spec #47 US25) : { src, alt } d'une image propre à la question, rapatriée dans
 // images/ de la Leçon (`../images/<fichier>`, relatif à la page) ou distante (http(s), en attendant le rapatriement).
+// `figure` (ajout compatible de la v1, spec #123) : l'`id` d'une figure du Kit (`kit-figure`) de la même page, que la
+// question remontre sous son énoncé (bouton « Revoir »). Si la question porte aussi `image`, la figure l'emporte ;
+// l'image ne s'affiche que si la figure est introuvable dans la page.
 // `pretest: true` : quiz du Pré-test (« Devine ! »), hors Maîtrise, Objectifs atteints, Étoiles et Rebond ordinaire.
 // Message envoyé à l'appli à la fin du quiz (`cartable-score`) :
 //   { type, score, page, objectifs, pretest?, bonus?, questions: [{ id, type?, enonce, choisie, bonne, juste, points?, detail?, jeNeSaisPas?, bonus, objectifs, sur? }] }
@@ -88,6 +91,34 @@ function imageValide(v) {
   return { src, alt };
 }
 
+// Figure d'une question (ajout compatible de la v1, spec #123) : l'`id` d'une figure du Kit de la même page, qui commence
+// par une lettre, puis lettres, chiffres, `-` ou `_` ; null sinon (la question reste, sans figure). Qu'une figure de la
+// page porte bien cet id se vérifie au rendu (quiz.js), qui ignore un id introuvable.
+export const FIGURE_ID_RE = /^[A-Za-z][\w-]*$/;
+function figureValide(v) {
+  const id = typeof v === 'string' ? v.trim() : '';
+  return id.length <= ID_MAX && FIGURE_ID_RE.test(id) ? id : null;
+}
+
+// Libellé du bouton qui remontre la figure d'une question : ce qu'on revoit, quand la figure le laisse savoir.
+// `legende` : texte de sa légende (sans le crédit) ; `visuel` : balise du visuel ('svg', 'img', 'blockquote' ou null).
+// Le premier nom de visuel de la légende l'emporte ; sinon un extrait de texte se revoit comme « le texte », une
+// image comme « l'image » ; sinon « Revoir » (un dessin SVG peut être un schéma, une frise ou une carte).
+const NOMS_DE_VISUELS = [
+  ['schema', 'le schéma'], ['photo', 'la photo'], ['photographie', 'la photo'], ['carte', 'la carte'],
+  ['frise', 'la frise'], ['tableau', 'le tableau'], ['dessin', 'le dessin'], ['graphique', 'le graphique'],
+  ['poeme', 'le poème'], ['texte', 'le texte'], ['extrait', 'l’extrait'], ['document', 'le document'],
+  ['image', 'l’image'], ['figure', 'la figure'],
+];
+const sansAccents = (t) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const PAR_VISUEL = { blockquote: 'le texte', img: 'l’image' };
+export function libelleRevoir({ legende = '', visuel = null } = {}) {
+  const mots = sansAccents(String(legende)).split(/[^\p{L}]+/u);
+  const nom = mots.map((m) => NOMS_DE_VISUELS.find(([n]) => m === n || m === `${n}s`)?.[1]).find(Boolean);
+  const quoi = nom ?? (Object.hasOwn(PAR_VISUEL, visuel) ? PAR_VISUEL[visuel] : null);
+  return quoi ? `👁 Revoir ${quoi}` : '👁 Revoir';
+}
+
 // Une question écrite par le prof : { question } validée, ou { id?, raison } si elle est ignorée. Les champs communs
 // sont validés ici, ceux propres au type par son `valider` (types/index.js).
 function examinerQuestion(q) {
@@ -102,6 +133,7 @@ function examinerQuestion(q) {
   // Un énoncé qui commence par 🚀 marque une question bonus, même sans `bonus: true` (oubli constaté du prof) : elle
   // reste hors score. Le 🚀 est retiré de l'énoncé, le Kit l'affiche lui-même.
   const fusee = ROCKET.test(enonce);
+  const figure = figureValide(q.figure);
   return {
     question: {
       id,
@@ -112,6 +144,7 @@ function examinerQuestion(q) {
       bonus: q.bonus === true || fusee,
       ...(Array.isArray(q.objectifs) && { objectifs: numeros(q.objectifs) }),
       ...(imageValide(q.image) && { image: imageValide(q.image) }),
+      ...(figure && { figure }),
     },
   };
 }

@@ -4,7 +4,7 @@
 // Activée par le réglage du Profil, que l'appli transmet dans l'adresse de la page (lectureActivee). Le quiz du Kit
 // (quiz.js) ajoute lui-même le bouton de la page et ceux des questions ; l'appli s'en sert pour les Révisions du jour.
 // La logique (voix, texte d'une question, découpage) est dans lecture-logique.js.
-import { choisirVoix, morceaux } from './lecture-logique.js';
+import { choisirVoix, morceaux, texteDeBloc, FIN_DE_VERS } from './lecture-logique.js';
 import { el } from './dom.js';
 
 const synthese = globalThis.speechSynthesis ?? null;
@@ -74,7 +74,7 @@ export function boutonLecture(texte, { libelle = ECOUTER, titre = 'Lire à voix 
 }
 
 // Blocs de texte lus sur la page, dans l'ordre ; ni le quiz (ses questions ont leur propre bouton), ni les crédits
-// des figures, ni le code, ni les schémas.
+// des figures, ni le code, ni les schémas. L'extrait de texte d'une figure (<blockquote>) est lu, vers par vers.
 const BLOCS = 'h1, h2, h3, h4, h5, h6, p, li, dt, dd, th, td, figcaption, blockquote, aside';
 const EXCLUS = '.kit-quiz, .kit-credit, .kit-lecture, script, style, svg, template, [hidden], [aria-hidden="true"]';
 
@@ -84,8 +84,8 @@ function texteDeLaPage(racine) {
   return blocs.map((b) => {
     const copie = b.cloneNode(true);
     copie.querySelectorAll(EXCLUS).forEach((n) => n.remove());
-    const t = copie.textContent.replace(/\s+/g, ' ').trim();
-    return t && !/[.?!…:]$/.test(t) ? `${t}.` : t; // un titre se lit comme une phrase
+    copie.querySelectorAll('br').forEach((n) => n.replaceWith(FIN_DE_VERS)); // des vers jamais collés
+    return texteDeBloc(copie.textContent);
   }).filter(Boolean).join(' ');
 }
 

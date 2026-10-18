@@ -77,7 +77,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - `bonus` (facultatif) : `true` pour la question bonus 🚀 du Dépassement, hors score. Une page qui a un Dépassement en a 1, sur son encart « Pour aller plus loin » ; la réussir rapporte une Fusée (les anciennes pages à 2 ou 3 questions bonus en demandent 2 réussies). Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
   - `objectifs` (facultatif) : numéros des Objectifs propres à cette question, à la place de ceux du quiz.
   - `image` (facultatif) : `{ "src": "…", "alt": "…" }`, une image propre à la question, affichée sous l'énoncé, et aussi quand l'élève la retrouve en révision. Même règle que pour une figure : photo distante déclarée dans `images.json` (l'appli la rapatrie et réécrit `src` en `../images/…`), `alt` qui dit ce qu'on voit. Une image mal formée est ignorée, la question reste. Pour un schéma en SVG, utilise plutôt la figure de la page, avec `figure`.
-  - `figure` (facultatif) : l'`id` d'une figure du Kit de la même page (voir « Figure »), par exemple `"figure": "schema-volcan"`. Mets-le sur chaque question qui oblige à regarder ce visuel : sous l'énoncé, un bouton « 👁 Revoir le schéma » (ou « Revoir la photo », « Revoir la carte »… d'après la légende, sinon « Revoir ») déplie une copie de la figure et de sa légende, puis la replie, sans faire défiler la page. Plusieurs questions peuvent désigner la même figure. Un `id` mal formé, ou qui ne désigne aucune figure du Kit de la page, est ignoré : la question s'affiche sans bouton. Si une question porte à la fois `image` et `figure`, `figure` l'emporte : l'image ne s'affiche que si la figure est introuvable. L'énoncé nomme le visuel (« Regarde le schéma… ») et ne dit jamais « ci-dessus » : la question revient aussi en révision, loin de la page.
+  - `figure` (facultatif) : l'`id` d'une figure du Kit de la même page (voir « Figure »), par exemple `"figure": "schema-volcan"`. Mets-le sur une question qui demande de lire ou d'interpréter ce visuel, pas sur une question de rappel dont la réponse y est écrite (voir « Figure ») : sous l'énoncé, un bouton « 👁 Revoir le schéma » (ou « Revoir la photo », « Revoir la carte »… d'après la légende, sinon « Revoir ») déplie une copie de la figure et de sa légende, puis la replie, sans faire défiler la page. Plusieurs questions peuvent désigner la même figure. Un `id` mal formé, ou qui ne désigne aucune figure du Kit de la page, est ignoré : la question s'affiche sans bouton. Si une question porte à la fois `image` et `figure`, `figure` l'emporte : l'image ne s'affiche que si la figure est introuvable. L'énoncé nomme le visuel (« Regarde le schéma… ») et ne dit jamais « ci-dessus » : la question revient aussi en révision, loin de la page.
 
 Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
@@ -232,7 +232,7 @@ Il affiche les questions dans leur format, mélange les réponses (ou les mots, 
 
 ## Figure
 
-Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre, extrait de texte), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Quand la page porte sur un objet, un lieu, une personne ou une œuvre réels (le site de Troie, un volcan, un tableau, un fossile, un personnage historique), son premier visuel est une photo de ce sujet ; un schéma peut s'y ajouter en second visuel. Pour un processus, une chronologie, une méthode ou une notion abstraite, choisis un schéma, une frise, une carte, un arbre ou un extrait. Le Pré-test, sans contenu à enseigner, n'a pas de photo obligatoire (une de ses questions peut toujours avoir une `image`). Mets le visuel dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source, auteur, et licence ou copyright). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur chaque question du quiz qui oblige à la regarder (voir « Format du quiz ») : l'élève peut la revoir depuis la question. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… », « Texte… ») : le bouton « Revoir » le reprend.
+Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou de lieu, schéma, frise, carte, arbre, extrait de texte), jamais une image seulement décorative, et au moins une question du quiz s'y rapporte. Quand la page porte sur un objet, un lieu, une personne ou une œuvre réels (le site de Troie, un volcan, un tableau, un fossile, un personnage historique), son premier visuel est une photo de ce sujet ; un schéma peut s'y ajouter en second visuel. Pour un processus, une chronologie, une méthode ou une notion abstraite, choisis un schéma, une frise, une carte, un arbre ou un extrait. Le Pré-test, sans contenu à enseigner, n'a pas de photo obligatoire (une de ses questions peut toujours avoir une `image`). Mets le visuel dans la figure du Kit : le visuel, puis une légende qui dit ce qu'on regarde, puis le crédit (source, auteur, et licence ou copyright). Donne à chaque figure un `id` court, unique dans la page (une lettre d'abord, puis lettres, chiffres, `-` ou `_`), et mets `"figure": "<cet id>"` sur une question qui demande de lire ou d'interpréter le visuel (« Regarde la grille : combien de cases… ») : l'élève peut la revoir depuis la question (voir « Format du quiz »). Pas sur une question de rappel (remettre dans l'ordre, associer, texte à trous, réfléchis puis dévoile) dont la réponse est écrite dans le visuel : le remontrer donnerait la réponse. Au moins une question comptée du quiz oblige toujours à regarder le visuel. Commence la légende par ce qu'on regarde (« Schéma… », « Carte… », « Frise… », « Photo… », « Texte… ») : le bouton « Revoir » le reprend.
 
 ```html
 <figure class="kit-figure" id="stromboli">
@@ -244,7 +244,30 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 </figure>
 ```
 
-- Schéma, frise ou carte : dessine un `<svg>` dans la figure, à la place de `<img>`. Rien à déclarer. Trace ses textes et ses traits en `currentColor` (`fill="currentColor"`, `stroke="currentColor"`) : ils prennent la couleur du texte et restent lisibles en mode sombre.
+- Schéma, frise ou carte : dessine un `<svg>` dans la figure, à la place de `<img>`. Rien à déclarer. Sur un écran de 360 px, le schéma fait environ 300 px de large ; suis ces repères :
+  - Textes : au moins 14 px une fois la page lue sur un écran de 360 px, soit `font-size` ≥ largeur de la viewBox × 14 / 300 (16 pour une viewBox de 340 de large, 30 pour 640). Prends une viewBox étroite, de 320 à 400 de large, et compose en hauteur plutôt qu'en frise très large.
+  - Traits : au moins 1,5 px rendu, soit `stroke-width` ≥ largeur de la viewBox × 1,5 / 300 (2 pour 400 de large).
+  - Police : aucune `font-family`, ni sur le `<svg>` ni sur ses textes : le schéma garde la police du Kit.
+  - Couleurs : `currentColor` pour l'encre, `var(--kit-accent)` pour un seul élément clé à mettre en évidence, `var(--kit-accent-doux)` pour une zone ; aucune couleur en dur. Elles suivent la Catégorie et restent lisibles en mode sombre. L'élément clé se reconnaît aussi sans la couleur : une étiquette, un contour épais ou un trait en pointillés (`stroke-dasharray`).
+  - Étiquettes : au plus près de ce qu'elles nomment, dans le dessin, plutôt qu'expliquées dans la légende, et une légende courte qui dit ce qu'on regarde.
+  - Contenu : peu d'éléments, et aucun trait ni forme qui ne porte une information.
+
+  Après ton tour, l'appli relève un texte trop petit, une police imposée ou une couleur en dur et te les signale au tour suivant ; elle ne modifie pas la page. Ajout compatible de la version 1.
+
+```html
+<figure class="kit-figure" id="schema-volcan">
+  <svg viewBox="0 0 340 300" role="img" aria-label="Coupe d'un volcan : chambre magmatique, cheminée, cratère">
+    <path d="M20 270 L150 70 L190 70 L320 270 Z" fill="none" stroke="currentColor" stroke-width="2"/>
+    <rect x="162" y="70" width="16" height="160" fill="var(--kit-accent-doux)"/>
+    <ellipse cx="170" cy="245" rx="60" ry="18" fill="var(--kit-accent)" stroke="currentColor" stroke-width="4"/>
+    <text x="170" y="55" font-size="16" text-anchor="middle" fill="currentColor">cratère</text>
+    <text x="186" y="150" font-size="16" fill="currentColor">cheminée</text>
+    <text x="170" y="294" font-size="16" text-anchor="middle" fill="currentColor">chambre magmatique</text>
+  </svg>
+  <figcaption>Schéma : le magma monte de la chambre au cratère.</figcaption>
+</figure>
+```
+
 - Extrait de texte (poème, passage d'un livre, document d'histoire) quand c'est lui qu'on étudie : mets-le dans un `<blockquote>` à la place de `<img>`, un `<p>` par paragraphe ou par strophe, un `<br>` à la fin de chaque vers. Il garde la légende et le crédit (auteur, œuvre, date). La lecture à voix haute le lit vers par vers, sans le crédit. Ajout compatible de la version 1.
 
 ```html

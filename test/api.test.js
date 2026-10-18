@@ -1705,6 +1705,33 @@ test('Visuels : photo du sujet réel en premier visuel, prise dans une source d�
   }
 });
 
+test('Visuels : repères de dessin des schémas SVG et « figure » réservé aux questions de lecture, mêmes termes dans la consigne et le LISEZMOI (#134)', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les probabilités' })).data;
+  const args = await argsDe(lecon);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  const figureDoc = doc.slice(doc.indexOf('## Figure'), doc.indexOf('## Lecture à voix haute')).replaceAll('`', '');
+  for (const phrase of [
+    'au moins 14 px une fois la page lue sur un écran de 360 px',
+    'font-size ≥ largeur de la viewBox × 14 / 300',
+    'une viewBox étroite, de 320 à 400 de large',
+    'stroke-width ≥ largeur de la viewBox × 1,5 / 300',
+    'aucune font-family, ni sur le <svg> ni sur ses textes',
+    'currentColor pour l\'encre, var(--kit-accent) pour un seul élément clé à mettre en évidence, var(--kit-accent-doux) pour une zone ; aucune couleur en dur',
+    'L\'élément clé se reconnaît aussi sans la couleur',
+    'au plus près de ce qu\'elles nomment, dans le dessin',
+    'aucun trait ni forme qui ne porte une information',
+    'qui demande de lire ou d\'interpréter le visuel',
+    'Pas sur une question de rappel (remettre dans l\'ordre, associer, texte à trous, réfléchis puis dévoile) dont la réponse est écrite dans le visuel : le remontrer donnerait la réponse.',
+  ]) {
+    assert.ok(args.includes(phrase), `consigne : ${phrase}`);
+    assert.ok(figureDoc.includes(phrase), `LISEZMOI : ${phrase}`);
+  }
+  assert.doesNotMatch(args, /sur chaque question qui oblige à regarder un visuel/);
+  assert.doesNotMatch(doc, /sur chaque question qui oblige à (la|le) regarder/);
+  assert.match(args, /au moins une question du quiz, parmi les questions comptées, oblige à regarder ce visuel/);
+  assert.match(figureDoc, /<svg viewBox="0 0 3\d\d /);
+});
+
 test('Visuels : un extrait de texte (poème, passage, document) peut être le visuel d\'une figure, consigne et LISEZMOI à l\'appui', async () => {
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les poèmes' })).data;
   const args = await fs.readFile(path.join(dossier, `args-${lecon.id}`), 'utf8');
@@ -2825,6 +2852,23 @@ test('Formats de rappel actif : une question mal formée ou d\'un type inconnu e
   assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'questionsIgnorees'), false);
   await message(lecon, 'ok');
   assert.doesNotMatch(await argsDe(lecon), /Questions ignorées/);
+});
+
+test('Visuels : un schéma SVG illisible est signalé au prof au tour suivant seulement, sans toucher à la page (#134)', async () => {
+  const html = '<figure class="kit-figure" id="troie"><svg viewBox="0 0 640 200" font-family="sans-serif"><text font-size="13" fill="#d33">Troie</text></svg><figcaption>Frise : la guerre de Troie.</figcaption></figure>';
+  const lecon = await avecPageImages({ page: html, manifeste: [] },
+    async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'schéma illisible' })).data);
+  assert.doesNotMatch(await argsDe(lecon), /Schémas à reprendre/);
+  await message(lecon, 'ok');
+  const signale = await argsDe(lecon);
+  assert.match(signale, /Schémas à reprendre/);
+  assert.ok(signale.includes('- 0002-images.html, figure « troie », texte trop petit : texte « Troie » à environ 6 px'), signale);
+  assert.ok(signale.includes('- 0002-images.html, figure « troie », police imposée : police « sans-serif »'), signale);
+  assert.ok(signale.includes('- 0002-images.html, figure « troie », couleur en dur : fill="#d33"'), signale);
+  assert.equal(await lirePage(lecon, '0002-images.html'), html);
+  assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'schemasAReprendre'), false);
+  await message(lecon, 'ok');
+  assert.doesNotMatch(await argsDe(lecon), /Schémas à reprendre/);
 });
 
 // Formats « réfléchis puis dévoile » et « meilleure explication » (spec #48, ticket #72).

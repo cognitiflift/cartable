@@ -31,7 +31,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Méta-analyse ou consensus pour le faible transfert à ce qui n'a pas été testé (Pan & Rickard 2018). Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007). Heuristique tirée d'un cadre pour les formats de **rappel actif** de Cartable : l'Élève y retrouve la réponse, mais en touchant des éléments donnés (mots à placer parmi des intrus, ordre, association), ce qui les rapproche de la reconnaissance ; seul « réfléchis puis dévoile » est un rappel sans indice, noté par l'Élève lui-même. Leur supériorité sur le QCM n'est pas mesurée.
 
-**Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; une question comptée par idée-clé de la page, chaque Objectif du quiz couvert, et en **Revoir** une question reformulée par question ratée (consigne « Nombre de questions » et Rebonds, `lib/agent.js`, ticket #128) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006.
+**Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; une question comptée par idée-clé de la page, chaque Objectif du quiz couvert, et en **Revoir** une question reformulée par question ratée (consigne « Nombre de questions » et Rebonds, `lib/agent.js`, ticket #128) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006 ; le champ `figure` d'une question réservé aux questions qui demandent de lire ou d'interpréter le visuel, pas aux questions de rappel dont la réponse y est écrite, que le visuel remontré donnerait à recopier (heuristique tirée d'un cadre, consigne « Visuels » et LISEZMOI, ticket #134).
 
 ### Espacement et réapprentissage espacé
 
@@ -138,7 +138,30 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour la segmentation (Rey et al. 2019) et le principe multimédia (synthèses de Mayer). Heuristique tirée d'un cadre pour leur application à des Pages de leçon écrites par un agent.
 
-**Où dans Cartable.** Consigne « Visuels » du prof : un visuel qui explique, jamais seulement décoratif, et une question qui oblige à le regarder (`lib/agent.js`), une photo du sujet comme premier **Visuel** quand la page porte sur un objet, un lieu, une personne ou une œuvre réels (ticket #129 ; le choix de la photo plutôt que du schéma n'en découle pas, voir « Décisions sans fondement écrit ») ; **Page de leçon** choisie une à une, une Question à la fois dans la **Révision du jour** ; figure du **Kit** avec légende.
+**Où dans Cartable.** Consigne « Visuels » du prof : un visuel qui explique, jamais seulement décoratif, et une question qui oblige à le regarder (`lib/agent.js`), une photo du sujet comme premier **Visuel** quand la page porte sur un objet, un lieu, une personne ou une œuvre réels (ticket #129 ; le choix de la photo plutôt que du schéma n'en découle pas, voir « Décisions sans fondement écrit ») ; **Page de leçon** choisie une à une, une Question à la fois dans la **Révision du jour** ; figure du **Kit** avec légende ; repère « Contenu » des schémas SVG : peu d'éléments, aucun trait ni forme qui ne porte une information (cohérence, consigne « Visuels » et section « Figure » du LISEZMOI, ticket #134).
+
+### Contiguïté spatiale
+
+**Ce qu'il dit.** On apprend mieux quand les mots qui décrivent une image sont placés près de ce qu'ils nomment, plutôt qu'à part (légende séparée, texte éloigné) : l'élève n'a pas à chercher le lien entre les deux. L'effet est plus net quand la matière est complexe et que mots et image ne se comprennent pas l'un sans l'autre.
+
+**Référence.**
+- Ginns, P. (2006). Integrating information: A meta-analysis of the spatial contiguity and temporal contiguity effects. *Learning and Instruction*, 16(6), 511–525. doi:[10.1016/j.learninstruc.2006.10.001](https://doi.org/10.1016/j.learninstruc.2006.10.001)
+- Mayer, R. E. (2020), *Multimedia learning*, ci-dessus.
+
+**Solidité.** Méta-analyse ou consensus pour l'effet (Ginns 2006). Heuristique tirée d'un cadre pour son application aux schémas SVG qu'un agent dessine dans une Page de leçon.
+
+**Où dans Cartable.** Repère « Étiquettes » des schémas SVG : au plus près de ce qu'elles nomment, dans le dessin, plutôt qu'expliquées dans la légende (consigne « Visuels », `lib/agent.js` ; section « Figure », `public/kit/v1/LISEZMOI.md` ; ticket #134).
+
+### Signalement
+
+**Ce qu'il dit.** Mettre en évidence ce qui compte dans un support (couleur, contour, flèche, mot en gras) aide à apprendre : l'attention va d'abord à l'essentiel. Le gain est modeste, et un signalement qui met tout en évidence ne signale plus rien.
+
+**Référence.**
+- Schneider, S., Beege, M., Nebel, S., & Rey, G. D. (2018). A meta-analysis of how signaling affects learning with media. *Educational Research Review*, 23, 1–24. doi:[10.1016/j.edurev.2017.11.001](https://doi.org/10.1016/j.edurev.2017.11.001)
+
+**Solidité.** Méta-analyse ou consensus pour l'effet (Schneider et al. 2018). Heuristique tirée d'un cadre pour la règle d'un seul élément clé par schéma.
+
+**Où dans Cartable.** Repère « Couleurs » des schémas SVG : `var(--kit-accent)` pour un seul élément clé, reconnaissable aussi sans la couleur (consigne « Visuels », `lib/agent.js` ; section « Figure », `public/kit/v1/LISEZMOI.md` ; ticket #134).
 
 ### Détails séduisants
 
@@ -151,7 +174,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus (Rey 2012 ; Sundararajan & Adesope 2020), effet modeste.
 
-**Où dans Cartable.** Interdiction des images seulement décoratives (consigne « Visuels », `lib/agent.js`) ; le **Dépassement** est un contenu hors du propos, mis à part en fin de page et hors score, réduit à 1 question bonus pour limiter ce contenu à côté (ticket #128 ; voir « Écarts relevés »).
+**Où dans Cartable.** Interdiction des images seulement décoratives (consigne « Visuels », `lib/agent.js`) ; le **Dépassement** est un contenu hors du propos, mis à part en fin de page et hors score, réduit à 1 question bonus pour limiter ce contenu à côté (ticket #128 ; voir « Écarts relevés ») ; aucun trait ni forme sans information dans un schéma SVG (ticket #134).
 
 ### Capacité de la mémoire de travail et charge cognitive
 
@@ -247,7 +270,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus : norme internationale publiée.
 
-**Où dans Cartable.** « Bonnes pratiques générales (WCAG AA) comme base » (`PRODUCT.md`) ; jetons de couleur des deux thèmes, anneau de focus de 3px et cibles tactiles (`DESIGN.md`, `public/style.css`) ; style de base du **Kit** (`public/kit/v1/base.css`).
+**Où dans Cartable.** « Bonnes pratiques générales (WCAG AA) comme base » (`PRODUCT.md`) ; jetons de couleur des deux thèmes, anneau de focus de 3px et cibles tactiles (`DESIGN.md`, `public/style.css`) ; style de base du **Kit** (`public/kit/v1/base.css`) ; dans un schéma SVG, l'élément clé reconnaissable aussi sans la couleur (1.4.1 Utilisation de la couleur), et l'encre en `currentColor` et les couleurs du Kit, qui suivent le mode sombre (ticket #134).
 
 ### Lisibilité pour la dyslexie
 
@@ -263,7 +286,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Heuristique tirée d'un cadre pour le guide de la BDA (recommandations d'association, en partie fondées sur des études). Étude isolée pour l'espacement des lettres et pour l'absence d'effet des polices spécialisées. Méta-analyse ou consensus pour la synthèse vocale (Wood et al. 2018).
 
-**Où dans Cartable.** Accessibilité de `PRODUCT.md` (dyslexie, textes courts, une chose à faire à la fois) ; Atkinson Hyperlegible Next, sans empattement, et corps de 17px (`DESIGN.md`) ; **Lecture à voix haute** ; « messages courts » demandés au prof (`lib/agent.js`).
+**Où dans Cartable.** Accessibilité de `PRODUCT.md` (dyslexie, textes courts, une chose à faire à la fois) ; Atkinson Hyperlegible Next, sans empattement, et corps de 17px (`DESIGN.md`) ; **Lecture à voix haute** ; « messages courts » demandés au prof (`lib/agent.js`) ; aucune `font-family` dans un schéma SVG, qui garde la police du Kit, et textes de schéma d'au moins 14 px rendus (seuil sans cadre, voir « Décisions sans fondement écrit » ; ticket #134).
 
 ### Taille des cibles tactiles
 
@@ -306,6 +329,8 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | Photo obligatoire pour un sujet réel (objet, lieu, personne ou œuvre) : premier **Visuel** de la page | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, ticket #129 | Le principe multimédia soutient mots + image, pas la photo plutôt que le schéma. Aucun cadre, hypothèse à mesurer. Deux mesures à noter : le **Coût d'un tour** de type page avant et après le changement, et la part des pages sur un sujet réel qui ont bien une photo, sur les 10 prochaines pages concernées. |
 | Photo prise dans une source déjà consultée pour vérifier les faits, dans le même WebFetch | `lib/agent.js`, ticket #129 | Décision de coût, aucun cadre. Mesurée par le **Coût d'un tour** (ligne précédente). |
 | **Pré-test** exempté de la photo du sujet réel | `lib/agent.js`, ticket #129 | Le Pré-test n'enseigne pas. Aucun cadre, hypothèse sans mesure prévue. |
+| Textes d'un schéma SVG d'au moins 14 px rendus sur un écran de 360 px, traits d'au moins 1,5 px | `lib/agent.js`, `public/kit/v1/LISEZMOI.md`, `lib/schemas.js`, ticket #134 | WCAG 2.2 ne fixe pas de taille minimale de texte ; la lisibilité pour la dyslexie demande un corps « assez grand », sans valeur. Aucun cadre, hypothèse à mesurer : refaire la critique des schémas (12/28 au départ) sur trois nouvelles pages à schéma. |
+| Schéma estimé à 300 px de large sur un écran de 360 px (repère des règles en unités de viewBox) | `lib/schemas.js`, ticket #134 | Mesure de la figure du Kit dans Chromium, pas un cadre. Aucun cadre, hypothèse à mesurer. |
 
 ## Écarts relevés
 

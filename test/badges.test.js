@@ -150,6 +150,21 @@ test('Mes badges : obtenus avec Palier et date (même si le compte a baissé), �
   assert.deepEqual(collection.map((b) => b.emoji), ['📅', '🔁', '🧠', '💪', '🚀', '⭐', '🏆', '🧭']);
 });
 
+test('Mes badges : l\'avancée vers le prochain Palier suit le meilleur compte atteint, jamais en recul ; aucune avant le premier Palier', () => {
+  const premier = fusionnerBadges(null, calculerBadges({ lecons: [leconMemoire()], evenements: [], maintenant: a('2026-10-20') }), a('2026-10-20')).fichier;
+  const oubli = calculerBadges({ lecons: [leconMemoire([true, true, false, true, true])], evenements: [], maintenant: a('2026-10-21') });
+  const { collection } = vueMesBadges(fusionnerBadges(premier, oubli, a('2026-10-21')).fichier, oubli);
+  const memoire = collection.find((b) => b.id === 'memoire');
+  assert.equal(memoire.avance, 0); // compte actuel 4, meilleur 5 : argent (5) atteint, rien de perdu vers or (15)
+  assert.equal(memoire.phrase, 'Les Objectifs qui restent en mémoire.');
+  assert.equal(collection.find((b) => b.id === 'jusquau-bout').avance, null); // À découvrir : ni ligne ni chiffre
+
+  const seize = calculerBadges({ lecons: [lecon({ scores: pagesFaites(jours('2026-10-01', 16)) })], evenements: [], maintenant: a('2026-10-20') });
+  const regulier = vueMesBadges(fusionnerBadges(null, seize, a('2026-10-20')).fichier, seize).collection.find((b) => b.id === 'regulier');
+  assert.equal(regulier.avance, (16 - 15) / (50 - 15)); // argent (15) atteint, en route vers or (50)
+  assert.ok(collection.every((b) => b.surprise || b.phrase), 'chaque Famille dit ce qu\'elle salue');
+});
+
 test('Mes badges : « Nouveau » pour les Paliers gagnés depuis la dernière ouverture, effacé en ouvrant ; le dernier Badge gagné', () => {
   const avant = calculerBadges({ lecons: [lecon({ scores: pagesFaites(jours('2026-10-01', 2)) })], evenements: [], maintenant: a('2026-10-02') });
   const premier = fusionnerBadges(null, avant, a('2026-10-02')).fichier;

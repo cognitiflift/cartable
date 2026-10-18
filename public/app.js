@@ -221,7 +221,7 @@ const ETATS_STATION = [
 ];
 const PAS_EVALUE = { classe: 'pas-encore', libelle: 'pas encore évalué' };
 const etatStation = (objectif) => ETATS_STATION.find((e) => objectif[e.cle]) ?? PAS_EVALUE;
-const station = (objectif, attrs = {}) => h('span', { className: `station ${etatStation(objectif).classe}`, ...attrs });
+const station = (objectif, attrs = {}, ...enfants) => h('span', { className: `station ${etatStation(objectif).classe}`, ...attrs }, ...enfants);
 
 function resumeObjectifs(objectifs) {
   const compte = (cle) => objectifs.filter((o) => o[cle]).length;
@@ -364,18 +364,45 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
 }
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
-const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore' }, emoji);
+const pastilleBadge = ({ emoji, palier }, attrs = {}) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore', ...attrs }, emoji);
 const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+const dateCourte = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' });
+
+// La ligne d'un Badge : ses Paliers en sont les stations (`station`), cerclées de la couleur de leur Palier une fois
+// atteintes, le prochain en « vous êtes ici ». Le trait est parcouru jusqu'au dernier Palier obtenu, puis rempli en
+// partie vers le prochain selon `avance`, sans chiffre ; le texte alternatif dit ce chemin en mots.
+const cheminVers = (avance) => (avance < 1 / 3 ? 'au début du chemin vers le Palier' : avance < 2 / 3 ? 'à mi-chemin du Palier' : 'presque au Palier');
+function ligneBadge(b, estNouveau) {
+  const dernier = b.paliers.findLastIndex((p) => p.jour);
+  const prochaine = b.prochain ? dernier + 1 : -1;
+  const obtenus = b.paliers.filter((p) => p.jour).map((p) => `${p.palier} le ${dateBadge(p.jour)}`).join(', ');
+  const suite = b.prochain ? `${cheminVers(b.avance)} ${b.prochain.palier}` : 'tous les Paliers obtenus';
+  return h('div', { className: 'ligne ligne-badge', role: 'img', ariaLabel: `${b.nom} : ${obtenus} ; ${suite}` },
+    b.paliers.map((p, i) => [
+      i > 0 && h('span', i === prochaine
+        ? { className: 'troncon en-cours', style: `--avance: ${Math.round(b.avance * 100)}%` }
+        : { className: `troncon${i <= dernier ? ' fait' : ''}` }),
+      station({ atteint: !!p.jour }, { className: `station ${p.jour ? 'atteinte' : 'pas-encore'} ${p.palier}${i === prochaine ? ' ici' : ''}` },
+        h('span', { className: 'station-nom' }, p.palier,
+          p.jour && h('small', {}, dateCourte(p.jour)),
+          estNouveau(p.palier) && h('span', { className: 'nouveau' }, 'Nouveau')))]));
+}
 
 // Mes badges (#95) : en tête, le total d'Étoiles et de Fusées de l'Élève (#96) ; puis le calendrier des Jours
-// travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection des Badges, obtenus avec leur
-// Palier et leur date, à venir en grisé avec leur progression (« 7/15 »). L'ouvrir efface « Nouveau » ; le mot
-// d'accueil s'affiche à la première ouverture.
+// travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection : chaque Badge commencé en
+// ligne (`ligneBadge`), le dernier Palier gagné en premier ; les badges surprise trouvés ; puis, à découvrir, les
+// Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. L'ouvrir efface « Nouveau » ; le mot d'accueil
+// s'affiche à la première ouverture.
 async function ecranBadges(profil) {
   const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
   barreNav(profil);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
+  const dernierJour = (b) => b.paliers.filter((p) => p.jour).at(-1).jour;
+  const commences = collection.filter((b) => !b.surprise && b.palier).sort((x, y) => dernierJour(y).localeCompare(dernierJour(x)));
+  const surprises = collection.filter((b) => b.surprise);
+  const aDecouvrir = collection.filter((b) => !b.surprise && !b.palier);
+  const tete = (b, ...detail) => h('div', { className: 'badge-tete' }, pastilleBadge(b, { ariaHidden: 'true', title: undefined }), h('div', {}, h('strong', {}, b.nom), ...detail));
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
     h('div', { className: 'badges-tete' },
@@ -387,15 +414,18 @@ async function ecranBadges(profil) {
       calendrierJours(calendrier),
       h('section', { className: 'collection', ariaLabel: 'Ma collection' },
         h('h3', {}, 'Ma collection'),
-        h('div', { className: 'grille badges' }, collection.map((b) => {
-          const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
-          return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
-            pastilleBadge(b),
-            h('div', {},
-              h('strong', {}, b.nom),
-              obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
-              b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`)));
-        })))));
+        commences.length
+          ? h('ul', { className: 'lignes-badges' }, commences.map((b) => h('li', {},
+            tete(b, h('p', {}, b.phrase)),
+            ligneBadge(b, (palier) => estNouveau(b, palier)))))
+          : h('p', { className: 'doux' }, 'Ton premier Palier dessinera ici la ligne de son Badge.'),
+        surprises.length > 0 && [
+          h('h4', {}, 'Surprises trouvées'),
+          h('ul', { className: 'badges-simples' }, surprises.map((b) => h('li', {},
+            tete(b, h('p', {},`Badge surprise · ${dateBadge(b.jour)}`, estNouveau(b, b.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))))))],
+        aDecouvrir.length > 0 && [
+          h('h4', {}, 'À découvrir'),
+          h('ul', { className: 'badges-simples a-decouvrir' }, aDecouvrir.map((b) => h('li', {}, tete(b, h('p', {}, b.phrase)))))])));
 }
 
 // Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour comme le bandeau de la semaine : pâle quand

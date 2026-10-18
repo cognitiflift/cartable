@@ -277,19 +277,38 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .pastille-badge { --palier:var(--bord); display:inline-flex; align-items:center; justify-content:center; width:2.2em; height:2.2em; border-radius:50%; border:3px solid var(--palier); background:color-mix(in srgb, var(--palier) 18%, var(--carte)); font-size:1.1em; vertical-align:middle; }
 .pastille-badge.bronze { --palier:var(--palier-bronze); } .pastille-badge.argent { --palier:var(--palier-argent); } .pastille-badge.or { --palier:var(--palier-or); }
 .pastille-badge.diamant { --palier:var(--palier-diamant); } .pastille-badge.unique { --palier:var(--palier-unique); }
-.pastille-badge.pas-encore { filter:grayscale(1); opacity:.45; }
-.badge.a-venir strong { color:var(--doux); }
-.badge strong { display:block; margin-top:.3rem; }
-/* La collection de Mes badges : la pastille à gauche, le nom et les Paliers à côté, en cartes simples serrées. */
-.grille.badges { grid-template-columns:repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
-.grille.badges .badge { display:flex; align-items:flex-start; gap:.8rem; }
-.grille.badges .badge strong { margin-top:.15rem; }
+.pastille-badge.pas-encore { filter:grayscale(1); opacity:.55; }
+/* La collection de Mes badges : une carte simple où chaque Badge commencé est une ligne, ses Paliers en stations (le
+   trait gris parcouru, rempli en partie vers le prochain Palier selon --avance), séparées par des tirets ; dessous, les
+   surprises trouvées et les Badges à découvrir, en rangées sans ligne. */
+.collection { padding:1rem 1.25rem .4rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
+.collection ul { list-style:none; margin:0; padding:0; }
+.collection li + li, .collection h4 { border-top:1px dashed var(--bord); }
+.collection h4 { margin:0; padding:1rem 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.badge-tete { display:flex; align-items:flex-start; gap:.8rem; }
+.badge-tete .pastille-badge { flex:none; }
+.badge-tete strong { display:block; margin-top:.2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.badge-tete p { margin:.15rem 0 0; color:var(--doux); line-height:1.35; }
+.lignes-badges li { padding:.9rem 0 .4rem; }
+.badges-simples li { padding:.8rem 0; }
+.a-decouvrir strong { color:var(--doux); }
+.ligne-badge { margin:.7rem 0 0; padding:0 1.9rem 3.2rem; }
+.ligne-badge .bronze { --palier:var(--palier-bronze); } .ligne-badge .argent { --palier:var(--palier-argent); }
+.ligne-badge .or { --palier:var(--palier-or); } .ligne-badge .diamant { --palier:var(--palier-diamant); }
+.ligne-badge .troncon.fait { background:var(--doux); }
+.ligne-badge .troncon.en-cours { background:linear-gradient(90deg, var(--doux) var(--avance), var(--troncon) var(--avance)); }
+.ligne-badge .station.atteinte { border-color:var(--palier); }
+.ligne-badge .station.ici { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--palier); }
+.station-nom { position:absolute; top:calc(100% + .5rem); left:50%; transform:translateX(-50%); display:grid; justify-items:center; color:var(--doux); font-size:.92rem; line-height:1.25; white-space:nowrap; }
+.station.atteinte .station-nom { color:var(--texte); font-weight:700; }
+.station-nom small { font-weight:400; color:var(--doux); }
+.station-nom .nouveau { margin:.15rem 0 0; }
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 /* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
 .totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
-.collection h3 { margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.collection h3 { margin:0 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
 @media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
 /* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
    entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */

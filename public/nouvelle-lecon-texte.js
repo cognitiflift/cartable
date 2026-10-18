@@ -19,3 +19,19 @@ export function sectionIdees({ etat, nombreCartes }) {
   if (nombreCartes === 0) return { texte: `Pas d'idée pour l'instant. ${QUOI_FAIRE}`, autresIdees: true };
   return { autresIdees: true };
 }
+
+// Confirmation des photos ou PDF choisis pour « Réviser une leçon de classe », d'après leurs noms dans l'ordre choisi.
+export function confirmationFichiers(noms) {
+  return `${noms.length} ${noms.length > 1 ? 'pages' : 'page'} : ${noms.join(', ')}`;
+}
+
+// Messages de validation des deux voies, dits par l'appli à côté du formulaire, à la place de la bulle du navigateur.
+export const FICHIERS_MANQUANTS = 'Choisis au moins une photo ou un PDF de ta leçon';
+
+// Message pour le sujet tapé (espaces autour ignorés, comme le serveur), ou `null` s'il convient.
+export function messageSujet(texte, sujetMax) {
+  const sujet = texte.trim();
+  if (!sujet) return 'Dis-moi ce que tu veux apprendre';
+  if (sujet.length > sujetMax) return `Ton sujet est trop long (${sujetMax} caractères au plus)`;
+  return null;
+}

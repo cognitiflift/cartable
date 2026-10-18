@@ -40,6 +40,7 @@
 body { margin:0; font:17px/1.5 var(--police); background:var(--fond); color:var(--texte); }
 ::selection { background:color-mix(in srgb, var(--accent) 30%, transparent); }
 :focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+::placeholder { color:var(--doux); opacity:1; } /* texte d'exemple : au moins 4,5:1 sur la carte, dans les deux thèmes */
 a { color:var(--accent); text-underline-offset:.18em; }
 h2 { margin-top:1.5rem; font-family:var(--police-titre); font-weight:800; letter-spacing:-.01em; }
 .cache { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
@@ -220,9 +221,20 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .proposition-categorie { display:inline-flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:600; color:var(--doux); }
 .proposition-categorie::before { content:""; flex:none; width:1rem; height:1rem; border-radius:6px; background:var(--ligne); }
 .proposition .accroche { line-height:1.35; text-wrap:pretty; }
-/* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet choisi) : deux cartes côte à côte. */
-.nouvelle-voies { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap:1rem; margin-top:2.2rem; }
-.nouvelle-voies h2 { margin:0 0 .8rem; font-size:1.45rem; line-height:1.1; }
+/* Cadre de Nouvelle leçon : « ← Mes leçons » comme en Séance, puis le titre d'écran en Display. */
+.nouvelle-tete { display:flex; flex-direction:column; align-items:flex-start; gap:.1rem; margin:.4rem 0 .3rem; }
+.nouvelle-tete .retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
+.nouvelle-tete h2 { margin:0; font-size:2rem; line-height:1.1; text-wrap:balance; }
+@media (max-width: 640px) { .nouvelle-tete h2 { font-size:1.6rem; } }
+/* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet à moi) : repliées sous les Propositions,
+   deux boutons secondaires qui déplient chacun leur formulaire dans une carte, un seul à la fois. */
+.nouvelle-voies { display:flex; flex-direction:column; align-items:flex-start; gap:1rem; margin-top:2.2rem; }
+.voies-boutons { display:flex; flex-wrap:wrap; gap:.6rem; }
+.voies-boutons button { min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; }
+.voies-boutons button[aria-expanded="true"] { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, var(--carte)); }
+.nouvelle-voies .voie { width:min(100%, 36rem); }
+.voie p { margin:0; } .voie p:empty { display:none; }
+.voie .erreur { min-height:0; font-weight:600; }
 .nouvelle-voies form.colonne { max-width:none; }
 .nouvelle-voies input:not([type=date]) { width:100%; }
 .nouvelle-voies form.colonne > button { align-self:flex-start; min-height:2.75rem; padding-inline:1.4rem; border-radius:12px; }

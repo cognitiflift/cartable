@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions } from '../public/nouvelle-lecon-texte.js';
+import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage } from '../public/nouvelle-lecon-texte.js';
 
 test('Idées prêtes avec des cartes : aucun texte d\'état, « D\'autres idées » proposé', () => {
   assert.deepEqual(sectionIdees({ etat: 'prêtes', nombreCartes: 4 }), { autresIdees: true });
@@ -79,4 +79,29 @@ test('Grille : de 2 à 10 Propositions (réglage du Profil), aucune carte seule 
       if (colonnes > 1) assert.ok(!rangees(nombre, colonnes).includes(1), `${nombre} cartes sur ${colonnes} colonnes`);
     }
   }
+});
+
+// Cadrage (#118) : la question nomme le sujet quand il est connu ; les questions du serveur restent la référence.
+test('Cadrage d\'un sujet connu : « Pourquoi ? » nomme le sujet', () => {
+  assert.equal(questionCadrage({ cle: 'pourquoi', question: 'Pourquoi ?', sujet: 'Les volcans' }),
+    'Pourquoi veux-tu apprendre « Les volcans » ?');
+});
+
+test('Cadrage d\'un sujet connu : « Tu en sais déjà… » nomme le sujet', () => {
+  assert.equal(questionCadrage({ cle: 'deja', question: 'Tu en sais déjà…', sujet: 'Les volcans' }),
+    'Sur « Les volcans », tu en sais déjà…');
+});
+
+test('Cadrage d\'une révision, sujet pas encore connu : la question du serveur, inchangée', () => {
+  assert.equal(questionCadrage({ cle: 'deja', question: 'Tu en sais déjà…' }), 'Tu en sais déjà…');
+  assert.equal(questionCadrage({ cle: 'deja', question: 'Tu en sais déjà…', sujet: '   ' }), 'Tu en sais déjà…');
+});
+
+test('Cadrage : un sujet tapé avec des espaces autour est nommé sans eux', () => {
+  assert.equal(questionCadrage({ cle: 'pourquoi', question: 'Pourquoi ?', sujet: '  la conjugaison du futur ' }),
+    'Pourquoi veux-tu apprendre « la conjugaison du futur » ?');
+});
+
+test('Cadrage : une question inconnue du module reste celle du serveur, même avec un sujet', () => {
+  assert.equal(questionCadrage({ cle: 'autre', question: 'Une autre question ?', sujet: 'Les volcans' }), 'Une autre question ?');
 });

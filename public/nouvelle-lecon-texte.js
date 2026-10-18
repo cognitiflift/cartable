@@ -35,3 +35,17 @@ export function colonnesPropositions(nombre, maximum) {
   }
   return 1;
 }
+
+// Question du Cadrage telle que l'écran la pose (#118). `question` est celle que le serveur sert pour `cle` ;
+// avec un `sujet` connu (sujet tapé ou titre d'une Proposition), elle le nomme. En révision d'une leçon de classe,
+// le sujet n'est pas encore connu : la question reste celle du serveur. Les réponses et les valeurs ne changent pas.
+const QUESTIONS_AVEC_SUJET = {
+  pourquoi: (sujet) => `Pourquoi veux-tu apprendre « ${sujet} » ?`,
+  deja: (sujet) => `Sur « ${sujet} », tu en sais déjà…`,
+};
+
+export function questionCadrage({ cle, question, sujet }) {
+  const nom = sujet?.trim();
+  const avecSujet = QUESTIONS_AVEC_SUJET[cle];
+  return nom && avecSujet ? avecSujet(nom) : question;
+}

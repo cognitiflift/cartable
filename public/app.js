@@ -1,6 +1,10 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import {
+  sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
+  confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
+} from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -197,6 +201,9 @@ async function ecranParent(profil) {
 // (voir morceauxRecompensesLecon).
 const recompensesLecon = (l) => h('span', { className: 'etoiles' },
   morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
+
+// Lien « ← Mes leçons » des en-têtes d'écran et de la carte d'attente.
+const retourAccueil = () => h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons');
 
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
 
@@ -552,17 +559,19 @@ const enBase64 = (fichier) => new Promise((resolve, reject) => {
 // Cadrage posé par l'appli (ADR 0002), avant tout tour du prof : questions fixes, une à la fois, dans une carte en
 // boîte de dialogue modale (le reste de l'écran est inerte sous le voile). L'Élève touche une réponse (« Je ne sais
 // pas » compris) ; on renvoie les valeurs, jamais les libellés. Les questions posées selon le mode viennent de la
-// configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer.
-async function cadrer(mode) {
+// configuration. « ✕ » ou Échap annule : on renvoie null, sans rien démarrer. Avec un `sujet` connu (sujet tapé
+// ou titre d'une Proposition), la question le nomme (#118) ; en révision, il n'est pas encore connu.
+async function cadrer(mode, sujet) {
   const cadrage = {};
   const cles = config.questionsCadrage[mode];
   for (const [i, cle] of cles.entries()) {
     const { question, reponses } = config.cadrage[cle];
+    const posee = questionCadrage({ question, avecSujet: config.cadrageAvecSujet?.[cle], sujet });
     cadrage[cle] = await new Promise((choisir) => {
       const fermer = (valeur) => { boite.close(); boite.remove(); choisir(valeur); };
       const boite = h('dialog', { className: 'carte cadrage', oncancel: (e) => { e.preventDefault(); fermer(null); } },
         cles.length > 1 && h('p', { className: 'cadrage-etape' }, `Question ${i + 1} sur ${cles.length}`),
-        h('h2', { id: 'cadrage-question' }, question),
+        h('h2', { id: 'cadrage-question' }, posee),
         h('div', { className: 'cadrage-choix' }, Object.entries(reponses).map(([valeur, libelle], j) =>
           h('button', { className: 'secondaire', autofocus: j === 0, onclick: () => fermer(valeur) }, libelle))),
         h('button', { className: 'secondaire annuler', ariaLabel: 'Annuler', title: 'Annuler', onclick: () => fermer(null) }, '✕'));
@@ -575,100 +584,237 @@ async function cadrer(mode) {
   return cadrage;
 }
 
+// Colonnes de la grille des Propositions pour chaque largeur (2, 3 ou 4 colonnes au plus, choisies par style.css) :
+// aucune carte seule sur la dernière rangée.
+const colonnesGrille = (nombre) => [2, 3, 4].map((maximum) => `--colonnes-${maximum}: ${colonnesPropositions(nombre, maximum)}`).join('; ');
+
+// Voile d'attente de l'écran Nouvelle leçon : une carte posée au centre, le reste de l'écran inerte dessous, barre de
+// navigation comprise. Pendant que le prof prépare la Leçon, la carte d'attente ; si la préparation échoue, une carte
+// d'erreur prend sa place, avec « Réessayer » et « Retour aux idées ». `lever` retire la carte et rend l'écran actif ;
+// l'écran l'appelle aussi en le quittant, pour ne pas laisser la barre de navigation inerte.
+function voileAttente() {
+  const element = h('div', { className: 'nouvelle-voile', hidden: true });
+  const dessous = () => [...app.children, nav].filter((el) => el !== element);
+  const poser = (carte) => {
+    for (const el of dessous()) el.inert = true;
+    element.replaceChildren(carte);
+    element.hidden = false;
+  };
+  const lever = () => {
+    element.hidden = true;
+    element.replaceChildren();
+    for (const el of dessous()) el.inert = false;
+  };
+  // L'attente est un état (jamais rouge) : la carte, région d'état, est remplie après sa pose pour être annoncée.
+  // La nouvelle ligne y est « en travaux », dessinée par `ligneLecon`, à la couleur de sa Catégorie quand elle est connue.
+  const attendre = ({ sujet, categorie, mode }) => {
+    const { titre, duree, ensuite } = carteAttente({ sujet, mode });
+    const carte = h('section', { className: 'carte carte-attente', role: 'status', tabIndex: -1, style: categorie ? styleLigne(categorie) : '--ligne: var(--ligne-autre)' });
+    poser(carte);
+    requestAnimationFrame(() => {
+      carte.replaceChildren(
+        h('h2', {}, titre),
+        ligneLecon({ objectifs: [] }),
+        h('p', { className: 'doux' }, duree),
+        h('p', { className: 'attente-ensuite' }, ensuite),
+        h('div', { className: 'attente-actions' }, retourAccueil()));
+      carte.focus();
+    });
+  };
+  // L'erreur est une alerte, à la place de la carte d'attente : le message du serveur, puis de quoi repartir.
+  // `reessayer` et `revenir` sont appelés une fois la carte levée.
+  const echouer = ({ message, reessayer, revenir }) => {
+    const { titre, message: texte } = carteErreur({ message });
+    const bouton = h('button', { onclick: () => { lever(); reessayer(); } }, 'Réessayer');
+    poser(h('section', { className: 'carte carte-attente echec', role: 'alert' },
+      h('h2', {}, titre),
+      h('p', {}, texte),
+      h('div', { className: 'attente-actions' },
+        bouton,
+        h('button', { className: 'secondaire', onclick: () => { lever(); revenir(); } }, 'Retour aux idées'),
+        retourAccueil())));
+    bouton.focus();
+  };
+  return { element, attendre, echouer, lever };
+}
+
 function ecranNouvelleLecon(profil) {
-  const erreur = h('p', { className: 'erreur', role: 'status' });
   const boutons = [];
   let boutonsIdees = []; // cartes de Propositions et « D'autres idées », remplacés à chaque affichage
   const activer = (actifs) => [...boutons, ...boutonsIdees].forEach((b) => (b.disabled = !actifs));
-  // `mode` : 'libre' (sujet tapé ou Proposition) ou 'revision', pour les questions du Cadrage posées d'abord.
-  // `cle` : ce que l'Élève démarre ; après une erreur du serveur, le réessayer garde les réponses du Cadrage.
+  // Réponses du Cadrage par démarrage (`cle`) : après une erreur du serveur, réessayer les garde sans le reposer.
   const cadrages = new Map();
-  const demarrer = async (corps, mode, cle) => {
-    const retour = document.activeElement;
+  // Ce que l'Élève a touché en dernier, pour lui rendre le focus après un Cadrage annulé ou « Retour aux idées ».
+  // Mémorisé au toucher : sur iPad Safari, toucher un bouton ne lui donne pas le focus et l'élément actif du document
+  // vaut le corps de la page.
+  let touche = null;
+  const memoriser = (e) => { touche = e.target.closest?.('button, input, select, textarea, a') ?? touche; };
+  app.addEventListener('pointerdown', memoriser, true);
+  app.addEventListener('focusin', memoriser, true);
+  // Les cartes de Propositions sont redessinées par la relecture des idées pendant le Cadrage ou l'attente : on retrouve
+  // la carte touchée par sa clé de démarrage (`data-cle`), et à défaut le titre de la section d'idées.
+  const rendreFocus = (element) => {
+    const cle = element?.dataset?.cle;
+    const cible = cle ? idees.querySelector(`[data-cle="${CSS.escape(cle)}"]`) : element;
+    (cible?.isConnected ? cible : idees.querySelector('h2'))?.focus();
+  };
+
+  // Un démarrage : `cle`, ce que l'Élève démarre (`proposition:<titre>`, `sujet:<texte>` ou `revision`) ; `mode`,
+  // 'libre' ou 'revision', pour les questions du Cadrage ; `envoi()`, le corps de la requête sans le Cadrage ;
+  // `sujet` et `categorie`, connus avant la préparation (sujet tapé, ou titre et Catégorie d'une Proposition), que la
+  // question du Cadrage et la carte d'attente nomment, absents en révision.
+  const demarrer = async (demarrage) => {
+    const retour = touche;
+    const revenir = () => { activer(true); rendreFocus(retour); };
     activer(false);
-    erreur.textContent = '';
-    if (!cadrages.has(cle)) {
-      const reponses = await cadrer(mode);
-      if (!reponses) { activer(true); return retour?.focus(); } // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
-      cadrages.set(cle, reponses);
+    if (!cadrages.has(demarrage.cle)) {
+      const reponses = await cadrer(demarrage.mode, demarrage.sujet);
+      if (!reponses) return revenir(); // Cadrage annulé : l'Élève revient où il était, rien n'est envoyé
+      cadrages.set(demarrage.cle, reponses);
     }
-    const cadrage = cadrages.get(cle);
-    erreur.textContent = '⏳ Ton prof prépare la leçon… (ça peut prendre quelques minutes)';
+    preparer(demarrage, revenir);
+  };
+
+  const voile = voileAttente();
+  const preparer = async (demarrage, revenir) => {
+    voile.attendre(demarrage);
     try {
-      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await corps()), cadrage } });
-      location.hash = `#/lecon/${lecon.id}`;
+      const lecon = await api(`eleves/${profil.slug}/lecons`, { method: 'POST', body: { ...(await demarrage.envoi()), cadrage: cadrages.get(demarrage.cle) } });
+      // L'Élève a pu revenir à « Mes leçons » : la Leçon y est déjà et finit de se préparer, on ne l'y ramène pas de force.
+      if (actif) location.hash = `#/lecon/${lecon.id}`;
     } catch (e) {
-      erreur.textContent = e.message;
-      activer(true);
+      if (!actif) return;
+      // Une coupure du réseau ou une réponse illisible n'a pas de message en français : le module des textes en donne un.
+      voile.echouer({
+        message: e instanceof TypeError || e instanceof SyntaxError ? undefined : e.message,
+        reessayer: () => preparer(demarrage, revenir),
+        revenir,
+      });
     }
   };
 
-  const sujet = h('input', { required: true, maxLength: config.sujetMax, placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
-  const fichiers = h('input', { type: 'file', required: true, multiple: true, accept: '.pdf,image/*' });
+  // Pas de validation native (bulle du navigateur, pas forcément en français) : l'appli dit ses messages, à côté du formulaire.
+  const sujet = h('input', { id: 'sujet', placeholder: 'Ex. : les volcans, la conjugaison du futur…' });
+  const fichiers = h('input', { id: 'fichiers', type: 'file', multiple: true, accept: '.pdf,image/*' });
   const dateControle = h('input', { type: 'date' });
-  boutons.push(h('button', {}, 'Commencer'), h('button', {}, 'Réviser'));
+  const erreurRevision = h('p', { className: 'erreur', role: 'alert' });
+  const erreurSujet = h('p', { className: 'erreur', role: 'alert' });
+  // Après le choix des photos, l'écran confirme les pages prises.
+  const pagesChoisies = h('p', { className: 'doux', role: 'status' });
+  fichiers.onchange = () => {
+    pagesChoisies.textContent = fichiers.files.length ? confirmationFichiers([...fichiers.files].map((f) => f.name)) : '';
+    erreurRevision.textContent = '';
+  };
+  boutons.push(h('button', {}, "C'est parti"), h('button', {}, 'Réviser'));
 
   // Propositions préparées en arrière-plan : on les lit sans attendre l'agent, et on revient voir tant qu'elles se préparent.
   const idees = h('div', {});
+  // Un seul texte d'état, gardé d'un affichage à l'autre : il n'est annoncé que quand il change, pas à chaque relecture.
+  const etatIdees = h('p', { className: 'doux', role: 'status' });
   let minuteur, actif = true;
   // Les anciennes Propositions restent affichées et cliquables pendant qu'on en prépare de nouvelles.
   const afficherPropositions = async () => {
     clearTimeout(minuteur);
     let etat, propositions;
-    try { ({ etat, propositions } = await api(`eleves/${profil.slug}/propositions`)); } catch { return idees.replaceChildren(); }
+    try { ({ etat, propositions } = await api(`eleves/${profil.slug}/propositions`)); } catch { etat = ECHEC_LECTURE; propositions = []; }
     if (!actif) return;
-    const enPreparation = etat === 'en préparation';
-    if (enPreparation) minuteur = setTimeout(afficherPropositions, 3000);
+    if (etat === 'en préparation') minuteur = setTimeout(afficherPropositions, 3000);
     // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
     // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
-    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
-      h('span', { className: 'proposition-tete' },
-        h('span', { className: 'cartouche-type' }, p.type === 'suite' ? 'Pour aller plus loin' : 'Nouveau sujet'),
-        p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
-      h('strong', { className: 'proposition-titre' }, p.titre),
-      h('span', { className: 'proposition-categorie' }, p.categorie),
-      p.accroche && h('span', { className: 'accroche' }, p.accroche)));
+    // Le nom accessible se limite au titre et au type ; l'accroche complète (coupée à 2 lignes à l'écran) en est la
+    // description. La Catégorie et « Au programme » restent visibles sur la carte.
+    const cartes = propositions.map((p, i) => {
+      const id = (partie) => `proposition-${i}-${partie}`;
+      const cle = `proposition:${p.titre}`;
+      const carte = h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled,
+        onclick: () => demarrer({ cle, mode: 'libre', envoi: async () => ({ proposition: p.titre }), sujet: p.titre, categorie: p.categorie }) },
+        h('span', { className: 'proposition-tete' },
+          h('span', { className: 'cartouche-type', id: id('type') }, cartoucheProposition(p.type)),
+          p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
+        h('strong', { className: 'proposition-titre', id: id('titre') }, p.titre),
+        h('span', { className: 'proposition-categorie' }, p.categorie),
+        p.accroche && h('span', { className: 'accroche', id: id('accroche') }, p.accroche));
+      carte.setAttribute('aria-labelledby', `${id('titre')} ${id('type')}`);
+      carte.dataset.cle = cle;
+      if (p.accroche) carte.setAttribute('aria-describedby', id('accroche'));
+      return carte;
+    });
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
       autresIdees.disabled = true;
       // Un refus (génération déjà en cours) revient au même : on attend les Propositions qui se préparent.
       await api(`eleves/${profil.slug}/propositions`, { method: 'POST' }).catch(() => {});
       afficherPropositions();
     } }, "🔄 D'autres idées");
-    boutonsIdees = [...cartes, autresIdees];
-    idees.replaceChildren(
-      h('h2', {}, '🎲 Des idées pour toi'),
-      cartes.length > 0 && h('div', { className: 'propositions' }, cartes),
-      enPreparation
-        ? h('p', { className: 'doux' }, cartes.length ? '⏳ Nouvelles idées en préparation…' : 'On prépare tes idées…')
-        : autresIdees);
+    // Ce que la section dit vient du module des textes ; tous ses enfants passent par `garder`, jamais de « false ».
+    const section = sectionIdees({ etat, nombreCartes: cartes.length });
+    if (etatIdees.textContent !== (section.texte ?? '')) etatIdees.textContent = section.texte ?? '';
+    etatIdees.hidden = !section.texte;
+    boutonsIdees = section.autresIdees ? [...cartes, autresIdees] : cartes;
+    idees.replaceChildren(...garder([
+      h('h2', { tabIndex: -1 }, '🎲 Des idées pour toi'),
+      cartes.length > 0 && h('div', { className: 'propositions', style: colonnesGrille(cartes.length) }, cartes),
+      etatIdees,
+      section.autresIdees && autresIdees]));
   };
   afficherPropositions();
-  quitterEcran = () => { actif = false; clearTimeout(minuteur); };
+  quitterEcran = () => {
+    actif = false; clearTimeout(minuteur);
+    voile.lever(); // la barre de navigation, hors de l'écran, ne reste pas inerte
+    app.removeEventListener('pointerdown', memoriser, true);
+    app.removeEventListener('focusin', memoriser, true);
+  };
 
+  // Les deux autres voies sont repliées sous les Propositions : un bouton secondaire déplie son formulaire,
+  // un seul à la fois, et le même bouton le replie.
+  const voies = [
+    { id: 'voie-revision', libelle: '📄 Réviser une leçon de classe', champ: fichiers,
+      formulaire: h('form', { className: 'colonne', noValidate: true, onsubmit: (ev) => {
+        ev.preventDefault();
+        if (!fichiers.files.length) return (erreurRevision.textContent = FICHIERS_MANQUANTS);
+        erreurRevision.textContent = '';
+        demarrer({ cle: 'revision', mode: 'revision', envoi: async () => ({
+          dateControle: dateControle.value || undefined,
+          fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
+        }) });
+      } },
+      h('label', { htmlFor: 'fichiers' }, 'Photos ou PDF de ta leçon (plusieurs pages possibles)'), fichiers, pagesChoisies,
+      h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
+      boutons[1], erreurRevision) },
+    { id: 'voie-sujet', libelle: '💡 Un sujet à moi', champ: sujet,
+      formulaire: h('form', { className: 'colonne', noValidate: true, onsubmit: (ev) => {
+        ev.preventDefault();
+        // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
+        const message = messageSujet(sujet.value, config.sujetMax);
+        erreurSujet.textContent = message ?? '';
+        if (message) return sujet.focus();
+        const texte = sujet.value.trim();
+        demarrer({ cle: `sujet:${texte}`, mode: 'libre', envoi: async () => ({ sujet: texte }), sujet: texte });
+      } }, h('label', { htmlFor: 'sujet' }, 'Ce que tu veux apprendre'), sujet, boutons[0], erreurSujet) },
+  ];
+  for (const voie of voies) {
+    voie.bouton = h('button', { className: 'secondaire', ariaExpanded: 'false', onclick: () => deplier(voie) }, voie.libelle);
+    voie.bouton.setAttribute('aria-controls', voie.id);
+    voie.panneau = h('section', { id: voie.id, className: 'carte voie', hidden: true, ariaLabel: voie.libelle }, voie.formulaire);
+  }
+  const deplier = (choisie) => {
+    for (const voie of voies) {
+      const ouverte = voie === choisie && voie.panneau.hidden;
+      voie.panneau.hidden = !ouverte;
+      voie.bouton.ariaExpanded = String(ouverte);
+      if (ouverte) voie.champ.focus();
+    }
+  };
+
+  document.title = 'Une nouvelle ligne · Cartable';
   montrer(
+    h('div', { className: 'nouvelle-tete' },
+      retourAccueil(),
+      h('h2', {}, 'Une nouvelle ligne')),
     idees,
     h('div', { className: 'nouvelle-voies' },
-      h('section', { className: 'carte' }, h('h2', {}, '📄 Réviser une leçon de classe'),
-        h('form', { className: 'colonne', onsubmit: (ev) => {
-          ev.preventDefault();
-          demarrer(async () => ({
-            dateControle: dateControle.value || undefined,
-            fichiers: await Promise.all([...fichiers.files].map(async (f) => ({ nom: f.name, data: await enBase64(f) }))),
-          }), 'revision', 'revision');
-        } },
-        h('label', {}, 'Photos ou PDF de ta leçon (plusieurs pages possibles)', h('br'), fichiers),
-        h('label', {}, 'Date du contrôle (facultatif)', h('br'), dateControle),
-        boutons[1])),
-      h('section', { className: 'carte' }, h('h2', {}, '💡 Apprendre ce que tu veux'),
-        h('form', { className: 'colonne', onsubmit: (ev) => {
-          ev.preventDefault();
-          // Sujet vérifié avant le Cadrage, comme le fera le serveur : pas de questions pour un sujet refusé.
-          const texte = sujet.value.trim();
-          if (!texte) return (erreur.textContent = 'Dis-moi ce que tu veux apprendre');
-          if (texte.length > config.sujetMax) return (erreur.textContent = `Ton sujet est trop long (${config.sujetMax} caractères au plus)`);
-          demarrer(async () => ({ sujet: texte }), 'libre', `sujet:${texte}`);
-        } }, h('label', {}, 'Ce que tu veux apprendre', h('br'), sujet), boutons[0]))),
-    erreur);
+      h('div', { className: 'voies-boutons' }, voies.map((v) => v.bouton)),
+      voies.map((v) => v.panneau)),
+    voile.element);
 }
 
 // Libellé du bouton de chaque Rebond ; le serveur ne reçoit que l'action.
@@ -730,7 +876,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
   const afficherEntete = () => {
     entete.style.cssText = styleLigne(lecon.categorie);
     entete.replaceChildren(...garder([
-      h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons'),
+      retourAccueil(),
       h('div', { className: 'seance-titre' },
         lecon.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${lecon.niveauLecon}`),
         h('h2', {}, lecon.titre),
@@ -829,6 +975,7 @@ async function route() {
   quitterEcran();
   arreterLecture(); // une lecture à voix haute des Révisions du jour s'arrête en changeant d'écran
   quitterEcran = () => {};
+  document.title = 'Cartable'; // un écran qui a son propre titre le pose lui-même
   try {
     config ??= await api('config');
     const [, page, id, sousPage] = location.hash.split('/');

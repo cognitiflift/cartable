@@ -40,6 +40,7 @@
 body { margin:0; font:17px/1.5 var(--police); background:var(--fond); color:var(--texte); }
 ::selection { background:color-mix(in srgb, var(--accent) 30%, transparent); }
 :focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+::placeholder { color:var(--doux); opacity:1; } /* texte d'exemple : au moins 4,5:1 sur la carte, dans les deux thèmes */
 a { color:var(--accent); text-underline-offset:.18em; }
 h2 { margin-top:1.5rem; font-family:var(--police-titre); font-weight:800; letter-spacing:-.01em; }
 .cache { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
@@ -102,7 +103,8 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 
 /* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
 .lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }
-.lecons-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
+/* Titres Display des en-têtes d'écran (Mes leçons, Mes badges, Nouvelle leçon) */
+.lecons-tete h2, .badges-tete h2, .nouvelle-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
 .lecons-tete button { padding:.7rem 1.1rem; border-radius:12px; }
 .bouton-nouvelle { background:var(--nuit); border-color:var(--nuit); color:var(--sur-nuit); }
 .bouton-nouvelle:hover { background:color-mix(in srgb, var(--nuit) 85%, var(--sur-nuit)); }
@@ -111,7 +113,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .categorie h3 { display:flex; align-items:center; gap:.65rem; margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
 .categorie h3::before { content:""; width:1.4rem; height:1.4rem; border-radius:6px; background:var(--ligne); }
 .lecons-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1rem; }
-/* La ligne foncée : les surfaces pleines à la couleur de la ligne (Niveau, Continuer, cartouche « Pour aller plus loin »). */
+/* La ligne foncée : les surfaces pleines à la couleur de la ligne (Niveau, Continuer, cartouche « Prolonge ta ligne »). */
 .lecon, .seance-tete, .proposition { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); }
 @media (prefers-color-scheme: dark) { .lecon, .seance-tete, .proposition { --ligne-fonce:var(--ligne); } }
 .lecon { display:flex; flex-direction:column; gap:.85rem; padding:1.05rem 1.25rem .5rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
@@ -166,7 +168,7 @@ details.objectifs li small { display:block; color:var(--doux); font-size:.82rem;
 .reseau-vide p { margin:.8rem 0 0; color:var(--doux); }
 header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
 @media (max-width: 480px) { header { padding-inline:.75rem; gap:.5rem; } header h1 .nom-appli { display:none; } .entete-droite, #nav { gap:.35rem; } header button.secondaire { padding:.45rem .6rem; font-size:.9rem; } .compteur-etoiles { padding:.3rem .7rem; } }
-@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
+@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2, .nouvelle-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 
 /* Séance : l'en-tête situe l'Élève sur la ligne de sa Leçon (ligneLecon, à la couleur de sa Catégorie) avec le mot de
@@ -174,7 +176,9 @@ header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
 body:has(.seance) { display:flex; flex-direction:column; height:100dvh; }
 body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-direction:column; gap:.6rem; padding-top:.8rem; padding-bottom:1rem; }
 .seance-tete { display:flex; align-items:center; flex-wrap:wrap; gap:.35rem 1rem; padding:.35rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
-.seance-tete .retour-accueil { display:inline-flex; align-items:center; min-height:2.6rem; font-weight:700; white-space:nowrap; }
+/* Lien « ← Mes leçons » des en-têtes (Séance, Nouvelle leçon, carte d'attente) */
+.retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
+.seance-tete .retour-accueil { min-height:2.6rem; white-space:nowrap; }
 .seance-titre { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .7rem; min-width:0; }
 .seance-titre h2 { margin:0; font-size:1.3rem; line-height:1.2; text-wrap:balance; }
 .seance-titre .maitrise { margin-top:0; }
@@ -210,7 +214,12 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .doux { color:var(--doux); }
 /* Nouvelle leçon, Propositions : cartes simples, puce de la Catégorie, type dit en mots dans une cartouche de
    signalétique, pleine à la couleur de la ligne pour une suite, en filet pour un sujet original. */
-.propositions { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap:1rem; margin-bottom:1rem; }
+/* La grille : 4 colonnes au plus sur ordinateur, 3 sur tablette, 2 sur grand téléphone, 1 en dessous ; app.js donne
+   pour chaque largeur le nombre de colonnes (--colonnes-n) qui ne laisse aucune carte seule sur sa rangée. */
+.propositions { display:grid; grid-template-columns:1fr; gap:1rem; margin-bottom:1rem; }
+@media (min-width: 560px) { .propositions { grid-template-columns:repeat(var(--colonnes-2, 2), minmax(0, 1fr)); } }
+@media (min-width: 768px) { .propositions { grid-template-columns:repeat(var(--colonnes-3, 3), minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .propositions { grid-template-columns:repeat(var(--colonnes-4, 4), minmax(0, 1fr)); } }
 .proposition { display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
 .proposition-tete { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .7rem; }
 .cartouche-type { padding:.36rem .5rem .22rem; border-radius:7px; border:.15rem solid var(--station-vide); color:var(--doux); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; }
@@ -219,10 +228,20 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .proposition-titre { font:800 1.15rem/1.2 var(--police-titre); letter-spacing:-.01em; text-wrap:balance; }
 .proposition-categorie { display:inline-flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:600; color:var(--doux); }
 .proposition-categorie::before { content:""; flex:none; width:1rem; height:1rem; border-radius:6px; background:var(--ligne); }
-.proposition .accroche { line-height:1.35; text-wrap:pretty; }
-/* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet choisi) : deux cartes côte à côte. */
-.nouvelle-voies { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap:1rem; margin-top:2.2rem; }
-.nouvelle-voies h2 { margin:0 0 .8rem; font-size:1.45rem; line-height:1.1; }
+/* L'accroche est coupée à 2 lignes à l'écran ; son texte complet reste dans le DOM, en description de la carte. */
+.proposition .accroche { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; line-height:1.35; text-wrap:pretty; }
+/* Cadre de Nouvelle leçon : « ← Mes leçons » comme en Séance, puis le titre d'écran en Display. */
+.nouvelle-tete { display:flex; flex-direction:column; align-items:flex-start; gap:.1rem; margin:.4rem 0 .3rem; }
+.nouvelle-tete h2 { text-wrap:balance; }
+/* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet à moi) : repliées sous les Propositions,
+   deux boutons secondaires qui déplient chacun leur formulaire dans une carte, un seul à la fois. */
+.nouvelle-voies { display:flex; flex-direction:column; align-items:flex-start; gap:1rem; margin-top:2.2rem; }
+.voies-boutons { display:flex; flex-wrap:wrap; gap:.6rem; }
+.voies-boutons button { min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; }
+.voies-boutons button[aria-expanded="true"] { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 8%, var(--carte)); }
+.nouvelle-voies .voie { width:min(100%, 36rem); }
+.voie p { margin:0; } .voie p:empty { display:none; }
+.voie .erreur { min-height:0; font-weight:600; }
 .nouvelle-voies form.colonne { max-width:none; }
 .nouvelle-voies input:not([type=date]) { width:100%; }
 .nouvelle-voies form.colonne > button { align-self:flex-start; min-height:2.75rem; padding-inline:1.4rem; border-radius:12px; }
@@ -234,6 +253,21 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .cadrage-choix { display:flex; flex-direction:column; gap:.5rem; }
 .cadrage-choix button { min-height:2.75rem; padding:.6rem 1rem; border-radius:12px; text-align:left; }
 .cadrage .annuler { position:absolute; top:.9rem; right:.9rem; width:2.75rem; height:2.75rem; padding:0; }
+/* Attente du prof : une carte posée au centre sur le voile, à la pose de carte de ligne, jamais rouge. La nouvelle
+   ligne y est « en travaux » et ses pointillés avancent tant que le prof prépare. La carte d'erreur prend sa place. */
+.nouvelle-voile { position:fixed; inset:0; z-index:10; display:flex; padding:1rem; overflow-y:auto; background:var(--voile); }
+.nouvelle-voile[hidden] { display:none; }
+.carte-attente { display:flex; flex-direction:column; gap:.8rem; width:min(34rem, 100%); margin:auto; padding:1.4rem 1.5rem 1.5rem; border-radius:18px; box-shadow:var(--ombre-carte); }
+.carte-attente:focus { outline:none; }
+.carte-attente h2 { margin:0; font-size:1.45rem; line-height:1.15; text-wrap:balance; overflow-wrap:anywhere; }
+.carte-attente p { margin:0; }
+.carte-attente .ligne { margin:.2rem 0; }
+.carte-attente .ligne.en-travaux::before { animation:travaux-avancent 1.4s linear infinite; }
+@keyframes travaux-avancent { to { background-position:1.5rem 0; } }
+.attente-ensuite { font-weight:700; }
+.attente-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1.2rem; margin-top:.3rem; }
+.attente-actions button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }
+.carte-attente.echec h2 { color:var(--rouge); }
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
@@ -253,7 +287,6 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 /* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
-.badges-tete h2 { margin:0; font-size:2rem; line-height:1.1; }
 .totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
 .collection h3 { margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }

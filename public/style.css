@@ -308,6 +308,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
 .totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
+.badges-corps > * { min-width:0; }
 .collection h3 { margin:0 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
 @media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
 /* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
@@ -327,5 +328,8 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .calendrier-detail { display:flex; flex-direction:column; gap:.35rem; padding-top:.8rem; border-top:1px dashed var(--bord); line-height:1.35; }
 .calendrier-detail strong { font-size:1.05rem; }
 .calendrier-detail p { margin:0; }
-.calendrier-detail .gain-badge { white-space:nowrap; }
+.calendrier-detail { overflow-wrap:anywhere; }
+.lecons-du-jour { list-style:none; margin:0; padding:0; display:grid; gap:.15rem; }
+.gains-du-jour { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .8rem; }
+.calendrier-detail .gain-badge { display:inline-flex; align-items:center; gap:.35rem; }
 @media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.6rem; } .badges-tete h2 { font-size:1.6rem; } }

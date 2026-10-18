@@ -444,13 +444,16 @@ function calendrierJours({ aujourdhui, jours }) {
   const detail = (journee) => {
     const faits = [journee.quiz && `${journee.quiz} quiz`, journee.revisions && pluriel(journee.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
     const gains = [journee.gains.etoiles && `⭐ ${journee.gains.etoiles}`, journee.gains.fusees && `🚀 ${journee.gains.fusees}`].filter(Boolean).join(' · ');
+    // Plusieurs Leçons : une liste plutôt qu'une phrase à virgules ; les gains en pastilles qui reviennent à la ligne.
+    const lecons = journee.lecons.map((l) => l.titre);
     return [
       h('strong', {}, dateBadge(journee.jour)),
-      journee.lecons.length > 0 && h('p', {}, `📚 ${journee.lecons.map((l) => l.titre).join(', ')}`),
+      lecons.length === 1 && h('p', {}, `📚 ${lecons[0]}`),
+      lecons.length > 1 && h('ul', { className: 'lecons-du-jour', ariaLabel: 'Leçons' }, lecons.map((titre) => h('li', {}, `📚 ${titre}`))),
       faits && h('p', {}, faits),
       journee.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
-      (gains || journee.gains.paliers.length > 0) && h('p', {}, gains && `Gagné : ${gains} `,
-        journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
+      (gains || journee.gains.paliers.length > 0) && h('div', { className: 'gains-du-jour' }, gains && h('span', {}, `Gagné : ${gains}`),
+        journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p, { ariaHidden: 'true', title: undefined }), nomEtPalier(p)))),
       !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, 'Rien ce jour-là.')];
   };
   const afficher = (choisi, focaliser = true) => {

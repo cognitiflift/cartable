@@ -27,7 +27,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 - Kang, S. H. K., McDermott, K. B., & Roediger, H. L. (2007). Test format and corrective feedback modify the effect of testing on long-term retention. *European Journal of Cognitive Psychology*, 19(4–5), 528–558. doi:[10.1080/09541440601056620](https://doi.org/10.1080/09541440601056620)
 - Butler, A. C., & Roediger, H. L. (2008). Feedback enhances the positive effects and reduces the negative effects of multiple-choice testing. *Memory & Cognition*, 36(3), 604–616. doi:[10.3758/MC.36.3.604](https://doi.org/10.3758/MC.36.3.604)
 
-**Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007). Heuristique tirée d'un cadre pour les formats de Cartable : ils se font en touchant (mots à placer parmi des intrus, ordre, association), donc entre reconnaissance et rappel ; seul « réfléchis puis dévoile » est un vrai rappel, noté par l'Élève lui-même.
+**Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007). Heuristique tirée d'un cadre pour les formats de **rappel actif** de Cartable : l'Élève y retrouve la réponse, mais en touchant des éléments donnés (mots à placer parmi des intrus, ordre, association), ce qui les rapproche de la reconnaissance ; seul « réfléchis puis dévoile » est un rappel sans indice, noté par l'Élève lui-même. Leur supériorité sur le QCM n'est pas mesurée.
 
 **Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006.
 
@@ -43,9 +43,9 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 - Rawson, K. A., Dunlosky, J., & Sciartelli, S. M. (2013). The power of successive relearning: Improving performance on course exams and long-term retention. *Educational Psychology Review*, 25(4), 523–548. doi:[10.1007/s10648-013-9240-4](https://doi.org/10.1007/s10648-013-9240-4)
 - Murre, J. M. J., & Dros, J. (2015). Replication and analysis of Ebbinghaus' forgetting curve. *PLOS ONE*, 10(7), e0120644. doi:[10.1371/journal.pone.0120644](https://doi.org/10.1371/journal.pone.0120644)
 
-**Solidité.** Méta-analyse ou consensus pour l'espacement (Cepeda et al. 2006) et la forme de la courbe d'oubli. Étude isolée (quelques expériences du même groupe) pour le réapprentissage espacé.
+**Solidité.** Méta-analyse ou consensus pour l'espacement (Cepeda et al. 2006). Étude isolée pour la forme de la courbe d'oubli telle que citée ici : Murre & Dros (2015) répliquent Ebbinghaus sur un seul sujet, mais le résultat est classique. Étude isolée (quelques expériences du même groupe) pour le réapprentissage espacé.
 
-**Où dans Cartable.** **Révision du jour**, état de mémoire de la **Question**, **Maîtrise** qui baisse avec le temps, **Retenu** (deux succès à au moins 24 heures d'écart), **Leçon terminée** qui continue d'être révisée ; ADR 0003 (mise à jour spec #46) et ADR 0006.
+**Où dans Cartable.** **Révision du jour**, état de mémoire de la **Question**, **Maîtrise** qui baisse avec le temps, **Retenu** (stabilité d'au moins 5 jours des Questions qui couvrent l'Objectif, ou, sans Question, deux succès à au moins 24 heures d'écart), **Leçon terminée** qui continue d'être révisée ; ADR 0003 (mise à jour spec #46) et ADR 0006.
 
 ### Entrelacement
 
@@ -81,7 +81,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 **Référence.**
 - Richland, L. E., Kornell, N., & Kao, L. S. (2009). The pretesting effect: Do unsuccessful retrieval attempts enhance learning? *Journal of Experimental Psychology: Applied*, 15(3), 243–257. doi:[10.1037/a0016496](https://doi.org/10.1037/a0016496)
 - Kornell, N., Hays, M. J., & Bjork, R. A. (2009). Unsuccessful retrieval attempts enhance subsequent learning. *Journal of Experimental Psychology: Learning, Memory, and Cognition*, 35(4), 989–998. doi:[10.1037/a0015729](https://doi.org/10.1037/a0015729)
-- Pan, S. C., & Carpenter, S. K. (2023). Prequestioning and pretesting effects: A review of empirical research, theoretical perspectives, and implications for educational practice. *Educational Psychology Review*, 35(4). doi:[10.1007/s10648-023-09814-5](https://doi.org/10.1007/s10648-023-09814-5)
+- Pan, S. C., & Carpenter, S. K. (2023). Prequestioning and pretesting effects: A review of empirical research, theoretical perspectives, and implications for educational practice. *Educational Psychology Review*, 35(4), article 97. doi:[10.1007/s10648-023-09814-5](https://doi.org/10.1007/s10648-023-09814-5)
 
 **Solidité.** Méta-analyse ou consensus (revue de Pan & Carpenter 2023) pour l'information pré-testée ; plus fragile pour l'information non pré-testée.
 
@@ -136,7 +136,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour la segmentation (Rey et al. 2019) et le principe multimédia (synthèses de Mayer). Heuristique tirée d'un cadre pour leur application à des Pages de leçon écrites par un agent.
 
-**Où dans Cartable.** Consigne « Visuels » du prof : un visuel qui explique, jamais seulement décoratif, et une question qui oblige à le regarder (`lib/agent.js`) ; **Page de leçon** choisie une à une, une question à la fois dans le quiz et dans la **Révision du jour** ; figure du **Kit** avec légende.
+**Où dans Cartable.** Consigne « Visuels » du prof : un visuel qui explique, jamais seulement décoratif, et une question qui oblige à le regarder (`lib/agent.js`) ; **Page de leçon** choisie une à une, une Question à la fois dans la **Révision du jour** ; figure du **Kit** avec légende.
 
 ### Détails séduisants
 
@@ -238,7 +238,7 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | --- | --- | --- |
 | Seuil de 80 % (Objectif atteint, Rebond Revoir ou Défi, Leçon terminée, Étoiles, palier « bien en tête ») | `CONTEXT.md`, ADR 0002, ADR 0003 | La pédagogie de maîtrise demande un critère, pas cette valeur. Sur un quiz de 4 ou 5 questions, 80 % se joue à une réponse. Aucun cadre, hypothèse à mesurer. |
 | Paliers de Maîtrise à 50 % et 80 % | `CONTEXT.md`, ADR 0006 | Aucun cadre, hypothèse à mesurer. |
-| **Retenu** : deux succès à au moins 24 heures d'écart, ou stabilité d'au moins 5 jours | ADR 0003, ADR 0006 | Inspiré du réapprentissage espacé, qui recommande plutôt environ trois rappels réussis puis des sessions espacées (Rawson & Dunlosky 2011). Les valeurs 2, 24 heures et 5 jours : aucun cadre, hypothèse à mesurer. |
+| **Retenu** : deux succès à au moins 24 heures d'écart, ou stabilité d'au moins 5 jours | `CONTEXT.md`, ADR 0003 | Inspiré du réapprentissage espacé, qui recommande plutôt environ trois rappels réussis puis des sessions espacées (Rawson & Dunlosky 2011). Les valeurs 2, 24 heures et 5 jours : aucun cadre, hypothèse à mesurer. |
 | Rétention visée de 90 % dans FSRS | `lib/memoire.js`, ADR 0006 | Valeur par défaut de FSRS et d'Anki, pas un optimum démontré pour des enfants. Aucun cadre, hypothèse à mesurer. |
 | Note FSRS de la Confiance : juste mais « pas sûr » vaut « difficile » | `lib/memoire.js`, ADR 0006 | L'hypercorrection porte sur les erreurs commises « sûr », pas sur cette correspondance. Aucun cadre, hypothèse à mesurer. |
 | Nombre de Propositions d'un lot (2 à 10, 4 par défaut) | Profil, `CONTEXT.md` | L'effet de surcharge du choix (Iyengar & Lepper 2000, doi:[10.1037/0022-3514.79.6.995](https://doi.org/10.1037/0022-3514.79.6.995)) n'est pas confirmé en moyenne par la méta-analyse de Scheibehenne, Greifeneder & Todd (2010, doi:[10.1086/651235](https://doi.org/10.1086/651235)). Aucun cadre, hypothèse à mesurer. |
@@ -255,9 +255,9 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 
 Décisions où les cadres ci-dessus vont contre la règle de Cartable, ou ne la soutiennent qu'à moitié. Ce registre ne change aucune règle : chacun de ces écarts doit devenir sa propre issue.
 
-- **Entrelacement entre matières.** Les Révisions du jour mélangent des Leçons de matières différentes au nom de l'entrelacement (ADR 0006), mais la méta-analyse de Brunmair & Richter (2019) ne trouve le bénéfice que pour des catégories proches. Le mélange reste défendable pour l'espacement, pas pour « apprendre à reconnaître de quoi il s'agit ».
+- **Entrelacement entre matières.** _Contredit l'ADR 0006 (Révisions mélangées entre Leçons), à rouvrir parce que…_ les Révisions du jour mélangent des Leçons de matières différentes au nom de l'entrelacement (ADR 0006), mais la méta-analyse de Brunmair & Richter (2019) ne trouve le bénéfice que pour des catégories proches. Le mélange reste défendable pour l'espacement, pas pour « apprendre à reconnaître de quoi il s'agit ».
 - **Dépassement et détails séduisants.** Un encart « Pour aller plus loin » est par définition hors du propos de la page. Le mettre en fin de page et hors score limite le risque, mais cette protection n'est pas mesurée.
-- **Étoiles conditionnées au score.** Les Étoiles d'un quiz réussi (80 % ou plus) sont une récompense attendue, conditionnée à la performance : la forme qui réduit le plus la motivation intrinsèque chez Deci et al. (1999), si l'effet vaut pour des récompenses virtuelles.
+- **Étoiles conditionnées au score.** Les Étoiles d'un quiz réussi (80 % ou plus) sont une récompense attendue, conditionnée à la performance : une forme qui, en moyenne, réduit la motivation intrinsèque chez Deci et al. (1999), si l'effet vaut pour des récompenses virtuelles.
 - **Lecture à voix haute et texte affiché.** Le principe de redondance de Mayer (2020) déconseille d'ajouter le texte écrit à une image déjà commentée à voix haute, ce qui rapproche la lecture mot pour mot d'un texte affiché d'une redondance, alors que la synthèse vocale aide les élèves en difficulté de lecture (Wood et al. 2018). Le réglage, coupé par défaut et choisi pour un Élève, est cohérent avec les deux ; l'activer pour tous ne le serait pas.
 - **Police pour la dyslexie.** Atkinson Hyperlegible Next a été dessinée pour les lecteurs malvoyants ; aucune étude trouvée ne mesure son effet chez les lecteurs dyslexiques.
-- **Saisie libre et effet de génération.** Sans clavier (ADR 0002), l'Élève ne produit jamais une réponse de lui-même, sauf de tête dans « réfléchis puis dévoile » ; l'effet de génération (Slamecka & Graf 1978) et le format des tests (Kang et al. 2007) indiquent que produire retient mieux que choisir. C'est le prix, accepté, de la sécurité d'un Élève enfant.
+- **Saisie libre et effet de génération.** _Contredit en partie l'ADR 0002 (Séance sans saisie libre), sans la remettre en cause :_ sans clavier, l'Élève ne produit jamais une réponse de lui-même, sauf de tête dans « réfléchis puis dévoile » ; l'effet de génération (Slamecka & Graf 1978) et le format des tests (Kang et al. 2007) indiquent que produire retient mieux que choisir. C'est le prix, accepté, de la sécurité d'un Élève enfant.

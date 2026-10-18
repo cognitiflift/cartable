@@ -20,7 +20,7 @@ Toute spec, tout ticket et toute ADR qui prend une décision d'apprentissage (qu
 2. sa solidité : méta-analyse ou consensus, étude isolée, ou heuristique tirée d'un cadre ;
 3. sinon, « aucun cadre, hypothèse à mesurer », plutôt qu'une justification inventée.
 
-Un tableau décision / cadre / solidité suffit. Les cadres déjà utilisés sont dans `docs/cadres-scientifiques.md` : s'y référer, y ajouter tout nouveau cadre avec une référence vérifiée, et y inscrire les décisions restées sans fondement. Une référence dont on doute ne s'écrit pas.
+Un tableau décision / cadre / solidité suffit. Les cadres déjà utilisés sont dans `docs/cadres-scientifiques.md` : s'y référer, y ajouter tout nouveau cadre avec une référence vérifiée, et inscrire dans sa rubrique « Décisions sans fondement écrit » celles qui n'en ont pas. Une référence dont on doute ne s'écrit pas.
 
 ## Style de l'appli
 

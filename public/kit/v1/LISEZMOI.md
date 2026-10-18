@@ -236,10 +236,10 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 
 ```html
 <figure class="kit-figure" id="stromboli">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/…/Volcan.jpg" alt="Le Stromboli en éruption, de nuit">
+  <img src="https://exemple.org/images/stromboli-1200.jpg" alt="Le Stromboli en éruption, de nuit">
   <figcaption>
     Photo : le Stromboli projette de la lave par son cratère.
-    <small class="kit-credit">Wikimedia Commons, Jean Dupont, CC BY-SA 4.0</small>
+    <small class="kit-credit">Observatoire du Stromboli, Jean Dupont, CC BY-SA 4.0</small>
   </figcaption>
 </figure>
 ```
@@ -282,13 +282,13 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 </figure>
 ```
 
-- Photo : prends-la dans une source que tu consultes déjà pour vérifier les faits (article Wikipédia, notice d'un musée ou d'une institution). Demande dans le même WebFetch l'adresse directe du fichier de son image principale, sa source, son auteur et sa licence ou son copyright ; fais un autre WebFetch (Wikimedia Commons, site d'un musée) seulement si cette source n'a pas d'image, et jamais une adresse devinée. Une œuvre protégée se montre aussi en photo : l'usage est familial, privé et éducatif, et le crédit cite toujours la source, l'auteur et la licence ou le copyright. Cite dans `src` l'adresse directe du fichier image, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
+- Photo : prends-la dans une source que tu consultes déjà pour vérifier les faits (article Wikipédia, notice d'un musée ou d'une institution). Demande dans le même WebFetch l'adresse de l'image de partage de cette page (sa balise `og:image`, à défaut `twitter:image`), que le site a déjà réduite, sa source, son auteur et sa licence ou son copyright. Cette règle vaut pour tout site : ne prends jamais le fichier original en pleine résolution (il pèse souvent plus de 5 Mo et l'appli le retire), ni sa page « Fichier : » ou « File: ». Si l'image de partage ne montre pas le sujet (logo du site, bandeau) ou s'il n'y en a pas, prends l'image principale telle qu'elle est affichée dans la page, dans sa version réduite. Garde l'adresse telle quelle, paramètres compris (`?utm_…`). Fais un autre WebFetch (une autre source sur le sujet, site d'un musée) seulement si cette source n'a pas d'image, et jamais une adresse devinée. Une œuvre protégée se montre aussi en photo : l'usage est familial, privé et éducatif, et le crédit cite toujours la source, l'auteur et la licence ou le copyright. Cite l'adresse retenue dans `src`, et déclare-la dans le manifeste `images.json`, à la racine de la Leçon (ajoute tes entrées à celles déjà présentes) :
 
 ```json
 [
   {
-    "url": "https://upload.wikimedia.org/wikipedia/commons/…/Volcan.jpg",
-    "source": "Wikimedia Commons, Jean Dupont",
+    "url": "https://exemple.org/images/stromboli-1200.jpg",
+    "source": "Observatoire du Stromboli, Jean Dupont",
     "licence": "CC BY-SA 4.0",
     "alt": "Le Stromboli en éruption, de nuit",
     "page": "0002-le-magma.html"
@@ -296,7 +296,7 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 ]
 ```
 
-Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre image qui marche ou par un schéma SVG. Sur une page qui porte sur un sujet réel, remplace-la par une autre photo : un schéma SVG n'y est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
+Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, trop lourde, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre image qui marche ou par un schéma SVG. Pour une image trop lourde, reprends l'image de partage déjà réduite de sa source (`og:image`, à défaut `twitter:image`), jamais le fichier original en pleine résolution. Sur une page qui porte sur un sujet réel, remplace-la par une autre photo : un schéma SVG n'y est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
 
 ## Lecture à voix haute
 

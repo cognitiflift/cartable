@@ -1,7 +1,7 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
-import { sectionIdees, ECHEC_LECTURE } from '/nouvelle-lecon-texte.js';
+import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions } from '/nouvelle-lecon-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -576,6 +576,10 @@ async function cadrer(mode) {
   return cadrage;
 }
 
+// Colonnes de la grille des Propositions pour chaque largeur (2, 3 ou 4 colonnes au plus, choisies par style.css) :
+// aucune carte seule sur la dernière rangée.
+const colonnesGrille = (nombre) => [2, 3, 4].map((maximum) => `--colonnes-${maximum}: ${colonnesPropositions(nombre, maximum)}`).join('; ');
+
 function ecranNouvelleLecon(profil) {
   const erreur = h('p', { className: 'erreur', role: 'status' });
   const boutons = [];
@@ -623,13 +627,21 @@ function ecranNouvelleLecon(profil) {
     if (etat === 'en préparation') minuteur = setTimeout(afficherPropositions, 3000);
     // Chaque Proposition porte la puce de sa Catégorie et dit son type en mots, dans une cartouche de signalétique :
     // pleine à la couleur de la ligne pour une suite (elle prolonge une ligne déjà ouverte), en filet pour un sujet original.
-    const cartes = propositions.map((p) => h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
-      h('span', { className: 'proposition-tete' },
-        h('span', { className: 'cartouche-type' }, p.type === 'suite' ? 'Pour aller plus loin' : 'Nouveau sujet'),
-        p.auProgramme && h('span', { className: 'au-programme' }, '🎒 Au programme')),
-      h('strong', { className: 'proposition-titre' }, p.titre),
-      h('span', { className: 'proposition-categorie' }, p.categorie),
-      p.accroche && h('span', { className: 'accroche' }, p.accroche)));
+    // Le nom accessible se limite au titre et au type ; la Catégorie, « Au programme » et l'accroche complète
+    // (coupée à 2 lignes à l'écran) en sont la description.
+    const cartes = propositions.map((p, i) => {
+      const id = (partie) => `proposition-${i}-${partie}`;
+      const carte = h('button', { className: `carte proposition ${p.type}`, style: styleLigne(p.categorie), disabled: boutons[0].disabled, onclick: () => demarrer(async () => ({ proposition: p.titre }), 'libre', `proposition:${p.titre}`) },
+        h('span', { className: 'proposition-tete' },
+          h('span', { className: 'cartouche-type', id: id('type') }, cartoucheProposition(p.type)),
+          p.auProgramme && h('span', { className: 'au-programme', id: id('programme') }, '🎒 Au programme')),
+        h('strong', { className: 'proposition-titre', id: id('titre') }, p.titre),
+        h('span', { className: 'proposition-categorie', id: id('categorie') }, p.categorie),
+        p.accroche && h('span', { className: 'accroche', id: id('accroche') }, p.accroche));
+      carte.setAttribute('aria-labelledby', `${id('titre')} ${id('type')}`);
+      carte.setAttribute('aria-describedby', ['categorie', p.auProgramme && 'programme', p.accroche && 'accroche'].filter(Boolean).map(id).join(' '));
+      return carte;
+    });
     const autresIdees = h('button', { className: 'secondaire', disabled: boutons[0].disabled, onclick: async () => {
       autresIdees.disabled = true;
       // Un refus (génération déjà en cours) revient au même : on attend les Propositions qui se préparent.
@@ -643,7 +655,7 @@ function ecranNouvelleLecon(profil) {
     boutonsIdees = section.autresIdees ? [...cartes, autresIdees] : cartes;
     idees.replaceChildren(...garder([
       h('h2', {}, '🎲 Des idées pour toi'),
-      cartes.length > 0 && h('div', { className: 'propositions' }, cartes),
+      cartes.length > 0 && h('div', { className: 'propositions', style: colonnesGrille(cartes.length) }, cartes),
       etatIdees,
       section.autresIdees && autresIdees]));
   };

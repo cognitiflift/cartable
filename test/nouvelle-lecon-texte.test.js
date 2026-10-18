@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sectionIdees, ECHEC_LECTURE } from '../public/nouvelle-lecon-texte.js';
+import { sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions } from '../public/nouvelle-lecon-texte.js';
 
 test('Idées prêtes avec des cartes : aucun texte d\'état, « D\'autres idées » proposé', () => {
   assert.deepEqual(sectionIdees({ etat: 'prêtes', nombreCartes: 4 }), { autresIdees: true });
@@ -40,6 +40,43 @@ test('Section d\'idées : jamais `false`, `null` ni vide, et toujours un texte q
         assert.equal(typeof section.texte, 'string', `${etat}, ${nombreCartes} cartes`);
         assert.ok(section.texte.trim().length > 0, `${etat}, ${nombreCartes} cartes`);
       }
+    }
+  }
+});
+
+test('Cartouche d\'une suite : « Prolonge ta ligne », pour ne pas la confondre avec « Pour aller plus loin » (Dépassement)', () => {
+  assert.equal(cartoucheProposition('suite'), 'Prolonge ta ligne');
+});
+
+test('Cartouche d\'un original : « Nouveau sujet »', () => {
+  assert.equal(cartoucheProposition('original'), 'Nouveau sujet');
+});
+
+// Nombre de colonnes de la grille, pour une place qui en tient au plus `maximum` : aucune carte seule sur sa rangée.
+const rangees = (nombre, colonnes) => Array.from({ length: Math.ceil(nombre / colonnes) }, (_, i) => Math.min(colonnes, nombre - i * colonnes));
+
+test('Grille : 4 Propositions sur 4 colonnes (ordinateur) et en 2 + 2 quand il n\'en tient que 3 (tablette)', () => {
+  assert.equal(colonnesPropositions(4, 4), 4);
+  assert.equal(colonnesPropositions(4, 3), 2);
+  assert.equal(colonnesPropositions(4, 2), 2);
+});
+
+test('Grille : 5 Propositions en 3 + 2, sur ordinateur comme sur tablette', () => {
+  assert.equal(colonnesPropositions(5, 4), 3);
+  assert.equal(colonnesPropositions(5, 3), 3);
+});
+
+test('Grille : moins de cartes que de colonnes, elles se partagent la rangée', () => {
+  assert.equal(colonnesPropositions(2, 4), 2);
+  assert.equal(colonnesPropositions(3, 4), 3);
+});
+
+test('Grille : de 2 à 10 Propositions (réglage du Profil), aucune carte seule sur la dernière rangée dès 2 colonnes', () => {
+  for (let nombre = 2; nombre <= 10; nombre++) {
+    for (const maximum of [2, 3, 4]) {
+      const colonnes = colonnesPropositions(nombre, maximum);
+      assert.ok(colonnes >= 1 && colonnes <= maximum, `${nombre} cartes, ${maximum} colonnes au plus`);
+      if (colonnes > 1) assert.ok(!rangees(nombre, colonnes).includes(1), `${nombre} cartes sur ${colonnes} colonnes`);
     }
   }
 });

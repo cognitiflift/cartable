@@ -176,6 +176,16 @@ test('consignes des Propositions : « D\'autres idées » liste les titres déj�
   assert.match(consignes, /suites/);
 });
 
+test('consignes des Propositions : des accroches qui tutoient l\'Élève, en une phrase courte adaptée à son âge', () => {
+  for (const lecons of [[], [{ titre: 'Les volcans', categorie: 'Sciences', maitrise: null }]]) {
+    const consignes = consignesPropositions({ ...profil, nombrePropositions: 4 }, lecons);
+    assert.match(consignes, /accroche[^\n]*tutoie l'élève/);
+    assert.match(consignes, /jamais « vous »/);
+    assert.match(consignes, /une phrase courte/);
+    assert.match(consignes, /adaptée à son âge/);
+  }
+});
+
 test('consignes : Étape suivante est une page nouvelle choisie selon la zone proximale ; Revoir est réservé à la révision', () => {
   const consignes = consignesLecon(profil);
   assert.match(consignes, /Étape suivante[^.]*page nouvelle[^.]*zone proximale/);

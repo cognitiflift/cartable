@@ -19,3 +19,19 @@ export function sectionIdees({ etat, nombreCartes }) {
   if (nombreCartes === 0) return { texte: `Pas d'idée pour l'instant. ${QUOI_FAIRE}`, autresIdees: true };
   return { autresIdees: true };
 }
+
+// Cartouche d'une carte de Proposition, d'après son type. Une suite « prolonge » une ligne du réseau de l'Élève :
+// pas « Pour aller plus loin », qui désigne déjà le Dépassement d'une Page de leçon.
+export function cartoucheProposition(type) {
+  return type === 'suite' ? 'Prolonge ta ligne' : 'Nouveau sujet';
+}
+
+// Nombre de colonnes de la grille des Propositions quand la place en tient au plus `maximum` : le plus grand nombre
+// qui ne laisse aucune carte seule sur la dernière rangée (5 cartes en 3 + 2 plutôt qu'en 4 + 1), et une seule
+// colonne quand aucun ne convient.
+export function colonnesPropositions(nombre, maximum) {
+  for (let colonnes = Math.min(nombre, maximum); colonnes > 1; colonnes--) {
+    if (nombre % colonnes !== 1) return colonnes;
+  }
+  return 1;
+}

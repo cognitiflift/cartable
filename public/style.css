@@ -111,7 +111,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .categorie h3 { display:flex; align-items:center; gap:.65rem; margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
 .categorie h3::before { content:""; width:1.4rem; height:1.4rem; border-radius:6px; background:var(--ligne); }
 .lecons-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1rem; }
-/* La ligne foncée : les surfaces pleines à la couleur de la ligne (Niveau, Continuer, cartouche « Pour aller plus loin »). */
+/* La ligne foncée : les surfaces pleines à la couleur de la ligne (Niveau, Continuer, cartouche « Prolonge ta ligne »). */
 .lecon, .seance-tete, .proposition { --ligne-fonce:color-mix(in srgb, var(--ligne) 82%, var(--encre-noire)); --sur-ligne:var(--sur-accent); }
 @media (prefers-color-scheme: dark) { .lecon, .seance-tete, .proposition { --ligne-fonce:var(--ligne); } }
 .lecon { display:flex; flex-direction:column; gap:.85rem; padding:1.05rem 1.25rem .5rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
@@ -210,7 +210,12 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .doux { color:var(--doux); }
 /* Nouvelle leçon, Propositions : cartes simples, puce de la Catégorie, type dit en mots dans une cartouche de
    signalétique, pleine à la couleur de la ligne pour une suite, en filet pour un sujet original. */
-.propositions { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap:1rem; margin-bottom:1rem; }
+/* La grille : 4 colonnes au plus sur ordinateur, 3 sur tablette, 2 sur grand téléphone, 1 en dessous ; app.js donne
+   pour chaque largeur le nombre de colonnes (--colonnes-n) qui ne laisse aucune carte seule sur sa rangée. */
+.propositions { display:grid; grid-template-columns:1fr; gap:1rem; margin-bottom:1rem; }
+@media (min-width: 560px) { .propositions { grid-template-columns:repeat(var(--colonnes-2, 2), minmax(0, 1fr)); } }
+@media (min-width: 768px) { .propositions { grid-template-columns:repeat(var(--colonnes-3, 3), minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .propositions { grid-template-columns:repeat(var(--colonnes-4, 4), minmax(0, 1fr)); } }
 .proposition { display:flex; flex-direction:column; align-items:flex-start; gap:.5rem; }
 .proposition-tete { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .7rem; }
 .cartouche-type { padding:.36rem .5rem .22rem; border-radius:7px; border:.15rem solid var(--station-vide); color:var(--doux); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; }
@@ -219,7 +224,8 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .proposition-titre { font:800 1.15rem/1.2 var(--police-titre); letter-spacing:-.01em; text-wrap:balance; }
 .proposition-categorie { display:inline-flex; align-items:center; gap:.45rem; font-size:.9rem; font-weight:600; color:var(--doux); }
 .proposition-categorie::before { content:""; flex:none; width:1rem; height:1rem; border-radius:6px; background:var(--ligne); }
-.proposition .accroche { line-height:1.35; text-wrap:pretty; }
+/* L'accroche est coupée à 2 lignes à l'écran ; son texte complet reste dans le DOM, en description de la carte. */
+.proposition .accroche { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; line-height:1.35; text-wrap:pretty; }
 /* Les deux autres voies vers une Leçon (réviser une leçon de classe, un sujet choisi) : deux cartes côte à côte. */
 .nouvelle-voies { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap:1rem; margin-top:2.2rem; }
 .nouvelle-voies h2 { margin:0 0 .8rem; font-size:1.45rem; line-height:1.1; }

@@ -11,7 +11,7 @@
   --kit-police: "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --kit-police-titre: "Overpass", "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --kit-fond: #f2f4f8; --kit-texte: #14182b; --kit-doux: #4f566c; --kit-carte: #fff; --kit-bord: #dde1ea;
-  --kit-accent: #2747c9; --kit-sur-accent: #fff; --kit-encre-noire: #000;
+  --kit-accent: #262a7a; --kit-sur-accent: #fff; --kit-encre-noire: #000;
   --kit-juste: #15803d; --kit-faux: #b42318;
   color-scheme: light dark;
 }
@@ -35,7 +35,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --kit-fond: #0f1220; --kit-texte: #e8eaf3; --kit-doux: #a6acc2; --kit-carte: #1a1e30; --kit-bord: #2c3248;
-    --kit-accent: #8aa2ff; --kit-sur-accent: #0f1220;
+    --kit-accent: #b9c3ff; --kit-sur-accent: #0f1220;
     --kit-juste: #5ad98a; --kit-faux: #f58b8b;
   }
   [data-categorie="francais"]      { --kit-accent: #fb923c; }

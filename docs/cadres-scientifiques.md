@@ -161,7 +161,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour l'effet (Schneider et al. 2018). Heuristique tirée d'un cadre pour la règle d'un seul élément clé par schéma.
 
-**Où dans Cartable.** Repère « Couleurs » des schémas SVG : `var(--kit-accent)` pour un seul élément clé, reconnaissable aussi sans la couleur (consigne « Visuels », `lib/agent.js` ; section « Figure », `public/kit/v1/LISEZMOI.md` ; ticket #134).
+**Où dans Cartable.** Repère « Couleurs » des schémas SVG : `var(--kit-accent)` pour un seul élément clé, reconnaissable aussi sans la couleur (consigne « Visuels », `lib/agent.js` ; section « Figure », `public/kit/v1/LISEZMOI.md` ; ticket #134). Un seul bouton plein sur l'accueil de l'Élève, le Continuer de la **Leçon** en tête, les autres actions en retrait : Révisions du jour et les autres Continuer en contour, « Apprendre quelque chose de nouveau » en simple texte accent (heuristique tirée d'un cadre : la méta-analyse porte sur des supports d'apprentissage, pas sur des boutons ; `ecranAccueil`, `public/app.js`, ticket #141).
 
 ### Détails séduisants
 
@@ -186,7 +186,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour une capacité limitée de la mémoire de travail (Cowan 2001, revue de nombreuses études ; la valeur de quatre éléments reste discutée). Heuristique tirée d'un cadre pour la théorie de la charge cognitive (Sweller 1988, étude isolée à l'origine d'un cadre largement repris) appliquée aux quiz. Heuristique tirée d'un cadre pour la borne de 3 à 6 questions comptées par page, qui suppose qu'une page tient en 3 à 5 idées, et pour le coût de chaque nouveau format de question.
 
-**Où dans Cartable.** Consigne « Nombre de questions » du prof : une question comptée par idée-clé, entre 3 et 6, sans chercher à couvrir tous les formats (`lib/agent.js`, ticket #128).
+**Où dans Cartable.** Consigne « Nombre de questions » du prof : une question comptée par idée-clé, entre 3 et 6, sans chercher à couvrir tous les formats (`lib/agent.js`, ticket #128). Moins d'éléments en concurrence au premier coup d'œil sur l'accueil de l'Élève : bandeau de la semaine resserré sur tablette, Révisions du jour et « Apprendre quelque chose de nouveau » en retrait (heuristique tirée d'un cadre ; `maSemaine`, `public/style.css`, ticket #141).
 
 ### Traitement approprié au transfert
 
@@ -270,7 +270,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus : norme internationale publiée.
 
-**Où dans Cartable.** « Bonnes pratiques générales (WCAG AA) comme base » (`PRODUCT.md`) ; jetons de couleur des deux thèmes, anneau de focus de 3px et cibles tactiles (`DESIGN.md`, `public/style.css`) ; style de base du **Kit** (`public/kit/v1/base.css`) ; dans un schéma SVG, l'élément clé reconnaissable aussi sans la couleur (1.4.1 Utilisation de la couleur), et l'encre en `currentColor` et les couleurs du Kit, qui suivent le mode sombre (ticket #134).
+**Où dans Cartable.** « Bonnes pratiques générales (WCAG AA) comme base » (`PRODUCT.md`) ; jetons de couleur des deux thèmes, anneau de focus de 3px et cibles tactiles (`DESIGN.md`, `public/style.css`) ; style de base du **Kit** (`public/kit/v1/base.css`) ; dans un schéma SVG, l'élément clé reconnaissable aussi sans la couleur (1.4.1 Utilisation de la couleur), et l'encre en `currentColor` et les couleurs du Kit, qui suivent le mode sombre (ticket #134) ; sur l'accueil, les Continuer en contour de ligne foncée (au moins 5,9:1 sur la carte, 1.4.11) avec un texte `texte` (1.4.3), et l'anneau de focus en `sur-nuit` dans l'en-tête, où l'accent ne tient pas 3:1 (ticket #141).
 
 ### Lisibilité pour la dyslexie
 
@@ -336,6 +336,9 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | La progression d'un Badge suit le meilleur compte atteint et ne recule jamais (un Objectif oublié ne la fait pas baisser) | `lib/badges.js` (`meilleur`, `avance`) | Prolonge « une pause n'efface pas ce qui est acquis » (`PRODUCT.md`) et le Palier qui ne redescend jamais (`CONTEXT.md`). Aucun cadre, hypothèse à mesurer. |
 | Jours d'avant le premier jour de l'Élève neutres dans le calendrier de Mes badges, plutôt que dessinés comme des jours vides | `public/app.js` (`classeJour`) | Prolonge « pas de punition » (`PRODUCT.md`). Aucun cadre, hypothèse à mesurer. |
 | Badges « À découvrir » sans ligne ni décompte, avec la phrase de ce qu'ils saluent | `public/app.js`, `lib/badges.js` (`phrase`) | Dire ce qui est salué oriente vers la tâche (Hattie & Timperley 2007), mais rend la récompense plus attendue (Deci et al. 1999) ; transposition aux Badges virtuels : heuristique. Le dosage : aucun cadre, hypothèse à mesurer. |
+| Leçon la plus récente en tête : sur l'accueil, la **Leçon** à la dernière activité la plus récente passe au-dessus des Catégories (« Tu en étais là »), et son Continuer est le seul bouton plein | `ecranAccueil`, `public/app.js`, ticket #141 | Le seul bouton plein relève du signalement (ci-dessus) ; le choix de la Leçon la plus récente, plutôt que celle dont des Questions sont dues ou dont un contrôle approche, n'en découle pas. Aucun cadre, hypothèse à mesurer (part des Séances lancées depuis la Leçon en tête). |
+| Accent séparé des couleurs de ligne par la clarté : indigo d'encre `#262a7a` en clair, `#b9c3ff` en sombre, à au moins 12 d'écart OKLab (×100) de chaque ligne, les Maths comprises | `public/style.css`, `public/kit/v1/quiz.css`, `DESIGN.md`, ticket #141 | WCAG 2.2 fixe des contrastes contre le fond, pas un écart entre deux couleurs de sens différent ; le signalement demande que l'action se distingue, sans dire de combien. Aucun cadre, hypothèse à mesurer : la prochaine critique de l'accueil doit cesser de relever la confusion entre Maths et accent. |
+| Pastille de compte des Questions dues sur Révisions du jour, plutôt qu'un bouton plein | `maSemaine`, `public/app.js`, ticket #141 | Aucun cadre, hypothèse à mesurer (part des jours avec des Questions dues où les Révisions du jour sont faites, avant et après). |
 
 ## Écarts relevés
 

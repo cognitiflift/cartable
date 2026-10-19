@@ -207,6 +207,9 @@ const recompensesLecon = (l) => h('span', { className: 'etoiles' },
 const retourAccueil = () => h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons');
 
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+// Espaces insécables du français autour des guillemets et devant : ; ? !, pour qu'un retour à la ligne n'en isole
+// jamais un (« Dire « stop » calmement », « Troie : mythe ou réalité ? »). Le texte vient du prof ou de l'Élève.
+const insecables = (texte) => texte.replace(/« /g, '«\u00a0').replace(/ ([»:;?!])/g, '\u00a0$1');
 
 // Accueil : chaque Leçon est une ligne du réseau, à la couleur de sa Catégorie (celle du Kit), et ses Objectifs
 // en sont les stations. L'état d'un Objectif se lit à la forme de sa station : vide (pas encore évalué), hachurée
@@ -258,19 +261,21 @@ function prochaineStation(l) {
   const texte = !l.pages?.length ? 'Ta première page'
     : l.quizEnAttente ? 'Le quiz de ta page'
       : l.mode === 'libre' && l.ensuite ? l.ensuite : null;
-  return texte && h('p', { className: 'prochaine' }, h('span', { className: 'libelle' }, 'Prochaine station : '), texte);
+  return texte && h('p', { className: 'prochaine' }, h('span', { className: 'libelle' }, 'Prochaine station\u00a0: '), insecables(texte));
 }
 
 const texteControle = (jours) => (jours === 0 ? "aujourd'hui" : jours === 1 ? 'demain' : `dans ${jours} jours`);
 const controleAVenir = (l) => Number.isInteger(l.joursAvantControle) && l.joursAvantControle >= 0;
 
-function carteLecon(l) {
+// enTete : la Leçon où l'Élève en était, posée en tête de l'accueil ; seul son Continuer est un bouton plein, les
+// autres sont en contour à la couleur de leur ligne.
+function carteLecon(l, { enTete = false } = {}) {
   const objectifs = l.objectifs ?? [];
   const adresse = `#/lecon/${l.id}`;
-  return h('article', { className: 'lecon', style: styleLigne(l.categorie) },
+  return h('article', { className: `lecon${enTete ? ' en-tete' : ''}`, style: styleLigne(l.categorie) },
     h('div', { className: 'lecon-tete' },
       l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
-      h('h4', {}, h('a', { href: adresse }, l.titre)),
+      h('h4', {}, h('a', { href: adresse }, insecables(l.titre))),
       l.maitrise?.palier !== 'acquis' && badgeMaitrise(l.maitrise)), // Acquis : dit par le terminus allumé, pas deux fois
     ligneLecon(l, { ici: !!prochaineStation(l) }),
     h('div', { className: 'lecon-bas' },
@@ -278,7 +283,7 @@ function carteLecon(l) {
       controleAVenir(l) && h('span', { className: 'controle' }, `📅 Contrôle ${texteControle(l.joursAvantControle)}`),
       l.terminee && h('span', { className: 'terminee' }, '🏁 Terminée'),
       recompensesLecon(l),
-      h('a', { className: 'bouton', href: adresse }, 'Continuer')),
+      h('a', { className: `bouton${enTete ? ' plein' : ''}`, href: adresse }, 'Continuer')),
     objectifs.length > 0 && h('details', { className: 'objectifs' },
       h('summary', {}, h('span', { className: 'voir' }, 'Voir les Objectifs'), h('span', { className: 'cacher' }, 'Cacher les Objectifs')),
       h('ul', {}, objectifs.map((o) => h('li', {}, station(o), h('span', {}, o.texte, h('small', {}, etatStation(o).libelle)))))));
@@ -288,19 +293,26 @@ async function ecranAccueil(profil) {
   const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
   retenirRecompenses(profil, badges);
   barreNav(profil);
-  const parCategorie = Object.groupBy(lecons, (l) => l.categorie);
+  // « Où j'en étais ? » : la Leçon à la dernière activité la plus récente passe en tête, hors de sa Catégorie (#141).
+  const enTete = lecons.reduce((recente, l) => (l.derniereActivite > recente.derniereActivite ? l : recente), lecons[0]);
+  const parCategorie = Object.groupBy(lecons.filter((l) => l !== enTete), (l) => l.categorie);
   montrer(
     recapitulatifSemaine(profil, rythme.recapitulatif),
     maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons),
     h('div', { className: 'lecons-tete' },
       h('h2', {}, 'Mes leçons'),
-      h('button', { className: 'bouton-nouvelle', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
+      // Une action en retrait, sauf quand le réseau est vide : c'est alors la seule chose à faire, et le seul bouton plein.
+      h('button', { className: lecons.length ? 'bouton-nouvelle' : 'bouton-nouvelle plein', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
     lecons.length === 0 && h('div', { className: 'reseau-vide' },
       h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Ton réseau est encore vide'), h('span', { className: 'terminus' }, 'Acquis')),
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
-    config.categories.filter((c) => parCategorie[c]).map((c) => h('section', { className: 'categorie', style: styleLigne(c) },
-      h('h3', {}, c),
-      h('div', { className: 'lecons-grille' }, parCategorie[c].map(carteLecon)))));
+    enTete && h('section', { className: 'categorie reprise', style: styleLigne(enTete.categorie) },
+      h('h3', {}, 'Tu en étais là', h('span', { className: 'reprise-categorie' }, `· ${enTete.categorie}`)),
+      carteLecon(enTete, { enTete: true })),
+    h('div', { className: 'reseau' }, config.categories.filter((c) => parCategorie[c]).map((c) => h('section', {
+      className: `categorie${parCategorie[c].length > 1 ? ' etendue' : ''}`, style: styleLigne(c) },
+    h('h3', {}, c),
+    h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l)))))));
 }
 
 // Ma semaine, comme la page de la semaine du journal de classe : du lundi au dimanche, un tampon par jour (vide,
@@ -361,9 +373,11 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
         h('small', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
         serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`)),
+      // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
-        h('strong', {}, 'Mes révisions du jour'),
-        h('small', {}, dues ? `${pluriel(dues, 'question')} à revoir` : 'Rien à revoir aujourd’hui'))));
+        h('strong', {}, 'Mes révisions du jour',
+          dues > 0 && h('span', { className: 'compte' }, String(dues), h('span', { className: 'cache' }, dues > 1 ? ' questions' : ' question'))),
+        h('small', {}, dues ? 'à revoir aujourd’hui' : 'Rien à revoir aujourd’hui'))));
 }
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.

@@ -152,7 +152,7 @@ Seuil d'un Badge : bronze, argent, or puis diamant. Un Palier atteint ne redesce
 _Avoid_: niveau (confusion avec Niveau de Leçon et Niveau de scolarité)
 
 **Mes badges**:
-Écran de l'Élève, ouvert depuis la carte de l'Objectif du jour sur l'accueil : un calendrier des Jours travaillés (toucher un jour montre ce qui a été fait et gagné, sans les scores) et la collection des Badges (obtenus avec leur date, à venir en grisé avec leur progression, surprise cachés). Un Badge reste marqué « Nouveau » tant que l'Élève n'a pas ouvert Mes badges depuis qu'il l'a gagné.
+Écran de l'Élève, ouvert depuis la carte de l'Objectif du jour sur l'accueil : un calendrier des Jours travaillés (toucher un jour montre ce qui a été fait et gagné, sans les scores) et la collection des Badges (chaque Badge commencé en ligne, ses Paliers en stations et le chemin vers le prochain sans chiffre ; à découvrir avec ce qu'ils saluent, sans décompte ; surprise cachés). Un Badge reste marqué « Nouveau » tant que l'Élève n'a pas ouvert Mes badges depuis qu'il l'a gagné.
 
 **Niveau de Leçon**:
 Avancée de l'Élève dans une Leçon libre : nombre d'Objectifs atteints plus un (on commence au niveau 1). Sans maximum : quand tous les Objectifs actuels sont atteints, l'agent propose à l'Élève d'élargir la mission, ce qui ajoute des Objectifs. Ne mesure pas ce que l'Élève sait (c'est la Maîtrise) mais jusqu'où il est allé.

@@ -299,26 +299,46 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .pastille-badge { --palier:var(--bord); display:inline-flex; align-items:center; justify-content:center; width:2.2em; height:2.2em; border-radius:50%; border:3px solid var(--palier); background:color-mix(in srgb, var(--palier) 18%, var(--carte)); font-size:1.1em; vertical-align:middle; }
 .pastille-badge.bronze { --palier:var(--palier-bronze); } .pastille-badge.argent { --palier:var(--palier-argent); } .pastille-badge.or { --palier:var(--palier-or); }
 .pastille-badge.diamant { --palier:var(--palier-diamant); } .pastille-badge.unique { --palier:var(--palier-unique); }
-.pastille-badge.pas-encore { filter:grayscale(1); opacity:.45; }
-.badge.a-venir strong { color:var(--doux); }
-.badge strong { display:block; margin-top:.3rem; }
-/* La collection de Mes badges : la pastille à gauche, le nom et les Paliers à côté, en cartes simples serrées. */
-.grille.badges { grid-template-columns:repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
-.grille.badges .badge { display:flex; align-items:flex-start; gap:.8rem; }
-.grille.badges .badge strong { margin-top:.15rem; }
+.pastille-badge.pas-encore { filter:grayscale(1); opacity:.55; }
+/* La collection de Mes badges : une carte simple où chaque Badge commencé est une ligne, ses Paliers en stations (le
+   trait gris parcouru, rempli en partie vers le prochain Palier selon --avance), séparées par des tirets ; dessous, les
+   surprises trouvées et les Badges à découvrir, en rangées sans ligne. */
+.collection { padding:1rem 1.25rem .4rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
+.collection ul { list-style:none; margin:0; padding:0; }
+.collection li + li, .collection h4 { border-top:1px dashed var(--bord); }
+.collection h4 { margin:0; padding:1rem 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; color:var(--doux); }
+.badge-tete { display:flex; align-items:flex-start; gap:.8rem; }
+.badge-tete .pastille-badge { flex:none; }
+.badge-tete strong { display:block; margin-top:.2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.badge-tete p { margin:.15rem 0 0; color:var(--doux); line-height:1.35; }
+.lignes-badges li { padding:.9rem 0 .4rem; }
+.badges-simples li { padding:.8rem 0; }
+.a-decouvrir strong { color:var(--doux); }
+.ligne-badge { margin:.7rem 0 0; padding:0 1.9rem 3.2rem; }
+.ligne-badge .bronze { --palier:var(--palier-bronze); } .ligne-badge .argent { --palier:var(--palier-argent); }
+.ligne-badge .or { --palier:var(--palier-or); } .ligne-badge .diamant { --palier:var(--palier-diamant); }
+.ligne-badge .troncon.fait { background:var(--doux); }
+.ligne-badge .troncon.en-cours { background:linear-gradient(90deg, var(--doux) var(--avance), var(--troncon) var(--avance)); }
+.ligne-badge .station.atteinte { border-color:var(--palier); }
+.ligne-badge .station.ici { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--doux); } /* le Palier visé : halo neutre, la couleur reste au Palier gagné */
+.station-nom { position:absolute; top:calc(100% + .5rem); left:50%; transform:translateX(-50%); display:grid; justify-items:center; color:var(--doux); font-size:.92rem; line-height:1.25; white-space:nowrap; }
+.station.atteinte .station-nom { color:var(--texte); font-weight:700; }
+.station-nom small { font-weight:400; color:var(--doux); }
+.station-nom .nouveau { margin:.15rem 0 0; }
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.75rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
 /* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
-.totaux-recompenses { margin:0; font-size:1.15rem; font-weight:800; font-variant-numeric:tabular-nums; }
+.totaux-recompenses { margin:0; font-size:1.2rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
-.collection h3 { margin:0 0 .7rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.badges-corps > * { min-width:0; }
+.collection h3 { margin:0 0 .2rem; font:800 1.45rem/1.1 var(--police-titre); letter-spacing:-.005em; }
 @media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
 /* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
    entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */
 .mon-calendrier { display:flex; flex-direction:column; gap:.8rem; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
 .calendrier-mois { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }
-.calendrier-mois strong { font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
-.calendrier-mois strong::first-letter { text-transform:uppercase; }
+.calendrier-mois h3 { margin:0; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
+.calendrier-mois h3::first-letter { text-transform:uppercase; }
 .calendrier-mois button { min-width:2.75rem; min-height:2.75rem; font-size:1.2rem; line-height:1; }
 .calendrier-grille { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.15rem; justify-items:center; }
 .calendrier-grille .nom { padding:.2rem 0 .35rem; }
@@ -327,8 +347,19 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .calendrier-jour.aujourdhui:hover:not(:disabled) { background:color-mix(in srgb, var(--texte) 6%, color-mix(in srgb, var(--accent) 9%, transparent)); }
 .calendrier-jour:disabled { opacity:1; cursor:default; background:transparent; }
 .calendrier-jour.choisi .tampon { box-shadow:0 0 0 .2rem var(--carte), 0 0 0 .38rem var(--texte); }
+.calendrier-jour.aujourdhui.choisi { box-shadow:none; } /* aujourd'hui choisi : la teinte et l'anneau suffisent */
 .calendrier-detail { display:flex; flex-direction:column; gap:.35rem; padding-top:.8rem; border-top:1px dashed var(--bord); line-height:1.35; }
 .calendrier-detail strong { font-size:1.05rem; }
 .calendrier-detail p { margin:0; }
-.calendrier-detail .gain-badge { white-space:nowrap; }
-@media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.6rem; } .badges-tete h2 { font-size:1.6rem; } }
+.jour.avant .tampon { border-color:transparent; color:color-mix(in srgb, var(--doux) 75%, var(--carte)); }
+.calendrier-legende { display:flex; flex-wrap:wrap; gap:.3rem 1rem; margin:.7rem 0 0; color:var(--doux); font-size:.92rem; }
+.calendrier-legende .jour { display:inline-flex; align-items:center; gap:.4rem; }
+.calendrier-legende .tampon { width:1.15rem; height:1.15rem; }
+.calendrier-legende .tampon .joker { top:-.35rem; right:-.5rem; }
+.calendrier-legende .jour.vide { gap:.8rem; }
+.accueil-badges { margin:0 0 1rem; font-weight:700; }
+.calendrier-detail { overflow-wrap:anywhere; }
+.lecons-du-jour { list-style:none; margin:0; padding:0; display:grid; gap:.15rem; }
+.gains-du-jour { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .8rem; }
+.calendrier-detail .gain-badge { display:inline-flex; align-items:center; gap:.35rem; }
+@media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.75rem; } .badges-tete h2 { font-size:1.6rem; } }

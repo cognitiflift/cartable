@@ -224,7 +224,7 @@ const ETATS_STATION = [
 ];
 const PAS_EVALUE = { classe: 'pas-encore', libelle: 'pas encore évalué' };
 const etatStation = (objectif) => ETATS_STATION.find((e) => objectif[e.cle]) ?? PAS_EVALUE;
-const station = (objectif, attrs = {}) => h('span', { className: `station ${etatStation(objectif).classe}`, ...attrs });
+const station = (objectif, attrs = {}, ...enfants) => h('span', { className: `station ${etatStation(objectif).classe}`, ...attrs }, ...enfants);
 
 function resumeObjectifs(objectifs) {
   const compte = (cle) => objectifs.filter((o) => o[cle]).length;
@@ -332,9 +332,12 @@ const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atte
 // Un jour en tampon, seule façon de dessiner un jour : le bandeau de la semaine et le calendrier de Mes badges.
 // Une journée : { jour, etat, joker, gains… }, celle du calendrier du serveur ou jourSansRien. classeJour porte l'état
 // (vide, pâle, plein), aujourd'hui et futur ; lectureJour le dit en mots, le tampon étant muet.
-const classeJour = ({ jour, etat }, aujourdhui) => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}`;
-const lectureJour = (nom, { jour, etat, joker }, aujourdhui) => [nom, jour === aujourdhui && "aujourd'hui", ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
-const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, String(Number(jour.slice(8))), joker && h('span', { className: 'joker' }, '🛡️'));
+// `debut` (calendrier de Mes badges) : le premier Jour de l'Élève ; un jour d'avant est neutre (« avant »), sans le
+// contour en tirets d'un jour vide, pour ne pas se lire comme un jour manqué.
+const classeJour = ({ jour, etat }, aujourdhui, debut = '') => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}${jour < debut ? ' avant' : ''}`;
+const lectureJour = (nom, { jour, etat, joker }, aujourdhui, debut = '') => [nom, jour === aujourdhui && "aujourd'hui", jour < debut ? 'avant ton premier jour' : ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
+// Sans `jour`, un tampon muet : la légende du calendrier.
+const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'));
 
 function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
@@ -378,38 +381,72 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
 }
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
-const pastilleBadge = ({ emoji, palier }) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore' }, emoji);
-const dateBadge = (jour) => new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+const pastilleBadge = ({ emoji, palier }, attrs = {}) => h('span', { className: `pastille-badge ${palier ?? 'pas-encore'}`, title: palier ?? 'pas encore', ...attrs }, emoji);
+// L'année n'est écrite que quand ce n'est pas celle d'aujourd'hui.
+// Le premier du mois s'écrit « 1er ».
+const premierDuMois = (texte) => texte.replace(/^1 /, '1er ');
+const dateBadge = (jour) => premierDuMois(new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE',
+  { day: 'numeric', month: 'long', ...(jour.slice(0, 4) !== String(new Date().getFullYear()) && { year: 'numeric' }) }));
+const dateCourte = (jour) => premierDuMois(new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' }));
+
+// La ligne d'un Badge : ses Paliers en sont les stations (`station`), cerclées de la couleur de leur Palier une fois
+// atteintes, le prochain en « vous êtes ici ». Le trait est parcouru jusqu'au dernier Palier obtenu, puis rempli en
+// partie vers le prochain selon `avance`, sans chiffre ; le texte alternatif dit ce chemin en mots.
+const cheminVers = (avance) => (avance < 1 / 3 ? 'au début du chemin vers le Palier' : avance < 2 / 3 ? 'à mi-chemin du Palier' : 'presque au Palier');
+function ligneBadge(b, estNouveau) {
+  const dernier = b.paliers.findLastIndex((p) => p.jour);
+  const prochaine = b.prochain ? dernier + 1 : -1;
+  const obtenus = b.paliers.filter((p) => p.jour).map((p) => `${p.palier} le ${dateBadge(p.jour)}${estNouveau(p.palier) ? ' (nouveau)' : ''}`).join(', ');
+  const suite = b.prochain ? `${cheminVers(b.avance)} ${b.prochain.palier}` : 'tous les Paliers obtenus';
+  return h('div', { className: 'ligne ligne-badge', role: 'img', ariaLabel: `${b.nom} : ${obtenus} ; ${suite}` },
+    b.paliers.map((p, i) => [
+      i > 0 && h('span', i === prochaine
+        ? { className: 'troncon en-cours', style: `--avance: ${Math.round(b.avance * 100)}%` }
+        : { className: `troncon${i <= dernier ? ' fait' : ''}` }),
+      station({ atteint: !!p.jour }, { className: `station ${p.jour ? 'atteinte' : 'pas-encore'} ${p.palier}${i === prochaine ? ' ici' : ''}` },
+        h('span', { className: 'station-nom' }, p.palier,
+          p.jour && h('small', {}, dateCourte(p.jour)),
+          estNouveau(p.palier) && h('span', { className: 'nouveau' }, 'Nouveau')))]));
+}
 
 // Mes badges (#95) : en tête, le total d'Étoiles et de Fusées de l'Élève (#96) ; puis le calendrier des Jours
-// travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection des Badges, obtenus avec leur
-// Palier et leur date, à venir en grisé avec leur progression (« 7/15 »). L'ouvrir efface « Nouveau » ; le mot
-// d'accueil s'affiche à la première ouverture.
+// travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection : chaque Badge commencé en
+// ligne (`ligneBadge`), le dernier Palier gagné en premier ; les badges surprise trouvés ; puis, à découvrir, les
+// Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. L'ouvrir efface « Nouveau » ; le mot d'accueil
+// s'affiche à la première ouverture.
 async function ecranBadges(profil) {
   const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
   barreNav(profil);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
+  const dernierJour = (b) => b.paliers.filter((p) => p.jour).at(-1).jour;
+  const commences = collection.filter((b) => !b.surprise && b.palier).sort((x, y) => dernierJour(y).localeCompare(dernierJour(x)));
+  const surprises = collection.filter((b) => b.surprise);
+  const aDecouvrir = collection.filter((b) => !b.surprise && !b.palier);
+  const tete = (b, ...detail) => h('div', { className: 'badge-tete' }, pastilleBadge(b, { ariaHidden: 'true', title: undefined }), h('div', {}, h('strong', {}, b.nom), ...detail));
   montrer(
     h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
     h('div', { className: 'badges-tete' },
       h('h2', {}, 'Mes badges'),
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
         `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`)),
-    accueil && h('p', { className: 'bulle-prof' }, 'Voici les badges que tu as déjà gagnés !'),
+    accueil && (commences.length > 0 || surprises.length > 0) && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
     h('div', { className: 'badges-corps' },
       calendrierJours(calendrier),
       h('section', { className: 'collection', ariaLabel: 'Ma collection' },
         h('h3', {}, 'Ma collection'),
-        h('div', { className: 'grille badges' }, collection.map((b) => {
-          const obtenus = b.surprise ? [{ palier: b.palier, jour: b.jour }] : b.paliers.filter((p) => p.jour);
-          return h('div', { className: `carte badge${b.palier ? '' : ' a-venir'}` },
-            pastilleBadge(b),
-            h('div', {},
-              h('strong', {}, b.nom),
-              obtenus.map((p) => h('small', {}, `${b.surprise ? 'badge surprise' : p.palier} · ${dateBadge(p.jour)}`, estNouveau(b, p.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))),
-              b.prochain && h('small', { className: 'progression', title: `Prochain palier : ${b.prochain.palier}` }, `${Math.min(b.compte, b.prochain.seuil)}/${b.prochain.seuil}`)));
-        })))));
+        commences.length
+          ? h('ul', { className: 'lignes-badges' }, commences.map((b) => h('li', {},
+            tete(b, h('p', {}, b.phrase)),
+            ligneBadge(b, (palier) => estNouveau(b, palier)))))
+          : h('p', { className: 'doux' }, 'Ton premier Palier dessinera ici la ligne de son Badge.'),
+        surprises.length > 0 && [
+          h('h4', {}, 'Surprises trouvées'),
+          h('ul', { className: 'badges-simples' }, surprises.map((b) => h('li', {},
+            tete(b, h('p', {},`Badge surprise · ${dateBadge(b.jour)}`, estNouveau(b, b.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))))))],
+        aDecouvrir.length > 0 && [
+          h('h4', {}, 'À découvrir'),
+          h('ul', { className: 'badges-simples a-decouvrir' }, aDecouvrir.map((b) => h('li', {}, tete(b, h('p', {}, b.phrase)))))])));
 }
 
 // Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour comme le bandeau de la semaine : pâle quand
@@ -421,21 +458,25 @@ const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], 
 function calendrierJours({ aujourdhui, jours }) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
-  const premier = (jours[0]?.jour ?? aujourdhui).slice(0, 7);
+  const debut = jours[0]?.jour ?? aujourdhui; // premier jour de l'Élève dans le calendrier
+  const premier = debut.slice(0, 7);
   const dernier = aujourdhui.slice(0, 7);
   let mois = dernier;
   const bloc = h('section', { className: 'mon-calendrier', ariaLabel: 'Mon calendrier' });
   const detail = (journee) => {
     const faits = [journee.quiz && `${journee.quiz} quiz`, journee.revisions && pluriel(journee.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
     const gains = [journee.gains.etoiles && `⭐ ${journee.gains.etoiles}`, journee.gains.fusees && `🚀 ${journee.gains.fusees}`].filter(Boolean).join(' · ');
+    // Plusieurs Leçons : une liste plutôt qu'une phrase à virgules ; les gains en pastilles qui reviennent à la ligne.
+    const lecons = journee.lecons.map((l) => l.titre);
     return [
       h('strong', {}, dateBadge(journee.jour)),
-      journee.lecons.length > 0 && h('p', {}, `📚 ${journee.lecons.map((l) => l.titre).join(', ')}`),
+      lecons.length === 1 && h('p', {}, `📚 ${lecons[0]}`),
+      lecons.length > 1 && h('ul', { className: 'lecons-du-jour', ariaLabel: 'Leçons' }, lecons.map((titre) => h('li', {}, `📚 ${titre}`))),
       faits && h('p', {}, faits),
       journee.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
-      (gains || journee.gains.paliers.length > 0) && h('p', {}, gains && `Gagné : ${gains} `,
-        journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p), ` ${nomEtPalier(p)} `))),
-      !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, 'Rien ce jour-là.')];
+      (gains || journee.gains.paliers.length > 0) && h('div', { className: 'gains-du-jour' }, gains && h('span', {}, `Gagné : ${gains}`),
+        journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p, { ariaHidden: 'true', title: undefined }), nomEtPalier(p)))),
+      !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, journee.jour === aujourdhui ? 'Pas encore aujourd’hui.' : 'Rien ce jour-là.')];
   };
   const afficher = (choisi, focaliser = true) => {
     const [a, m] = mois.split('-').map(Number);
@@ -443,31 +484,55 @@ function calendrierJours({ aujourdhui, jours }) {
     const nombre = new Date(a, m, 0).getDate();
     const cases = [...Array(decalage).fill(null), ...Array.from({ length: nombre }, (_, i) => `${mois}-${String(i + 1).padStart(2, '0')}`)];
     let aFocaliser = null;
+    // Un seul arrêt de tabulation dans la grille : le jour choisi, sinon aujourd'hui, sinon le premier jour touchable
+    // du mois ; les flèches passent d'un jour à l'autre (et d'un mois à l'autre), comme un calendrier natif.
+    const touchable = (jour) => jour && jour >= debut && jour <= aujourdhui;
+    const arret = [choisi, aujourdhui].find((j) => cases.includes(j) && touchable(j)) ?? cases.find(touchable);
+    const deplacer = (e) => {
+      const pas = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+      if (!pas || !e.target.value) return;
+      e.preventDefault();
+      const cible = jourPlus(e.target.value, pas);
+      if (!touchable(cible)) return;
+      mois = cible.slice(0, 7);
+      afficher(cible);
+    };
     bloc.replaceChildren(
       h('div', { className: 'calendrier-jours' },
         h('div', { className: 'calendrier-mois' },
-          h('button', { className: 'secondaire', ariaLabel: 'Mois précédent', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(); } }, '‹'),
-          h('strong', {}, `${MOIS[m - 1]} ${a}`),
-          h('button', { className: 'secondaire', ariaLabel: 'Mois suivant', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(); } }, '›')),
-        h('div', { className: 'calendrier-grille' },
+          h('button', { className: 'secondaire', name: 'precedent', ariaLabel: 'Mois précédent', title: 'Mois précédent', disabled: mois <= premier, onclick: () => { mois = moisSuivant(mois, -1); afficher(undefined, 'precedent'); } }, '‹'),
+          h('h3', {}, `${MOIS[m - 1]} ${a}`),
+          h('button', { className: 'secondaire', name: 'suivant', ariaLabel: 'Mois suivant', title: 'Mois suivant', disabled: mois >= dernier, onclick: () => { mois = moisSuivant(mois, 1); afficher(undefined, 'suivant'); } }, '›')),
+        h('div', { className: 'calendrier-grille', role: 'group', ariaLabel: `${MOIS[m - 1]} ${a}`, onkeydown: deplacer },
           JOURS_SEMAINE.map((d) => h('span', { className: 'nom', ariaHidden: 'true' }, d)),
           cases.map((jour) => {
             if (!jour) return h('span', {});
             const journee = duJour(jour);
             const nom = `${JOURS_ENTIERS[(new Date(`${jour}T12:00:00`).getDay() + 6) % 7]} ${Number(jour.slice(8))} ${MOIS[m - 1]}`;
             const bouton = h('button', {
-              className: `${classeJour(journee, aujourdhui)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
-              ariaLabel: lectureJour(nom, journee, aujourdhui),
+              className: `${classeJour(journee, aujourdhui, debut)} calendrier-jour${jour === choisi ? ' choisi' : ''}`,
+              ariaLabel: lectureJour(nom, journee, aujourdhui, debut),
               ariaPressed: String(jour === choisi),
-              disabled: jour > aujourdhui,
+              ariaCurrent: jour === aujourdhui ? 'date' : undefined,
+              disabled: !touchable(jour),
+              tabIndex: jour === arret ? 0 : -1,
+              value: jour,
               onclick: () => afficher(jour),
             }, tamponJour(journee));
             if (jour === choisi) aFocaliser = bouton;
             return bouton;
-          }))),
+          })),
+        h('p', { className: 'calendrier-legende' },
+          [['pale', 'travaillé'], ['plein', 'Objectif du jour atteint'], ['vide', 'joker', true]].map(([etat, mot, joker]) =>
+            h('span', { className: `jour ${etat}` }, tamponJour({ joker }), mot)))),
       h('div', { className: 'calendrier-detail', ariaLive: 'polite' },
         choisi ? detail(duJour(choisi)) : h('p', { className: 'doux' }, 'Touche un jour pour voir ce que tu as fait et gagné.')));
-    if (focaliser) aFocaliser?.focus();
+    // Après ‹ ou ›, le focus reste sur le même bouton (ou, désactivé au bout de l'historique, va à la grille) ; après un
+    // jour touché, sur ce jour.
+    const cible = typeof focaliser === 'string'
+      ? bloc.querySelector(`button[name="${focaliser}"]:not(:disabled)`) ?? bloc.querySelector('.calendrier-grille button[tabindex="0"]')
+      : aFocaliser;
+    if (focaliser) cible?.focus();
   };
   afficher(aujourdhui, false); // le détail d'aujourd'hui d'abord, sans prendre le focus
   return bloc;

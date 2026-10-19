@@ -16,7 +16,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Effet du test et rappel actif
 
-**Ce qu'il dit.** Se tester sur une matière la fait mieux retenir à long terme que la relire, même sans retour. Retrouver soi-même une réponse (rappel, production) retient mieux que la reconnaître parmi d'autres, surtout quand une correction suit ; la correction réduit aussi ce qu'un QCM peut faire retenir de faux, et un nouveau test sur l'erreur corrigée la fait retenir. L'effet profite surtout à ce qui a été testé : il se transfère peu à ce qui ne l'a pas été.
+**Ce qu'il dit.** Se tester sur une matière la fait mieux retenir à long terme que la relire, même sans retour. Retrouver soi-même une réponse (rappel, production) retient mieux que la reconnaître parmi d'autres, surtout quand une correction suit ; la correction réduit aussi ce qu'un QCM peut faire retenir de faux, et un nouveau test sur l'erreur corrigée la fait retenir. Un QCM dont les réponses fausses sont assez plausibles pour qu'il faille retrouver pourquoi chacune est fausse sollicite pourtant le rappel autant qu'une question ouverte, et fait en plus retenir ce qui concerne les réponses fausses. L'effet se retrouve en classe, de l'école primaire à l'université. L'effet profite surtout à ce qui a été testé : il se transfère peu à ce qui ne l'a pas été.
 
 **Référence.**
 - Roediger, H. L., & Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. *Psychological Science*, 17(3), 249–255. doi:[10.1111/j.1467-9280.2006.01693.x](https://doi.org/10.1111/j.1467-9280.2006.01693.x)
@@ -28,10 +28,12 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 - Butler, A. C., & Roediger, H. L. (2008). Feedback enhances the positive effects and reduces the negative effects of multiple-choice testing. *Memory & Cognition*, 36(3), 604–616. doi:[10.3758/MC.36.3.604](https://doi.org/10.3758/MC.36.3.604)
 - Pashler, H., Cepeda, N. J., Wixted, J. T., & Rohrer, D. (2005). When does feedback facilitate learning of words? *Journal of Experimental Psychology: Learning, Memory, and Cognition*, 31(1), 3–8. doi:[10.1037/0278-7393.31.1.3](https://doi.org/10.1037/0278-7393.31.1.3)
 - Pan, S. C., & Rickard, T. C. (2018). Transfer of test-enhanced learning: Meta-analytic review and synthesis. *Psychological Bulletin*, 144(7), 710–756. doi:[10.1037/bul0000151](https://doi.org/10.1037/bul0000151)
+- Little, J. L., Bjork, E. L., Bjork, R. A., & Angello, G. (2012). Multiple-choice tests exonerated, at least of some charges: Fostering test-induced learning and avoiding test-induced forgetting. *Psychological Science*, 23(11), 1337–1344. doi:[10.1177/0956797612443370](https://doi.org/10.1177/0956797612443370)
+- Agarwal, P. K., Nunes, L. D., & Blunt, J. R. (2021). Retrieval practice consistently benefits student learning: A systematic review of applied research in schools and classrooms. *Educational Psychology Review*, 33(4), 1409–1453. doi:[10.1007/s10648-021-09595-9](https://doi.org/10.1007/s10648-021-09595-9)
 
-**Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Méta-analyse ou consensus pour le faible transfert à ce qui n'a pas été testé (Pan & Rickard 2018). Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007). Heuristique tirée d'un cadre pour les formats de **rappel actif** de Cartable : l'Élève y retrouve la réponse, mais en touchant des éléments donnés (mots à placer parmi des intrus, ordre, association), ce qui les rapproche de la reconnaissance ; seul « réfléchis puis dévoile » est un rappel sans indice, noté par l'Élève lui-même. Leur supériorité sur le QCM n'est pas mesurée.
+**Solidité.** Méta-analyse ou consensus pour l'effet du test (Adesope et al. 2017 ; « utilité élevée » chez Dunlosky et al. 2013) et pour la correction après la réponse. Méta-analyse ou consensus pour le faible transfert à ce qui n'a pas été testé (Pan & Rickard 2018). Méta-analyse ou consensus pour l'effet en classe, y compris à l'école primaire et au secondaire (revue systématique d'Agarwal et al. 2021). Étude isolée pour la supériorité du rappel sur la reconnaissance selon le format (Kang et al. 2007) ; étude isolée, plus récente, pour un QCM aux réponses fausses plausibles qui l'égale (Little et al. 2012) : le format compte moins que la qualité des réponses fausses. Heuristique tirée d'un cadre pour les formats de **rappel actif** de Cartable : l'Élève y retrouve la réponse, mais en touchant des éléments donnés (mots à placer parmi des intrus, ordre, association), ce qui les rapproche de la reconnaissance ; seul « réfléchis puis dévoile » est un rappel sans indice, noté par l'Élève lui-même. Leur supériorité sur le QCM n'est pas mesurée.
 
-**Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; une question comptée par idée-clé de la page, chaque Objectif du quiz couvert, et en **Revoir** une question reformulée par question ratée (consigne « Nombre de questions » et Rebonds, `lib/agent.js`, ticket #128) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006 ; le champ `figure` d'une question réservé aux questions qui demandent de lire ou d'interpréter le visuel, pas aux questions de rappel dont la réponse y est écrite, que le visuel remontré donnerait à recopier (heuristique tirée d'un cadre, consigne « Visuels » et LISEZMOI, ticket #134).
+**Où dans Cartable.** Le quiz de chaque **Page de leçon** ; les réponses fausses plausibles, tirées d'idées reçues ou d'erreurs fréquentes, demandées pour « choisis la meilleure explication », pour les mathématiques et pour les **Variantes** (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`), mais pas pour un QCM ordinaire (voir « Écarts relevés ») ; les formats de **rappel actif** de la **Question** et la consigne « au moins une question de rappel actif par quiz » (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`) ; une question comptée par idée-clé de la page, chaque Objectif du quiz couvert, et en **Revoir** une question reformulée par question ratée (consigne « Nombre de questions » et Rebonds, `lib/agent.js`, ticket #128) ; la correction et l'explication après chaque réponse dans les **Révisions du jour** ; ADR 0006 ; le champ `figure` d'une question réservé aux questions qui demandent de lire ou d'interpréter le visuel, pas aux questions de rappel dont la réponse y est écrite, que le visuel remontré donnerait à recopier (heuristique tirée d'un cadre, consigne « Visuels » et LISEZMOI, ticket #134).
 
 ### Espacement et réapprentissage espacé
 
@@ -64,28 +66,33 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Exemples résolus et retrait progressif
 
-**Ce qu'il dit.** Pour une méthode nouvelle, étudier des exemples entièrement résolus apprend mieux, au début, que résoudre seul des problèmes. Retirer ensuite les étapes une à une (« fading ») fait passer en douceur de l'exemple à la résolution autonome. L'avantage s'inverse quand l'Élève maîtrise déjà la méthode (effet d'inversion dû à l'expertise).
+**Ce qu'il dit.** Pour une méthode nouvelle, étudier des exemples entièrement résolus apprend mieux, au début, que résoudre seul des problèmes. Retirer ensuite les étapes une à une (« fading ») fait passer en douceur de l'exemple à la résolution autonome. L'avantage s'inverse quand l'Élève maîtrise déjà la méthode (effet d'inversion dû à l'expertise). Des exemples justes font mieux que des exemples faux ou mêlés de faux ; ajouter à l'exemple une demande d'explication (« explique pourquoi ») en réduit l'effet au lieu de l'augmenter. Chercher seul avant d'être enseigné (« échec productif ») aide en moyenne la compréhension des concepts, mais pas chez les plus jeunes : de la 2e à la 5e année, enseigner d'abord fait mieux.
 
 **Référence.**
 - Sweller, J., & Cooper, G. A. (1985). The use of worked examples as a substitute for problem solving in learning algebra. *Cognition and Instruction*, 2(1), 59–89. doi:[10.1207/s1532690xci0201_3](https://doi.org/10.1207/s1532690xci0201_3)
 - Atkinson, R. K., Derry, S. J., Renkl, A., & Wortham, D. (2000). Learning from examples: Instructional principles from the worked examples research. *Review of Educational Research*, 70(2), 181–214. doi:[10.3102/00346543070002181](https://doi.org/10.3102/00346543070002181)
 - Renkl, A., Atkinson, R. K., Maier, U. H., & Staley, R. (2002). From example study to problem solving: Smooth transitions help learning. *The Journal of Experimental Education*, 70(4), 293–315. doi:[10.1080/00220970209599510](https://doi.org/10.1080/00220970209599510)
 - Kalyuga, S., Ayres, P., Chandler, P., & Sweller, J. (2003). The expertise reversal effect. *Educational Psychologist*, 38(1), 23–31. doi:[10.1207/S15326985EP3801_4](https://doi.org/10.1207/S15326985EP3801_4)
+- Barbieri, C. A., Miller-Cotto, D., Clerjuste, S. N., & Chawla, K. (2023). A meta-analysis of the worked examples effect on mathematics performance. *Educational Psychology Review*, 35(1), article 11. doi:[10.1007/s10648-023-09745-1](https://doi.org/10.1007/s10648-023-09745-1)
+- Sinha, T., & Kapur, M. (2021). When problem solving followed by instruction works: Evidence for productive failure. *Review of Educational Research*, 91(5), 761–798. doi:[10.3102/00346543211019105](https://doi.org/10.3102/00346543211019105)
 
-**Solidité.** Méta-analyse ou consensus pour l'effet des exemples résolus (revue d'Atkinson et al. 2000, nombreuses réplications). Étude isolée pour le retrait progressif (quelques expériences de Renkl et collègues).
+**Solidité.** Méta-analyse ou consensus pour l'effet des exemples résolus en mathématiques (Barbieri et al. 2023, la plus récente : 55 études, g = 0,48 ; revue d'Atkinson et al. 2000), pour l'avantage des exemples justes et l'effet négatif des demandes d'explication (même méta-analyse, analyse des modérateurs). Méta-analyse ou consensus pour l'échec productif (Sinha & Kapur 2021 : g = 0,36 sur la compréhension et le transfert), dont l'inversion chez les élèves de 2e à 5e année vient d'une analyse des modérateurs. Étude isolée pour le retrait progressif (quelques expériences de Renkl et collègues).
 
-**Où dans Cartable.** Consigne de mathématiques du prof (`lib/agent.js`, commentaire « Sweller, Renkl ») et format « exemple à étapes » du Kit (`public/kit/v1/LISEZMOI.md`) ; spec #48, ticket #73.
+**Où dans Cartable.** Consigne de mathématiques du prof (`lib/agent.js`, commentaire « Sweller, Renkl ») et format « exemple à étapes » du Kit, dont les étapes données sont justes et qui ne demande pas d'explication (`public/kit/v1/LISEZMOI.md`) ; spec #48, ticket #73. L'exemple résolu d'abord reste le bon ordre pour un Élève du primaire ; le **Pré-test** tient lieu d'essai avant l'enseignement, sans en faire une page de recherche.
 
 ### Effet du pré-test
 
-**Ce qu'il dit.** Essayer de répondre avant d'avoir appris, même en se trompant, fait mieux apprendre ensuite ce qui a été demandé. L'effet sur le reste de la matière, non pré-testé, est moins régulier.
+**Ce qu'il dit.** Essayer de répondre avant d'avoir appris, même en se trompant, fait mieux apprendre ensuite ce qui a été demandé. L'effet sur le reste de la matière, non pré-testé, est moins régulier. Se tester et prédire font partie des rares stratégies « génératives » qui marchent dès le début du primaire, alors que dessiner ou poser ses propres questions ne marchent guère avant le secondaire. Qu'un test fasse mieux apprendre la matière nouvelle qui suit n'est fiable que pour le pré-test : un test intercalé entre deux parties d'une leçon a un effet faible.
 
 **Référence.**
 - Richland, L. E., Kornell, N., & Kao, L. S. (2009). The pretesting effect: Do unsuccessful retrieval attempts enhance learning? *Journal of Experimental Psychology: Applied*, 15(3), 243–257. doi:[10.1037/a0016496](https://doi.org/10.1037/a0016496)
 - Kornell, N., Hays, M. J., & Bjork, R. A. (2009). Unsuccessful retrieval attempts enhance subsequent learning. *Journal of Experimental Psychology: Learning, Memory, and Cognition*, 35(4), 989–998. doi:[10.1037/a0015729](https://doi.org/10.1037/a0015729)
 - Pan, S. C., & Carpenter, S. K. (2023). Prequestioning and pretesting effects: A review of empirical research, theoretical perspectives, and implications for educational practice. *Educational Psychology Review*, 35(4), article 97. doi:[10.1007/s10648-023-09814-5](https://doi.org/10.1007/s10648-023-09814-5)
+- Brod, G. (2021). Generative learning: Which strategies for what age? *Educational Psychology Review*, 33(4), 1295–1318. doi:[10.1007/s10648-020-09571-9](https://doi.org/10.1007/s10648-020-09571-9)
+- Chan, J. C. K., Meissner, C. A., & Davis, S. D. (2018). Retrieval potentiates new learning: A theoretical and meta-analytic review. *Psychological Bulletin*, 144(11), 1111–1146. doi:[10.1037/bul0000166](https://doi.org/10.1037/bul0000166)
+- Boustani, S., & Shanks, D. R. (2022). Heterogeneity and publication bias in research on test-potentiated new learning. *Collabra: Psychology*, 8(1), 31996. doi:[10.1525/collabra.31996](https://doi.org/10.1525/collabra.31996)
 
-**Solidité.** Méta-analyse ou consensus (revue de Pan & Carpenter 2023) pour l'information pré-testée ; plus fragile pour l'information non pré-testée.
+**Solidité.** Méta-analyse ou consensus (revue de Pan & Carpenter 2023) pour l'information pré-testée ; plus fragile pour l'information non pré-testée. Heuristique tirée d'un cadre pour l'âge (revue de Brod 2021, sans méta-analyse). Pour un test qui fait mieux apprendre la suite, la réanalyse de Boustani & Shanks (2022), plus récente et corrigée du biais de publication, remplace l'effet robuste annoncé par Chan et al. (2018, g = 0,44) : petit mais fiable pour le pré-test, faible pour un test intercalé.
 
 **Où dans Cartable.** **Pré-test** « Devine ! » et l'état **À confirmer** (`lib/pretest.js`, `consignePremierTour` dans `lib/agent.js`) ; ADR 0002 (Cadrage) et ADR 0003.
 
@@ -104,15 +111,16 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Métacognition et Confiance
 
-**Ce qu'il dit.** Les élèves jugent mal ce qu'ils savent : une réussite juste après la lecture (fluence) donne l'illusion d'avoir retenu. Les erreurs commises avec une grande confiance, une fois corrigées, sont mieux corrigées que les autres (hypercorrection).
+**Ce qu'il dit.** Les élèves jugent mal ce qu'ils savent : une réussite juste après la lecture (fluence) donne l'illusion d'avoir retenu. Les erreurs commises avec une grande confiance, une fois corrigées, sont mieux corrigées que les autres (hypercorrection). Plus largement, se tromper puis être corrigé, dans une situation sans enjeu, fait mieux retenir la bonne réponse que d'éviter l'erreur, surtout quand la correction explique le raisonnement qui y menait. Demander à l'élève de juger ce qu'il a appris ne change pas, en moyenne, ce qu'il retient.
 
 **Référence.**
 - Koriat, A., & Bjork, R. A. (2005). Illusions of competence in monitoring one's knowledge during study. *Journal of Experimental Psychology: Learning, Memory, and Cognition*, 31(2), 187–194. doi:[10.1037/0278-7393.31.2.187](https://doi.org/10.1037/0278-7393.31.2.187)
 - Bjork, R. A., Dunlosky, J., & Kornell, N. (2013). Self-regulated learning: Beliefs, techniques, and illusions. *Annual Review of Psychology*, 64, 417–444. doi:[10.1146/annurev-psych-113011-143823](https://doi.org/10.1146/annurev-psych-113011-143823)
 - Butterfield, B., & Metcalfe, J. (2001). Errors committed with high confidence are hypercorrected. *Journal of Experimental Psychology: Learning, Memory, and Cognition*, 27(6), 1491–1494. doi:[10.1037/0278-7393.27.6.1491](https://doi.org/10.1037/0278-7393.27.6.1491)
 - Metcalfe, J. (2017). Learning from errors. *Annual Review of Psychology*, 68, 465–489. doi:[10.1146/annurev-psych-010416-044022](https://doi.org/10.1146/annurev-psych-010416-044022)
+- Double, K. S., Birney, D. P., & Walker, S. A. (2018). A meta-analysis and systematic review of reactivity to judgements of learning. *Memory*, 26(6), 741–750. doi:[10.1080/09658211.2017.1404111](https://doi.org/10.1080/09658211.2017.1404111)
 
-**Solidité.** Méta-analyse ou consensus pour l'hypercorrection (répliquée, revue de Metcalfe 2017) et pour les illusions de compétence (revue de Bjork et al. 2013). Heuristique tirée d'un cadre pour l'usage de la Confiance dans FSRS (juste mais « pas sûr » noté « difficile »).
+**Solidité.** Méta-analyse ou consensus pour l'hypercorrection et l'apprentissage par l'erreur corrigée (répliqués, revue de Metcalfe 2017) et pour les illusions de compétence (revue de Bjork et al. 2013). Heuristique tirée d'un cadre pour l'usage de la Confiance dans FSRS (juste mais « pas sûr » noté « difficile »). Méta-analyse ou consensus pour l'absence d'effet moyen d'un jugement d'apprentissage sur la mémoire (Double et al. 2018, g = 0,05) ; sa transposition à la Confiance, donnée après chaque réponse, est une heuristique tirée d'un cadre.
 
 **Où dans Cartable.** **Confiance** et erreurs commises « sûr » retravaillées d'abord (`lib/agent.js`, commentaire « hypercorrection ») ; distinction Objectif atteint et **Retenu** (ADR 0003, mise à jour spec #46) ; Retour de quiz du **Pré-test** qui montre l'écart entre ce que l'Élève pensait savoir et ce qu'il a trouvé ; note FSRS de la réponse (`noteDeReponse`, `lib/memoire.js`).
 
@@ -247,7 +255,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Retours et récompenses
 
-**Ce qu'il dit.** Un retour aide quand il porte sur la tâche et sur la façon de s'améliorer, et peut nuire quand il porte sur la personne. Des récompenses attendues et conditionnées à la tâche réduisent en moyenne la motivation intrinsèque, alors que des retours verbaux positifs l'entretiennent. Féliciter un enfant pour son intelligence plutôt que pour son effort l'a rendu moins persévérant après un échec, dans les études d'origine ; une réplication à grande échelle ne l'a pas retrouvé.
+**Ce qu'il dit.** Un retour aide quand il porte sur la tâche et sur la façon de s'améliorer, et peut nuire quand il porte sur la personne. Des récompenses attendues et conditionnées à la tâche réduisent en moyenne la motivation intrinsèque, alors que des retours verbaux positifs l'entretiennent. Féliciter un enfant pour son intelligence plutôt que pour son effort l'a rendu moins persévérant après un échec, dans les études d'origine ; une réplication à grande échelle ne l'a pas retrouvé. L'effet d'un retour dépend surtout de l'information qu'il apporte. Selon les méta-analyses les plus récentes, la gamification (points, badges, séries) a un petit effet positif sur la motivation intrinsèque, plutôt que l'effet négatif attendu des récompenses ; en primaire et au secondaire, elle agit davantage sur la motivation extrinsèque, et le moins à l'école primaire. Une série cassée fait moins revenir qu'une série intacte, d'autant plus quand on se reproche la rupture, d'autant moins quand on peut la réparer.
 
 **Référence.**
 - Kluger, A. N., & DeNisi, A. (1996). The effects of feedback interventions on performance: A historical review, a meta-analysis, and a preliminary feedback intervention theory. *Psychological Bulletin*, 119(2), 254–284. doi:[10.1037/0033-2909.119.2.254](https://doi.org/10.1037/0033-2909.119.2.254)
@@ -255,10 +263,74 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 - Deci, E. L., Koestner, R., & Ryan, R. M. (1999). A meta-analytic review of experiments examining the effects of extrinsic rewards on intrinsic motivation. *Psychological Bulletin*, 125(6), 627–668. doi:[10.1037/0033-2909.125.6.627](https://doi.org/10.1037/0033-2909.125.6.627)
 - Mueller, C. M., & Dweck, C. S. (1998). Praise for intelligence can undermine children's motivation and performance. *Journal of Personality and Social Psychology*, 75(1), 33–52. doi:[10.1037/0022-3514.75.1.33](https://doi.org/10.1037/0022-3514.75.1.33)
 - Li, Y., & Bates, T. C. (2019). You can't change your basic ability, but you work at things, and that's how we get hard things done: Testing the role of growth mindset on response to setbacks, educational attainment, and cognitive ability. *Journal of Experimental Psychology: General*, 148(9), 1640–1655. doi:[10.1037/xge0000669](https://doi.org/10.1037/xge0000669)
+- Wisniewski, B., Zierer, K., & Hattie, J. (2020). The power of feedback revisited: A meta-analysis of educational feedback research. *Frontiers in Psychology*, 10, 3087. doi:[10.3389/fpsyg.2019.03087](https://doi.org/10.3389/fpsyg.2019.03087)
+- Li, L., Hew, K. F., & Du, J. (2024). Gamification enhances student intrinsic motivation, perceptions of autonomy and relatedness, but minimal impact on competency: A meta-analysis and systematic review. *Educational Technology Research and Development*, 72(2), 765–796. doi:[10.1007/s11423-023-10337-7](https://doi.org/10.1007/s11423-023-10337-7)
+- Kurnaz, M. F., & Koçtürk, N. (2025). A meta-analysis of gamification's impact on student motivation in K-12 education. *Psychology in the Schools*, 62(12), 4997–5009. doi:[10.1002/pits.70056](https://doi.org/10.1002/pits.70056)
+- Silverman, J., & Barasch, A. (2023). On or off track: How (broken) streaks affect consumer decisions. *Journal of Consumer Research*, 49(6), 1095–1117. doi:[10.1093/jcr/ucac029](https://doi.org/10.1093/jcr/ucac029)
 
-**Solidité.** Méta-analyse ou consensus pour les retours (Kluger & DeNisi 1996) et les récompenses extrinsèques (Deci et al. 1999), mais ces études portent sur des récompenses tangibles : leur transposition à des Étoiles et des Badges virtuels est une heuristique tirée d'un cadre. Étude isolée, contestée, pour l'éloge de l'effort.
+**Solidité.** Méta-analyse ou consensus pour les retours (Kluger & DeNisi 1996 ; Wisniewski et al. 2020, d = 0,48, effet qui croît avec l'information apportée) et pour les récompenses extrinsèques (Deci et al. 1999), mais ces dernières études portent sur des récompenses tangibles. Pour des récompenses virtuelles, les méta-analyses de gamification, plus récentes, priment : petit effet positif sur la motivation intrinsèque (Li, Hew & Du 2024, g = 0,26) ; en primaire et au secondaire, effet plus fort sur la motivation extrinsèque (g = 0,71) que sur l'intrinsèque (g = 0,64), et le plus faible à l'école primaire (g = 0,31 ; Kurnaz & Koçtürk 2025, forte hétérogénéité). Leur transposition aux Étoiles et aux Badges reste une heuristique tirée d'un cadre. Étude isolée, contestée, pour l'éloge de l'effort. Étude isolée (plusieurs expériences d'un même article, hors de l'école) pour les séries cassées.
 
-**Où dans Cartable.** **Retour de quiz** et commentaires du prof sur les questions ratées ; **Étoiles**, **Fusées**, **Badges** qui saluent l'effort et ce qui reste en mémoire ; principe « Encourager l'effort, jamais comparer » (`PRODUCT.md`) ; **Série de jours** et **Jokers**.
+**Où dans Cartable.** **Retour de quiz** et commentaires du prof sur les questions ratées ; **Étoiles**, **Fusées**, **Badges** qui saluent l'effort et ce qui reste en mémoire ; principe « Encourager l'effort, jamais comparer » (`PRODUCT.md`) ; **Série de jours** et **Jokers**, qui évitent qu'une série se casse, sans la réparer après coup (voir « Écarts relevés ») ; explication après chaque réponse, juste ou fausse (`public/kit/v1/LISEZMOI.md`).
+
+### Implication des parents
+
+**Ce qu'il dit.** L'implication des parents dans la scolarité va de pair, en moyenne, avec une meilleure adaptation scolaire de l'enfant, sauf l'aide aux devoirs, liée à de moins bons résultats. Dans l'aide aux devoirs, seul le soutien à l'autonomie (laisser l'enfant faire, l'encourager, l'aider à s'organiser) est lié à de meilleurs résultats ; l'aide sur le contenu et le contrôle n'y sont guère liés.
+
+**Référence.**
+- Barger, M. M., Kim, E. M., Kuncel, N. R., & Pomerantz, E. M. (2019). The relation between parents' involvement in children's schooling and children's adjustment: A meta-analysis. *Psychological Bulletin*, 145(9), 855–890. doi:[10.1037/bul0000201](https://doi.org/10.1037/bul0000201)
+- Xu, J., Guo, S., Feng, Y., Ma, Y., Zhang, Y., Núñez, J. C., & Fan, H. (2024). Parental homework involvement and students' achievement: A three-level meta-analysis. *Psicothema*, 36(1), 1–14. doi:[10.7334/psicothema2023.92](https://doi.org/10.7334/psicothema2023.92)
+
+**Solidité.** Méta-analyse ou consensus, mais corrélationnelle : ces études mesurent des liens, pas des effets (Barger et al. 2019, 448 études, aide aux devoirs r = −0,15 avec les résultats ; Xu et al. 2024, la plus récente, seul le soutien à l'autonomie est lié positivement). Heuristique tirée d'un cadre pour leur transposition à un écran que le parent consulte.
+
+**Où dans Cartable.** **Vue parent**, ouverte depuis le Profil et jamais depuis l'accueil de l'Élève, sans classement ni comparaison (`CONTEXT.md`, `lib/parent.js`) ; elle montre les Objectifs et Questions fragiles, ce qui peut inviter à l'aide sur le contenu plutôt qu'au soutien à l'autonomie (voir « Écarts relevés »).
+
+### Habitudes et intentions de mise en œuvre
+
+**Ce qu'il dit.** Décider à l'avance quand et où on fera une chose (« après l'école, je fais mes révisions ») aide nettement à la faire. Une habitude met environ deux mois à s'installer, avec de grandes différences d'une personne à l'autre ; les habitudes du matin et celles qu'on a choisies soi-même sont plus fortes.
+
+**Référence.**
+- Gollwitzer, P. M., & Sheeran, P. (2006). Implementation intentions and goal achievement: A meta-analysis of effects and processes. *Advances in Experimental Social Psychology*, 38, 69–119. doi:[10.1016/S0065-2601(06)38002-1](https://doi.org/10.1016/S0065-2601(06)38002-1)
+- Singh, B., Murphy, A., Maher, C., & Smith, A. E. (2024). Time to form a habit: A systematic review and meta-analysis of health behaviour habit formation and its determinants. *Healthcare*, 12(23), 2488. doi:[10.3390/healthcare12232488](https://doi.org/10.3390/healthcare12232488)
+
+**Solidité.** Méta-analyse ou consensus pour les intentions de mise en œuvre (Gollwitzer & Sheeran 2006, 94 tests, effet moyen à fort), dont une partie porte sur le travail scolaire. Étude isolée pour la durée de formation d'une habitude : seules quatre études de la revue de Singh et al. (2024) la mesurent, chez des adultes et pour des comportements de santé ; sa transposition aux révisions d'un enfant est une heuristique tirée d'un cadre.
+
+**Où dans Cartable.** **Objectif du jour** et **Série de jours**, qui visent une habitude quotidienne ; rappels hors de l'appli écartés (ADR 0006). Aucune question ne demande à l'Élève quand il révisera (voir « Écarts relevés »).
+
+### Tuteurs à IA générative et garde-fous
+
+**Ce qu'il dit.** Un tuteur à IA générative peut faire apprendre plus qu'un bon cours quand il est conçu selon les principes pédagogiques (guider pas à pas sans donner la réponse). Laissé sans garde-fous, il sert de béquille : les élèves réussissent mieux leurs exercices avec lui, puis moins bien seuls que ceux qui ne l'ont jamais eu. Des garde-fous pédagogiques suppriment l'essentiel de cette perte. L'IA améliore le travail produit avec elle plus que le savoir qu'on en retire.
+
+**Référence.**
+- Bastani, H., Bastani, O., Sungu, A., Ge, H., Kabakcı, Ö., & Mariman, R. (2025). Generative AI without guardrails can harm learning: Evidence from high school mathematics. *Proceedings of the National Academy of Sciences*, 122(26), e2422633122. doi:[10.1073/pnas.2422633122](https://doi.org/10.1073/pnas.2422633122)
+- Kestin, G., Miller, K., Klales, A., Milbourne, T., & Ponti, G. (2025). AI tutoring outperforms in-class active learning: An RCT introducing a novel research-based design in an authentic educational setting. *Scientific Reports*, 15, 17458. doi:[10.1038/s41598-025-97652-6](https://doi.org/10.1038/s41598-025-97652-6)
+- Fan, Y., Tang, L., Le, H., Shen, K., Tan, S., Zhao, Y., Shen, Y., Li, X., & Gašević, D. (2025). Beware of metacognitive laziness: Effects of generative artificial intelligence on learning motivation, processes, and performance. *British Journal of Educational Technology*, 56(2), 489–530. doi:[10.1111/bjet.13544](https://doi.org/10.1111/bjet.13544)
+
+**Solidité.** Étude isolée pour chaque résultat : des essais randomisés, mais chacun dans un seul contexte (près de 1 000 lycéens en mathématiques pour Bastani et al. 2025, avec +127 % en exercice pour le tuteur à garde-fous et −17 % à l'examen après un accès libre ; 194 étudiants de physique pour Kestin et al. 2025 ; 117 étudiants en écriture pour Fan et al. 2025, où ChatGPT améliore la rédaction sans plus de connaissances ni de transfert). Aucune ne porte sur des enfants du primaire. Heuristique tirée d'un cadre pour la transposition aux garde-fous de Cartable.
+
+**Où dans Cartable.** Séance sans saisie libre : l'Élève ne peut pas demander la réponse au prof (ADR 0002) ; règles d'évaluation, de mémoire et de récompense tenues par l'appli, pas par le prof (ADR 0002, 0003, 0006) ; quiz du **Kit**, corrigé par l'appli (ADR 0004) ; **Révisions du jour** sans le prof.
+
+### Questions écrites par un modèle de langage
+
+**Ce qu'il dit.** Un modèle de langage écrit vite des QCM, mais parfois avec une bonne réponse ambiguë ou des réponses fausses peu plausibles, et il prévoit mal les erreurs que font réellement les élèves. Une relecture humaine reste nécessaire pour la justesse et pour l'accord avec ce qui a été enseigné.
+
+**Référence.**
+- Grévisse, C., Pavlou, M. A. S., & Schneider, J. G. (2024). Docimological quality analysis of LLM-generated multiple choice questions in computer science and medicine. *SN Computer Science*, 5(5), 636. doi:[10.1007/s42979-024-02963-6](https://doi.org/10.1007/s42979-024-02963-6)
+- Feng, W., Lee, J., McNichols, H., Scarlatos, A., Smith, D., Woodhead, S., Ornelas, N., & Lan, A. (2024). Exploring automated distractor generation for math multiple-choice questions via large language models. *Findings of the Association for Computational Linguistics: NAACL 2024*, 3067–3082. doi:[10.18653/v1/2024.findings-naacl.193](https://doi.org/10.18653/v1/2024.findings-naacl.193)
+
+**Solidité.** Étude isolée pour chacune (des modèles de 2023 et 2024, en informatique, en médecine et en mathématiques ; sans données d'élèves pour Grévisse et al.). Les modèles évoluent vite : à revérifier sur les Questions de Cartable.
+
+**Où dans Cartable.** Questions des Pages de leçon et **Variantes**, écrites par le prof ; l'appli n'en valide que la forme (ADR 0006, « Consequences ») ; ni l'Élève ni le parent ne peuvent signaler une question fausse (voir « Écarts relevés »).
+
+### Difficulté optimale d'entraînement
+
+**Ce qu'il dit.** Pour une large famille d'algorithmes d'apprentissage, on apprend le plus vite quand l'entraînement est réussi environ 85 % du temps : assez dur pour se tromper parfois, pas au point d'échouer souvent.
+
+**Référence.**
+- Wilson, R. C., Shenhav, A., Straccia, M., & Cohen, J. D. (2019). The Eighty Five Percent Rule for optimal learning. *Nature Communications*, 10, 4646. doi:[10.1038/s41467-019-12552-4](https://doi.org/10.1038/s41467-019-12552-4)
+
+**Solidité.** Étude isolée, théorique : démontrée pour des tâches de classement binaire et des réseaux de neurones, pas mesurée chez des élèves. Heuristique tirée d'un cadre pour sa transposition à la difficulté des quiz.
+
+**Où dans Cartable.** Nulle part encore : rien ne règle la difficulté des quiz d'après le taux de réussite observé, alors que l'ADR 0005 relève des quiz à 100 % partout (voir « Écarts relevés »). Distinct du seuil de 80 %, qui est un critère de maîtrise et non une cible de difficulté.
 
 ## Ergonomie et accessibilité
 
@@ -274,7 +346,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 ### Lisibilité pour la dyslexie
 
-**Ce qu'il dit.** Pour des lecteurs dyslexiques : police sans empattement, corps assez grand, interlignage et espacement des lettres généreux, texte aligné à gauche, pas d'italique ni de soulignement, phrases courtes. Les polices « spéciales dyslexie » (OpenDyslexic, Dyslexie) n'apportent pas de gain mesuré ; un espacement des lettres plus large en apporte un. La synthèse vocale aide en moyenne la compréhension des élèves en difficulté de lecture.
+**Ce qu'il dit.** Pour des lecteurs dyslexiques : police sans empattement, corps assez grand, interlignage et espacement des lettres généreux, texte aligné à gauche, pas d'italique ni de soulignement, phrases courtes. Les polices « spéciales dyslexie » (OpenDyslexic, Dyslexie) n'apportent pas de gain mesuré. Un espacement des lettres plus large réduit les erreurs de lecture, chez les lecteurs dyslexiques comme chez les autres, et accélère la lecture des adolescents dyslexiques dans l'étude la plus récente. La synthèse vocale aide en moyenne la compréhension des élèves en difficulté de lecture ; surligner les mots lus n'y ajoute rien de mesuré.
 
 **Référence.**
 - British Dyslexia Association (2023). *Dyslexia style guide 2023*. [https://cdn.bdadyslexia.org.uk/uploads/documents/Advice/style-guide/BDA-Style-Guide-2023.pdf](https://cdn.bdadyslexia.org.uk/uploads/documents/Advice/style-guide/BDA-Style-Guide-2023.pdf)
@@ -283,10 +355,37 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 - Wery, J. J., & Diliberto, J. A. (2017). The effect of a specialized dyslexia font, OpenDyslexic, on reading rate and accuracy. *Annals of Dyslexia*, 67(2), 114–127. doi:[10.1007/s11881-016-0127-1](https://doi.org/10.1007/s11881-016-0127-1)
 - Kuster, S. M., van Weerdenburg, M., Gompel, M., & Bosman, A. M. T. (2018). Dyslexie font does not benefit reading in children with or without dyslexia. *Annals of Dyslexia*, 68(1), 25–42. doi:[10.1007/s11881-017-0154-6](https://doi.org/10.1007/s11881-017-0154-6)
 - Wood, S. G., Moxley, J. H., Tighe, E. L., & Wagner, R. K. (2018). Does use of text-to-speech and related read-aloud tools improve reading comprehension for students with reading disabilities? A meta-analysis. *Journal of Learning Disabilities*, 51(1), 73–84. doi:[10.1177/0022219416688170](https://doi.org/10.1177/0022219416688170)
+- Hakvoort, B., van den Boer, M., Leenaars, T., Bos, P., & Tijms, J. (2017). Improvements in reading accuracy as a result of increased interletter spacing are not specific to children with dyslexia. *Journal of Experimental Child Psychology*, 164, 101–116. doi:[10.1016/j.jecp.2017.07.010](https://doi.org/10.1016/j.jecp.2017.07.010)
+- Stagg, S. D., & Kiss, N. (2021). Room to read: The effect of extra-large letter spacing and coloured overlays on reading speed and accuracy in adolescents with dyslexia. *Research in Developmental Disabilities*, 119, 104065. doi:[10.1016/j.ridd.2021.104065](https://doi.org/10.1016/j.ridd.2021.104065)
+- Keelor, J. L., Creaghead, N. A., Silbert, N. H., Breit, A. D., & Horowitz-Kraus, T. (2023). Impact of text-to-speech features on the reading comprehension of children with reading and language difficulties. *Annals of Dyslexia*, 73(3), 469–486. doi:[10.1007/s11881-023-00281-9](https://doi.org/10.1007/s11881-023-00281-9)
 
-**Solidité.** Heuristique tirée d'un cadre pour le guide de la BDA (recommandations d'association, en partie fondées sur des études). Étude isolée pour l'espacement des lettres et pour l'absence d'effet des polices spécialisées. Méta-analyse ou consensus pour la synthèse vocale (Wood et al. 2018).
+**Solidité.** Heuristique tirée d'un cadre pour le guide de la BDA (recommandations d'association, en partie fondées sur des études). Étude isolée pour l'espacement des lettres (Zorzi et al. 2012 ; Hakvoort et al. 2017, gain d'exactitude non propre à la dyslexie ; Stagg & Kiss 2021, la plus récente, 59 adolescents de 13 ans en moyenne, gain de vitesse plus net chez les dyslexiques) et pour l'absence d'effet des polices spécialisées. Méta-analyse ou consensus pour la synthèse vocale (Wood et al. 2018). Étude isolée pour le surlignage sans gain de compréhension (Keelor et al. 2023, élèves de 8 à 12 ans).
 
-**Où dans Cartable.** Accessibilité de `PRODUCT.md` (dyslexie, textes courts, une chose à faire à la fois) ; Atkinson Hyperlegible Next, sans empattement, et corps de 17px (`DESIGN.md`) ; **Lecture à voix haute** ; « messages courts » demandés au prof (`lib/agent.js`) ; aucune `font-family` dans un schéma SVG, qui garde la police du Kit, et textes de schéma d'au moins 14 px rendus (seuil sans cadre, voir « Décisions sans fondement écrit » ; ticket #134).
+**Où dans Cartable.** Accessibilité de `PRODUCT.md` (dyslexie, textes courts, une chose à faire à la fois) ; Atkinson Hyperlegible Next, sans empattement, et corps de 17px (`DESIGN.md`) ; **Lecture à voix haute**, sans surlignage des mots ; pas de réglage d'espacement des lettres ; « messages courts » demandés au prof (`lib/agent.js`) ; aucune `font-family` dans un schéma SVG, qui garde la police du Kit, et textes de schéma d'au moins 14 px rendus (seuil sans cadre, voir « Décisions sans fondement écrit » ; ticket #134).
+
+### Lecture sur écran
+
+**Ce qu'il dit.** Les premières méta-analyses trouvent qu'on comprend un peu moins bien un texte informatif lu sur écran que sur papier, surtout sous pression de temps, et qu'on surestime alors ce qu'on a compris. La méta-analyse la plus récente ne trouve pas de différence d'ensemble, seulement des différences selon le lecteur, le texte et les conditions de lecture.
+
+**Référence.**
+- Delgado, P., Vargas, C., Ackerman, R., & Salmerón, L. (2018). Don't throw away your printed books: A meta-analysis on the effects of reading media on reading comprehension. *Educational Research Review*, 25, 23–38. doi:[10.1016/j.edurev.2018.09.003](https://doi.org/10.1016/j.edurev.2018.09.003)
+- Clinton, V. (2019). Reading from paper compared to screens: A systematic review and meta-analysis. *Journal of Research in Reading*, 42(2), 288–325. doi:[10.1111/1467-9817.12269](https://doi.org/10.1111/1467-9817.12269)
+- Li, Y., & Yan, L. (2024). Which reading comprehension is better? A meta-analysis of the effect of paper versus digital reading in recent 20 years. *Telematics and Informatics Reports*, 14, 100142. doi:[10.1016/j.teler.2024.100142](https://doi.org/10.1016/j.teler.2024.100142)
+
+**Solidité.** Méta-analyse ou consensus pour chacune, mais elles se contredisent : la plus récente (Li & Yan 2024, 37 études) l'emporte, et le désavantage de l'écran n'est donc pas établi. La surestimation de sa compréhension sur écran (Clinton 2019) n'est pas contredite.
+
+**Où dans Cartable.** Toute la lecture se fait sur écran, tablette ou ordinateur (`PRODUCT.md`) ; « textes courts » et « peu de lecture obligatoire » (`PRODUCT.md`) ; **Retenu** et **Confiance**, qui corrigent l'illusion d'avoir compris.
+
+### Polarité d'affichage
+
+**Ce qu'il dit.** Un texte sombre sur fond clair se lit et se relit avec plus d'exactitude qu'un texte clair sur fond sombre, chez les jeunes adultes comme chez les plus âgés, surtout en petit corps.
+
+**Référence.**
+- Piepenbrock, C., Mayr, S., Mund, I., & Buchner, A. (2013). Positive display polarity is advantageous for both younger and older adults. *Ergonomics*, 56(7), 1116–1124. doi:[10.1080/00140139.2013.790485](https://doi.org/10.1080/00140139.2013.790485)
+
+**Solidité.** Étude isolée, chez des adultes.
+
+**Où dans Cartable.** Thème automatique par défaut, qui suit l'appareil, clair ou sombre au choix (`public/theme.js`, #114) ; mode sombre du **Kit**. Le thème automatique reste cohérent avec l'étude tant que l'appareil est en clair.
 
 ### Taille des cibles tactiles
 
@@ -306,7 +405,7 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 
 | Décision | Où | Ce qu'en disent les cadres |
 | --- | --- | --- |
-| Seuil de 80 % (Objectif atteint, Rebond Revoir ou Défi, Leçon terminée, Étoiles, palier « bien en tête ») | `CONTEXT.md`, ADR 0002, ADR 0003 | La pédagogie de maîtrise demande un critère, pas cette valeur. Sur un quiz de 4 ou 5 questions, 80 % se joue à une réponse. Aucun cadre, hypothèse à mesurer. |
+| Seuil de 80 % (Objectif atteint, Rebond Revoir ou Défi, Leçon terminée, Étoiles, palier « bien en tête ») | `CONTEXT.md`, ADR 0002, ADR 0003 | La pédagogie de maîtrise demande un critère, pas cette valeur. Sur un quiz de 4 ou 5 questions, 80 % se joue à une réponse. La règle des 85 % (Wilson et al. 2019) porte sur la difficulté de l'entraînement, pas sur un critère de maîtrise : elle ne fonde pas ce seuil. Aucun cadre, hypothèse à mesurer. |
 | Paliers de Maîtrise à 50 % et 80 % | `CONTEXT.md`, ADR 0006 | Aucun cadre, hypothèse à mesurer. |
 | **Retenu** : deux succès à au moins 24 heures d'écart, ou stabilité d'au moins 5 jours | `CONTEXT.md`, ADR 0003 | Inspiré du réapprentissage espacé, qui recommande plutôt environ trois rappels réussis puis des sessions espacées (Rawson & Dunlosky 2011). Les valeurs 2, 24 heures et 5 jours : aucun cadre, hypothèse à mesurer. |
 | Rétention visée de 90 % dans FSRS | `lib/memoire.js`, ADR 0006 | Valeur par défaut de FSRS et d'Anki, pas un optimum démontré pour des enfants. Aucun cadre, hypothèse à mesurer. |
@@ -346,7 +445,14 @@ Décisions où les cadres ci-dessus vont contre la règle de Cartable, ou ne la 
 
 - **Entrelacement entre matières.** _Contredit l'ADR 0006 (Révisions mélangées entre Leçons), à rouvrir parce que…_ les Révisions du jour mélangent des Leçons de matières différentes au nom de l'entrelacement (ADR 0006), mais la méta-analyse de Brunmair & Richter (2019) ne trouve le bénéfice que pour des catégories proches. Le mélange reste défendable pour l'espacement, pas pour « apprendre à reconnaître de quoi il s'agit ».
 - **Dépassement et détails séduisants.** Un encart « Pour aller plus loin » est par définition hors du propos de la page. Le mettre en fin de page et hors score limite le risque, mais cette protection n'est pas mesurée.
-- **Étoiles conditionnées au score.** Les Étoiles d'un quiz réussi (80 % ou plus) sont une récompense attendue, conditionnée à la performance : une forme qui, en moyenne, réduit la motivation intrinsèque chez Deci et al. (1999), si l'effet vaut pour des récompenses virtuelles.
-- **Lecture à voix haute et texte affiché.** Le principe de redondance de Mayer (2020) déconseille d'ajouter le texte écrit à une image déjà commentée à voix haute, ce qui rapproche la lecture mot pour mot d'un texte affiché d'une redondance, alors que la synthèse vocale aide les élèves en difficulté de lecture (Wood et al. 2018). Le réglage, coupé par défaut et choisi pour un Élève, est cohérent avec les deux ; l'activer pour tous ne le serait pas.
+- **Étoiles conditionnées au score.** Les Étoiles d'un quiz réussi (80 % ou plus) sont une récompense attendue, conditionnée à la performance : une forme qui, en moyenne, réduit la motivation intrinsèque chez Deci et al. (1999), si l'effet vaut pour des récompenses virtuelles. Les méta-analyses de gamification, plus récentes, atténuent l'écart sans le lever : petit effet positif sur la motivation intrinsèque (Li, Hew & Du 2024), mais effet surtout extrinsèque en primaire et au secondaire, et le plus faible à l'école primaire (Kurnaz & Koçtürk 2025). Aucune n'isole des récompenses conditionnées au score.
+- **Lecture à voix haute et texte affiché.** Le principe de redondance de Mayer (2020) déconseille d'ajouter le texte écrit à une image déjà commentée à voix haute, ce qui rapproche la lecture mot pour mot d'un texte affiché d'une redondance, alors que la synthèse vocale aide les élèves en difficulté de lecture (Wood et al. 2018). Le réglage, coupé par défaut et choisi pour un Élève, est cohérent avec les deux ; l'activer pour tous ne le serait pas. Surligner les mots lus n'ajoute rien de mesuré (Keelor et al. 2023) : ce n'est pas une piste.
 - **Police pour la dyslexie.** Atkinson Hyperlegible Next a été dessinée pour les lecteurs malvoyants ; aucune étude trouvée ne mesure son effet chez les lecteurs dyslexiques.
-- **Saisie libre et effet de génération.** _Contredit en partie l'ADR 0002 (Séance sans saisie libre), sans la remettre en cause :_ sans clavier, l'Élève ne produit jamais une réponse de lui-même, sauf de tête dans « réfléchis puis dévoile » ; l'effet de génération (Slamecka & Graf 1978) et le format des tests (Kang et al. 2007) indiquent que produire retient mieux que choisir. C'est le prix, accepté, de la sécurité d'un Élève enfant.
+- **Saisie libre et effet de génération.** _Contredit en partie l'ADR 0002 (Séance sans saisie libre), sans la remettre en cause :_ sans clavier, l'Élève ne produit jamais une réponse de lui-même, sauf de tête dans « réfléchis puis dévoile » ; l'effet de génération (Slamecka & Graf 1978) et le format des tests (Kang et al. 2007) indiquent que produire retient mieux que choisir. C'est le prix, accepté, de la sécurité d'un Élève enfant. Deux résultats plus récents réduisent ce prix : un QCM aux réponses fausses plausibles sollicite le rappel autant qu'une question ouverte (Little et al. 2012), et un tuteur à IA sans garde-fous fait moins bien apprendre (Bastani et al. 2025). Le levier est donc la qualité des réponses fausses (écart suivant), plus qu'un clavier.
+- **Réponses fausses plausibles demandées pour certains QCM seulement.** La consigne de réponses fausses tirées d'idées reçues ou d'erreurs fréquentes vaut pour « choisis la meilleure explication », pour les mathématiques et pour les **Variantes** (`lib/agent.js`, `public/kit/v1/LISEZMOI.md`), pas pour un QCM ordinaire, alors que c'est la condition pour qu'un QCM sollicite le rappel (Little et al. 2012), et qu'un modèle de langage prévoit mal de lui-même les erreurs des élèves (Feng et al. 2024). L'explication, commune à toutes les réponses, ne dit pas non plus pourquoi la réponse choisie était fausse, le retour le plus informatif (Metcalfe 2017 ; Wisniewski et al. 2020).
+- **Questions du prof sans relecture de fond.** _Contredit en partie l'ADR 0006 (seule la forme des Variantes est validée) :_ une Question dont la bonne réponse est ambiguë ou fausse revient dans les Révisions du jour et fait compter faux un Élève qui sait. Les modèles de langage en écrivent (Grévisse et al. 2024), et ni l'Élève ni le parent ne peuvent la signaler.
+- **« Je ne sais pas » toujours proposé dans les quiz de page.** Se tromper puis être corrigé, sans enjeu, fait mieux retenir que ne pas répondre (Metcalfe 2017 ; effet du pré-test). « Je ne sais pas » garde son sens pour la sincérité de la **Confiance** et dans les **Révisions du jour** ; dans le quiz qui suit une page, inviter à deviner avec « pas sûr » serait plus cohérent avec ces cadres. L'ampleur de l'écart dépend de la part de « Je ne sais pas » dans les journaux, à mesurer.
+- **Difficulté des quiz non réglée sur la réussite observée.** L'ADR 0005 relève des quiz à 100 % partout, et rien ne transmet au prof le taux de réussite récent pour viser un entraînement réussi environ 85 % du temps (Wilson et al. 2019, cadre théorique).
+- **Série repartie à zéro sans réparation.** Les **Jokers** évitent qu'une **Série de jours** se casse, mais une pause plus longue la fait repartir sans moyen de la réparer, alors que pouvoir réparer une série atténue le décrochage qui suit sa rupture (Silverman & Barasch 2023).
+- **Rappels hors de l'appli écartés, sans autre plan.** _Contredit en partie l'ADR 0006 (« Rappels hors de l'appli : écarté ») :_ l'appli ne demande pas non plus à l'Élève quand il révisera, alors que décider à l'avance du moment aide nettement à agir (Gollwitzer & Sheeran 2006). Une question à réponses fermées resterait dans l'esprit de l'ADR 0002.
+- **Vue parent centrée sur ce qui est fragile.** La **Vue parent** montre les Objectifs et Questions fragiles, ce qui invite à l'aide sur le contenu, liée à de moins bons résultats, plutôt qu'au soutien à l'autonomie, le seul lié à de meilleurs (Barger et al. 2019 ; Xu et al. 2024 ; études corrélationnelles).

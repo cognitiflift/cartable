@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { indicateurs } from '../lib/indicateurs.js';
+import { SEUIL_REPONSES, probabiliteDeRappel } from '../lib/memoire.js';
 
 // Événements datés à dates maîtrisées : jours locaux d'octobre 2026, à midi (heure locale).
 const a = (jour, heure = 12, minute = 0, seconde = 0) => new Date(2026, 9, jour, heure, minute, seconde).getTime();
@@ -99,4 +100,27 @@ test('Calibration : tranche vide sans pourcentage ; réponse hors période et pr
   for (const t of calibration) assert.deepEqual([t.reponses, t.pourcentage, t.predit], [0, null, null]);
   const dedans = indicateurs([], { maintenant: maintenant30, du: '2026-10-01', au: '2026-10-31', lecons: [avecJournal(journal)] }).calibration;
   assert.equal(dedans.reduce((t, x) => t + x.reponses, 0), 1); // la première réponse n'a pas de prédiction
+});
+
+// Planificateur de mémoire (#161) : celui qui sert et la comparaison, exposés dans les indicateurs.
+test('Planificateur : FSRS-5 sans assez de réponses en Révision du jour, avec la comparaison exposée', () => {
+  const journal = [{ date: A(10, 1), juste: true, origine: 'quiz' }, rev(A(10, 3), true)];
+  const { planificateur } = indicateurs([], { maintenant: maintenant30, lecons: [avecJournal(journal)] });
+  assert.equal(planificateur.utilise, 'fsrs5');
+  assert.equal(planificateur.reponses, 1);
+  assert.equal(planificateur.seuil, SEUIL_REPONSES);
+  assert.ok(planificateur.fsrs5.perte > 0 && planificateur.fsrs6.perte > 0);
+  assert.deepEqual(indicateurs([], { maintenant: maintenant30 }).planificateur,
+    { utilise: 'fsrs5', reponses: 0, seuil: SEUIL_REPONSES, fsrs5: { perte: null }, fsrs6: { perte: null } });
+});
+
+test('Planificateur : FSRS-6 une fois le seuil atteint s\'il prédit mieux ; la calibration le suit', () => {
+  // Réponse du quiz le 1er, puis une révision juste le 31 : FSRS-6 y prédit mieux (voir test/memoire-fsrs6.test.js).
+  const journal = [{ date: A(10, 1), juste: true, origine: 'quiz' }, rev(A(10, 31), true)];
+  const lecons = Array.from({ length: SEUIL_REPONSES }, () => avecJournal(journal));
+  const { planificateur, calibration } = indicateurs([], { maintenant: maintenant30, du: '2026-10-01', au: '2026-11-30', lecons });
+  assert.equal(planificateur.utilise, 'fsrs6');
+  assert.ok(planificateur.fsrs6.perte < planificateur.fsrs5.perte);
+  const predit = 100 * probabiliteDeRappel(30, 2.3065, 'fsrs6');
+  assert.ok(Math.abs(calibration.find((t) => t.reponses).predit - predit) <= 1);
 });

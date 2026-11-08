@@ -184,7 +184,7 @@ const SECTIONS_PARENT = [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions } }) => [
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
@@ -202,6 +202,7 @@ const SECTIONS_PARENT = [
         ? MESURES_REBOND.filter(([cle]) => reussiteParRebond[cle].quiz).map(([cle, mot]) =>
           `${mot} ${reussiteParRebond[cle].pourcentage} % (${pluriel(reussiteParRebond[cle].quiz, 'quiz')})`).join(' ; ') + '.'
         : 'pas encore de quiz.'),
+      h('li', {}, 'Planificateur de mémoire : ', texteDuPlanificateur(planificateur)),
       h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
       h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
@@ -212,6 +213,14 @@ const SECTIONS_PARENT = [
     h('ul', {}, calibration.map((t) => h('li', {}, `Prédit ${t.de} à ${t.a} % : `, t.reponses
       ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % prédit en moyenne)` : 'aucune réponse.')))] },
 ];
+
+// Planificateur de mémoire (#161), en mots : celui qui sert et pourquoi, avec la perte de prédiction de chacun (plus basse = mieux).
+const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
+  const nom = utilise === 'fsrs6' ? 'FSRS-6' : 'FSRS-5';
+  if (reponses < seuil) return `${nom} (il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour comparer, ${reponses} jusqu’ici).`;
+  const chiffres = `perte de prédiction ${String(fsrs5.perte).replace('.', ',')} pour FSRS-5, ${String(fsrs6.perte).replace('.', ',')} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}`;
+  return `${nom} (${chiffres}).`;
+};
 
 // Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »
 const partJeNeSaisPas = ({ reponses, jeNeSaisPas, pourcentage }, ou, vide) =>

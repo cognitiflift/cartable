@@ -548,3 +548,38 @@ test('Kit : chaque format connaît la réponse entièrement juste, que le rendu 
   // Pour un format à plusieurs éléments, c'est la réponse que l'Élève aurait donnée en touchant les bons éléments.
   assert.deepEqual(reponseAttendue(lu.questions.find((q) => q.type === 'ordre')), [0, 1, 2, 3]);
 });
+
+// « Pourquoi c'est faux » (spec #145, ticket #149) : une raison courte par réponse fausse d'un QCM.
+const avecRaisons = {
+  id: 'r1', enonce: 'Par où sort la lave ?', reponses: ['Par le cratère', 'Par les racines', 'Par les nuages'], bonne: 0,
+  raisons: [null, 'Les racines sont sous terre : la lave en sort au contraire.', 'Les nuages sont dans le ciel, pas dans le volcan.'],
+  explication: 'Par la cheminée puis le cratère.',
+};
+
+test('Kit : la raison de la réponse fausse choisie est donnée à la correction, pas pour une réponse juste ni après « Je ne sais pas »', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [avecRaisons] }).questions;
+  assert.deepEqual(q.raisons, avecRaisons.raisons);
+  assert.equal(corriger(q, 1).raison, avecRaisons.raisons[1]);
+  assert.equal(corriger(q, 2).raison, avecRaisons.raisons[2]);
+  assert.equal(Object.hasOwn(corriger(q, 0), 'raison'), false);
+  assert.equal(Object.hasOwn(corriger(q, JE_NE_SAIS_PAS), 'raison'), false);
+  // Le même format sert au type « explication ».
+  const [e] = lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, type: 'explication' }] }).questions;
+  assert.equal(corriger(e, 1).raison, avecRaisons.raisons[1]);
+});
+
+test('Kit : une raison mal formée est ignorée, la question reste ; une page sans raisons est inchangée', () => {
+  const lire = (raisons) => lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, raisons }] }).questions[0];
+  // Pas une liste, ou pas de la longueur des réponses : toutes ignorées.
+  for (const raisons of ['parce que', { 1: 'x' }, ['seulement une'], [null, 'a', 'b', 'c']]) {
+    const q = lire(raisons);
+    assert.ok(q, JSON.stringify(raisons));
+    assert.equal(Object.hasOwn(q, 'raisons'), false, JSON.stringify(raisons));
+  }
+  // Une entrée mal formée est ignorée seule ; une raison attachée à la bonne réponse l'est aussi.
+  assert.deepEqual(lire(['Elle est juste', 42, 'Les nuages sont dans le ciel.']).raisons, [null, null, 'Les nuages sont dans le ciel.']);
+  assert.equal(Object.hasOwn(lire([null, 42, '  ']), 'raisons'), false);
+  const [sans] = lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, raisons: undefined }] }).questions;
+  assert.equal(Object.hasOwn(sans, 'raisons'), false);
+  assert.equal(Object.hasOwn(corriger(sans, 1), 'raison'), false);
+});

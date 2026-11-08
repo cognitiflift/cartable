@@ -63,6 +63,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
     retour.classList.add(correction.juste ? 'kit-juste' : partiel ? 'kit-partiel' : 'kit-faux');
     retour.append(
       el('strong', {}, messageCorrection(correction)),
+      correction.raison ? el('p', { className: 'kit-quiz-raison' }, correction.raison) : null,
       correction.explication ? el('p', {}, correction.explication) : null,
     );
     quandCorrigee({ choisie: reponse, ...(typeof sur === 'boolean' && { sur }) });

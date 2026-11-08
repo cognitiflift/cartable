@@ -72,6 +72,8 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - Pour un `qcm` :
     - `reponses` : 2 à 5 réponses en texte. Le Kit les mélange : n'écris pas « toutes les réponses ci-dessus ».
     - `bonne` : index (à partir de 0) de la bonne réponse dans `reponses`.
+    - Les réponses fausses sont **plausibles** : tirées d'idées reçues ou d'erreurs fréquentes d'un élève de cet âge, de même longueur et de même forme que la bonne (jamais absurdes, jamais « toutes les réponses »). Sans elles, l'élève reconnaît la bonne réponse au lieu de la retrouver. Cela vaut pour tout QCM, y compris `"explication"`.
+    - `raisons` (facultatif) : « pourquoi c'est faux ». Une liste de la même longueur que `reponses` : pour chaque réponse fausse, une phrase courte qui dit pourquoi elle est fausse, et `null` à la place de la bonne réponse. Quand l'élève choisit une réponse fausse, le Kit montre la raison de cette réponse, puis l'`explication` ; après « Je ne sais pas », seule l'explication s'affiche. La Banque de Questions garde les raisons, les Révisions du jour les montrent et la Lecture à voix haute les lit. Une liste qui n'a pas la longueur de `reponses` est ignorée, une entrée mal formée (ou posée sur la bonne réponse) aussi ; la question reste. Une page sans `raisons` s'affiche comme avant. Exemple : `"reponses": ["Par le cratère", "Par les racines", "Par les nuages"], "bonne": 0, "raisons": [null, "Les racines sont sous terre : la lave en sort au contraire.", "Les nuages sont dans le ciel, pas dans le volcan."]`.
   - Pour les autres formats : leurs champs propres, décrits plus bas.
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
   - `bonus` (facultatif) : `true` pour la question bonus 🚀 du Dépassement, hors score. Une page qui a un Dépassement en a 1, sur son encart « Pour aller plus loin » ; la réussir rapporte une Fusée (les anciennes pages à 2 ou 3 questions bonus en demandent 2 réussies). Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
@@ -81,7 +83,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
 
 Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
-Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, la `figure` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, la `figure` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`), la lecture à voix haute et les `raisons` des réponses fausses d'un QCM. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
 
 ## Formats de rappel actif
 
@@ -186,7 +188,7 @@ Pour un « pourquoi ? » : plusieurs explications d'un phénomène, une seule ju
 }
 ```
 
-- `reponses` et `bonne` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne.
+- `reponses`, `bonne` et `raisons` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne, chacune avec sa raison.
 
 ### Associer : `"type": "associer"`
 
@@ -300,7 +302,7 @@ Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou
 
 ## Lecture à voix haute
 
-Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
+Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction, la raison de la réponse fausse choisie s'il y en a une, et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
 
 Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases complètes, dans des blocs (`<p>`, titres, listes, `<figcaption>`, `<aside>`, l'extrait de texte `<blockquote>` d'une figure) : ce sont eux qui sont lus, dans l'ordre. Le quiz, les crédits des figures (`kit-credit`), les schémas `<svg>` et ce qui est caché ne sont pas lus ; les émojis non plus.
 

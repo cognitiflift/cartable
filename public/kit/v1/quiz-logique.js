@@ -216,6 +216,7 @@ export function corriger(question, reponse) {
     juste: points === 1, points, bonne: r.bonne, choisie: jeNeSaisPas ? TEXTE_JE_NE_SAIS_PAS : r.choisie,
     explication: question.explication ?? '',
     ...(r.detail && !jeNeSaisPas && r.choisie !== null && { detail: r.detail }),
+    ...(r.raison && !jeNeSaisPas && r.choisie !== null && { raison: r.raison }),
     ...(jeNeSaisPas && { jeNeSaisPas: true }),
   };
 }

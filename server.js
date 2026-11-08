@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, fuseesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneLongueursAReprendre,consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -104,6 +104,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   lignes.push(...consigneQuestionsIgnorees(lecon.questionsIgnorees));
   lignes.push(...consigneSchemasAReprendre(lecon.schemasAReprendre));
+  lignes.push(...consigneLongueursAReprendre(lecon.longueursAReprendre));
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
   }
@@ -203,7 +204,13 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
     return [];
   });
   const schemasAReprendre = [...(premier ? lecon.schemasAReprendre : []), ...schemas];
-  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre }, cout });
+  // Pages et parties trop longues des pages écrites par ce tour (ticket #156) : signalées de même, page intacte.
+  const longueurs = await store.longueursAReprendreDepuis(slug, id, pagesAvant).catch((e) => {
+    console.error(`Longueur des pages de ${id} : ${e.message}`);
+    return [];
+  });
+  const longueursAReprendre = [...(premier ? lecon.longueursAReprendre : []), ...longueurs];
+  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre, longueursAReprendre }, cout });
   relancerPropositions(slug);
   const apres = await store.lireLecon(slug, id);
   if (apres.mode === 'libre' && lecon.objectifs.length > 0 && apres.objectifs.length > lecon.objectifs.length) {

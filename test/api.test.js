@@ -3428,6 +3428,63 @@ test('Moment de révision : proposé de nouveau le jour suivant, quand l\'Object
   assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.aProposer, false);
 });
 
+// Rappel calendrier (#155) : le parent règle l'heure de chaque moment et télécharge un fichier iCalendar.
+test('Rappel calendrier : heures réglables, gardées pour l\'Élève, et refus des valeurs mal formées', async () => {
+  const { slug } = await eleveRevisions('Rappel-Heures', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  const depart = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(depart.data.heures['apres-ecole'], '16:30'); // valeur proposée
+  // La lecture de la Vue parent ne consomme pas la question du jour de l'Élève (ici déjà posée par le GET ci-dessus).
+  const { slug: autre } = await eleveRevisions('Rappel-Lecture', 1);
+  assert.equal((await appel(`/api/eleves/${autre}/moment/heures`, 'GET', undefined, le(BANQUE_DATE))).data.heures.matin, '07:30');
+  assert.equal((await appel(`/api/eleves/${autre}/moment`, 'GET', undefined, le(BANQUE_DATE))).data.aProposer, true);
+  assert.deepEqual(Object.keys(depart.data.heures).sort(), ['apres-ecole', 'apres-repas', 'matin', 'week-end']);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { matin: '25:00' } }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { minuit: '08:00' } }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { matin: 'sept heures' } }, le(BANQUE_DATE))).status, 400);
+  const ok = await appel(`${url}/heures`, 'PUT', { heures: { 'apres-ecole': '17:15' } }, le(BANQUE_DATE));
+  assert.equal(ok.data.heures['apres-ecole'], '17:15');
+  assert.equal(ok.data.heures.matin, '07:30');
+  // Gardées, y compris quand l'Élève change de moment.
+  await appel(url, 'PUT', { moment: 'apres-ecole' }, le(BANQUE_DATE));
+  const relu = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(relu.data.heures['apres-ecole'], '17:15');
+  assert.equal(relu.data.moment, 'apres-ecole');
+});
+
+test('Rappel calendrier : fichier iCalendar quotidien, alarme, heure locale, suit le moment choisi', async () => {
+  const { slug } = await eleveRevisions('Rappel-Ics', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  await appel(url, 'PUT', { moment: 'apres-repas' }, le(BANQUE_DATE));
+  await appel(`${url}/heures`, 'PUT', { heures: { 'apres-repas': '19:45' } }, le(BANQUE_DATE));
+  const res = await fetch(`${base}${url}/calendrier.ics`, { headers: le(BANQUE_DATE) });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^text\/calendar/);
+  assert.match(res.headers.get('content-disposition'), /attachment; filename="[^"]+\.ics"/);
+  const ics = await res.text();
+  assert.ok(ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n'));
+  assert.ok(!/[^\r]\n/.test(ics), 'fins de ligne CRLF');
+  for (const ligne of ['VERSION:2.0', 'BEGIN:VEVENT', 'RRULE:FREQ=DAILY', 'BEGIN:VALARM', 'ACTION:DISPLAY', 'END:VALARM', 'END:VEVENT']) assert.ok(ics.includes(`\r\n${ligne}\r\n`), ligne);
+  assert.match(ics, /\r\nDTSTART:\d{8}T194500\r\n/); // heure locale flottante, ni Z ni TZID
+  assert.match(ics, /\r\nUID:[^\r]+\r\n/);
+  assert.match(ics, /\r\nDTSTAMP:\d{8}T\d{6}Z\r\n/);
+  assert.match(ics, /\r\nTRIGGER:-?PT0S\r\n/);
+  // Suit le moment choisi.
+  await appel(url, 'PUT', { moment: 'matin' }, le(BANQUE_DATE));
+  assert.match(await (await fetch(`${base}${url}/calendrier.ics`, { headers: le(BANQUE_DATE) })).text(), /\r\nDTSTART:\d{8}T073000\r\n/);
+});
+
+test('Rappel calendrier : sans moment choisi, ou « Je ne sais pas », pas de fichier vide', async () => {
+  const { slug } = await eleveRevisions('Rappel-Vide', 1);
+  const url = `/api/eleves/${slug}/moment/calendrier.ics`;
+  assert.equal((await fetch(`${base}${url}`, { headers: le(BANQUE_DATE) })).status, 409);
+  await appel(`/api/eleves/${slug}/moment`, 'PUT', { moment: 'je-ne-sais-pas' }, le(BANQUE_DATE));
+  const res = await fetch(`${base}${url}`, { headers: le(BANQUE_DATE) });
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).erreur, /moment/i);
+  assert.equal((await fetch(`${base}/api/eleves/personne-ici/moment/calendrier.ics`)).status, 404);
+});
+
 test('Moment de révision : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/moment')).status, 404);
   assert.equal((await appel('/api/eleves/personne-ici/moment', 'PUT', { moment: 'matin' })).status, 404);

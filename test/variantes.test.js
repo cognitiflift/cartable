@@ -45,3 +45,14 @@ test('Variantes : celles d\'une Question avec figure la gardent, et le prof en r
   const sansLegende = { ...qcm, figure: { ...figure, enfants: [figure.enfants[0]] } };
   assert.equal(demandeDeVariantes({ 'p#q1': { contenu: sansLegende } }, ['p#q1'])[0].figure, 'une figure sans légende');
 });
+
+test('Variantes : elles gardent les raisons des réponses fausses, jamais celle de la bonne réponse, et le prof reçoit celles de la Question', () => {
+  const qcm = { enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines'], bonne: 0, raisons: [null, 'Sous terre.'], explication: 'Le cratère.', objectifs: [1] };
+  const [v1, v2] = lireVariantes([
+    { enonce: 'Par où la lave sort-elle ?', reponses: ['Les racines', 'Le cratère'], bonne: 1, raisons: ['Elles sont sous terre.', 'Je suis juste'], explication: 'Le cratère.' },
+    { enonce: 'Quelle sortie pour la lave ?', reponses: ['Les racines', 'Le cratère'], bonne: 1, explication: 'Le cratère.' },
+  ], qcm);
+  assert.deepEqual(v1.raisons, ['Elles sont sous terre.', null]);
+  assert.equal(Object.hasOwn(v2, 'raisons'), false);
+  assert.deepEqual(demandeDeVariantes({ 'p#q1': { contenu: qcm } }, ['p#q1'])[0].raisons, [null, 'Sous terre.']);
+});

@@ -79,3 +79,11 @@ test('Lecture à voix haute : un bloc de la page se lit comme une phrase, un ext
   assert.equal(texteDeBloc(strophe), 'Le ciel est, par-dessus le toit, Si bleu, si calme ! Un arbre, par-dessus le toit, Berce sa palme.');
   assert.equal(texteDeBloc(` ${FIN_DE_VERS} \n `), '');
 });
+
+test('Lecture à voix haute : la raison de la réponse fausse choisie est lue avant l\'explication', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [{ id: 'r1', enonce: 'Par où sort la lave ?', reponses: ['Le cratère', 'Les racines'], bonne: 0,
+    raisons: [null, 'Les racines sont sous terre.'], explication: 'Par le cratère.' }] }).questions;
+  assert.equal(texteDeQuestion(q, corriger(q, 1)),
+    'Par où sort la lave ? Les réponses : Le cratère. Les racines. La bonne réponse : Le cratère. Les racines sont sous terre. Par le cratère.');
+  assert.equal(texteDeQuestion(q, corriger(q, 0)), 'Par où sort la lave ? Les réponses : Le cratère. Les racines. Bravo ! Par le cratère.');
+});

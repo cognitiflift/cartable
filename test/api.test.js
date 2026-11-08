@@ -2440,6 +2440,16 @@ test('Maîtrise : « acquis » porté par le préambule de relais et le résumé
   assert.match(await fs.readFile(path.join(dossier, 'args-propositions'), 'utf8'), /\) : Maîtrise \d+ %, acquis/);
 });
 
+test('Difficulté visée : le préambule de relais porte la réussite récente et la consigne de la page suivante', async () => {
+  const avant = (jours) => new Date(Date.now() - jours * JOUR_MS).toISOString();
+  const { slug, lecon, url } = await leconAcquise('Difficulte-Visee', [avant(2), avant(1)]);
+  assert.equal((await avecFichier('objectifs', () => appel(`${url}/messages`, 'POST', { texte: 'Page suivante' }))).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Réussite récente : 100 % en moyenne sur les 2 derniers quiz de cette Leçon.*plus difficile/);
+  await attendrePropositions(slug);
+});
+
 test('Vue parent : un contrôle à venir porte « acquis » comme la lecture de sa Leçon de révision', async () => {
   const dates = ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z'];
   const { slug, lecon, url } = await leconAcquise('Acquis-Parent', dates, { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-10-20' });

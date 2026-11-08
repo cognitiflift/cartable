@@ -3925,3 +3925,40 @@ test('Signaler une Question : rejouée avec un nouveau contenu et un score, elle
   assert.equal(q1.contenu.enonce, 'Par où sort la lave ?');
   assert.equal(q1.journal.length, 2);
 });
+
+// FSRS-6 (#161) : adopté pour un Élève seulement s'il prédit mieux que FSRS-5 sur ses Révisions du jour, avec assez de réponses.
+const banqueDeRevisions = (nombre, juste) => Object.fromEntries(Array.from({ length: nombre }, (_, i) => [`0002-volcans.html#p${i}`, {
+  id: `p${i}`, page: '0002-volcans.html',
+  contenu: { enonce: `Planificateur ${i} ?`, reponses: ['a', 'b'], bonne: 0, explication: '' },
+  journal: [{ date: '2026-10-01T10:00:00.000Z', juste: true, origine: 'quiz' }, { date: '2026-10-31T10:00:00.000Z', juste, origine: 'revision' }],
+}]));
+
+test('Planificateur : FSRS-5 pour un Élève sans assez de réponses en Révision du jour, comparaison exposée', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Planif-Peu', 1);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueDeRevisions(5, true)));
+  const maintenant = le('2026-10-31T12:00:00.000Z');
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, maintenant);
+  assert.equal(data.planificateur.utilise, 'fsrs5');
+  assert.equal(data.planificateur.reponses, 5);
+  assert.ok(data.planificateur.fsrs6.perte < data.planificateur.fsrs5.perte);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, maintenant)).data.planificateur, 'fsrs5');
+});
+
+test('Planificateur : FSRS-6 pour un Élève dont il prédit mieux les réponses, sans migration, la mémoire le suit', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Planif-Beaucoup', 1);
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const maintenant = le('2026-10-31T12:00:00.000Z');
+  await fs.writeFile(fichier, JSON.stringify(banqueDeRevisions(5, true)));
+  const avant = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, maintenant)).data.questions.find((q) => q.id === 'p0');
+  await fs.writeFile(fichier, JSON.stringify(banqueDeRevisions(200, true)));
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, maintenant);
+  assert.equal(data.planificateur.utilise, 'fsrs6');
+  assert.equal(data.planificateur.reponses, 200);
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, maintenant)).data;
+  assert.equal(lue.planificateur, 'fsrs6');
+  // Le même journal, rejoué avec l'autre planificateur : une autre prochaine révision, sans aucune migration du fichier.
+  assert.notEqual(lue.questions.find((q) => q.id === 'p0').prochaineRevision, avant.prochaineRevision);
+  assert.deepEqual(Object.keys(JSON.parse(await fs.readFile(fichier, 'utf8'))['0002-volcans.html#p0']), ['id', 'page', 'contenu', 'journal']);
+  // Le résumé de la liste des Leçons n'expose pas le planificateur.
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, maintenant)).data[0].planificateur, undefined);
+});

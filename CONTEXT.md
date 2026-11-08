@@ -148,7 +148,7 @@ Jour manqué, seul jour non couvert par un Joker d'une pause, que l'Élève a r�
 _Avoid_: jour rattrapé, jour gagné
 
 **Moment de révision**:
-Quand l'Élève dit qu'il reviendra, choisi dans une liste fermée tenue par l'appli : après l'école, après le repas du soir, le matin avant l'école, le week-end, « Je ne sais pas ». Proposé une fois par jour, quand l'Objectif du jour vient d'être atteint ; l'accueil le rappelle dans le bandeau de la semaine, et l'Élève peut le changer ou le retirer sans être relancé. Enregistré pour l'Élève seul, jamais envoyé hors de l'appareil.
+Quand l'Élève dit qu'il reviendra, choisi dans une liste fermée tenue par l'appli : après l'école, après le repas du soir, le matin avant l'école, le week-end, « Je ne sais pas ». Proposé une fois par jour, quand l'Objectif du jour vient d'être atteint ; l'accueil le rappelle dans le bandeau de la semaine, et l'Élève peut le changer ou le retirer sans être relancé. Enregistré pour l'Élève seul, jamais envoyé hors de l'appareil. Le parent règle, dans la Vue parent, l'heure de chaque moment (valeurs proposées) et peut télécharger un fichier iCalendar (événement récurrent avec alarme) pour son propre calendrier ; le fichier est généré sur place, rien n'est hébergé, et il n'y en a pas tant que l'Élève n'a pas choisi de moment.
 _Avoid_: rappel, notification, alarme
 
 **Série de jours**:

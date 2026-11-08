@@ -22,7 +22,7 @@ L'appli prend donc la mémoire en charge, dans l'esprit des ADR 0002 et 0003 : l
 - Une Leçon terminée qui sort des révisions : rejeté, c'est justement après le contrôle que l'oubli commence.
 - Révisions par Leçon plutôt que mélangées : rejeté, l'entrelacement (Rohrer & Taylor 2007) apprend à reconnaître de quoi il s'agit.
 - Paramètres FSRS optimisés pour chaque Élève : écarté pour l'instant, trop peu de réponses par Élève ; le journal permettra de le faire plus tard.
-- Rappels hors de l'appli (notifications) : écarté, l'appli reste locale (ADR 0001). Mise à jour (#154) : l'appli demande désormais à l'Élève, dans une liste fermée, quand il reviendra (Moment de révision) et le lui rappelle sur l'accueil ; rien ne sort de l'appareil.
+- Rappels hors de l'appli (notifications) : écarté, l'appli reste locale (ADR 0001). Mise à jour (#154) : l'appli demande désormais à l'Élève, dans une liste fermée, quand il reviendra (Moment de révision) et le lui rappelle sur l'accueil ; rien ne sort de l'appareil. Mise à jour (#155) : le rappel reste hors de l'appli, dans le calendrier du parent et à son initiative : la Vue parent règle l'heure de chaque moment et télécharge un fichier iCalendar généré localement (événement récurrent avec alarme) ; l'appli n'envoie ni n'héberge rien (ADR 0001).
 
 ## Consequences
 

@@ -23,7 +23,7 @@ import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
-import { MOMENTS, validerMoment } from './lib/moment.js';
+import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -633,6 +633,29 @@ async function api(req, res, segments) {
         recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
     }
+  } else if (r2 === 'moment' && id === 'heures' && !r3) {
+    // Rappel calendrier (#155) : le parent règle l'heure de chaque moment (lib/moment.js), gardée dans le fichier du moment.
+    // Lecture pour la Vue parent : ne marque pas la question du jour comme posée (GET …/moment le fait, pour l'Élève).
+    if (m === 'GET') {
+      const f = await store.modifierMoment(slug, (x) => [x, x]);
+      return json(res, 200, { moment: f.moment, choix: MOMENTS, heures: heuresDe(f.heures) });
+    }
+    if (m === 'PUT') {
+      const { heures } = await lireCorps(req);
+      const valides = validerHeures(heures);
+      return json(res, 200, await store.modifierMoment(slug, (f) => {
+        const reglees = { ...f.heures, ...valides };
+        return [{ ...f, heures: reglees }, { moment: f.moment, aProposer: false, choix: MOMENTS, heures: heuresDe(reglees) }];
+      }));
+    }
+  } else if (r2 === 'moment' && id === 'calendrier.ics' && !r3) {
+    // Fichier iCalendar du rappel (#155), généré ici et rendu tel quel : rien n'est envoyé ni hébergé (ADR 0001).
+    if (m === 'GET') {
+      const [profil, f] = await Promise.all([store.lireEleve(slug), store.modifierMoment(slug, (x) => [x, x])]);
+      const ics = fichierIcal({ moment: f.moment, heures: f.heures, pseudo: profil.pseudo, maintenant });
+      res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="rappel-${slug}.ics"` });
+      return res.end(ics);
+    }
   } else if (r2 === 'moment' && !id) {
     // Moment de révision (#154) : proposé une fois par jour, une fois l'Objectif du jour atteint ; valeur fermée (lib/moment.js).
     const jour = jourLocal(maintenant);
@@ -641,13 +664,13 @@ async function api(req, res, segments) {
       const atteint = objectifDuJour(activiteParJour(lecons), maintenant).atteint;
       return json(res, 200, await store.modifierMoment(slug, (f) => {
         const aProposer = atteint && f.proposeLe !== jour;
-        return [aProposer ? { ...f, proposeLe: jour } : f, { moment: f.moment, aProposer, choix: MOMENTS }];
+        return [aProposer ? { ...f, proposeLe: jour } : f, { moment: f.moment, aProposer, choix: MOMENTS, heures: heuresDe(f.heures) }];
       }));
     }
     if (m === 'PUT') {
       const { moment } = await lireCorps(req);
       const valeur = validerMoment(moment === undefined ? 'inconnu' : moment);
-      return json(res, 200, await store.modifierMoment(slug, () => [{ moment: valeur, proposeLe: jour }, { moment: valeur, aProposer: false, choix: MOMENTS }]));
+      return json(res, 200, await store.modifierMoment(slug, (f) => [{ ...f, moment: valeur, proposeLe: jour }, { moment: valeur, aProposer: false, choix: MOMENTS, heures: heuresDe(f.heures) }]));
     }
   } else if (r2 === 'badges' && !id) {
     // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture, les totaux d'Étoiles et de Fusées (#96) et

@@ -359,9 +359,9 @@ const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atte
 // `debut` (calendrier de Mes badges) : le premier Jour de l'Élève ; un jour d'avant est neutre (« avant »), sans le
 // contour en tirets d'un jour vide, pour ne pas se lire comme un jour manqué.
 const classeJour = ({ jour, etat }, aujourdhui, debut = '') => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}${jour < debut ? ' avant' : ''}`;
-const lectureJour = (nom, { jour, etat, joker }, aujourdhui, debut = '') => [nom, jour === aujourdhui && "aujourd'hui", jour < debut ? 'avant ton premier jour' : ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
+const lectureJour = (nom, { jour, etat, joker, repare }, aujourdhui, debut = '') => [nom, jour === aujourdhui && "aujourd'hui", jour < debut ? 'avant ton premier jour' : ETATS_JOUR[etat], joker && 'protégé par un joker', repare && 'jour réparé'].filter(Boolean).join(', ');
 // Sans `jour`, un tampon muet : la légende du calendrier.
-const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'));
+const tamponJour = ({ jour, joker, repare }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'), repare && h('span', { className: 'joker' }, '🩹'));
 
 // Mon moment de révision (#154) : une liste fermée de moments, proposée une fois par jour après l'Objectif du jour
 // atteint (`aProposer`), puis rappelée dans le bandeau ; l'Élève peut le changer ou le retirer, sans être relancé.
@@ -388,7 +388,7 @@ function momentDeRevision(profil, etat) {
   return zone;
 }
 
-function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons, moment) {
+function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours, reparation, meilleureSerie, joursTravailles }, dues, lecons, moment) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
   const caseJour = (jour, i) => {
@@ -422,6 +422,12 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
         h('small', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
         serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+        // Série repartie (#159) : la meilleure série et tous les Jours travaillés restent sous les yeux, à la place d'un « 0 » seul.
+        meilleureSerie > serieDeJours.jours && h('small', { className: 'serie-acquis' },
+          `Ta meilleure série : ${pluriel(meilleureSerie, 'jour')} · ${pluriel(joursTravailles, 'jour')} travaillé${joursTravailles > 1 ? 's' : ''} en tout`),
+        // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
+        reparation && h('small', { className: 'reparation' },
+          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`),
         momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
@@ -504,7 +510,7 @@ async function ecranBadges(profil) {
 // montre à côté ce qui a été fait et gagné, sans score ; aujourd'hui est montré à l'ouverture.
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const moisSuivant = (mois, n) => { const [a, m] = mois.split('-').map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
+const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, repare: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
 function calendrierJours({ aujourdhui, jours }) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
@@ -524,9 +530,10 @@ function calendrierJours({ aujourdhui, jours }) {
       lecons.length > 1 && h('ul', { className: 'lecons-du-jour', ariaLabel: 'Leçons' }, lecons.map((titre) => h('li', {}, `📚 ${titre}`))),
       faits && h('p', {}, faits),
       journee.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
+      journee.repare && h('p', {}, '🩹 Tu as réparé ta série de jours ce jour-là.'),
       (gains || journee.gains.paliers.length > 0) && h('div', { className: 'gains-du-jour' }, gains && h('span', {}, `Gagné : ${gains}`),
         journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p, { ariaHidden: 'true', title: undefined }), nomEtPalier(p)))),
-      !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, journee.jour === aujourdhui ? 'Pas encore aujourd’hui.' : 'Rien ce jour-là.')];
+      !faits && !journee.lecons.length && !journee.joker && !journee.repare && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, journee.jour === aujourdhui ? 'Pas encore aujourd’hui.' : 'Rien ce jour-là.')];
   };
   const afficher = (choisi, focaliser = true) => {
     const [a, m] = mois.split('-').map(Number);
@@ -573,8 +580,8 @@ function calendrierJours({ aujourdhui, jours }) {
             return bouton;
           })),
         h('p', { className: 'calendrier-legende' },
-          [['pale', 'travaillé'], ['plein', 'Objectif du jour atteint'], ['vide', 'joker', true]].map(([etat, mot, joker]) =>
-            h('span', { className: `jour ${etat}` }, tamponJour({ joker }), mot)))),
+          [['pale', 'travaillé'], ['plein', 'Objectif du jour atteint'], ['vide', 'joker', true], ['vide', 'jour réparé', false, true]].map(([etat, mot, joker, repare]) =>
+            h('span', { className: `jour ${etat}` }, tamponJour({ joker, repare }), mot)))),
       h('div', { className: 'calendrier-detail', ariaLive: 'polite' },
         choisi ? detail(duJour(choisi)) : h('p', { className: 'doux' }, 'Touche un jour pour voir ce que tu as fait et gagné.')));
     // Après ‹ ou ›, le focus reste sur le même bouton (ou, désactivé au bout de l'historique, va à la grille) ; après un

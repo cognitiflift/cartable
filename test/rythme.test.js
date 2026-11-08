@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { activiteParJour, objectifDuJour, serieDeJours, joursCouvertsParJoker, recapitulatifSemaine, joursTravailles } from '../lib/rythme.js';
+import { activiteParJour, objectifDuJour, serieDeJours, joursCouvertsParJoker, joursReparesDeSerie, meilleureSerie, reparationDeSerie, recapitulatifSemaine, joursTravailles } from '../lib/rythme.js';
 import { jourLocal } from '../lib/jour.js';
 
 // Dates en heure locale : les jours de l'Élève sont ceux de sa machine (voir lib/jour.js).
@@ -179,4 +179,68 @@ test('Jours travaillés : au moins une réponse ce jour-là (quiz de page, Pré-
   ]);
   assert.deepEqual(jours, ['2026-10-10', '2026-10-11', '2026-10-12', '2026-10-14']);
   assert.deepEqual(joursTravailles([]), []);
+});
+
+// Réparation (#159). Semaine du lundi 5 au dimanche 11 octobre : atteint lundi 5 ; mardi 6, mercredi 7 et jeudi 8 couverts
+// par les 3 Jokers ; vendredi 9 manqué sans Joker : la série repart. Samedi 10 est le jour de retour.
+const double = { revisions: 10, pages: 0 };
+
+test('Réparation : deux fois l\'Objectif du jour le jour du retour reprend la série, le jour manqué est réparé', () => {
+  const activite = { ...historique(['2026-10-05']), '2026-10-10': double };
+  const m = a('2026-10-10');
+  // 1 jour avant la pause + le jour de retour ; le jour réparé compte comme couvert (4 « Jokers »), pas comme atteint.
+  assert.deepEqual(serieDeJours(activite, m), { jours: 2, jokers: 0, jokersUtilises: 4, aujourdhui: true });
+  assert.deepEqual(joursReparesDeSerie(activite, m), ['2026-10-09']);
+  assert.deepEqual(joursCouvertsParJoker(activite, m), ['2026-10-06', '2026-10-07', '2026-10-08']);
+  assert.equal(reparationDeSerie(activite, m), null);
+  assert.deepEqual(meilleureSerie(activite, m), { meilleure: 2, jours: 2 });
+  // Deux Pages de leçon valent dix Révisions du jour.
+  assert.equal(serieDeJours({ ...historique(['2026-10-05']), '2026-10-10': { revisions: 0, pages: 2 } }, m).jours, 2);
+});
+
+test('Réparation : une seule fois l\'Objectif du jour ne répare pas ; la réparation est proposée le jour même seulement', () => {
+  const m = a('2026-10-10');
+  // Samedi, rien encore : la série est repartie, la réparation est proposée avec ce qu'il reste à faire.
+  const rien = historique(['2026-10-05']);
+  assert.equal(serieDeJours(rien, m).jours, 0);
+  assert.deepEqual(reparationDeSerie(rien, m), { jourManque: '2026-10-09', serieAvant: 1, revisions: 0, revisionsVisees: 10, pages: 0, pagesVisees: 2 });
+  // Samedi, l'objectif atteint une fois : la série repart à 1, la réparation reste proposée.
+  const une = { ...rien, '2026-10-10': { revisions: 5, pages: 0 } };
+  assert.equal(serieDeJours(une, m).jours, 1);
+  assert.equal(reparationDeSerie(une, m).revisions, 5);
+  assert.deepEqual(joursReparesDeSerie(une, m), []);
+  // Dimanche : le jour de retour est passé, plus de réparation, la série est perdue ; la meilleure série reste.
+  const apres = { ...une, '2026-10-11': { revisions: 5, pages: 0 } };
+  assert.equal(reparationDeSerie(apres, a('2026-10-11')), null);
+  assert.deepEqual(serieDeJours(apres, a('2026-10-11')), { jours: 2, jokers: 0, jokersUtilises: 0, aujourdhui: true });
+  assert.deepEqual(meilleureSerie(apres, a('2026-10-11')), { meilleure: 2, jours: 2 });
+});
+
+test('Réparation : une pause de deux jours non couverts ne se répare pas', () => {
+  // Vendredi 9 et samedi 10 non couverts ; retour dimanche 11 avec deux fois l'objectif.
+  const activite = { ...historique(['2026-10-05']), '2026-10-11': double };
+  assert.equal(reparationDeSerie(activite, a('2026-10-11')), null); // samedi, la réparation était encore possible
+  assert.deepEqual(serieDeJours(activite, a('2026-10-11')), { jours: 1, jokers: 0, jokersUtilises: 0, aujourdhui: true });
+  assert.deepEqual(joursReparesDeSerie(activite, a('2026-10-11')), []);
+});
+
+test('Réparation : à cheval sur deux semaines, la pause d\'un jour non couvert se répare avec les Jokers de chacune', () => {
+  // Atteint jeudi 15 ; manqués du vendredi 16 au mercredi 21 couverts (3 + 3) ; jeudi 22 sans Joker ; retour vendredi 23.
+  const activite = { ...historique(['2026-10-15']), '2026-10-23': double };
+  assert.deepEqual(serieDeJours(activite, a('2026-10-23')), { jours: 2, jokers: 0, jokersUtilises: 7, aujourdhui: true });
+  assert.deepEqual(joursReparesDeSerie(activite, a('2026-10-23')), ['2026-10-22']);
+  assert.deepEqual(joursCouvertsParJoker(activite, a('2026-10-23')), suite('2026-10-16', 6));
+});
+
+test('Réparation : changement d\'heure (nuit du 24 au 25 octobre), le jour manqué et le retour se suivent au calendrier', () => {
+  // Atteint mardi 20 ; couverts 21, 22, 23 ; non couvert samedi 24 ; retour dimanche 25, jour de 25 heures.
+  const tard = { ...historique(['2026-10-20']), '2026-10-25': double };
+  assert.deepEqual(joursReparesDeSerie(tard, a('2026-10-25')), ['2026-10-24']);
+  assert.equal(serieDeJours(tard, a('2026-10-25')).jours, 2);
+});
+
+test('Meilleure série : la plus longue de l\'historique, même quand la série en cours est plus courte', () => {
+  const activite = historique([...suite('2026-09-01', 5), '2026-10-20']);
+  assert.deepEqual(meilleureSerie(activite, a('2026-10-20')), { meilleure: 5, jours: 1 });
+  assert.deepEqual(meilleureSerie({}, a('2026-10-20')), { meilleure: 0, jours: 0 });
 });

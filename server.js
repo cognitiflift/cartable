@@ -17,7 +17,7 @@ import { revisionsDuJour } from './lib/revisions.js';
 import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
-import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
+import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, reparationDeSerie, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
@@ -626,6 +626,10 @@ async function api(req, res, segments) {
       return json(res, 200, {
         objectifDuJour: objectifDuJour(activite, maintenant),
         serieDeJours: serieDeJours(activite, maintenant),
+        // Réparation proposée aujourd'hui (#159) ; meilleure série et total des Jours travaillés, montrés après une série repartie.
+        reparation: reparationDeSerie(activite, maintenant),
+        meilleureSerie: meilleureSerie(activite, maintenant).meilleure,
+        joursTravailles: joursTravailles(lecons).filter((j) => j <= jourLocal(maintenant)).length,
         recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
     }

@@ -184,7 +184,7 @@ const SECTIONS_PARENT = [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus } }) => [
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
@@ -204,6 +204,8 @@ const SECTIONS_PARENT = [
         : 'pas encore de quiz.'),
       h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
+      h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
+        ? `${pluriel(predictions.faites, 'faite')}, ${predictions.justes} juste${predictions.justes > 1 ? 's' : ''} (${predictions.pourcentage} %).` : 'aucune pour l’instant.'),
     ),
     h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
     h('p', { className: 'doux' }, 'Pour chaque tranche de probabilité de se souvenir prédite avant la réponse, la part de réponses justes aux Révisions du jour.'),
@@ -1125,9 +1127,17 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     if (pagesScorees.has(page)) envoyerSignalement({ page, id: question, raison });
     else signalementsEnAttente.push({ page, id: question, raison });
   };
+  // Prédictions de la page (#157), envoyées par le Kit : seulement un événement daté pour les indicateurs, jamais un score ;
+  // le parent qui ouvre la Leçon en aperçu n'en fait pas (il n'y a pas d'Élève qui répond).
+  const recevoirPrediction = (ev) => {
+    if (apercu || !iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-prediction') return;
+    const { page, id: prediction, juste } = ev.data;
+    api(`eleves/${profil.slug}/predictions`, { method: 'POST', body: { lecon: id, page, id: prediction, juste } }).catch(() => {});
+  };
   window.addEventListener('message', recevoirSignalement);
+  window.addEventListener('message', recevoirPrediction);
   window.addEventListener('message', recevoirScore);
-  quitterEcran = () => { window.removeEventListener('message', recevoirScore); window.removeEventListener('message', recevoirSignalement); };
+  quitterEcran = () => { window.removeEventListener('message', recevoirScore); window.removeEventListener('message', recevoirSignalement); window.removeEventListener('message', recevoirPrediction); };
 
   afficherEntete();
   afficher();

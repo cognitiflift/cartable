@@ -433,6 +433,7 @@ La signature du système. Le trait est à la couleur de la Catégorie jusqu'à l
 La Page de leçon remplit l'écran sous un en-tête de Séance qui situe l'Élève sur son réseau.
 - **En-tête :** « ← Mes leçons », le cartouche de Niveau et le nom de la Leçon (Title), le mot de Maîtrise (rien quand la Leçon est acquise : le terminus allumé le dit), puis la ligne de la Leçon (`ligneLecon`, prochaine station en « vous êtes ici ») et « Ma fiche ». Sous 640px, la ligne passe sur sa propre rangée.
 - **Bulle du prof :** carte 18px à pose légère, au centre, sur le `voile` quand une page est dessous ; Réponses proposées en boutons pleins de 12px.
+- **Prédiction (Page de leçon, Kit) :** carte 14px comme les questions du quiz, filet d'accent de 1px tout autour (jamais un filet épais d'un seul côté) et teinte `accent-doux`, posée avant une partie de la page. Ses réponses sont des boutons de 2.75rem de haut au contour neutre ; la réponse choisie prend le contour `texte` des réponses du quiz avant correction. Jamais de vert ni de rouge : elle est hors score, il n'y a pas de faute à craindre. La révélation s'ouvre dans la carte, sous un filet pointillé d'accent, sans rien déplacer au-dessus.
 - **Retour de quiz :** carte 18px à pose légère en bas à droite, bouton ✕ secondaire de 2.6rem, au-dessus du Rebond.
 - **Leçon terminée :** carte 18px à pose légère, « 🏆 Leçon terminée » en Title Overpass, score du Défi et récompenses dessous.
 

@@ -147,6 +147,10 @@ Jour local où l'Élève a enregistré au moins une réponse : quiz de page, Pr�
 Jour manqué, seul jour non couvert par un Joker d'une pause, que l'Élève a réparé en atteignant deux fois l'Objectif du jour à son retour. Il compte comme un jour couvert par un Joker (la **Série de jours** d'avant reprend), pas comme un jour où l'Objectif du jour est atteint ; le calendrier de Mes badges le marque de 🩹, distinct du 🛡️.
 _Avoid_: jour rattrapé, jour gagné
 
+**Prédiction**:
+Composant du Kit placé avant une partie d'une Page de leçon : une question courte (2 ou 3 réponses) où l'Élève touche ce qu'il pense avant de lire. Pas de correction tout de suite : la révélation (« Tu avais pensé… ; en fait… ») s'ouvre quand il atteint la partie suivante ou le quiz. Hors score, hors Banque de Questions, hors Maîtrise et hors Étoiles, sans Confiance ni « Je ne sais pas » (on devine). Le prof la déclare en données dans la page ; il en met au plus une par partie et deux par page, jamais dans le Pré-test ni dans les pages Revoir. Le Kit envoie son résultat (juste ou non) à l'appli, qui le note comme événement daté `prediction`, pour les indicateurs seulement (Prédictions faites et justes).
+_Avoid_: question, quiz, test, Question (une Prédiction n'entre pas dans la Banque de Questions)
+
 **Moment de révision**:
 Quand l'Élève dit qu'il reviendra, choisi dans une liste fermée tenue par l'appli : après l'école, après le repas du soir, le matin avant l'école, le week-end, « Je ne sais pas ». Proposé une fois par jour, quand l'Objectif du jour vient d'être atteint ; l'accueil le rappelle dans le bandeau de la semaine, et l'Élève peut le changer ou le retirer sans être relancé. Enregistré pour l'Élève seul, jamais envoyé hors de l'appareil.
 _Avoid_: rappel, notification, alarme

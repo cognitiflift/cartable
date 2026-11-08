@@ -3925,3 +3925,43 @@ test('Signaler une Question : rejouée avec un nouveau contenu et un score, elle
   assert.equal(q1.contenu.enonce, 'Par où sort la lave ?');
   assert.equal(q1.journal.length, 2);
 });
+
+// Prédiction (spec #145, ticket #157) : le Kit envoie un résultat, l'appli le note comme événement daté, rien d'autre.
+const predictions = (slug) => `/api/eleves/${slug}/predictions`;
+
+test('Prédiction : le serveur note un événement daté et ne touche ni la Banque ni les scores', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Prediction-Enreg', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'pred-1', juste: true };
+  assert.equal((await appel(predictions(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+  assert.equal((await appel(predictions(slug), 'POST', { ...corps, id: 'pred-2', juste: false }, le(LENDEMAIN))).status, 200);
+  const evenements = (await evenementsDe(slug)).filter((e) => e.type === 'prediction');
+  assert.deepEqual(evenements, [
+    { type: 'prediction', date: LENDEMAIN, lecon: lecon.id, juste: true },
+    { type: 'prediction', date: LENDEMAIN, lecon: lecon.id, juste: false },
+  ]);
+  const apres = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(apres.questions.map((q) => q.id), avant.questions.map((q) => q.id));
+  assert.deepEqual(apres.scores, avant.scores);
+  assert.equal(apres.maitrise.pourcentage, avant.maitrise.pourcentage);
+});
+
+test('Prédiction : un résultat mal formé est refusé (400) et ne laisse aucun événement', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Prediction-Refus', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'pred-1', juste: true };
+  for (const mauvais of [{ juste: 'oui' }, { juste: undefined }, { id: '' }, { id: 3 }, { page: undefined }, { lecon: undefined }]) {
+    assert.equal((await appel(predictions(slug), 'POST', { ...corps, ...mauvais }, le(LENDEMAIN))).status, 400, JSON.stringify(mauvais));
+  }
+  assert.equal((await appel(predictions(slug), 'POST', { ...corps, lecon: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await evenementsDe(slug)).some((e) => e.type === 'prediction'), false);
+});
+
+test('Prédiction : les indicateurs de la Vue parent comptent les Prédictions faites et justes', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Prediction-Parent', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'pred-1' };
+  await appel(predictions(slug), 'POST', { ...corps, juste: true }, le(LENDEMAIN));
+  await appel(predictions(slug), 'POST', { ...corps, id: 'pred-2', juste: false }, le(LENDEMAIN));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.indicateurs.predictions, { faites: 2, justes: 1, pourcentage: 50 });
+});

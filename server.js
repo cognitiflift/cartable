@@ -155,7 +155,7 @@ async function chronometrer(slug, id, maintenant, operation) {
   }
 }
 
-async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant }) {
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant, rebond }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -172,7 +172,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
     });
     // Les Questions signalées que ce tour a données au prof (#146) ne lui seront plus données.
     if (!premier) await store.signalementsTransmis(slug, id, questionsASignaler(lecon.questions).map((q) => `${q.page}#${q.id}`)).catch((e) => console.error(`Signalements de ${id} : ${e.message}`));
-    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant });
+    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant, rebond });
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
@@ -185,7 +185,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 // à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
 // L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :
 // c'est donc l'ajout d'Objectifs, constaté après le tour, qui marque l'élargissement.
-async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant }) {
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant, rebond = 'nouvelle' }) {
   const { texte, choix } = extraireChoix(reponse);
   // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
   // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
@@ -213,7 +213,9 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
     return [];
   });
   const longueursAReprendre = [...(premier ? lecon.longueursAReprendre : []), ...longueurs];
-  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre, longueursAReprendre }, cout });
+  // Rebond qui a fait créer les pages de ce tour (#147) : « nouvelle » sauf Revoir, Défi et Réviser.
+  const pages = await store.pagesEcritesDepuis(slug, id, pagesAvant).catch(() => []);
+  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre, longueursAReprendre }, cout, pagesRebond: { pages, rebond } });
   relancerPropositions(slug);
   const apres = await store.lireLecon(slug, id);
   if (apres.mode === 'libre' && lecon.objectifs.length > 0 && apres.objectifs.length > lecon.objectifs.length) {
@@ -290,7 +292,7 @@ async function adopterPreparation(slug, id, preparation, action, maintenant) {
   await store.adopterPreparation(slug, id);
   await store.noterPreparation(slug, { lecon: id, action, utilisee: true });
   const { reponse, sessionId, cout } = preparation;
-  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant });
+  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant, rebond: REBOND_DE_PAGE[action] });
 }
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
@@ -500,6 +502,8 @@ async function annoncerBadges(slug, maintenant) {
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
 // consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant ;
 // choisir Réviser ouvre la phase Réviser jusqu'au Défi réussi.
+// Rebond qui crée la page, tel que les indicateurs le comptent (#147) ; les autres (Étape suivante, Commencer) créent une page nouvelle.
+const REBOND_DE_PAGE = { revoir: 'revoir', defi: 'defi', reviser: 'reviser' };
 const ETAT_APRES_REBOND = { defi: { defiEnCours: true }, reviser: { reviserEnCours: true } };
 
 async function rebond(slug, id, { action }, maintenant) {
@@ -512,7 +516,7 @@ async function rebond(slug, id, { action }, maintenant) {
     const preparation = await prendrePreparation(slug, id);
     if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action, maintenant);
     await ecarterPreparation(slug, id, preparation);
-    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action], maintenant });
+    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action], maintenant, rebond: REBOND_DE_PAGE[action] });
   }));
   preparerPageSuivante(slug, id);
   return apres;

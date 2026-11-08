@@ -3139,6 +3139,31 @@ test('Indicateurs : une Leçon lue sans être ouverte par l\'Élève (vue parent
   assert.deepEqual(data.retour, { lecons: 1, revenus: 0, enAttente: 0, pourcentage: 0 });
 });
 
+// Mesures « avant » du ticket #147 : « Je ne sais pas », réussite selon le Rebond qui a créé la page, révisions des jours dus.
+test('Indicateurs : « Je ne sais pas », réussite par Rebond et révisions des jours dus, lues dans les journaux', async () => {
+  const { slug } = await eleveRevisions('Indic-Mesures', 0);
+  const l = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'page.pdf', data: Buffer.from('%PDF-1.4 faux').toString('base64') }] }, le('2026-11-02T10:00:00.000Z'))).data;
+  const url = `/api/eleves/${slug}/lecons/${l.id}`;
+  const quiz = (page, corps, date) => appel(`${url}/scores`, 'POST', { page, ...corps }, le(date));
+  const questions = [
+    { id: 'q1', enonce: 'A ?', choisie: 'Je ne sais pas', bonne: 'x', juste: false, jeNeSaisPas: true },
+    { id: 'q2', enonce: 'B ?', choisie: 'x', bonne: 'x', juste: true },
+  ];
+  await quiz((await appel(url)).data.pages.at(-1), { score: 50, questions }, '2026-11-02T11:00:00.000Z');
+  await appel(`${url}/retours`, 'POST', { score: 50, questions }, le('2026-11-02T11:00:00.000Z'));
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' }, le('2026-11-02T12:00:00.000Z'))).status, 200);
+  await quiz((await appel(url)).data.pages.at(-1), { score: 90 }, '2026-11-03T11:00:00.000Z');
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-05`, 'GET', undefined, le('2026-11-05T12:00:00.000Z'));
+  assert.deepEqual(data.jeNeSaisPas.quiz, { reponses: 2, jeNeSaisPas: 1, pourcentage: 50 });
+  assert.deepEqual(data.jeNeSaisPas.revision, { reponses: 0, jeNeSaisPas: 0, pourcentage: null });
+  assert.equal(data.reussiteParRebond.nouvelle.pourcentage, 50);
+  assert.deepEqual(data.reussiteParRebond.revoir, { quiz: 1, pourcentage: 90 });
+  assert.deepEqual(data.reussiteParRebond.defi, { quiz: 0, pourcentage: null });
+  // La Vue parent porte les mêmes mesures.
+  const parent = (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-05T12:00:00.000Z'))).data;
+  assert.deepEqual(parent.indicateurs.reussiteParRebond.revoir, { quiz: 1, pourcentage: 90 });
+});
+
 test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le temps d\'attente', async () => {
   const { slug } = await eleveRevisions('Indic-Attente', 0);
   const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;

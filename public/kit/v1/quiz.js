@@ -8,8 +8,10 @@ import { el, rendreQuestion } from './question.js';
 import { lectureActivee } from './lecture-logique.js';
 import { ajouterLecturePage } from './lecture.js';
 import { copieDeFigure } from './figure.js';
+import { appliquerEspacement } from './espacement.js';
 
 function demarrer() {
+  appliquerEspacement(document, location.search); // espacement des lettres du Profil (#160)
   // Lecture à voix haute (#76), si le Profil de l'Élève l'active : un bouton pour la page, un par question.
   const lecture = lectureActivee(location.search);
   if (lecture) ajouterLecturePage();

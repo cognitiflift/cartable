@@ -147,6 +147,8 @@ spacing:
   bloc: "2.2rem"
   page-max: "1200px"
   marge-page: "clamp(1rem, 3vw, 2rem)"
+  espacement-lettres: "0.12em"
+  espacement-mots: "0.16em"
 components:
   en-tete:
     backgroundColor: "{colors.nuit}"
@@ -346,6 +348,8 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 ### Named Rules
 **La règle de la signalétique.** Les capitales espacées sont réservées aux cartouches de signalétique du réseau (terminus, Niveau, noms de jours) ; aucun texte courant, aucun titre n'est en capitales.
+
+**La règle de l'espacement des lettres.** Un réglage du Profil, coupé par défaut, agrandit l'espacement des lettres (`--espacement-lettres`, 0.12em) et des mots (`--espacement-mots`, 0.16em), les valeurs que WCAG 1.4.12 demande de supporter. Il s'applique à l'appli, aux Pages de leçon, au quiz et aux Révisions du jour ; les schémas SVG n'y sont pas soumis. Le texte doit rester lisible sans perte avec ce réglage : pas de hauteur fixe sur un bloc de texte.
 
 **La règle des chiffres alignés.** Les compteurs (Étoiles, Fusées, dates des tampons, total de l'en-tête) sont en chiffres tabulaires.
 

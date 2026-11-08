@@ -616,6 +616,8 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
           // Copie de la figure de sa page (#126), dépliée d'office : reconstruite élément par élément, sans balisage.
           figure: construireFigure(document, q.figure),
           figureDepliee: true,
+          // Signaler (#146) : une raison de la liste fermée du Kit, enregistrée par le serveur.
+          signaler: (raison) => api(`eleves/${profil.slug}/signalements`, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, raison } }),
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
@@ -1042,10 +1044,28 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();
     } catch (e) { return (erreur.textContent = e.message); }
+    pagesScorees.add(corps.page);
+    for (const s of signalementsEnAttente.filter((x) => x.page === corps.page)) {
+      signalementsEnAttente.splice(signalementsEnAttente.indexOf(s), 1);
+      envoyerSignalement(s);
+    }
     tour({ texte: '⏳ Un instant…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
   };
+  // Signalements de Questions du quiz de la page (#146), envoyés par le Kit : la Question n'est dans la Banque qu'une fois
+  // le score enregistré, donc ceux qui arrivent avant attendent. Le Kit confirme tout de suite à l'Élève.
+  const pagesScorees = new Set();
+  const signalementsEnAttente = [];
+  const envoyerSignalement = ({ page, id: question, raison }) =>
+    api(`eleves/${profil.slug}/signalements`, { method: 'POST', body: { lecon: id, page, id: question, raison } }).catch((e) => { erreur.textContent = e.message; });
+  const recevoirSignalement = (ev) => {
+    if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-signalement') return;
+    const { page, id: question, raison } = ev.data;
+    if (pagesScorees.has(page)) envoyerSignalement({ page, id: question, raison });
+    else signalementsEnAttente.push({ page, id: question, raison });
+  };
+  window.addEventListener('message', recevoirSignalement);
   window.addEventListener('message', recevoirScore);
-  quitterEcran = () => window.removeEventListener('message', recevoirScore);
+  quitterEcran = () => { window.removeEventListener('message', recevoirScore); window.removeEventListener('message', recevoirSignalement); };
 
   afficherEntete();
   afficher();

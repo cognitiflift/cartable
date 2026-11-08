@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, fuseesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneQuestionsFragiles, consigneQuestionsSignalees, questionsASignaler, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -101,6 +101,7 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
     if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1), null, lecon));
   }
   lignes.push(...consigneQuestionsFragiles(lecon.questions));
+  lignes.push(...consigneQuestionsSignalees(lecon.questions));
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   lignes.push(...consigneQuestionsIgnorees(lecon.questionsIgnorees));
   lignes.push(...consigneSchemasAReprendre(lecon.schemasAReprendre));
@@ -168,6 +169,8 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
+    // Les Questions signalées que ce tour a données au prof (#146) ne lui seront plus données.
+    if (!premier) await store.signalementsTransmis(slug, id, questionsASignaler(lecon.questions).map((q) => `${q.page}#${q.id}`)).catch((e) => console.error(`Signalements de ${id} : ${e.message}`));
     return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant });
   } catch (e) {
     if (e instanceof HttpError) throw e;
@@ -232,7 +235,7 @@ function preparerPageSuivante(slug, id) {
       const cwd = await store.preparerDossierPreparation(slug, id);
       const { reponse, sessionId, cout } = await lancerAgent({
         cwd,
-        prompt: `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz: false })}\n\n${consignePreparation(prevision, lecon)}`,
+        prompt: `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz: false, signalements: false })}\n\n${consignePreparation(prevision, lecon)}`,
         consignes: consignesLecon(profil),
         modele: profil.modele,
         tache: 'rebond',
@@ -572,6 +575,16 @@ async function api(req, res, segments) {
       await noterEvenement(slug, { type: 'revision', date: new Date(maintenant).toISOString(), lecon: corps.lecon, juste: reponse.juste });
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
+    }
+  } else if (r2 === 'signalements' && !id) {
+    // Signaler une Question (#146), en quiz de page ou en Révision du jour : une raison de la liste fermée du Kit, jamais
+    // de tour du prof (il reçoit le signalement au tour suivant de la Leçon).
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const signalement = await store.signalerQuestion(slug, corps, { maintenant });
+      await noterEvenement(slug, { type: 'signalement', date: signalement.date, lecon: corps.lecon, raison: signalement.raison });
+      return json(res, 200, signalement);
     }
   } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.

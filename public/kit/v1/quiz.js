@@ -59,6 +59,9 @@ function demarrer() {
       lecture,
       // Figure de la page désignée par la question (spec #123) : une copie par question ; un id introuvable est ignoré.
       figure: copieDeFigure(document, q.figure),
+      // Signaler (#146) : seulement une question comptée d'un quiz qui entre dans la Banque (ni bonus, ni Pré-test) ;
+      // l'appli reçoit un message, comme pour le score, et l'enregistre.
+      signaler: q.bonus || quiz.pretest ? null : async (raison) => window.parent.postMessage({ type: 'cartable-signalement', page, id: q.id, raison }, '*'),
       quandCorrigee: ({ choisie, sur }) => {
         choix[q.id] = choisie;
         if (typeof sur === 'boolean') confiance[q.id] = sur;

@@ -3649,3 +3649,100 @@ test('Annonce des Badges : la fin de Révision du jour qui fait atteindre un Pal
   assert.deepEqual(recompenses.paliers, [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }]);
   assert.equal(recompenses.annonce, '🏅 Nouveau badge : Retour gagnant, bronze !');
 });
+
+// Signaler une Question (spec #145, ticket #146) : l'Élève signale une Question après sa correction ; elle sort des
+// Révisions du jour, de la Maîtrise et de Retenu, son journal reste entier, et le prof la reçoit une fois.
+const signalements = (slug) => `/api/eleves/${slug}/signalements`;
+const evenementsDe = async (slug) => (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+
+test('Signaler une Question : le serveur enregistre raison, auteur Élève et date, et refuse une raison inconnue (400)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Enreg', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'reponse-fausse' };
+  for (const raison of ['au-hasard', undefined, 3, '']) {
+    assert.equal((await appel(signalements(slug), 'POST', { ...corps, raison }, le(LENDEMAIN))).status, 400, String(raison));
+  }
+  assert.equal((await appel(signalements(slug), 'POST', { ...corps, id: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await appel(signalements(slug), 'POST', { ...corps, lecon: undefined }, le(LENDEMAIN))).status, 400);
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(lue.questions.find((q) => q.id === 'q1').signalement, undefined);
+
+  assert.equal((await appel(signalements(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+  const apres = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(apres.questions.find((q) => q.id === 'q1').signalement, { raison: 'reponse-fausse', auteur: 'eleve', date: LENDEMAIN });
+  assert.equal(apres.questions.find((q) => q.id === 'q2').signalement, undefined);
+  // Événement daté, pour les indicateurs.
+  const evenement = (await evenementsDe(slug)).find((e) => e.type === 'signalement');
+  assert.deepEqual(evenement, { type: 'signalement', date: LENDEMAIN, lecon: lecon.id, raison: 'reponse-fausse' });
+});
+
+test('Signaler une Question : plus servie ni comptée dans les Questions dues, journal intact, hors Maîtrise', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Sort', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  const q2Avant = avant.questions.find((q) => q.id === 'q2');
+  assert.equal((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.dues, 2);
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q2', raison: 'pas-claire' }, le(LENDEMAIN));
+  const revisions = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(revisions.dues, 1);
+  assert.deepEqual(revisions.questions.map((q) => q.id), ['q1']);
+  assert.equal((await appel(`/api/eleves/${slug}/revisions?suite=1`, 'GET', undefined, le(LENDEMAIN))).data.questions.some((q) => q.id === 'q2'), false);
+  const apres = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(apres.questions.find((q) => q.id === 'q2').journal, q2Avant.journal);
+  // La Maîtrise est celle de la seule q1 : q2, « Je ne sais pas », ne la tire plus vers le bas.
+  assert.ok(apres.maitrise.pourcentage > avant.maitrise.pourcentage, `${apres.maitrise.pourcentage} > ${avant.maitrise.pourcentage}`);
+});
+
+test('Signaler une Question : une Question signalée ne bloque plus Retenu', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Retenu', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const page = '0002-volcans.html';
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  // q1 et q2 couvrent l'Objectif 1 : q1 tenue sur trois semaines, q2 ratée la veille.
+  const reponse = (jour, juste) => ({ date: `${jour}T10:00:00.000Z`, juste, ...(juste && { sur: true }), origine: 'quiz' });
+  banque[`${page}#q1`].contenu.objectifs = [1];
+  banque[`${page}#q1`].journal = [reponse('2026-09-01', true), reponse('2026-09-05', true), reponse('2026-09-20', true)];
+  banque[`${page}#q2`].contenu.objectifs = [1];
+  banque[`${page}#q2`].journal = [reponse('2026-09-20', false)];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+  const maintenant = le('2026-09-21T10:00:00.000Z');
+  // L'Objectif 1 est atteint (un quiz à 100 % qui le couvre, sans résultats par question).
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0003-volcans.html', objectifs: [1] }, le('2026-09-20T11:00:00.000Z'));
+  const retenu = async () => (await appel(url, 'GET', undefined, maintenant)).data.objectifs[0].retenu;
+  assert.equal(await retenu(), false, 'une Question oubliée empêche Retenu');
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page, id: 'q2', raison: 'reponse-fausse' }, maintenant);
+  assert.equal(await retenu(), true, 'signalée, elle ne pèse plus');
+});
+
+test('Signaler une Question : le préambule de relais la donne au prof une seule fois, avec la raison', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Prof', 1);
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'pas-claire' }, le(LENDEMAIN));
+  const envoyer = () => appel(`/api/eleves/${slug}/lecons/${lecon.id}/messages`, 'POST', { texte: 'Page suivante' });
+  assert.equal((await avecFichier('objectifs', envoyer)).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Questions signalées par l'élève/);
+  assert.match(prompt, /« Où sort la lave \? » \(0002-volcans\.html\) : bonne réponse « Par le cratère » ; raison : la question n'est pas claire/);
+  assert.match(prompt, /réécris-les/);
+  assert.equal(prompt.split('raison : ').length, 2, 'une seule Question signalée listée');
+  // Une seule fois.
+  assert.equal((await avecFichier('objectifs', envoyer)).status, 200);
+  assert.doesNotMatch(await argsDe(lecon), /Questions signalées/);
+  // Toujours signalée tant que son contenu n'a pas changé.
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.equal(lue.questions.find((q) => q.id === 'q1').signalement.raison, 'pas-claire');
+});
+
+test('Signaler une Question : rejouée avec un nouveau contenu et un score, elle perd son signalement', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Reecrite', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'image-differente' }, le(LENDEMAIN));
+  const reecrit = { ...quizBanque, questions: quizBanque.questions.map((q) => (q.id === 'q1' ? { ...q, enonce: 'Par où sort la lave ?' } : q)) };
+  const dir = path.join(eleves, slug, 'lecons', lecon.id, 'lessons');
+  await fs.writeFile(path.join(dir, '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(reecrit)}</script>`);
+  const apres = (await appel(`${url}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(LENDEMAIN))).data;
+  const q1 = apres.questions.find((q) => q.id === 'q1');
+  assert.equal(q1.signalement, undefined);
+  assert.equal(q1.contenu.enonce, 'Par où sort la lave ?');
+  assert.equal(q1.journal.length, 2);
+});

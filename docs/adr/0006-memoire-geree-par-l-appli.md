@@ -41,3 +41,14 @@ Les formats où l'Élève répond en plusieurs éléments (texte à trous, ordre
 Juste après une réponse, la courbe d'oubli donne une probabilité de se souvenir de 100 %, quelle que soit la stabilité : un quiz raté à l'instant affichait une Leçon « 100 % acquis ». Une Question dont la dernière réponse est « à revoir » (fausse sans crédit partiel, ou « Je ne sais pas ») compte donc 0 dans la Maîtrise, jusqu'à une réponse juste ou juste en partie (quiz de page ou Révision du jour) ; elle suit ensuite la courbe d'oubli. La probabilité exposée par chaque Question (`rappel`) et le planificateur ne changent pas.
 
 Options écartées : calculer la probabilité au moins un jour après la dernière réponse (une Question ratée vaudrait encore 79 % le lendemain, FSRS supposant la correction lue) ; compter 0 pour les Objectifs pas encore interrogés (mélange « ce que je sais » et « jusqu'où je suis allé », rejeté par l'ADR 0003).
+
+## Mise à jour du 2026-11-08 : Questions signalées (spec #145, ticket #146)
+
+Le prof est un modèle de langage et l'appli ne valide que la forme des Questions : une Question fausse ou ambiguë revient chaque jour et fait compter faux un Élève qui sait. L'Élève peut donc **signaler** une Question après sa correction, en quiz de page comme en Révision du jour, en choisissant une raison dans une liste fermée tenue par l'appli (le serveur refuse toute autre valeur, dans l'esprit de l'ADR 0002).
+
+- Le signalement (raison, auteur, date) est rangé sur la Question dans la Banque, à côté de son journal, qui reste entier : la mémoire se recalcule toujours depuis lui.
+- Une Question signalée n'est plus servie en Révision du jour ni comptée dans les Questions dues, et elle sort de la Maîtrise et de Retenu, comme si la Leçon ne l'avait pas. Choix volontaire, contraire à une Question `horsRevision` (visuel introuvable, qui compte encore) : une Question peut-être fausse ne doit pas peser sur ce que l'Élève sait.
+- Le préambule de relais du tour suivant la donne au prof une seule fois (énoncé, bonne réponse, raison), avec la demande de la réécrire ou de dire qu'elle est juste. Elle perd son signalement quand son nouveau contenu arrive avec un score ; une Question réécrite perd ses variantes, comme avant.
+- Un événement daté `signalement` est noté pour les indicateurs.
+
+Écarté pour ce ticket : retirer la Question de la Banque (le journal serait perdu) ; un champ de texte libre (saisie libre écartée par l'ADR 0002).

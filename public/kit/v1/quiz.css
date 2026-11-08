@@ -107,6 +107,15 @@
 .kit-quiz-retour.kit-faux { background: var(--kit-faux-fond); }
 /* Juste en partie (crédit partiel des formats à plusieurs éléments, spec #48) : entre juste et faux. */
 .kit-quiz-retour.kit-partiel { background: color-mix(in srgb, var(--kit-juste-fond) 50%, var(--kit-faux-fond)); }
+/* Signaler une Question (#146) : discret sous la correction, un bouton-lien ; les raisons sont des boutons secondaires. */
+.kit-signaler { margin-top: .5rem; }
+.kit-signaler[hidden], .kit-signaler-raisons[hidden], .kit-signaler-bouton[hidden] { display: none; }
+.kit-signaler-bouton { font: inherit; font-size: .9rem; min-height: 2.4rem; padding: .3rem .4rem; border: 0; background: none; color: var(--kit-doux); text-decoration: underline; cursor: pointer; }
+.kit-signaler-bouton:hover { color: var(--kit-texte); }
+.kit-signaler-raisons { display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; margin: .3rem 0; }
+.kit-signaler-raison { font: inherit; font-weight: 600; min-height: 2.6rem; padding: .4rem .9rem; border-radius: 10px; cursor: pointer; border: 1px solid var(--kit-bord); background: var(--kit-carte); color: var(--kit-texte); }
+.kit-signaler-raison:hover:not(:disabled) { border-color: var(--kit-accent); }
+.kit-signaler-message { margin: .2rem 0 0; font-size: .9rem; color: var(--kit-doux); }
 .kit-quiz-valider {
   font: inherit; font-weight: 600; align-self: flex-start; padding: .5rem 1.1rem; border-radius: 999px; cursor: pointer;
   border: 2px solid var(--kit-accent); background: var(--kit-accent-doux); color: var(--kit-texte);

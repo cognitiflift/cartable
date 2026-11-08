@@ -3,7 +3,7 @@
 // L'Élève répond (selon le format de la question, voir rendus/), dit s'il est sûr (Confiance), puis voit la correction
 // et l'explication ; « Je ne sais pas » est corrigé tout de suite, sans Confiance. Ce fichier ne contient que ce qui
 // est commun à tous les formats ; ce qui est propre à chacun est dans rendus/<type>.js (registre : rendus/index.js).
-import { corriger, estPartiel, typeDe, libelleRevoir, JE_NE_SAIS_PAS, TYPES } from './quiz-logique.js';
+import { corriger, estPartiel, typeDe, libelleRevoir, JE_NE_SAIS_PAS, TYPES, RAISONS_SIGNALEMENT, MESSAGE_SIGNALEMENT } from './quiz-logique.js';
 import { el } from './dom.js';
 import { descriptionFigure, revoirFigure } from './figure.js';
 import { RENDUS } from './rendus/index.js';
@@ -28,8 +28,11 @@ const messageCorrection = (correction) => {
 // (lecture à voix haute du Profil, #76), puis aussi sa correction une fois corrigée. `figure` (spec #123) : la copie de
 // la figure que désigne la question (figure.js), repliée sous l'énoncé derrière un bouton « 👁 Revoir… », ou montrée
 // d'office avec `figureDepliee` ; elle prend la place de l'image de la question, qui ne s'affiche que sans figure.
-export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false, figure = null, figureDepliee = false } = {}) {
+// `signaler(raison)` (ticket #146) : promesse appelée quand l'Élève signale la question après sa correction, avec l'id
+// d'une raison de RAISONS_SIGNALEMENT ; sans elle, pas de bouton « Signaler ».
+export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false, figure = null, figureDepliee = false, signaler = null } = {}) {
   let correction = null;
+  const zoneSignaler = signaler ? el('div', { className: 'kit-signaler', hidden: true }) : null;
   const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
   // Confiance : après la réponse et avant la correction, l'Élève dit s'il est sûr ou pas.
   const demande = el('div', { className: 'kit-quiz-confiance', hidden: true }, el('span', {}, 'Tu es sûr ?'));
@@ -65,6 +68,10 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
       el('strong', {}, messageCorrection(correction)),
       correction.explication ? el('p', {}, correction.explication) : null,
     );
+    if (zoneSignaler) {
+      zoneSignaler.hidden = false;
+      zoneSignaler.append(boutonSignaler(signaler));
+    }
     quandCorrigee({ choisie: reponse, ...(typeof sur === 'boolean' && { sur }) });
   };
   for (const [libelle, sur] of [['👍 Sûr', true], ['🤔 Pas sûr', false]]) {
@@ -89,5 +96,35 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
     revoir || image || null,
     rendu.zone,
     demande,
-    retour);
+    retour,
+    zoneSignaler);
+}
+
+// « Signaler » : un bouton discret qui déplie les raisons fermées ; le choix d'une raison l'envoie, puis un message
+// bref et bienveillant remplace les boutons. Si l'envoi échoue, les raisons restent pour réessayer.
+function boutonSignaler(signaler) {
+  const raisons = el('div', { className: 'kit-signaler-raisons', role: 'group', ariaLabel: 'Pourquoi signaler cette question ?', hidden: true });
+  const message = el('p', { className: 'kit-signaler-message', role: 'status' });
+  const bouton = el('button', { type: 'button', className: 'kit-signaler-bouton', ariaExpanded: 'false' }, 'Signaler');
+  bouton.addEventListener('click', () => {
+    raisons.hidden = !raisons.hidden;
+    bouton.setAttribute('aria-expanded', String(!raisons.hidden));
+  });
+  for (const { id, libelle } of RAISONS_SIGNALEMENT) {
+    const choix = el('button', { type: 'button', className: 'kit-signaler-raison' }, libelle);
+    choix.addEventListener('click', async () => {
+      raisons.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+      try {
+        await signaler(id);
+        bouton.hidden = true;
+        raisons.hidden = true;
+        message.textContent = MESSAGE_SIGNALEMENT;
+      } catch {
+        raisons.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+        message.textContent = 'Je n’ai pas pu envoyer ton signalement. Réessaie.';
+      }
+    });
+    raisons.append(choix);
+  }
+  return el('div', {}, bouton, raisons, message);
 }

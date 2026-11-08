@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS, RAISONS_SIGNALEMENT, raisonSignalement, MESSAGE_SIGNALEMENT } from '../public/kit/v1/quiz-logique.js';
 
 const quiz = {
   objectifs: [1],
@@ -547,4 +547,12 @@ test('Kit : chaque format connaît la réponse entièrement juste, que le rendu 
   for (const q of lu.questions) assert.equal(corriger(q, reponseAttendue(q)).juste, true, q.type);
   // Pour un format à plusieurs éléments, c'est la réponse que l'Élève aurait donnée en touchant les bons éléments.
   assert.deepEqual(reponseAttendue(lu.questions.find((q) => q.type === 'ordre')), [0, 1, 2, 3]);
+});
+
+test('Kit : les raisons de signalement forment une liste fermée de trois valeurs, avec leur libellé pour l\'Élève et pour le prof (#146)', () => {
+  assert.deepEqual(RAISONS_SIGNALEMENT.map((r) => r.id), ['reponse-fausse', 'pas-claire', 'image-differente']);
+  assert.deepEqual(RAISONS_SIGNALEMENT.map((r) => r.libelle), ['La bonne réponse me semble fausse', 'La question n’est pas claire', 'L’image ne correspond pas']);
+  assert.equal(raisonSignalement('pas-claire').pourLeProf, 'la question n\'est pas claire');
+  for (const inconnue of ['au-hasard', '', undefined, null, 2, '__proto__', 'constructor']) assert.equal(raisonSignalement(inconnue), null, String(inconnue));
+  assert.equal(MESSAGE_SIGNALEMENT, 'Merci, le prof va la revoir.');
 });

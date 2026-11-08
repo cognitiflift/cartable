@@ -32,6 +32,16 @@ export { QUESTIONS_MAX, ID_MAX, TEXTE_MAX, TYPES };
 export const JE_NE_SAIS_PAS = 'je-ne-sais-pas';
 export const TEXTE_JE_NE_SAIS_PAS = 'Je ne sais pas';
 
+// Raisons fermées pour signaler une Question (spec #145, ticket #146), tenues par l'appli : l'écran n'envoie que `id`,
+// le serveur refuse toute autre valeur. `libelle` : ce que lit l'Élève ; `pourLeProf` : ce que lit le prof au tour suivant.
+export const RAISONS_SIGNALEMENT = [
+  { id: 'reponse-fausse', libelle: 'La bonne réponse me semble fausse', pourLeProf: 'la bonne réponse semble fausse' },
+  { id: 'pas-claire', libelle: 'La question n’est pas claire', pourLeProf: 'la question n\'est pas claire' },
+  { id: 'image-differente', libelle: 'L’image ne correspond pas', pourLeProf: 'l\'image ne correspond pas' },
+];
+export const raisonSignalement = (id) => RAISONS_SIGNALEMENT.find((r) => r.id === id) ?? null;
+export const MESSAGE_SIGNALEMENT = 'Merci, le prof va la revoir.';
+
 // Questions examinées une à une (`examiner` : question brute → { question } ou { id?, raison }) : les valides, sans
 // doublon d'id, au plus QUESTIONS_MAX, et les ignorées avec leur raison.
 function trierQuestions(brut, examiner) {

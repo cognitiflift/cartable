@@ -155,18 +155,22 @@ const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements)
 // Le parent ouvre la Leçon en aperçu (#/apercu/…) : ce n'est pas un retour de l'Élève pour les indicateurs (#78).
 const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/apercu/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
 const SECTIONS_PARENT = [
+  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
+  // Soutien à l'autonomie (#158) : des questions ouvertes à poser, tirées des Objectifs Retenus récents, sans tour du prof.
+  { titre: '💬 Pour en parler avec lui', rendu: ({ pourEnParler: { invitations, autonomie } }) => [
+    listeOuVide(invitations.map((i) => avecLecon(i.texte, i)), 'Pas d’activité ces 7 derniers jours : rien à proposer pour l’instant.'),
+    h('p', { className: 'doux' }, autonomie)] },
+  { titre: '🌱 Ce qui se consolide', rendu: ({ objectifs }) => [
+    h('p', { className: 'doux' }, 'Objectifs atteints, pas encore Retenus : ils se consolident au fil des Révisions du jour.'),
+    listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
+  { titre: '🔁 Ce qu’il revoit en ce moment', rendu: ({ questionsFragiles }) => listeOuVide(
+    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
   { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
     h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
     jours.map((j) => h('tr', {},
       h('td', {}, new Date(`${j.jour}T12:00`).toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'short' })),
       h('td', {}, j.revisions ? `${j.revisions} (${j.justes} juste${j.justes > 1 ? 's' : ''})` : '–'),
       h('td', {}, j.quiz || '–')))) },
-  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
-  { titre: '🌱 Objectifs fragiles', rendu: ({ objectifs }) => [
-    h('p', { className: 'doux' }, 'Atteints, mais pas encore Retenus : à retravailler un autre jour.'),
-    listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
-  { titre: '❓ Questions fragiles', rendu: ({ questionsFragiles }) => listeOuVide(
-    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
   { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
     avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise : ${c.maitrise ? `${PALIERS_DE_MAITRISE[c.maitrise.palier].mot} (${c.maitrise.pourcentage} %)` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
   // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).

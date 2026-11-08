@@ -3100,6 +3100,24 @@ test('Vue parent : les Objectifs Retenus, et les Objectifs fragiles (atteints ma
   });
 });
 
+test('Vue parent : « Pour en parler avec lui » tire au plus trois invitations des Objectifs Retenus des Leçons travaillées ces 7 derniers jours, et garde une phrase fixe sur l\'autonomie', async () => {
+  const { slug } = await eleveRevisions('Parent-Parler', 0);
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}/scores`;
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, le('2026-10-01T10:00:00.000Z'));
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2] }, le('2026-10-02T10:00:00.000Z'));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'));
+  assert.deepEqual(data.pourEnParler.invitations, [
+    { lecon: lecon.id, titreLecon: 'Les volcans', texte: 'Demande-lui de t’expliquer : Nommer les parties d’un volcan' },
+  ]);
+  assert.match(data.pourEnParler.autonomie, /s’organiser et à expliquer/);
+  assert.match(data.pourEnParler.autonomie, /refaire les exercices/);
+  // Dix jours plus tard : plus d'activité récente, donc aucune invitation inventée, mais la phrase fixe reste.
+  const { data: plusTard } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-13T10:00:00.000Z'));
+  assert.deepEqual(plusTard.pourEnParler.invitations, []);
+  assert.ok(plusTard.pourEnParler.autonomie);
+});
+
 test('Vue parent : les Questions fragiles (moins de 80 % de chances de s\'en souvenir aujourd\'hui), la plus fragile d\'abord', async () => {
   const { slug } = await eleveRevisions('Parent-Questions', 0);
   const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);

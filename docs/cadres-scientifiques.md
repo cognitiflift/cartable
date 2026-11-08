@@ -282,7 +282,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus, mais corrélationnelle : ces études mesurent des liens, pas des effets (Barger et al. 2019, 448 études, aide aux devoirs r = −0,15 avec les résultats ; Xu et al. 2024, la plus récente, seul le soutien à l'autonomie est lié positivement). Heuristique tirée d'un cadre pour leur transposition à un écran que le parent consulte.
 
-**Où dans Cartable.** **Vue parent**, ouverte depuis le Profil et jamais depuis l'accueil de l'Élève, sans classement ni comparaison (`CONTEXT.md`, `lib/parent.js`) ; elle montre les Objectifs et Questions fragiles, ce qui peut inviter à l'aide sur le contenu plutôt qu'au soutien à l'autonomie (voir « Écarts relevés »).
+**Où dans Cartable.** **Vue parent**, ouverte depuis le Profil et jamais depuis l'accueil de l'Élève, sans classement ni comparaison (`CONTEXT.md`, `lib/parent.js`) ; elle met les Objectifs Retenus en tête, présente les Questions fragiles comme « Ce qu'il revoit en ce moment » et propose des invitations à faire expliquer l'enfant (« Pour en parler avec lui », ticket #158).
 
 ### Habitudes et intentions de mise en œuvre
 
@@ -448,6 +448,7 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | Un jour est « dû » si la prochaine révision d'une Question, rejouée d'après ses réponses d'avant ce jour, tombe au plus tard ce jour-là ; la date de contrôle n'est pas rejouée | `lib/indicateurs.js` (`revisionsDesJoursDus`) | Même règle que la Révision du jour (`lib/revisions.js`), sans la resserrer avant un contrôle : approximation. Aucun cadre, hypothèse à mesurer. |
 | Rebond d'une page noté sur le score de son quiz (`rebond`) ; un ancien score sans lui n'est classé que s'il porte le marqueur de Défi | `lib/store.js`, `server.js` | Choix de mesure : mieux vaut ne pas classer que classer à tort. Aucun cadre, hypothèse sans mesure prévue. |
 | Liste fermée des Moments de révision (après l'école, après le repas du soir, le matin avant l'école, le week-end, « Je ne sais pas ») et question posée une fois par jour | `lib/moment.js`, ticket #154 | Aucun cadre n'établit ces cinq moments ni la fréquence d'une fois par jour ; « Je ne sais pas » évite de forcer un choix. Aucun cadre, hypothèse à mesurer (part des jours avec des Questions dues où les Révisions du jour sont faites, selon qu'un moment est choisi ou non). |
+| « Pour en parler avec lui » : au plus 3 invitations, tirées des Objectifs Retenus des Leçons dont la dernière activité date de moins de 7 jours ; formulation « Demande-lui de t'expliquer » | `lib/parent.js` (`pourEnParler`), ticket #158 | Le soutien à l'autonomie est lié à de meilleurs résultats (Xu et al. 2024 ; Barger et al. 2019, voir « Implication des parents »), mais ces études ne disent ni combien d'invitations ni quelle formulation. Aucun cadre, hypothèse à mesurer. |
 
 ## Écarts relevés
 
@@ -463,4 +464,3 @@ Décisions où les cadres ci-dessus vont contre la règle de Cartable, ou ne la 
 - **« Je ne sais pas » toujours proposé dans les quiz de page.** Se tromper puis être corrigé, sans enjeu, fait mieux retenir que ne pas répondre (Metcalfe 2017 ; effet du pré-test). « Je ne sais pas » garde son sens pour la sincérité de la **Confiance** et dans les **Révisions du jour** ; dans le quiz qui suit une page, inviter à deviner avec « pas sûr » serait plus cohérent avec ces cadres. L'ampleur de l'écart dépend de la part de « Je ne sais pas » dans les journaux, à mesurer.
 - **Difficulté des quiz non réglée sur la réussite observée.** L'ADR 0005 relève des quiz à 100 % partout, et rien ne transmet au prof le taux de réussite récent pour viser un entraînement réussi environ 85 % du temps (Wilson et al. 2019, cadre théorique).
 - **Série repartie à zéro sans réparation.** Les **Jokers** évitent qu'une **Série de jours** se casse, mais une pause plus longue la fait repartir sans moyen de la réparer, alors que pouvoir réparer une série atténue le décrochage qui suit sa rupture (Silverman & Barasch 2023).
-- **Vue parent centrée sur ce qui est fragile.** La **Vue parent** montre les Objectifs et Questions fragiles, ce qui invite à l'aide sur le contenu, liée à de moins bons résultats, plutôt qu'au soutien à l'autonomie, le seul lié à de meilleurs (Barger et al. 2019 ; Xu et al. 2024 ; études corrélationnelles).

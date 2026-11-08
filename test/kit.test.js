@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS, RAISONS_SIGNALEMENT, raisonSignalement, MESSAGE_SIGNALEMENT } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS, RAISONS_SIGNALEMENT, raisonSignalement, MESSAGE_SIGNALEMENT, inviterADeviner, INVITATION_A_DEVINER } from '../public/kit/v1/quiz-logique.js';
+import fs from 'node:fs/promises';
 
 const quiz = {
   objectifs: [1],
@@ -590,4 +591,27 @@ test('Kit : une raison mal formée est ignorée, la question reste ; une page sa
   const [sans] = lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, raisons: undefined }] }).questions;
   assert.equal(Object.hasOwn(sans, 'raisons'), false);
   assert.equal(Object.hasOwn(corriger(sans, 1), 'raison'), false);
+});
+
+test('Kit : le quiz d\'une page invite à deviner (« Je ne sais pas » au second plan) ; le Pré-test non, et le résultat ne change pas', () => {
+  const brut = { objectifs: [1], questions: [{ id: 'a', enonce: 'Q ?', reponses: ['x', 'y'], bonne: 0, explication: 'e' }] };
+  const page = lireQuiz(brut);
+  const pretest = lireQuiz({ ...brut, pretest: true });
+  assert.equal(inviterADeviner(page), true);
+  assert.equal(inviterADeviner(pretest), false, 'le Pré-test garde sa présentation');
+  assert.equal(INVITATION_A_DEVINER, 'Pas sûr ? Devine, puis dis « pas sûr »');
+  // « Je ne sais pas » envoie le même résultat qu'avant : jeNeSaisPas, fausse, sans Confiance.
+  const m = messageScore(page, { a: JE_NE_SAIS_PAS }, 'p.html', {});
+  assert.equal(m.questions[0].jeNeSaisPas, true);
+  assert.equal(m.questions[0].juste, false);
+  assert.equal('sur' in m.questions[0], false);
+});
+
+test('Kit : le rendu d\'une question n\'invite à deviner que si on le lui demande (Révisions du jour inchangées)', async () => {
+  const lire = (f) => fs.readFile(new URL(`../public/${f}`, import.meta.url), 'utf8');
+  const [question, quiz, app] = await Promise.all([lire('kit/v1/question.js'), lire('kit/v1/quiz.js'), lire('app.js')]);
+  assert.match(question, /inviterADeviner = false/, 'par défaut : présentation d\'avant');
+  assert.match(quiz, /inviterADeviner: inviterADeviner\(quiz\)/);
+  const debut = app.indexOf('rendreQuestion(q, {');
+  assert.doesNotMatch(app.slice(debut, debut + 900), /inviterADeviner/);
 });

@@ -32,6 +32,12 @@ export { QUESTIONS_MAX, ID_MAX, TEXTE_MAX, TYPES };
 export const JE_NE_SAIS_PAS = 'je-ne-sais-pas';
 export const TEXTE_JE_NE_SAIS_PAS = 'Je ne sais pas';
 
+// Deviner plutôt que s'abstenir (spec #145, ticket #153) : dans le quiz d'une Page de leçon, hors Pré-test (déjà « Devine ! »),
+// le Kit invite à deviner avant les réponses et présente « Je ne sais pas » en bouton secondaire après elles. Le résultat
+// (`jeNeSaisPas`) et la note de mémoire ne changent pas. Les Révisions du jour gardent leur présentation.
+export const INVITATION_A_DEVINER = 'Pas sûr ? Devine, puis dis « pas sûr »';
+export const inviterADeviner = (quiz) => quiz?.pretest !== true;
+
 // Raisons fermées pour signaler une Question (spec #145, ticket #146), tenues par l'appli : l'écran n'envoie que `id`,
 // le serveur refuse toute autre valeur. `libelle` : ce que lit l'Élève ; `pourLeProf` : ce que lit le prof au tour suivant.
 export const RAISONS_SIGNALEMENT = [

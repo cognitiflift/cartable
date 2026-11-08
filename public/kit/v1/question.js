@@ -3,7 +3,7 @@
 // L'Élève répond (selon le format de la question, voir rendus/), dit s'il est sûr (Confiance), puis voit la correction
 // et l'explication ; « Je ne sais pas » est corrigé tout de suite, sans Confiance. Ce fichier ne contient que ce qui
 // est commun à tous les formats ; ce qui est propre à chacun est dans rendus/<type>.js (registre : rendus/index.js).
-import { corriger, estPartiel, typeDe, libelleRevoir, JE_NE_SAIS_PAS, TYPES, RAISONS_SIGNALEMENT, MESSAGE_SIGNALEMENT } from './quiz-logique.js';
+import { corriger, estPartiel, typeDe, libelleRevoir, JE_NE_SAIS_PAS, TYPES, RAISONS_SIGNALEMENT, MESSAGE_SIGNALEMENT, INVITATION_A_DEVINER } from './quiz-logique.js';
 import { el } from './dom.js';
 import { descriptionFigure, revoirFigure } from './figure.js';
 import { RENDUS } from './rendus/index.js';
@@ -30,7 +30,9 @@ const messageCorrection = (correction) => {
 // d'office avec `figureDepliee` ; elle prend la place de l'image de la question, qui ne s'affiche que sans figure.
 // `signaler(raison)` (ticket #146) : promesse appelée quand l'Élève signale la question après sa correction, avec l'id
 // d'une raison de RAISONS_SIGNALEMENT ; sans elle, pas de bouton « Signaler ».
-export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false, figure = null, figureDepliee = false, signaler = null } = {}) {
+// `inviterADeviner` (ticket #153) : quiz de page hors Pré-test, une invitation à deviner avant les réponses et « Je ne
+// sais pas » en bouton secondaire ; sans lui (Révisions du jour, Pré-test), présentation d'avant.
+export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lecture = false, figure = null, figureDepliee = false, signaler = null, inviterADeviner = false } = {}) {
   let correction = null;
   const zoneSignaler = signaler ? el('div', { className: 'kit-signaler', hidden: true }) : null;
   const retour = el('div', { className: 'kit-quiz-retour', hidden: true });
@@ -81,7 +83,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
     demande.append(bouton);
   }
   // « Je ne sais pas » : plutôt que deviner, l'Élève le dit ; la question compte comme fausse (voir messageScore).
-  const neSaisPas = el('button', { type: 'button', className: 'kit-quiz-reponse kit-quiz-je-ne-sais-pas' }, '🤷 Je ne sais pas');
+  const neSaisPas = el('button', { type: 'button', className: `kit-quiz-reponse kit-quiz-je-ne-sais-pas${inviterADeviner ? ' kit-secondaire' : ''}` }, '🤷 Je ne sais pas');
   neSaisPas.addEventListener('click', () => {
     if (!repondre(JE_NE_SAIS_PAS)) return;
     neSaisPas.classList.add('kit-choisie');
@@ -95,6 +97,7 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
     el('legend', {}, legende, q.enonce),
     lecture ? boutonLecture(() => texteDeQuestion(q, correction), { titre: 'Lire la question à voix haute' }) : null,
     revoir || image || null,
+    inviterADeviner && !souvenirDeclare ? el('p', { className: 'kit-quiz-invitation' }, INVITATION_A_DEVINER) : null,
     rendu.zone,
     demande,
     retour,

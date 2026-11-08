@@ -3,7 +3,7 @@
 // qu'assembler le quiz et envoyer le message à l'appli.
 // Usage (voir LISEZMOI.md) : <script type="application/json" id="cartable-quiz">{…}</script>
 //                            <script type="module" src="/kit/v1/quiz.js"></script>
-import { lireQuiz, messageScore } from './quiz-logique.js';
+import { lireQuiz, messageScore, inviterADeviner } from './quiz-logique.js';
 import { el, rendreQuestion } from './question.js';
 import { lectureActivee } from './lecture-logique.js';
 import { ajouterLecturePage } from './lecture.js';
@@ -68,6 +68,8 @@ function demarrer() {
     zone.append(rendreQuestion(q, {
       legende: q.bonus ? '🚀 Bonus · ' : `${++numero}. `,
       lecture,
+      // Deviner plutôt que s'abstenir (#153) : hors Pré-test, invitation à deviner et « Je ne sais pas » secondaire.
+      inviterADeviner: inviterADeviner(quiz),
       // Figure de la page désignée par la question (spec #123) : une copie par question ; un id introuvable est ignoré.
       figure: copieDeFigure(document, q.figure),
       // Signaler (#146) : seulement une question comptée d'un quiz qui entre dans la Banque (ni bonus, ni Pré-test) ;

@@ -2892,6 +2892,28 @@ test('Visuels : un schéma SVG illisible est signalé au prof au tour suivant se
   assert.doesNotMatch(await argsDe(lecon), /Schémas à reprendre/);
 });
 
+test('Pages courtes : une page ou une partie trop longue est signalée au prof au tour suivant seulement, sans toucher à la page (#156)', async () => {
+  const mots = (n) => Array(n).fill('mot').join(' ');
+  const html = `<h1>Troie</h1><p>${mots(850)}</p><figure class="kit-figure" id="f"><figcaption>${mots(300)}</figcaption></figure><aside class="encart">${mots(300)}</aside>`;
+  const lecon = await avecPageImages({ page: html, manifeste: [] },
+    async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'page trop longue' })).data);
+  assert.doesNotMatch(await argsDe(lecon), /Pages à raccourcir/);
+  await message(lecon, 'ok');
+  const signale = await argsDe(lecon);
+  assert.match(signale, /Pages à raccourcir/);
+  assert.ok(signale.includes('- 0002-images.html, page trop longue : 850 mots'), signale);
+  assert.ok(signale.includes('- 0002-images.html, partie trop longue sans titre : 850 mots d\'un seul tenant sous « Troie »'), signale);
+  assert.equal(await lirePage(lecon, '0002-images.html'), html);
+  assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'longueursAReprendre'), false);
+  await message(lecon, 'ok');
+  assert.doesNotMatch(await argsDe(lecon), /Pages à raccourcir/);
+});
+
+test('Pages : la consigne du prof donne les bornes de 800 et de 200 mots (#156)', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data;
+  assert.match(await argsDe(lecon), /Pages : [^\n]*au plus 800 mots[^\n]*200 mots d'un seul tenant sans titre/);
+});
+
 // Formats « réfléchis puis dévoile » et « meilleure explication » (spec #48, ticket #72).
 const quizDevoile = {
   objectifs: [1],

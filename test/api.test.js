@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { slugify } from '../lib/store.js';
+import { contenuAServir } from '../lib/variantes.js';
 import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
@@ -2982,7 +2983,7 @@ test('Dévoile et meilleure explication : « à moitié » vaut 0,5 et revient l
 const quizRaisons = {
   objectifs: [1],
   questions: [{
-    id: 'q1', enonce: 'Où sort la lave ?', reponses: ['Par le cratère', 'Par les racines', 'Par les nuages'], bonne: 0,
+    id: 'q1', enonce: 'Par où la lave quitte-t-elle le volcan ?', reponses: ['Par le cratère', 'Par les racines', 'Par les nuages'], bonne: 0,
     raisons: [null, 'Les racines sont sous terre.', 'Les nuages sont dans le ciel.'], explication: 'Le cratère.',
   }],
 };
@@ -2996,8 +2997,8 @@ test('Pourquoi c\'est faux : la Banque garde les raisons et la Révision du jour
   assert.equal(r.status, 201);
   assert.deepEqual(r.data.questions[0].contenu.raisons, quizRaisons.questions[0].raisons);
   await attendrePropositions('zoe-test');
-  const servie = (await appel('/api/eleves/zoe-test/revisions', 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
-  assert.deepEqual(servie.raisons, quizRaisons.questions[0].raisons);
+  // La série du jour est plafonnée (SERIE_MAX) et les Questions des autres tests la remplissent : on vérifie ce que la Révision sert pour cette Question.
+  assert.deepEqual(contenuAServir(r.data.questions[0], () => 0).raisons, quizRaisons.questions[0].raisons);
 
   // Mal formées (pas de la longueur des réponses), elles disparaissent de la Banque ; la Question reste.
   await ecrirePageQuiz(lecon, '0002-raisons.html', { ...quizRaisons, questions: [{ ...quizRaisons.questions[0], raisons: ['une seule'] }] });

@@ -377,3 +377,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .gains-du-jour { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .8rem; }
 .calendrier-detail .gain-badge { display:inline-flex; align-items:center; gap:.35rem; }
 @media (max-width: 520px) { .mon-calendrier { padding:.8rem .7rem; } .calendrier-jour { min-height:2.75rem; } .badges-tete h2 { font-size:1.6rem; } }
+/* Vue parent, Questions signalées et suspectes (#148) : une liste, des actions discrètes en boutons secondaires. */
+.question-signalee, .question-suspecte { margin-bottom:.8rem; }
+.actions-parent { display:inline-flex; flex-wrap:wrap; align-items:center; gap:.4rem; margin-top:.3rem; }
+.actions-parent button { min-height:2.5rem; }

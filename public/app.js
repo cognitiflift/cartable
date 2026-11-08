@@ -6,6 +6,7 @@ import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
   confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
 } from '/nouvelle-lecon-texte.js';
+import { RAISONS_SIGNALEMENT } from '/kit/v1/quiz-logique.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -167,6 +168,24 @@ const SECTIONS_PARENT = [
     listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
   { titre: '🔁 Ce qu’il revoit en ce moment', rendu: ({ questionsFragiles }) => listeOuVide(
     questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
+  // Questions signalées et suspectes (#148) : le parent juge. Rétablir retire le signalement sans perte ; Signaler porte l'auteur parent.
+  { titre: '🚩 Questions signalées', rendu: ({ questionsSignalees }, contexte) => [
+    h('p', { className: 'doux' }, 'Ces Questions ne sont plus posées ni comptées. Rétablir les remet en Révision du jour et dans la Maîtrise, sans rien perdre.'),
+    listeOuVide(questionsSignalees.map((q) => h('li', { className: 'question-signalee' },
+      h('strong', {}, insecables(q.enonce)), ' ', h('a', { href: `#/apercu/${q.lecon}`, className: 'doux' }, `(${q.titreLecon})`),
+      h('br'), `Bonne réponse attendue : ${q.bonne}`,
+      h('br'), `${q.libelleRaison}, signalée par ${q.auteur === 'parent' ? 'toi' : 'l’Élève'} le ${new Date(q.date).toLocaleDateString('fr-BE')}.`,
+      ' ', actionParent(contexte, 'Rétablir', `eleves/${contexte.slug}/parent/retablissements`, q))), 'Aucune Question signalée.')] },
+  { titre: '🔎 Questions à vérifier', rendu: ({ questionsSuspectes, questionsSignalables }, contexte) => [
+    h('p', { className: 'doux' }, 'L’appli les juge suspectes mais n’en retire aucune : c’est à toi de décider.'),
+    listeOuVide(questionsSuspectes.map((q) => h('li', { className: 'question-suspecte' },
+      h('strong', {}, insecables(q.enonce)), ' ', h('a', { href: `#/apercu/${q.lecon}`, className: 'doux' }, `(${q.titreLecon})`),
+      h('br'), `Bonne réponse attendue : ${q.bonne}`,
+      q.motifs.map((m) => [h('br'), motifSuspect(m)]),
+      h('br'), signalerParent(contexte, q))), 'Aucune Question suspecte.'),
+    questionsSignalables.length > 0 && h('details', { className: 'signaler-parent' }, h('summary', {}, 'Signaler une autre Question'),
+      questionsSignalables.map((l) => h('details', {}, h('summary', {}, l.titreLecon),
+        h('ul', {}, l.questions.map((q) => h('li', {}, insecables(q.enonce), h('br'), signalerParent(contexte, { ...q, lecon: l.lecon })))))))] },
   { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
     h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
     jours.map((j) => h('tr', {},
@@ -184,7 +203,7 @@ const SECTIONS_PARENT = [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus } }) => [
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, questionsSignalees: qs } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
@@ -204,6 +223,7 @@ const SECTIONS_PARENT = [
         : 'pas encore de quiz.'),
       h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
+      h('li', {}, 'Questions : ', `${pluriel(qs.signalees, 'signalée')}, ${pluriel(qs.retablies, 'rétablie')} sur la période ; ${pluriel(qs.suspectes, 'suspecte')} en ce moment.`),
     ),
     h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
     h('p', { className: 'doux' }, 'Pour chaque tranche de probabilité de se souvenir prédite avant la réponse, la part de réponses justes aux Révisions du jour.'),
@@ -216,12 +236,34 @@ const partJeNeSaisPas = ({ reponses, jeNeSaisPas, pourcentage }, ou, vide) =>
   reponses ? `${pourcentage} % ${ou} (${jeNeSaisPas} sur ${pluriel(reponses, 'réponse')}).` : `${vide}.`;
 const MESURES_REBOND = [['nouvelle', 'page nouvelle'], ['revoir', 'Revoir'], ['defi', 'Défi'], ['reviser', 'Réviser']];
 
+// Bouton d'action du parent sur une Question (Rétablir, Signaler) : envoie { lecon, page, id, …corps() } puis recharge l'écran.
+function actionParent(contexte, libelle, url, q, corps = () => ({})) {
+  const erreur = h('span', { className: 'erreur', role: 'alert' });
+  const bouton = h('button', { className: 'secondaire', type: 'button', onclick: async () => {
+    bouton.disabled = true;
+    try { await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, ...corps() } }); await contexte.recharger(); }
+    catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+  } }, libelle);
+  return h('span', { className: 'actions-parent' }, bouton, erreur);
+}
+// « Signaler » côté parent : une raison de la liste fermée du Kit (comme pour l'Élève), auteur parent.
+function signalerParent(contexte, q) {
+  const raison = h('select', { ariaLabel: 'Raison du signalement' }, RAISONS_SIGNALEMENT.map((r) => h('option', { value: r.id }, r.libelle)));
+  return h('span', { className: 'actions-parent' }, raison, ' ',
+    actionParent(contexte, 'Signaler', `eleves/${contexte.slug}/parent/signalements`, q, () => ({ raison: raison.value })));
+}
+// Motif d'une Question suspecte, en mots.
+const motifSuspect = (m) => (m.type === 'reponse-fausse-sure'
+  ? `Même réponse fausse « ${m.choisie} » choisie « sûr » à ${m.jours} jours différents, alors qu’un Objectif qu’elle couvre est Retenu.`
+  : `La Variante ${m.variante + 1} est ratée ${m.ratees} fois sur ${m.reponses}, la Question d’origine ${m.origine.ratees} sur ${m.origine.reponses}.`);
+
 async function ecranParent(profil) {
   const agregats = await api(`eleves/${profil.slug}/parent`);
+  const contexte = { slug: profil.slug, recharger: () => ecranParent(profil) };
   montrer(
     h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
-    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
+    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats, contexte))));
 }
 
 // Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0

@@ -601,6 +601,24 @@ async function api(req, res, segments) {
   } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
     if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
+  } else if (r2 === 'parent' && id === 'signalements' && !r3) {
+    // Le parent signale lui-même une Question (#148) : même liste fermée de raisons, auteur parent, jamais de tour du prof.
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const signalement = await store.signalerQuestion(slug, corps, { maintenant, auteur: 'parent' });
+      await noterEvenement(slug, { type: 'signalement', date: signalement.date, lecon: corps.lecon, raison: signalement.raison, auteur: 'parent' });
+      return json(res, 200, signalement);
+    }
+  } else if (r2 === 'parent' && id === 'retablissements' && !r3) {
+    // Rétablir une Question signalée (#148) : le signalement est retiré, la mémoire se recalcule depuis le journal.
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const reponse = await store.retablirQuestion(slug, corps);
+      await noterEvenement(slug, { type: 'retablissement', date: new Date(maintenant).toISOString(), lecon: corps.lecon });
+      return json(res, 200, reponse);
+    }
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {

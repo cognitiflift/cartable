@@ -3278,6 +3278,45 @@ test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls
   assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
 });
 
+// Moment de révision (#154) : une question fermée posée une fois par jour, après l'Objectif du jour atteint.
+test('Moment de révision : proposé une seule fois par jour, après l\'Objectif du jour atteint, et la valeur est fermée', async () => {
+  const { slug } = await eleveRevisions('Moment-Api', 1); // lundi 2 novembre : une page terminée, Objectif du jour atteint
+  const url = `/api/eleves/${slug}/moment`;
+  const lundi = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(lundi.status, 200);
+  assert.equal(lundi.data.moment, null);
+  assert.equal(lundi.data.aProposer, true);
+  assert.deepEqual(lundi.data.choix.map((c) => c.id), ['apres-ecole', 'apres-repas', 'matin', 'week-end', 'je-ne-sais-pas']);
+  // Déjà proposé : pas une seconde fois le même jour, sans que l'Élève ait rien choisi.
+  assert.equal((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.aProposer, false);
+  // Valeur inconnue refusée, rien d'enregistré.
+  assert.equal((await appel(url, 'PUT', { moment: 'minuit' }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(url, 'PUT', {}, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.moment, null);
+  // « Je ne sais pas » est une réponse valide ; l'Élève peut ensuite changer ou retirer son choix.
+  assert.equal((await appel(url, 'PUT', { moment: 'je-ne-sais-pas' }, le(BANQUE_DATE))).data.moment, 'je-ne-sais-pas');
+  assert.equal((await appel(url, 'PUT', { moment: 'matin' }, le(BANQUE_DATE))).data.moment, 'matin');
+  assert.equal((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.moment, 'matin');
+  assert.equal((await appel(url, 'PUT', { moment: null }, le(BANQUE_DATE))).data.moment, null);
+  // Le lendemain, l'Objectif du jour n'est pas atteint : rien à proposer.
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.aProposer, false);
+});
+
+test('Moment de révision : proposé de nouveau le jour suivant, quand l\'Objectif du jour y est atteint', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Moment-Jours', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  for (let i = 0; i < 5; i++) await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 }, le(LENDEMAIN));
+  const mardi = await appel(url, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(mardi.data.aProposer, true);
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.aProposer, false);
+});
+
+test('Moment de révision : Élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne-ici/moment')).status, 404);
+  assert.equal((await appel('/api/eleves/personne-ici/moment', 'PUT', { moment: 'matin' })).status, 404);
+});
+
 test('Rythme : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/rythme')).status, 404);
 });

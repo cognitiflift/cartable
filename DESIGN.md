@@ -439,6 +439,7 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
 - **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
+- **Moment de révision :** sous l'Objectif du jour, une question fermée en boutons secondaires (le choix en cours cerclé de 2px `accent`), proposée une fois par jour ; ensuite une ligne `doux` « Je reviens : … » et un lien « Changer » en texte `accent`, sans fond.
 
 ### Mes badges
 L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusées à droite en chiffres tabulaires), puis deux colonnes (une seule sous 900px) : le calendrier à gauche, la collection à droite.

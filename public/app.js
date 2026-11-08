@@ -310,7 +310,7 @@ function carteLecon(l, { enTete = false } = {}) {
 }
 
 async function ecranAccueil(profil) {
-  const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
+  const [lecons, revisions, rythme, badges, moment] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`), api(`eleves/${profil.slug}/moment`)]);
   retenirRecompenses(profil, badges);
   barreNav(profil);
   // « Où j'en étais ? » : la Leçon à la dernière activité la plus récente passe en tête, hors de sa Catégorie (#141).
@@ -318,7 +318,7 @@ async function ecranAccueil(profil) {
   const parCategorie = Object.groupBy(lecons.filter((l) => l !== enTete), (l) => l.categorie);
   montrer(
     recapitulatifSemaine(profil, rythme.recapitulatif),
-    maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons),
+    maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons, moment),
     h('div', { className: 'lecons-tete' },
       h('h2', {}, 'Mes leçons'),
       // Une action en retrait, sauf quand le réseau est vide : c'est alors la seule chose à faire, et le seul bouton plein.
@@ -359,7 +359,32 @@ const lectureJour = (nom, { jour, etat, joker }, aujourdhui, debut = '') => [nom
 // Sans `jour`, un tampon muet : la légende du calendrier.
 const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'));
 
-function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
+// Mon moment de révision (#154) : une liste fermée de moments, proposée une fois par jour après l'Objectif du jour
+// atteint (`aProposer`), puis rappelée dans le bandeau ; l'Élève peut le changer ou le retirer, sans être relancé.
+function momentDeRevision(profil, etat) {
+  const libelle = (id) => etat.choix.find((c) => c.id === id)?.libelle;
+  const zone = h('div', { className: 'moment-revision' });
+  const enregistrer = async (moment) => {
+    Object.assign(etat, await api(`eleves/${profil.slug}/moment`, { method: 'PUT', body: { moment } }));
+    dessiner(false);
+  };
+  const choix = (question) => h('div', { className: 'moment-choix', role: 'group', ariaLabel: question },
+    h('strong', {}, question),
+    h('div', { className: 'moment-boutons' }, etat.choix.map((c) =>
+      h('button', { className: 'secondaire', ariaPressed: String(etat.moment === c.id), onclick: () => enregistrer(c.id) }, c.libelle))));
+  const dessiner = (ouvert) => {
+    zone.replaceChildren(ouvert
+      ? h('div', {}, choix('Quand reviendras-tu ?'),
+        h('button', { className: 'moment-lien', onclick: () => (etat.moment ? enregistrer(null) : dessiner(false)) }, etat.moment ? 'Ne plus en choisir' : 'Plus tard'))
+      : etat.moment
+        ? h('small', {}, `🕐 Je reviens : ${libelle(etat.moment).toLowerCase()} `, h('button', { className: 'moment-lien', onclick: () => dessiner(true) }, 'Changer'))
+        : h('button', { className: 'moment-lien', onclick: () => dessiner(true) }, 'Choisir mon moment de révision'));
+  };
+  dessiner(etat.aProposer);
+  return zone;
+}
+
+function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons, moment) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
   const caseJour = (jour, i) => {
@@ -392,7 +417,8 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
       h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
         h('small', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`)),
+        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+        momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
         h('strong', {}, 'Mes révisions du jour',

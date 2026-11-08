@@ -2946,35 +2946,28 @@ const quizRaisons = {
 };
 
 test('Pourquoi c\'est faux : la Banque garde les raisons et la Révision du jour les sert, une raison mal formée est écartée sans perdre la Question', async () => {
-  const slug = slugify('Revis-Raisons');
-  await appel('/api/eleves', 'POST', { pseudo: 'Revis-Raisons', age: 11, niveau: 'Primaire 6' });
-  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'raisons' })).data);
-  const page = path.join(eleves, slug, 'lecons', lecon.id, 'lessons', '0002-raisons.html');
-  const ecrire = (quiz) => fs.writeFile(page, `<script type="application/json" id="cartable-quiz">${JSON.stringify(quiz)}</script>`);
-  await ecrire(quizRaisons);
-  const { type, ...corps } = messageScore(lireQuiz(quizRaisons), { q1: 0 }, '0002-raisons.html');
-  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(BANQUE_DATE));
-  await attendrePropositions(slug);
-
-  const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
-  assert.deepEqual(questions.find((q) => q.id === 'q1').contenu.raisons, quizRaisons.questions[0].raisons);
-  const servie = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const corps = (quiz) => { const { type, ...c } = messageScore(lireQuiz(quiz), { q1: 0 }, '0002-raisons.html', { q1: false }); return c; };
+  await ecrirePageQuiz(lecon, '0002-raisons.html', quizRaisons);
+  const r = await appel(`${url}/scores`, 'POST', corps(quizRaisons), le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.data.questions[0].contenu.raisons, quizRaisons.questions[0].raisons);
+  await attendrePropositions('zoe-test');
+  const servie = (await appel('/api/eleves/zoe-test/revisions', 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
   assert.deepEqual(servie.raisons, quizRaisons.questions[0].raisons);
 
   // Mal formées (pas de la longueur des réponses), elles disparaissent de la Banque ; la Question reste.
-  const abimee = { ...quizRaisons, questions: [{ ...quizRaisons.questions[0], raisons: ['une seule'] }] };
-  await ecrire(abimee);
-  const { type: _, ...corps2 } = messageScore(lireQuiz(quizRaisons), { q1: 0 }, '0002-raisons.html');
-  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps2, le(LENDEMAIN));
-  const apres = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1');
-  assert.equal(apres.journal.length, 2);
-  assert.equal(Object.hasOwn(apres.contenu, 'raisons'), false);
+  await ecrirePageQuiz(lecon, '0002-raisons.html', { ...quizRaisons, questions: [{ ...quizRaisons.questions[0], raisons: ['une seule'] }] });
+  const apres = await appel(`${url}/scores`, 'POST', corps(quizRaisons), le(LENDEMAIN));
+  assert.equal(apres.data.questions[0].journal.length, 2);
+  assert.equal(Object.hasOwn(apres.data.questions[0].contenu, 'raisons'), false);
 });
 
 test('Pourquoi c\'est faux : la consigne demande des réponses fausses plausibles pour tout QCM, avec leur raison, aux pages comme aux Variantes', async () => {
   const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les marées' })).data;
   const args = await argsDe(lecon);
-  assert.match(args, /pour tout QCM[^]*réponses fausses plausibles[^]*idées reçues ou[^]*erreurs fréquentes[^]*même longueur que la bonne/);
+  assert.match(args, /pour tout QCM[^]*réponses fausses plausibles[^]*idées reçues ou[^]*erreurs fréquentes[^]*de même longueur et de même forme que la bonne/);
   assert.match(args, /"raisons"/);
   const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
   assert.match(doc, /`raisons`/);

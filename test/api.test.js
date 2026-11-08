@@ -7,7 +7,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { slugify } from '../lib/store.js';
 import { contenuAServir } from '../lib/variantes.js';
-import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, messageScore, corriger } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
 const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
@@ -38,7 +38,10 @@ before(async () => {
   await fs.writeFile(path.join(dossier, 'faux-variantes.mjs'), `import fs from 'node:fs';
 const demandes = JSON.parse(fs.readFileSync('questions-a-varier.json', 'utf8'));
 const malFormees = fs.existsSync(process.argv[2]);
-const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication });
+const avecRaisons = fs.existsSync(process.argv[3]);
+const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication,
+  // \`variantes-raisons\` : la variante 1 donne une raison à chaque réponse, la bonne comprise (écartée) ; la variante 2 une liste mal formée (écartée, la variante reste).
+  ...(avecRaisons && { raisons: n === 1 ? q.reponses.map((_, i) => 'Raison ' + i) : ['une seule'] }) });
 const sortie = Object.fromEntries(demandes.map((q) => [q.cle, [
   ...(malFormees ? [] : [variante(q, 1), variante(q, 2)]),
   { enonce: q.enonce + ' (mal formée)', reponses: q.reponses, bonne: 9, explication: '' },
@@ -63,7 +66,7 @@ if [ "$(basename "$PWD")" = variantes ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
     exit 0
   fi
-  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees'
+  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees' '${dossier}/variantes-raisons'
   echo '{"result":"ok","session_id":"s-var","is_error":false,"total_cost_usd":0.01,"modelUsage":{"claude-haiku-test":{"costUSD":0.01}}}'
   exit 0
 fi
@@ -2437,6 +2440,16 @@ test('Maîtrise : « acquis » porté par le préambule de relais et le résumé
   assert.match(await fs.readFile(path.join(dossier, 'args-propositions'), 'utf8'), /\) : Maîtrise \d+ %, acquis/);
 });
 
+test('Difficulté visée : le préambule de relais porte la réussite récente et la consigne de la page suivante', async () => {
+  const avant = (jours) => new Date(Date.now() - jours * JOUR_MS).toISOString();
+  const { slug, lecon, url } = await leconAcquise('Difficulte-Visee', [avant(2), avant(1)]);
+  assert.equal((await avecFichier('objectifs', () => appel(`${url}/messages`, 'POST', { texte: 'Page suivante' }))).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Réussite récente : 100 % en moyenne sur les 2 derniers quiz de cette Leçon.*plus difficile/);
+  await attendrePropositions(slug);
+});
+
 test('Vue parent : un contrôle à venir porte « acquis » comme la lecture de sa Leçon de révision', async () => {
   const dates = ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z'];
   const { slug, lecon, url } = await leconAcquise('Acquis-Parent', dates, { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-10-20' });
@@ -2620,6 +2633,32 @@ test('Variantes : une Révision du jour sert la Question ou une variante ; la r�
   ]);
   // Même état de mémoire : la Question (et donc ses variantes) n'est plus due aujourd'hui.
   assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+});
+
+test('Variantes : leurs raisons sont gardées pour les réponses fausses seulement, une raison mal formée est écartée sans perdre la Variante, et la Révision du jour les sert', async () => {
+  const { slug, lecons: [lecon], quiz, avecVariantes } = await eleveVariantes('Var-Raisons');
+  await quiz(lecon);
+  await avecFichier('variantes-raisons', async () => {
+    await quiz(lecon);
+    await avecVariantes(lecon);
+  });
+  const args = await fs.readFile(path.join(dossier, 'args-variantes'), 'utf8');
+  assert.match(args, /raison pour chaque réponse fausse[^]*plausibles|plausibles[^]*raison pour chaque réponse fausse/);
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions.find((q) => q.id === 'q1');
+  // Variante 1 : réponses inversées, la bonne est la dernière ; sa raison est écartée (null). Variante 2 : raisons mal formées, absentes.
+  assert.equal(q1.variantes.length, 2);
+  assert.deepEqual(q1.variantes[0].raisons, ['Raison 0', null]);
+  assert.equal(Object.hasOwn(q1.variantes[1], 'raisons'), false);
+  // La Révision du jour sert la Variante avec ses raisons ; le Kit en tire celle de la réponse fausse choisie.
+  let servie = null;
+  for (let i = 0; i < 30 && !servie; i++) {
+    const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+    const q = data.questions.find((x) => x.id === 'q1');
+    if (q.variante === 0) servie = q;
+  }
+  assert.ok(servie, 'variante 1 jamais servie');
+  assert.deepEqual(servie.raisons, ['Raison 0', null]);
+  assert.equal(corriger(lireQuiz({ objectifs: [1], questions: [servie] }).questions[0], 0).raison, 'Raison 0');
 });
 
 test('Variantes : une Question réécrite par le prof perd ses Variantes, qui sont redemandées', async () => {
@@ -3387,6 +3426,63 @@ test('Moment de révision : proposé de nouveau le jour suivant, quand l\'Object
   const mardi = await appel(url, 'GET', undefined, le(LENDEMAIN));
   assert.equal(mardi.data.aProposer, true);
   assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.aProposer, false);
+});
+
+// Rappel calendrier (#155) : le parent règle l'heure de chaque moment et télécharge un fichier iCalendar.
+test('Rappel calendrier : heures réglables, gardées pour l\'Élève, et refus des valeurs mal formées', async () => {
+  const { slug } = await eleveRevisions('Rappel-Heures', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  const depart = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(depart.data.heures['apres-ecole'], '16:30'); // valeur proposée
+  // La lecture de la Vue parent ne consomme pas la question du jour de l'Élève (ici déjà posée par le GET ci-dessus).
+  const { slug: autre } = await eleveRevisions('Rappel-Lecture', 1);
+  assert.equal((await appel(`/api/eleves/${autre}/moment/heures`, 'GET', undefined, le(BANQUE_DATE))).data.heures.matin, '07:30');
+  assert.equal((await appel(`/api/eleves/${autre}/moment`, 'GET', undefined, le(BANQUE_DATE))).data.aProposer, true);
+  assert.deepEqual(Object.keys(depart.data.heures).sort(), ['apres-ecole', 'apres-repas', 'matin', 'week-end']);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { matin: '25:00' } }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { minuit: '08:00' } }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { matin: 'sept heures' } }, le(BANQUE_DATE))).status, 400);
+  const ok = await appel(`${url}/heures`, 'PUT', { heures: { 'apres-ecole': '17:15' } }, le(BANQUE_DATE));
+  assert.equal(ok.data.heures['apres-ecole'], '17:15');
+  assert.equal(ok.data.heures.matin, '07:30');
+  // Gardées, y compris quand l'Élève change de moment.
+  await appel(url, 'PUT', { moment: 'apres-ecole' }, le(BANQUE_DATE));
+  const relu = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(relu.data.heures['apres-ecole'], '17:15');
+  assert.equal(relu.data.moment, 'apres-ecole');
+});
+
+test('Rappel calendrier : fichier iCalendar quotidien, alarme, heure locale, suit le moment choisi', async () => {
+  const { slug } = await eleveRevisions('Rappel-Ics', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  await appel(url, 'PUT', { moment: 'apres-repas' }, le(BANQUE_DATE));
+  await appel(`${url}/heures`, 'PUT', { heures: { 'apres-repas': '19:45' } }, le(BANQUE_DATE));
+  const res = await fetch(`${base}${url}/calendrier.ics`, { headers: le(BANQUE_DATE) });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^text\/calendar/);
+  assert.match(res.headers.get('content-disposition'), /attachment; filename="[^"]+\.ics"/);
+  const ics = await res.text();
+  assert.ok(ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n'));
+  assert.ok(!/[^\r]\n/.test(ics), 'fins de ligne CRLF');
+  for (const ligne of ['VERSION:2.0', 'BEGIN:VEVENT', 'RRULE:FREQ=DAILY', 'BEGIN:VALARM', 'ACTION:DISPLAY', 'END:VALARM', 'END:VEVENT']) assert.ok(ics.includes(`\r\n${ligne}\r\n`), ligne);
+  assert.match(ics, /\r\nDTSTART:\d{8}T194500\r\n/); // heure locale flottante, ni Z ni TZID
+  assert.match(ics, /\r\nUID:[^\r]+\r\n/);
+  assert.match(ics, /\r\nDTSTAMP:\d{8}T\d{6}Z\r\n/);
+  assert.match(ics, /\r\nTRIGGER:-?PT0S\r\n/);
+  // Suit le moment choisi.
+  await appel(url, 'PUT', { moment: 'matin' }, le(BANQUE_DATE));
+  assert.match(await (await fetch(`${base}${url}/calendrier.ics`, { headers: le(BANQUE_DATE) })).text(), /\r\nDTSTART:\d{8}T073000\r\n/);
+});
+
+test('Rappel calendrier : sans moment choisi, ou « Je ne sais pas », pas de fichier vide', async () => {
+  const { slug } = await eleveRevisions('Rappel-Vide', 1);
+  const url = `/api/eleves/${slug}/moment/calendrier.ics`;
+  assert.equal((await fetch(`${base}${url}`, { headers: le(BANQUE_DATE) })).status, 409);
+  await appel(`/api/eleves/${slug}/moment`, 'PUT', { moment: 'je-ne-sais-pas' }, le(BANQUE_DATE));
+  const res = await fetch(`${base}${url}`, { headers: le(BANQUE_DATE) });
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).erreur, /moment/i);
+  assert.equal((await fetch(`${base}/api/eleves/personne-ici/moment/calendrier.ics`)).status, 404);
 });
 
 test('Moment de révision : Élève inconnu', async () => {

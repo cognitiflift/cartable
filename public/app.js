@@ -257,13 +257,40 @@ const motifSuspect = (m) => (m.type === 'reponse-fausse-sure'
   ? `Même réponse fausse « ${m.choisie} » choisie « sûr » à ${m.jours} jours différents, alors qu’un Objectif qu’elle couvre est Retenu.`
   : `La Variante ${m.variante + 1} est ratée ${m.ratees} fois sur ${m.reponses}, la Question d’origine ${m.origine.ratees} sur ${m.origine.reponses}.`);
 
+// Rappel dans le calendrier du parent (#155) : le parent règle l'heure de chaque moment, puis télécharge un fichier
+// iCalendar généré par le serveur, à importer dans son propre calendrier. Sans moment choisi par l'Élève, on l'explique.
+function rappelCalendrier(profil, etat) {
+  const zone = h('div', {});
+  const libelle = (id) => etat.choix.find((c) => c.id === id).libelle;
+  const dessiner = () => {
+    const avecHeure = etat.moment && etat.moment in etat.heures;
+    zone.replaceChildren(
+      h('p', { className: 'doux' }, 'Le fichier se génère ici, sur cet appareil : rien n’est envoyé ni hébergé. Tu l’ouvres dans ton calendrier, qui te préviendra à l’heure choisie.'),
+      h('div', { className: 'rappel-heures' }, Object.entries(etat.heures).map(([id, heure]) => h('label', {},
+        `${libelle(id)} `,
+        h('input', { type: 'time', value: heure, required: true, onchange: async (e) => {
+          if (!e.target.value) { e.target.value = etat.heures[id]; return; }
+          Object.assign(etat, await api(`eleves/${profil.slug}/moment/heures`, { method: 'PUT', body: { heures: { [id]: e.target.value } } }));
+          dessiner();
+        } })))),
+      avecHeure
+        ? [h('p', {}, `${profil.pseudo} a choisi : ${libelle(etat.moment).toLowerCase()}, à ${etat.heures[etat.moment].replace(':', ' h ')}.`),
+          h('a', { className: 'bouton', href: `/api/eleves/${profil.slug}/moment/calendrier.ics`, download: `rappel-${profil.slug}.ics` }, 'Télécharger le fichier calendrier')]
+        : h('p', {}, `${profil.pseudo} n’a pas encore choisi son moment de révision (l’appli le lui propose après l’Objectif du jour). Il n’y a donc pas de fichier à télécharger pour l’instant.`));
+  };
+  dessiner();
+  return zone;
+}
+
 async function ecranParent(profil) {
   const agregats = await api(`eleves/${profil.slug}/parent`);
+  const moment = await api(`eleves/${profil.slug}/moment/heures`);
   const contexte = { slug: profil.slug, recharger: () => ecranParent(profil) };
   montrer(
     h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
-    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats, contexte))));
+    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats, contexte))),
+    h('section', { className: 'vue-parent' }, h('h3', {}, '🔔 Rappel dans ton calendrier'), rappelCalendrier(profil, moment)));
 }
 
 // Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0

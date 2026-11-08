@@ -307,6 +307,8 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
+.rappel-heures { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin:.5rem 0 .8rem; }
+.rappel-heures label { display:flex; flex-direction:column; gap:.2rem; font-weight:600; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }
 /* Badges (#95) : pastilles cerclées à la couleur de leur Palier, sur un fond pâle de la même teinte ; distinctes du vert
    « Acquis » de la Maîtrise. */

@@ -7,7 +7,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { slugify } from '../lib/store.js';
 import { contenuAServir } from '../lib/variantes.js';
-import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, messageScore, corriger } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
 const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
@@ -38,7 +38,10 @@ before(async () => {
   await fs.writeFile(path.join(dossier, 'faux-variantes.mjs'), `import fs from 'node:fs';
 const demandes = JSON.parse(fs.readFileSync('questions-a-varier.json', 'utf8'));
 const malFormees = fs.existsSync(process.argv[2]);
-const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication });
+const avecRaisons = fs.existsSync(process.argv[3]);
+const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication,
+  // \`variantes-raisons\` : la variante 1 donne une raison à chaque réponse, la bonne comprise (écartée) ; la variante 2 une liste mal formée (écartée, la variante reste).
+  ...(avecRaisons && { raisons: n === 1 ? q.reponses.map((_, i) => 'Raison ' + i) : ['une seule'] }) });
 const sortie = Object.fromEntries(demandes.map((q) => [q.cle, [
   ...(malFormees ? [] : [variante(q, 1), variante(q, 2)]),
   { enonce: q.enonce + ' (mal formée)', reponses: q.reponses, bonne: 9, explication: '' },
@@ -63,7 +66,7 @@ if [ "$(basename "$PWD")" = variantes ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
     exit 0
   fi
-  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees'
+  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees' '${dossier}/variantes-raisons'
   echo '{"result":"ok","session_id":"s-var","is_error":false,"total_cost_usd":0.01,"modelUsage":{"claude-haiku-test":{"costUSD":0.01}}}'
   exit 0
 fi
@@ -2620,6 +2623,32 @@ test('Variantes : une Révision du jour sert la Question ou une variante ; la r�
   ]);
   // Même état de mémoire : la Question (et donc ses variantes) n'est plus due aujourd'hui.
   assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+});
+
+test('Variantes : leurs raisons sont gardées pour les réponses fausses seulement, une raison mal formée est écartée sans perdre la Variante, et la Révision du jour les sert', async () => {
+  const { slug, lecons: [lecon], quiz, avecVariantes } = await eleveVariantes('Var-Raisons');
+  await quiz(lecon);
+  await avecFichier('variantes-raisons', async () => {
+    await quiz(lecon);
+    await avecVariantes(lecon);
+  });
+  const args = await fs.readFile(path.join(dossier, 'args-variantes'), 'utf8');
+  assert.match(args, /raison pour chaque réponse fausse[^]*plausibles|plausibles[^]*raison pour chaque réponse fausse/);
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions.find((q) => q.id === 'q1');
+  // Variante 1 : réponses inversées, la bonne est la dernière ; sa raison est écartée (null). Variante 2 : raisons mal formées, absentes.
+  assert.equal(q1.variantes.length, 2);
+  assert.deepEqual(q1.variantes[0].raisons, ['Raison 0', null]);
+  assert.equal(Object.hasOwn(q1.variantes[1], 'raisons'), false);
+  // La Révision du jour sert la Variante avec ses raisons ; le Kit en tire celle de la réponse fausse choisie.
+  let servie = null;
+  for (let i = 0; i < 30 && !servie; i++) {
+    const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+    const q = data.questions.find((x) => x.id === 'q1');
+    if (q.variante === 0) servie = q;
+  }
+  assert.ok(servie, 'variante 1 jamais servie');
+  assert.deepEqual(servie.raisons, ['Raison 0', null]);
+  assert.equal(corriger(lireQuiz({ objectifs: [1], questions: [servie] }).questions[0], 0).raison, 'Raison 0');
 });
 
 test('Variantes : une Question réécrite par le prof perd ses Variantes, qui sont redemandées', async () => {

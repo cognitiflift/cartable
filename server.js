@@ -600,6 +600,20 @@ async function api(req, res, segments) {
       await noterEvenement(slug, { type: 'signalement', date: signalement.date, lecon: corps.lecon, raison: signalement.raison });
       return json(res, 200, signalement);
     }
+  } else if (r2 === 'predictions' && !id) {
+    // Prédiction du Kit (#157) : l'Élève a dit ce qu'il pensait avant une partie de la page. Seulement un événement daté,
+    // pour les indicateurs : ni score, ni Banque, ni Maîtrise, ni tour du prof.
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const { lecon, page, id: prediction, juste } = await lireCorps(req);
+      if (typeof lecon !== 'string') throw new HttpError(400, 'Leçon manquante');
+      if (![page, prediction].every((t) => typeof t === 'string' && t.trim() && t.length <= 200)) throw new HttpError(400, 'Prédiction mal formée');
+      if (typeof juste !== 'boolean') throw new HttpError(400, 'Résultat manquant');
+      await store.lireLecon(slug, lecon, { maintenant });
+      const date = new Date(maintenant).toISOString();
+      await noterEvenement(slug, { type: 'prediction', date, lecon, juste });
+      return json(res, 200, { date, juste });
+    }
   } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
     if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));

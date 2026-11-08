@@ -72,3 +72,13 @@ test('Révisions des jours dus : un jour dû sans réponse compte pour non fait,
   assert.equal(r.faites, 0);
   assert.ok(r.jours >= 1 && r.jours <= 5);
 });
+
+test('Prédictions : faites et justes sur la période, événements hors période et mal datés écartés', () => {
+  const evenements = [
+    { type: 'prediction', date: iso(2), lecon: 'a', juste: true }, { type: 'prediction', date: iso(3), lecon: 'a', juste: false },
+    { type: 'prediction', date: iso(4), lecon: 'b', juste: true }, { type: 'prediction', date: new Date(2026, 8, 20).toISOString(), lecon: 'b', juste: true },
+    { type: 'prediction', date: 'pas une date', juste: true }, { type: 'revision', date: iso(2), juste: true },
+  ];
+  assert.deepEqual(indicateurs(evenements, periode).predictions, { faites: 3, justes: 2, pourcentage: 67 });
+  assert.deepEqual(indicateurs([], periode).predictions, { faites: 0, justes: 0, pourcentage: null });
+});

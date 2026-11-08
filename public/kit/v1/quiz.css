@@ -172,6 +172,27 @@
 .kit-devoile-reponse[hidden], .kit-devoile-souvenir[hidden] { display: none; }
 .kit-devoile-souvenir { display: flex; flex-direction: column; gap: .5rem; }
 
+/* Prédiction (#157) : une carte de la page, avant une partie, hors score. Filet d’accent tout autour et teinte douce, pour la
+   distinguer d'une question du quiz ; jamais de vert ni de rouge : il n'y a pas de bonne note à craindre. Sa réponse
+   choisie prend le contour neutre des réponses du quiz avant correction. */
+.kit-prediction { margin: 1.5rem 0; padding: .9rem 1.1rem; border-radius: 14px; border: 1px solid var(--kit-accent); background: var(--kit-accent-doux); }
+.kit-prediction p { margin: 0; }
+.kit-prediction-etiquette { font-weight: 700; color: var(--kit-accent-fort); font-size: .95rem; }
+.kit-prediction .kit-prediction-enonce { font-weight: 600; margin: .3rem 0 .6rem; }
+.kit-prediction-reponses { display: flex; flex-direction: column; gap: .5rem; }
+.kit-prediction-reponse {
+  font: inherit; text-align: left; min-height: 2.75rem; padding: .6rem .9rem; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--kit-bord); background: var(--kit-carte); color: var(--kit-texte);
+}
+.kit-prediction-reponse:hover:not(:disabled) { border-color: var(--kit-accent); }
+.kit-prediction-reponse:disabled { cursor: default; }
+.kit-prediction-reponse.kit-choisie { border-color: var(--kit-texte); box-shadow: inset 0 0 0 1px var(--kit-texte); }
+.kit-prediction .kit-prediction-note { margin-top: .6rem; color: var(--kit-doux); font-size: .9rem; }
+.kit-prediction-note[hidden] { display: none; }
+.kit-prediction-revelation { margin-top: .6rem; }
+.kit-prediction-revelation:not(:empty) { padding: .6rem .9rem; border-radius: 10px; background: var(--kit-carte); border: 1px dashed var(--kit-accent); }
+.kit-prediction-fin { height: 1px; }
+
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font: 800 1.4rem/1.2 var(--kit-police-titre); color: var(--kit-accent-fort); }

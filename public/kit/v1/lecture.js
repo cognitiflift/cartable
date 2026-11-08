@@ -76,7 +76,7 @@ export function boutonLecture(texte, { libelle = ECOUTER, titre = 'Lire à voix 
 // Blocs de texte lus sur la page, dans l'ordre ; ni le quiz (ses questions ont leur propre bouton), ni les crédits
 // des figures, ni le code, ni les schémas. L'extrait de texte d'une figure (<blockquote>) est lu, vers par vers.
 const BLOCS = 'h1, h2, h3, h4, h5, h6, p, li, dt, dd, th, td, figcaption, blockquote, aside';
-const EXCLUS = '.kit-quiz, .kit-credit, .kit-lecture, script, style, svg, template, [hidden], [aria-hidden="true"]';
+const EXCLUS = '.kit-quiz, .kit-prediction,.kit-credit, .kit-lecture, script, style, svg, template, [hidden], [aria-hidden="true"]';
 
 function texteDeLaPage(racine) {
   const blocs = [...racine.querySelectorAll(BLOCS)]

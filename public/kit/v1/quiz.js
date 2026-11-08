@@ -9,6 +9,7 @@ import { lectureActivee } from './lecture-logique.js';
 import { ajouterLecturePage } from './lecture.js';
 import { copieDeFigure } from './figure.js';
 import { appliquerEspacement } from './espacement.js';
+import { montrerPredictions } from './prediction.js';
 
 function demarrer() {
   appliquerEspacement(document, location.search); // espacement des lettres du Profil (#160)
@@ -16,15 +17,23 @@ function demarrer() {
   const lecture = lectureActivee(location.search);
   if (lecture) ajouterLecturePage();
   const source = document.getElementById('cartable-quiz');
-  if (!source) return;
   let quiz = null;
-  try {
-    quiz = lireQuiz(JSON.parse(source.textContent));
-  } catch (e) {
-    console.error('Kit : quiz illisible', e);
+  if (source) {
+    try {
+      quiz = lireQuiz(JSON.parse(source.textContent));
+    } catch (e) {
+      console.error('Kit : quiz illisible', e);
+    }
   }
-  const zone = el('section', { className: 'kit-quiz' });
-  source.after(zone);
+  const zone = source ? el('section', { className: 'kit-quiz' }) : null;
+  source?.after(zone);
+  // Prédictions (#157) : déclarées dans la page, hors du quiz ; l'appli est prévenue de chaque réponse. Pas de Prédiction
+  // dans le Pré-test.
+  montrerPredictions(document, {
+    page: location.pathname.split('/').pop(), lecture: Boolean(lecture), pretest: quiz?.pretest === true, zoneQuiz: zone,
+    envoyer: (message) => window.parent.postMessage(message, '*'),
+  });
+  if (!source) return;
   if (!quiz) {
     zone.append(el('p', { className: 'kit-quiz-erreur' }, 'Ce quiz ne peut pas s’afficher.'));
     return;

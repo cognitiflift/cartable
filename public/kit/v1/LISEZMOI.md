@@ -300,6 +300,34 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 
 Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, trop lourde, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre image qui marche ou par un schéma SVG. Pour une image trop lourde, reprends l'image de partage déjà réduite de sa source (`og:image`, à défaut `twitter:image`), jamais le fichier original en pleine résolution. Sur une page qui porte sur un sujet réel, remplace-la par une autre photo : un schéma SVG n'y est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
 
+## Prédiction
+
+Ajout compatible de la version 1 : une page sans Prédiction s'affiche comme avant. Avant une partie de la page, une question courte où l'élève dit ce qu'il pense, **sans note** : le Kit ne la corrige pas tout de suite, et la révélation (« Tu avais pensé… ; en fait… ») s'ouvre quand l'élève atteint le titre `<h2>` suivant (la partie suivante) ou le quiz. Elle ne compte ni dans le score, ni dans la Banque de Questions, ni dans la Maîtrise, ni dans les Étoiles ; pas de Confiance, pas de « Je ne sais pas » : on devine.
+
+Déclare-la en données, à l'endroit où elle doit s'afficher, juste sous le titre de la partie qu'elle prépare (plusieurs déclarations possibles dans la page, chacune dans son `<script>`) :
+
+```html
+<h2>Que devient la lave ?</h2>
+<script type="application/json" class="cartable-prediction">
+{
+  "id": "p1",
+  "enonce": "Que fait la lave quand elle refroidit ?",
+  "reponses": ["Elle durcit en roche", "Elle redevient du magma", "Elle s'évapore"],
+  "bonne": 0,
+  "revelation": "La lave qui refroidit durcit et devient une roche, comme le basalte."
+}
+</script>
+<p>…la partie, qui dit la réponse…</p>
+<h2>Autre partie</h2>
+```
+
+- `id` : identifiant court, unique dans la page et stable (`p1`, `p2`…), commençant par une lettre.
+- `enonce` : la question.
+- `reponses` : 2 ou 3 réponses en texte (le Kit ne les mélange pas). `bonne` : index (à partir de 0) de la bonne réponse.
+- `revelation` : une phrase qui dit ce qu'il en est. Le Kit la fait précéder de « Tu avais pensé « … » ; en fait, tu avais raison » ou « c'était « … » ». La partie qui suit la Prédiction doit donc donner la réponse.
+
+Règles : au plus **une Prédiction par partie et deux par page** ; jamais dans le Pré-test (le Kit l'y ignore) ni dans une page Revoir. Ne la répète pas dans le quiz. Une déclaration mal formée (identifiant absent ou en double, moins de 2 ou plus de 3 réponses, `bonne` hors liste, texte vide) est ignorée : la page reste utilisable. Quand l'élève répond, le Kit envoie à l'appli `{ "type": "cartable-prediction", "page", "id", "juste" }` ; l'appli le note comme événement daté, seulement pour les indicateurs du parent (Prédictions faites et justes). La Lecture à voix haute lit la Prédiction avec son propre bouton « 🔊 Écouter », puis sa révélation une fois montrée.
+
 ## Lecture à voix haute
 
 Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction, la raison de la réponse fausse choisie s'il y en a une, et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.

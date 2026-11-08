@@ -23,6 +23,7 @@ import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
+import { MOMENTS, validerMoment } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -602,6 +603,22 @@ async function api(req, res, segments) {
         serieDeJours: serieDeJours(activite, maintenant),
         recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
+    }
+  } else if (r2 === 'moment' && !id) {
+    // Moment de révision (#154) : proposé une fois par jour, une fois l'Objectif du jour atteint ; valeur fermée (lib/moment.js).
+    const jour = jourLocal(maintenant);
+    if (m === 'GET') {
+      const lecons = await store.leconsLues(slug, { maintenant });
+      const atteint = objectifDuJour(activiteParJour(lecons), maintenant).atteint;
+      return json(res, 200, await store.modifierMoment(slug, (f) => {
+        const aProposer = atteint && f.proposeLe !== jour;
+        return [aProposer ? { ...f, proposeLe: jour } : f, { moment: f.moment, aProposer, choix: MOMENTS }];
+      }));
+    }
+    if (m === 'PUT') {
+      const { moment } = await lireCorps(req);
+      const valeur = validerMoment(moment === undefined ? 'inconnu' : moment);
+      return json(res, 200, await store.modifierMoment(slug, () => [{ moment: valeur, proposeLe: jour }, { moment: valeur, aProposer: false, choix: MOMENTS }]));
     }
   } else if (r2 === 'badges' && !id) {
     // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture, les totaux d'Étoiles et de Fusées (#96) et

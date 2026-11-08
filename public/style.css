@@ -94,6 +94,15 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .objectif-du-jour strong { display:block; line-height:1.3; text-wrap:balance; }
 .objectif-du-jour small { display:block; color:var(--doux); margin-top:.15rem; }
 .objectif-du-jour.atteint strong { color:var(--vert); }
+/* Mon moment de révision (#154) : question fermée sous l'Objectif du jour, boutons secondaires, liens en texte accent. */
+.moment-revision { margin-top:.5rem; color:var(--doux); }
+.moment-revision small { display:block; }
+.moment-choix strong { display:block; color:var(--texte); margin-bottom:.35rem; }
+.moment-boutons { display:flex; flex-wrap:wrap; gap:.4rem; }
+.moment-boutons button { min-height:2.6rem; }
+.moment-boutons button[aria-pressed="true"] { border-color:var(--accent); border-width:2px; }
+.moment-lien { background:transparent; border-color:transparent; color:var(--accent); padding:.35rem .5rem; min-height:2.6rem; }
+.moment-lien:hover { background:color-mix(in srgb, var(--accent) 8%, transparent); }
 .bouton-revisions { display:flex; flex-direction:column; align-items:flex-start; gap:.05rem; width:100%; padding:.7rem 1rem; border-radius:12px; text-align:left; }
 .bouton-revisions strong { display:flex; align-items:center; gap:.5rem; width:100%; }
 .bouton-revisions small { font-weight:400; opacity:.92; }

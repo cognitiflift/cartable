@@ -587,7 +587,8 @@ async function api(req, res, segments) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
     if (m === 'GET') {
       const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
-      return json(res, 200, indicateurs(await store.lireEvenements(slug), { maintenant, ...periode }));
+      const [evenements, lecons] = await Promise.all([store.lireEvenements(slug), store.leconsLues(slug, { maintenant })]);
+      return json(res, 200, indicateurs(evenements, { maintenant, lecons, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
     // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.

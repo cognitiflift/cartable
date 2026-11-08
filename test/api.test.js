@@ -3127,6 +3127,20 @@ test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le te
   await attendrePropositions(slug);
 });
 
+test('Indicateurs : la calibration de la mémoire compare la probabilité prédite à la réponse en Révision du jour', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Indic-Calibration', 1);
+  const reviser = (choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie }, le(LENDEMAIN));
+  await reviser(0);
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.calibration.reduce((t, x) => t + x.reponses, 0), 1);
+  const tranche = data.calibration.find((t) => t.reponses);
+  assert.equal(tranche.justes, 1);
+  assert.equal(tranche.pourcentage, 100);
+  assert.ok(tranche.predit >= tranche.de && tranche.predit <= tranche.a);
+  for (const t of data.calibration.filter((x) => !x.reponses)) assert.equal(t.pourcentage, null);
+  assert.deepEqual(data.retenu30, { objectifs: 0, encoreRetenus: 0, pourcentage: null });
+});
+
 test('Vue parent : les indicateurs des 28 derniers jours y figurent', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Indic', 1);
   await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 0 }, le(LENDEMAIN));

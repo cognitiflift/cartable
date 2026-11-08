@@ -308,6 +308,10 @@ Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases c
 
 L'appli transmet le réglage à la page dans son adresse (`…/0002-le-magma.html?lecture=1`). Ajout compatible de la version 1 : une page déjà écrite avec le Kit en profite sans changement.
 
+## Espacement des lettres
+
+Quand le Profil de l'élève l'active, l'appli ajoute `?espacement=1` à l'adresse de la page et le Kit agrandit l'espacement des lettres (0,12 em) et des mots (0,16 em), valeurs de WCAG 1.4.12. Tu n'as rien à écrire. Ne fixe pas la hauteur d'un bloc de texte et n'écris pas de `letter-spacing` sur le texte courant : le réglage doit pouvoir s'y appliquer sans perte. Les schémas `<svg>` ne sont pas touchés. Ajout compatible de la version 1 : une page ouverte sans le réglage est inchangée.
+
 ## Style de base
 
 `/kit/v1/base.css` règle la typographie, le mode sombre et la couleur de la Catégorie, choisie par `data-categorie` sur `<html>` : `francais`, `mathematiques`, `sciences`, `histoire`, `geographie`, `langues`, `arts` ou `autre`. La classe `encart` (ou `<aside>`) met un bloc en valeur, par exemple l'encart « 🚀 Pour aller plus loin » : une carte teintée et cerclée de la couleur de la Catégorie.

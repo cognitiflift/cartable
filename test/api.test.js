@@ -1125,6 +1125,26 @@ test('Lecture à voix haute : coupée par défaut, réglée à la création et d
   await attendrePropositions('voix-test');
 });
 
+test('Espacement des lettres : coupé par défaut, réglé à la création et dans le Profil, 400 si ce n\'est pas oui ou non', async () => {
+  const defaut = await appel('/api/eleves', 'POST', { pseudo: 'Esp-Defaut', age: 7, niveau: 'Primaire 2' });
+  assert.equal(defaut.data.espacementLettres, false);
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Esp-Invalide', age: 7, niveau: 'Primaire 2', espacementLettres: 'oui' })).status, 400);
+  const cree = await appel('/api/eleves', 'POST', { pseudo: 'Esp-Test', age: 7, niveau: 'Primaire 2', espacementLettres: true });
+  assert.equal(cree.data.espacementLettres, true);
+  assert.equal((await appel('/api/eleves/esp-test', 'PUT', { espacementLettres: 1 })).status, 400);
+  assert.equal((await appel('/api/eleves/esp-test', 'PUT', { age: 8 })).data.espacementLettres, true, 'un autre réglage ne le change pas');
+  assert.equal((await appel('/api/eleves/esp-test', 'PUT', { espacementLettres: false })).data.espacementLettres, false);
+  assert.equal((await appel('/api/eleves/esp-test')).data.espacementLettres, false);
+  await attendrePropositions('esp-defaut');
+  await attendrePropositions('esp-test');
+});
+
+test('Espacement des lettres : un Élève existant sans ce réglage ne l\'a pas', async () => {
+  await fs.mkdir(path.join(eleves, 'ancien-esp', 'lecons'), { recursive: true });
+  await fs.writeFile(path.join(eleves, 'ancien-esp', 'profil.json'), JSON.stringify({ pseudo: 'Ancien-Esp', slug: 'ancien-esp', age: 10, niveau: 'Primaire 5' }));
+  assert.equal((await appel('/api/eleves/ancien-esp')).data.espacementLettres, false);
+});
+
 test('Lecture à voix haute : un Élève existant sans ce réglage ne l\'a pas', async () => {
   await fs.mkdir(path.join(eleves, 'ancien-voix', 'lecons'), { recursive: true });
   await fs.writeFile(path.join(eleves, 'ancien-voix', 'profil.json'), JSON.stringify({ pseudo: 'Ancien-Voix', slug: 'ancien-voix', age: 10, niveau: 'Primaire 5' }));

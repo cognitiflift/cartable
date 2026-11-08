@@ -94,9 +94,10 @@ function formulaireProfil({ profil, titre, envoyer }) {
   const preparerPages = h('input', { name: 'preparerPages', type: 'checkbox', checked: profil?.preparerPages ?? true });
   const modele = h('select', { name: 'modele' }, config.modeles.map((m) => h('option', { value: m.id, selected: m.id === (profil?.modele ?? config.modeleDefaut) }, `${m.libelle} — ${m.description}`)));
   const lectureVoixHaute = h('input', { name: 'lectureVoixHaute', type: 'checkbox', checked: profil?.lectureVoixHaute ?? false });
+  const espacementLettres = h('input', { name: 'espacementLettres', type: 'checkbox', checked: profil?.espacementLettres ?? false });
   const form = h('form', { className: 'colonne', onsubmit: async (ev) => {
     ev.preventDefault();
-    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked, preparerPages: preparerPages.checked }); } catch (e) { erreur.textContent = e.message; }
+    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked, espacementLettres: espacementLettres.checked, preparerPages: preparerPages.checked }); } catch (e) { erreur.textContent = e.message; }
   } },
     !profil && h('label', {}, 'Pseudo', h('br'), pseudo),
     h('label', {}, 'Âge', h('br'), age),
@@ -104,6 +105,7 @@ function formulaireProfil({ profil, titre, envoyer }) {
     h('label', {}, "Nombre d'idées de leçons proposées (2 à 10)", h('br'), nombrePropositions),
     h('label', {}, 'Modèle', h('br'), modele),
     h('label', {}, lectureVoixHaute, ' 🔊 Lecture à voix haute des pages et des questions (avec la voix de cet appareil)'),
+    h('label', {}, espacementLettres, ' Espacement des lettres et des mots agrandi (pour lire plus facilement)'),
     h('label', {}, preparerPages, ' Préparer la page suivante pendant le quiz (plus rapide, coûte parfois un tour de plus)'),
     h('button', {}, profil ? 'Enregistrer' : 'Créer'),
     erreur);
@@ -1033,7 +1035,10 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     if (!lecon.pages.length || pagesAffichees === lecon.pages.join()) return;
     pagesAffichees = lecon.pages.join();
     // Le réglage de lecture à voix haute du Profil est transmis à la page dans son adresse (Kit, lecture.js).
-    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${profil.lectureVoixHaute ? '?lecture=1' : ''}`;
+    const reglages = new URLSearchParams();
+    if (profil.lectureVoixHaute) reglages.set('lecture', '1');
+    if (profil.espacementLettres) reglages.set('espacement', '1'); // espacement des lettres du Profil (#160)
+    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${reglages.size ? `?${reglages}` : ''}`;
     const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
     choix.value = lecon.pages.includes(pageDemandee) ? pageDemandee : lecon.pages.at(-1);
     pageDemandee = null; // seulement à l'ouverture : une nouvelle page du prof s'affiche ensuite comme d'habitude
@@ -1142,6 +1147,7 @@ async function route() {
     if (page === 'nouvel-eleve') return await ecranNouvelEleve();
     const slug = pseudoCourant();
     const profil = slug && (await api(`eleves/${slug}`).catch(() => null));
+    document.documentElement.classList.toggle('espacement-lettres', !!profil?.espacementLettres); // réglage du Profil (#160)
     if (!profil) return await ecranChoix();
     barreNav(profil);
     if (page === 'profil') return await ecranProfil(profil);

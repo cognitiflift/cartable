@@ -13,6 +13,7 @@
   --kit-fond: #f2f4f8; --kit-texte: #14182b; --kit-doux: #4f566c; --kit-carte: #fff; --kit-bord: #dde1ea;
   --kit-accent: #262a7a; --kit-sur-accent: #fff; --kit-encre-noire: #000;
   --kit-juste: #15803d; --kit-faux: #b42318;
+  --kit-espacement-lettres: .12em; --kit-espacement-mots: .16em; /* WCAG 1.4.12 : valeurs de DESIGN.md (espacement-lettres, espacement-mots) */
   color-scheme: light dark;
 }
 [data-categorie="francais"]      { --kit-accent: #c2410c; }
@@ -175,3 +176,9 @@
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font: 800 1.4rem/1.2 var(--kit-police-titre); color: var(--kit-accent-fort); }
 .kit-quiz-erreur { color: var(--kit-faux); }
+
+/* Espacement des lettres (#160) : réglage du Profil, transmis par l'adresse de la page (espacement.js). Hérité par tout
+   le texte ; les schémas SVG ne sont pas touchés. */
+html.kit-espacement { letter-spacing: var(--kit-espacement-lettres); word-spacing: var(--kit-espacement-mots); }
+html.kit-espacement :is(h1, h2, h3, h4) { letter-spacing: var(--kit-espacement-lettres); }
+html.kit-espacement svg, html.kit-espacement svg * { letter-spacing: normal; word-spacing: normal; }

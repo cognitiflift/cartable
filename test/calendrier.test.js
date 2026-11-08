@@ -78,3 +78,13 @@ test('Calendrier : chaque jour dit ce qui a été gagné (Étoiles, Fusées, Pal
   ]);
   assert.doesNotMatch(JSON.stringify(cal), /score|%|reussies|juste/i);
 });
+
+test('Calendrier : un jour réparé a sa propre marque (repare), distincte du Joker (#159)', () => {
+  // Lundi 5 atteint ; mardi 6 à jeudi 8 couverts ; vendredi 9 non couvert ; samedi 10, dix Révisions du jour : vendredi est réparé.
+  const cal = calendrier({
+    lecons: [lecon({ scores: [['2026-10-05', '0002-a.html']], revisions: Array(10).fill('2026-10-10') })],
+    maintenant: a('2026-10-10', 20),
+  });
+  assert.deepEqual(cal.jours.filter((j) => j.repare).map((j) => [j.jour, j.joker]), [['2026-10-09', false]]);
+  assert.deepEqual(cal.jours.filter((j) => j.joker).map((j) => j.jour), ['2026-10-06', '2026-10-07', '2026-10-08']);
+});

@@ -137,10 +137,14 @@ Petit but quotidien montré sur l'accueil : 5 réponses en Révision du jour ou 
 _Avoid_: Objectif tout court (un Objectif appartient à une Leçon), quota, devoir
 
 **Jour travaillé**:
-Jour local où l'Élève a enregistré au moins une réponse : quiz de page, Pré-test ou Révision du jour. Lire une page sans faire son quiz ne compte pas. Le calendrier de Mes badges le montre pâle, plein quand l'Objectif du jour est atteint, avec 🛡️ quand un Joker l'a couvert.
+Jour local où l'Élève a enregistré au moins une réponse : quiz de page, Pré-test ou Révision du jour. Lire une page sans faire son quiz ne compte pas. Le calendrier de Mes badges le montre pâle, plein quand l'Objectif du jour est atteint, avec 🛡️ quand un Joker l'a couvert et 🩹 quand c'est un **jour réparé**.
+
+**Jour réparé**:
+Jour manqué, seul jour non couvert par un Joker d'une pause, que l'Élève a réparé en atteignant deux fois l'Objectif du jour à son retour. Il compte comme un jour couvert par un Joker (la **Série de jours** d'avant reprend), pas comme un jour où l'Objectif du jour est atteint ; le calendrier de Mes badges le marque de 🩹, distinct du 🛡️.
+_Avoid_: jour rattrapé, jour gagné
 
 **Série de jours**:
-Nombre de jours où l'Objectif du jour a été atteint, de suite. Aujourd'hui, pas encore atteint, ne la casse pas. Chaque semaine (du lundi au dimanche), l'Élève reçoit sans condition trois **Jokers**, qui ne se reportent pas sur la semaine suivante ; un Joker couvre tout seul un jour manqué. Une pause plus longue que les Jokers de la semaine fait repartir la série. Un **récapitulatif de la semaine** passée (Objectifs devenus Retenus, révisions, pages) s'affiche au premier retour de la semaine. Jamais de comparaison entre Élèves.
+Nombre de jours où l'Objectif du jour a été atteint, de suite. Aujourd'hui, pas encore atteint, ne la casse pas. Chaque semaine (du lundi au dimanche), l'Élève reçoit sans condition trois **Jokers**, qui ne se reportent pas sur la semaine suivante ; un Joker couvre tout seul un jour manqué. Une pause plus longue que les Jokers de la semaine fait repartir la série, sauf si un seul jour reste non couvert : le jour du retour, atteindre **deux fois** l'Objectif du jour (10 réponses en Révision du jour ou 2 Pages de leçon) la répare. Une série repartie laisse voir, à côté de la série en cours, la meilleure série et le total des Jours travaillés. Un **récapitulatif de la semaine** passée (Objectifs devenus Retenus, révisions, pages) s'affiche au premier retour de la semaine. Jamais de comparaison entre Élèves.
 _Avoid_: série tout court (une Révision du jour est aussi une série de Questions), streak, classement
 
 **Badge**:

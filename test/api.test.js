@@ -3146,6 +3146,9 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.deepEqual(lundi.data, {
     objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
     serieDeJours: { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: true },
+    reparation: null,
+    meilleureSerie: 1,
+    joursTravailles: 1,
     recapitulatif: null,
   });
   // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
@@ -3165,7 +3168,42 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
 });
 
-test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls la série des jours manqués', async () => {
+// Réparation de la Série de jours (#159) : une pause qui dépasse les Jokers d'un seul jour se répare le jour du retour
+// en atteignant deux fois l'Objectif du jour ; le jour réparé a sa marque dans le calendrier de Mes badges.
+test('Rythme : réparer sa série le jour du retour (deux fois l\'Objectif du jour), meilleure série et Jours travaillés', async () => {
+  // Lundi 2 novembre : une page terminée. Mardi 3, mercredi 4 et jeudi 5 couverts par les 3 Jokers ; vendredi 6 non couvert.
+  const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Reparation', 1);
+  const url = `/api/eleves/${slug}/rythme`;
+  const samedi = '2026-11-07T12:00:00.000Z';
+  const rythme = async () => (await appel(url, 'GET', undefined, le(samedi))).data;
+  // Samedi 7, rien encore : la série est repartie, la réparation est proposée, la meilleure série reste sous les yeux.
+  const avant = await rythme();
+  assert.equal(avant.serieDeJours.jours, 0);
+  assert.deepEqual(avant.reparation, { jourManque: '2026-11-06', serieAvant: 1, revisions: 0, revisionsVisees: 10, pages: 0, pagesVisees: 2 });
+  assert.equal(avant.meilleureSerie, 1);
+  assert.equal(avant.joursTravailles, 1);
+  // Neuf Révisions du jour : pas encore deux fois l'objectif.
+  const reviser = (i) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 }, le(samedi));
+  for (let i = 0; i < 9; i++) assert.equal((await reviser(i)).status, 200);
+  const presque = await rythme();
+  assert.equal(presque.reparation.revisions, 9);
+  assert.equal(presque.serieDeJours.jours, 1);
+  // La dixième : la série d'avant reprend (1 jour + le retour), le jour manqué est réparé et compte comme couvert.
+  await reviser(9);
+  const apres = await rythme();
+  assert.equal(apres.reparation, null);
+  assert.deepEqual(apres.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 4, aujourdhui: true });
+  assert.equal(apres.meilleureSerie, 2);
+  const { calendrier } = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le(samedi))).data;
+  assert.deepEqual(calendrier.jours.filter((j) => j.repare).map((j) => [j.jour, j.joker]), [['2026-11-06', false]]);
+  assert.deepEqual(calendrier.jours.filter((j) => j.joker).map((j) => j.jour), ['2026-11-03', '2026-11-04', '2026-11-05']);
+  // Dimanche 8 : plus de réparation à proposer, et le jour réparé reste réparé.
+  const dimanche = (await appel(url, 'GET', undefined, le('2026-11-08T12:00:00.000Z'))).data;
+  assert.equal(dimanche.reparation, null);
+  assert.equal(dimanche.serieDeJours.jours, 2);
+});
+
+test('Rythme : 3 Jokers par semaine dès la première,qui protègent tout seuls la série des jours manqués', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
   const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
   for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
@@ -3257,9 +3295,9 @@ test('Calendrier de Mes badges (#99) : Jours travaillés, ce qui a été fait et
   assert.equal(calendrier.aujourdhui, '2026-11-05');
   const volcans = { id: lecon.id, titre: 'Les volcans' };
   assert.deepEqual(calendrier.jours, [
-    { jour: '2026-11-02', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } },
-    { jour: '2026-11-03', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 1, fusees: 0, paliers: [] } },
-    { jour: '2026-11-04', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0,
+    { jour: '2026-11-02', etat: 'plein', joker: false, repare: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } },
+    { jour: '2026-11-03', etat: 'plein', joker: false, repare: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 1, fusees: 0, paliers: [] } },
+    { jour: '2026-11-04', etat: 'plein', joker: false, repare: false, lecons: [volcans], quiz: 1, revisions: 0,
       gains: { etoiles: 1, fusees: 0, paliers: [{ id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze' }] } },
   ]);
   assert.doesNotMatch(JSON.stringify(calendrier), /score|%/i);

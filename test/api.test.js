@@ -2228,7 +2228,7 @@ test('Révisions du jour : une réponse est corrigée par le serveur et journali
   const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
   const [q1, q2] = questions;
   assert.deepEqual(q1.journal.at(-1), { date: LENDEMAIN, juste: true, sur: true, origine: 'revision' });
-  assert.deepEqual(q2.journal.at(-1), { date: LENDEMAIN, juste: false, sur: true, origine: 'revision' });
+  assert.deepEqual(q2.journal.at(-1), { date: LENDEMAIN, juste: false, sur: true, choisie: 'De la glace', origine: 'revision' });
   // Ratée : de nouveau due le lendemain. Sue : plusieurs jours plus tard.
   assert.equal(q2.prochaineRevision, '2026-11-04T12:00:00.000Z');
   assert.ok(Date.parse(q1.prochaineRevision) >= Date.parse('2026-11-06T12:00:00.000Z'), q1.prochaineRevision);
@@ -4097,4 +4097,88 @@ test('Planificateur : FSRS-6 pour un Élève dont il prédit mieux les réponses
   assert.deepEqual(Object.keys(JSON.parse(await fs.readFile(fichier, 'utf8'))['0002-volcans.html#p0']), ['id', 'page', 'contenu', 'journal']);
   // Le résumé de la liste des Leçons n'expose pas le planificateur.
   assert.equal((await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, maintenant)).data[0].planificateur, undefined);
+});
+
+// Vue parent : Questions signalées, suspectes, Rétablir et Signaler (spec #145, ticket #148).
+const parentSignalements = (slug) => `/api/eleves/${slug}/parent/signalements`;
+const parentRetablissements = (slug) => `/api/eleves/${slug}/parent/retablissements`;
+const vueParentDe = async (slug, date) => (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(date))).data;
+
+test('Vue parent : le parent signale une Question (auteur parent), elle est listée avec sa bonne réponse et sa raison', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Signale', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'reponse-fausse' };
+  assert.equal((await vueParentDe(slug, LENDEMAIN)).questionsSignalees.length, 0);
+  for (const raison of ['au-hasard', undefined, '']) {
+    assert.equal((await appel(parentSignalements(slug), 'POST', { ...corps, raison }, le(LENDEMAIN))).status, 400, String(raison));
+  }
+  assert.equal((await appel(parentSignalements(slug), 'POST', { ...corps, id: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await appel(parentSignalements(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+
+  const vue = await vueParentDe(slug, LENDEMAIN);
+  assert.deepEqual(vue.questionsSignalees, [{
+    lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'q1', enonce: 'Où sort la lave ?', bonne: 'Par le cratère',
+    raison: 'reponse-fausse', libelleRaison: 'La bonne réponse me semble fausse', auteur: 'parent', date: LENDEMAIN,
+  }]);
+  // Plus signalable ; les autres Questions le restent.
+  assert.deepEqual(vue.questionsSignalables.flatMap((l) => l.questions.map((q) => q.id)), ['q2']);
+  const evenement = (await evenementsDe(slug)).find((e) => e.type === 'signalement');
+  assert.deepEqual(evenement, { type: 'signalement', date: LENDEMAIN, lecon: lecon.id, raison: 'reponse-fausse', auteur: 'parent' });
+  // Comme celle de l'Élève : plus servie.
+  assert.deepEqual((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.questions.map((q) => q.id), ['q2']);
+});
+
+test('Vue parent : Rétablir retire le signalement sans perte (Révision du jour, Maîtrise, journal) et note un événement', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Retablit', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'q1' };
+  assert.equal((await appel(parentRetablissements(slug), 'POST', corps, le(LENDEMAIN))).status, 409, 'pas signalée');
+  await appel(signalements(slug), 'POST', { ...corps, raison: 'pas-claire' }, le(LENDEMAIN)); // signalée par l'Élève
+  assert.equal((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+  assert.equal((await appel(parentRetablissements(slug), 'POST', { ...corps, id: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await appel(parentRetablissements(slug), 'POST', { ...corps, lecon: undefined }, le(LENDEMAIN))).status, 400);
+  assert.equal((await appel(parentRetablissements(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+
+  const apres = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(apres.questions.find((q) => q.id === 'q1').signalement, undefined);
+  assert.deepEqual(apres.questions.find((q) => q.id === 'q1').journal, avant.questions.find((q) => q.id === 'q1').journal);
+  assert.deepEqual(apres.maitrise, avant.maitrise);
+  assert.equal((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.dues, 2);
+  assert.deepEqual((await vueParentDe(slug, LENDEMAIN)).questionsSignalees, []);
+  assert.deepEqual((await evenementsDe(slug)).find((e) => e.type === 'retablissement'), { type: 'retablissement', date: LENDEMAIN, lecon: lecon.id });
+  // Les indicateurs comptent la Question signalée puis rétablie.
+  assert.deepEqual((await vueParentDe(slug, LENDEMAIN)).indicateurs.questionsSignalees, { signalees: 1, retablies: 1, suspectes: 0 });
+});
+
+test('Vue parent : une Question suspecte est montrée sans être retirée ni stockée, et le parent peut la signaler', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Suspecte', 1);
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  const cle = '0002-volcans.html#q1';
+  const rep = (jour, juste, variante) => ({ date: `2026-10-0${jour}T10:00:00.000Z`, juste, origine: 'revision', ...(variante !== undefined && { variante }) });
+  // Question d'origine réussie deux fois, sa Variante ratée deux fois sur deux.
+  banque[cle].journal = [rep(1, true), rep(2, true), rep(3, false, 0), rep(4, false, 0)];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+
+  const vue = await vueParentDe(slug, LENDEMAIN);
+  assert.equal(vue.questionsSuspectes.length, 1);
+  assert.deepEqual(vue.questionsSuspectes[0], {
+    lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'q1', enonce: 'Où sort la lave ?', bonne: 'Par le cratère',
+    motifs: [{ type: 'variante', variante: 0, ratees: 2, reponses: 2, origine: { ratees: 0, reponses: 2 } }],
+  });
+  assert.equal(vue.indicateurs.questionsSignalees.suspectes, 1);
+  // Jamais retirée d'office : toujours dans la Banque, sans signalement.
+  assert.equal(JSON.parse(await fs.readFile(fichier, 'utf8'))[cle].signalement, undefined);
+  // Signalée par le parent : elle quitte la liste des suspectes.
+  await appel(parentSignalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'pas-claire' }, le(LENDEMAIN));
+  assert.deepEqual((await vueParentDe(slug, LENDEMAIN)).questionsSuspectes, []);
+});
+
+test('Vue parent : la réponse fausse choisie en Révision du jour est gardée au journal (pour repérer les Questions suspectes)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Choisie', 1);
+  const reponse = await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 1, sur: true }, le(LENDEMAIN));
+  assert.equal(reponse.data.juste, false);
+  const journal = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1').journal;
+  assert.equal(journal.at(-1).choisie, 'Par les racines');
+  assert.equal(journal.at(-1).sur, true);
 });

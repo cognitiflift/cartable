@@ -1119,7 +1119,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     if (profil.lectureVoixHaute) reglages.set('lecture', '1');
     if (profil.espacementLettres) reglages.set('espacement', '1'); // espacement des lettres du Profil (#160)
     const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${reglages.size ? `?${reglages}` : ''}`;
-    const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
+    const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p, i) => h('option', { value: p }, `Page ${i + 1} sur ${lecon.pages.length}`)));
     choix.value = lecon.pages.includes(pageDemandee) ? pageDemandee : lecon.pages.at(-1);
     pageDemandee = null; // seulement à l'ouverture : une nouvelle page du prof s'affiche ensuite comme d'habitude
     iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
@@ -1247,7 +1247,7 @@ async function route() {
     if (page === 'badges') return await ecranBadges(profil);
     return await ecranAccueil(profil);
   } catch (e) {
-    montrer(h('p', { className: 'erreur' }, e.message));
+    montrer(h('div', {}, h('p', { className: 'erreur' }, 'Impossible de charger cet écran pour le moment. Vérifie que l’appli tourne encore, puis réessaie.'), h('button', { className: 'secondaire', onclick: () => route() }, 'Réessayer')));
   }
 }
 

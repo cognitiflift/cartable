@@ -178,7 +178,7 @@ const SECTIONS_PARENT = [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente } }) => [
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
@@ -187,8 +187,21 @@ const SECTIONS_PARENT = [
         ? `${retour.pourcentage} % (${retour.revenus} sur ${pluriel(retour.lecons, 'Leçon')})` : 'pas encore mesurable.',
         retour.enAttente ? ` ${pluriel(retour.enAttente, 'Leçon')} trop récente${retour.enAttente > 1 ? 's' : ''} pour le dire.` : ''),
       h('li', {}, 'Attente du prof : ', attente.tours
-        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'))] },
+        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'),
+      h('li', {}, '« Je ne sais pas » : ', partJeNeSaisPas(jeNeSaisPas.quiz, 'dans les quiz de page', 'aucun quiz de page'), ' ',
+        partJeNeSaisPas(jeNeSaisPas.revision, 'aux Révisions du jour', 'aucune Révision du jour')),
+      h('li', {}, 'Réussite des quiz selon la page : ', MESURES_REBOND.some(([cle]) => reussiteParRebond[cle].quiz)
+        ? MESURES_REBOND.filter(([cle]) => reussiteParRebond[cle].quiz).map(([cle, mot]) =>
+          `${mot} ${reussiteParRebond[cle].pourcentage} % (${pluriel(reussiteParRebond[cle].quiz, 'quiz')})`).join(' ; ') + '.'
+        : 'pas encore de quiz.'),
+      h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
+        ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'))] },
 ];
+
+// Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »
+const partJeNeSaisPas = ({ reponses, jeNeSaisPas, pourcentage }, ou, vide) =>
+  reponses ? `${pourcentage} % ${ou} (${jeNeSaisPas} sur ${pluriel(reponses, 'réponse')}).` : `${vide}.`;
+const MESURES_REBOND = [['nouvelle', 'page nouvelle'], ['revoir', 'Revoir'], ['defi', 'Défi'], ['reviser', 'Réviser']];
 
 async function ecranParent(profil) {
   const agregats = await api(`eleves/${profil.slug}/parent`);

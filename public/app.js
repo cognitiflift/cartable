@@ -312,7 +312,7 @@ function rappelCalendrier(profil, etat) {
   const libelle = (id) => etat.choix.find((c) => c.id === id).libelle;
   const dessiner = () => {
     const avecHeure = etat.moment && etat.moment in etat.heures;
-    zone.replaceChildren(
+    zone.replaceChildren(...garder([
       h('p', { className: 'doux' }, 'Le fichier se génère ici, sur cet appareil : rien n’est envoyé ni hébergé. Tu l’ouvres dans ton calendrier, qui te préviendra à l’heure choisie.'),
       h('div', { className: 'rappel-heures' }, Object.entries(etat.heures).map(([id, heure]) => h('label', {},
         `${libelle(id)} `,
@@ -324,7 +324,7 @@ function rappelCalendrier(profil, etat) {
       avecHeure
         ? [h('p', {}, `${profil.pseudo} a choisi : ${libelle(etat.moment).toLowerCase()}, à ${etat.heures[etat.moment].replace(':', ' h ')}.`),
           h('a', { className: 'bouton', href: `/api/eleves/${profil.slug}/moment/calendrier.ics`, download: `rappel-${profil.slug}.ics` }, 'Télécharger le fichier calendrier')]
-        : h('p', {}, `${profil.pseudo} n’a pas encore choisi son moment de révision (l’appli le lui propose après l’Objectif du jour). Il n’y a donc pas de fichier à télécharger pour l’instant.`));
+        : h('p', {}, `${profil.pseudo} n’a pas encore choisi son moment de révision (l’appli le lui propose après l’Objectif du jour). Il n’y a donc pas de fichier à télécharger pour l’instant.`)]));
   };
   dessiner();
   return zone;

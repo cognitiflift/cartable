@@ -101,6 +101,69 @@ test('Style : public/style.css n\'emploie que les jetons de DESIGN.md, hors exce
   assert.deepEqual(ecartsDeStyle(css, EXCEPTIONS), []);
 });
 
+test('Style : une taille de texte hors de l\'échelle de DESIGN.md est signalée, raccourci font compris', () => {
+  const css = `.a { font-size: .92rem; } .b { font: 800 1.2rem/1.2 var(--police-titre); } .c { font-size: .85rem; }
+    .d { font: 600 1.05rem/1.2 var(--police); } .e { font-size: inherit; } .f { font: inherit; } .g { font-size: 17px; }
+    @media (max-width: 640px) { .h { font-size: 1.15rem; } }`;
+  const tailles = ['0.92rem', '1.2rem', '17px', '1.15rem'];
+  assert.deepEqual(ecartsDeTailles(css, tailles, []).map((e) => e.split(' hors')[0]), [
+    '.c { font-size } : taille .85rem',
+    '.d { font } : taille 1.05rem',
+  ]);
+});
+
+test('Style : une taille en exception passe ; une exception qui ne correspond plus à rien échoue', () => {
+  const ecarts = ecartsDeTailles('.p { font-size: .85em; }', ['1rem'], [{ lieu: '.p', valeur: '.85em' }, { lieu: '.q', valeur: '1.1em' }]);
+  assert.deepEqual(ecarts, ['Exception périmée : .q { font-size: 1.1em } n\'apparaît plus dans la feuille de style. La retirer de la liste.']);
+});
+
+test('Style : les tailles de DESIGN.md sont celles du bloc typography', () => {
+  const design = '---\ntypography:\n  body:\n    fontSize: "17px"\n  petit:\n    fontSize: "0.92rem"\ncolors:\n  a: "#fff"\n---\n';
+  assert.deepEqual([...taillesDuDesign(design)], ['17px', '.92rem']);
+});
+
+// Les tailles en em de public/style.css, relatives au texte qui les porte et non à l'échelle : la pastille d'un
+// Badge se dimensionne en em de son contexte. La liste ne peut que rétrécir.
+const EXCEPTIONS_TAILLES = [
+  { lieu: '.gain-badge .pastille-badge', valeur: '.85em' },
+  { lieu: '.pastille-badge', valeur: '1.1em' },
+];
+
+test('Style : toute taille de texte de public/style.css est un niveau de l\'échelle de DESIGN.md', async () => {
+  const design = await readFile(new URL('../DESIGN.md', import.meta.url), 'utf8');
+  assert.deepEqual(ecartsDeTailles(await lireStyle(), taillesDuDesign(design), EXCEPTIONS_TAILLES), []);
+});
+
+// Les tailles (fontSize) du bloc typography de DESIGN.md, normalisées (« 0.92rem » → « .92rem »).
+function taillesDuDesign(design) {
+  const entete = design.split(/^---$/m)[1] ?? '';
+  const bloc = entete.match(/^typography:\n((?:[ \t]+.*\n?)*)/m)?.[1] ?? '';
+  return new Set([...bloc.matchAll(/^\s+fontSize:\s*"([^"]+)"/gm)].map((m) => normaliserTaille(m[1])));
+}
+
+const normaliserTaille = (t) => t.replace(/^0(?=\.)/, '');
+
+// Les tailles de texte hors de l'échelle : font-size et le raccourci font, hors mots-clés CSS (inherit…).
+function ecartsDeTailles(css, tailles, exceptions) {
+  const echelle = new Set([...tailles].map(normaliserTaille));
+  const ecarts = [];
+  const vues = new Set();
+  for (const { lieu, propriete, valeur } of declarations(css)) {
+    if (propriete !== 'font-size' && propriete !== 'font') continue;
+    const taille = propriete === 'font-size' ? valeur : valeur.match(/(?:^|\s)(\d*\.?\d+(?:rem|px|em))(?=\/|\s|$)/)?.[1];
+    if (!taille || MOTS_CLES_CSS.test(taille)) continue;
+    const t = normaliserTaille(taille);
+    if (echelle.has(t)) continue;
+    const exception = exceptions.find((e) => e.lieu === lieu && e.valeur === t);
+    if (exception) { vues.add(exception); continue; }
+    ecarts.push(`${lieu} { ${propriete} } : taille ${t} hors de l'échelle de DESIGN.md. Prendre un niveau de la rubrique typography, ou en créer un dans DESIGN.md.`);
+  }
+  for (const e of exceptions) {
+    if (!vues.has(e)) ecarts.push(`Exception périmée : ${e.lieu} { font-size: ${e.valeur} } n'apparaît plus dans la feuille de style. La retirer de la liste.`);
+  }
+  return ecarts;
+}
+
 test('Style : les couleurs de DESIGN.md sont celles de public/style.css', async () => {
   const design = await readFile(new URL('../DESIGN.md', import.meta.url), 'utf8');
   const css = await lireStyle();

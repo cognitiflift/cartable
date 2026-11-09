@@ -856,15 +856,23 @@
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Le titre « Mes leçons » (1.6rem sous 640px)."
+        "purpose": "Les titres « Mes leçons » et de la Vue parent."
+      },
+      "display-mobile": {
+        "displayName": "Display mobile",
+        "purpose": "Display sous 640px (1.6rem)."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Le salut du bandeau de la semaine et les titres de section."
+        "purpose": "Le salut du bandeau de la semaine et les titres de section, dont ceux de la Vue parent."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Le nom d'une Leçon sur sa carte de ligne (1.15rem sous 640px)."
+        "purpose": "Le nom d'une Leçon sur sa carte de ligne."
+      },
+      "title-mobile": {
+        "displayName": "Title mobile",
+        "purpose": "Title sous 640px (1.15rem)."
       },
       "title-categorie": {
         "displayName": "Titre de Catégorie",
@@ -1074,7 +1082,7 @@
       "refersTo": "en-tete",
       "description": "La bande bleu nuit commune : marque, compteur d'Étoiles, Élève, Profil, Changer et le bouton de thème (automatique, clair, sombre).",
       "html": "<header class=\"ds-tete\"><strong class=\"ds-marque\">🎒 Cartable</strong><nav class=\"ds-nav\"><a class=\"ds-etoiles\" href=\"#\"><span aria-hidden=\"true\">⭐</span> 12 <span class=\"ds-nouveau\">Nouveau</span></a><span class=\"ds-qui\">Robin · Primaire 6</span><button class=\"ds-tete-btn\">Mon profil</button><button class=\"ds-tete-btn\">Changer</button><button class=\"ds-tete-btn\" aria-label=\"Thème : automatique, comme l'appareil. Passer au thème clair\" title=\"Thème : automatique, comme l'appareil. Passer au thème clair\"><span aria-hidden=\"true\">🌗</span></button></nav></header>",
-      "css": ".ds-tete{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 1.5rem;background:#14182b;color:#fff}.ds-marque{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.35rem;line-height:1;letter-spacing:-.01em}.ds-nav{display:flex;align-items:center;gap:.5rem}.ds-qui{color:#c3c8db;margin:0 .3rem}.ds-etoiles{display:inline-flex;align-items:center;gap:.35rem;min-height:2.6rem;padding:.3rem .9rem;border-radius:999px;background:rgb(255 255 255/.12);color:#fff;font-weight:800;font-variant-numeric:tabular-nums;text-decoration:none;transition:background .15s}.ds-etoiles:hover{background:rgb(255 255 255/.2)}.ds-nouveau{padding:0 .45rem;font-size:.75rem;font-weight:700;border-radius:999px;background:#fbbf24;color:#14182b}.ds-tete-btn{font:inherit;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid rgb(255 255 255/.32);background:transparent;color:#fff;cursor:pointer}.ds-tete-btn:hover{background:rgb(255 255 255/.1)}.ds-tete-btn:focus-visible,.ds-etoiles:focus-visible{outline:3px solid #b9c3ff;outline-offset:2px}"
+      "css": ".ds-tete{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 1.5rem;background:#14182b;color:#fff}.ds-marque{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:1.35rem;line-height:1;letter-spacing:-.01em}.ds-nav{display:flex;align-items:center;gap:.5rem}.ds-qui{color:#c3c8db;margin:0 .3rem}.ds-etoiles{display:inline-flex;align-items:center;gap:.35rem;min-height:2.75rem;padding:.3rem .9rem;border-radius:999px;background:rgb(255 255 255/.12);color:#fff;font-weight:800;font-variant-numeric:tabular-nums;text-decoration:none;transition:background .15s}.ds-etoiles:hover{background:rgb(255 255 255/.2)}.ds-nouveau{padding:0 .45rem;font-size:.75rem;font-weight:700;border-radius:999px;background:#fbbf24;color:#14182b}.ds-tete-btn{font:inherit;font-weight:600;padding:.5rem .8rem;border-radius:10px;border:1px solid rgb(255 255 255/.32);background:transparent;color:#fff;cursor:pointer}.ds-tete-btn:hover{background:rgb(255 255 255/.1)}.ds-tete-btn:focus-visible,.ds-etoiles:focus-visible{outline:3px solid #b9c3ff;outline-offset:2px}"
     },
     {
       "name": "Pastilles",
@@ -1098,7 +1106,7 @@
       "refersTo": "ma-semaine",
       "description": "Du lundi au dimanche : tampons vide, pâle, plein, futur, avec le jour courant cerclé.",
       "html": "<ol class=\"ds-jours\"><li class=\"ds-j\"><span class=\"ds-n\">lun</span><span class=\"ds-t\">12</span></li><li class=\"ds-j ds-pale\"><span class=\"ds-n\">mar</span><span class=\"ds-t\">13</span></li><li class=\"ds-j ds-plein\"><span class=\"ds-n\">mer</span><span class=\"ds-t\">14<span class=\"ds-jk\">🛡️</span></span></li><li class=\"ds-j ds-plein ds-auj\"><span class=\"ds-n\">jeu</span><span class=\"ds-t\">15</span><span class=\"ds-g\">⭐2 🚀</span></li><li class=\"ds-j ds-fut\"><span class=\"ds-n\">ven</span><span class=\"ds-t\">16</span></li></ol>",
-      "css": ".ds-jours{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;list-style:none;margin:0;padding:1rem;display:grid;grid-template-columns:repeat(5,4.5rem);gap:.35rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 2px 10px rgb(20 24 43/.05);width:max-content}.ds-j{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.45rem .15rem .5rem;border-radius:12px;min-height:6.3rem}.ds-n{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;color:#4f566c}.ds-t{position:relative;display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:50%;border:2px dashed #80879a;font-weight:800;font-variant-numeric:tabular-nums;color:#4f566c;box-sizing:border-box}.ds-pale .ds-t{border:2px solid transparent;background:color-mix(in srgb,#262a7a 22%,#fff);color:#14182b}.ds-plein .ds-t{border:2px solid #262a7a;background:#262a7a;color:#fff}.ds-fut .ds-t{border-style:dotted}.ds-auj{background:color-mix(in srgb,#262a7a 9%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,#262a7a 45%,transparent)}.ds-auj .ds-n{color:#262a7a}.ds-jk{position:absolute;top:-.45rem;right:-.55rem;font-size:.8rem}.ds-g{font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}"
+      "css": ".ds-jours{font-family:'Atkinson Hyperlegible Next',system-ui,sans-serif;list-style:none;margin:0;padding:1rem;display:grid;grid-template-columns:repeat(5,4.5rem);gap:.35rem;background:#fff;border:1px solid #dde1ea;border-radius:18px;box-shadow:0 2px 10px rgb(20 24 43/.05);width:max-content}.ds-j{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.45rem .15rem .5rem;border-radius:12px}.ds-n{font-family:'Overpass','Atkinson Hyperlegible Next',system-ui,sans-serif;font-weight:800;font-size:.74rem;line-height:1;text-transform:uppercase;letter-spacing:.07em;color:#4f566c}.ds-t{position:relative;display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:50%;border:2px dashed #80879a;font-weight:800;font-variant-numeric:tabular-nums;color:#4f566c;box-sizing:border-box}.ds-pale .ds-t{border:2px solid transparent;background:color-mix(in srgb,#262a7a 22%,#fff);color:#14182b}.ds-plein .ds-t{border:2px solid #262a7a;background:#262a7a;color:#fff}.ds-fut .ds-t{border-style:dotted}.ds-auj{background:color-mix(in srgb,#262a7a 9%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,#262a7a 45%,transparent)}.ds-auj .ds-n{color:#262a7a}.ds-jk{position:absolute;top:-.45rem;right:-.55rem;font-size:.8rem}.ds-g{font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}"
     }
   ],
   "narrative": {
@@ -1148,7 +1156,7 @@
       "Do donner à chaque Leçon sa couleur de Catégorie par la variable `--ligne` posée sur sa carte ou sa section, à partir des jetons `ligne-*`.",
       "Do dire l'état d'un Objectif avec les quatre stations (vide, hachurée, blanche, verte) et doubler l'image d'un texte (titre, `aria-label`, ou mots dans le dépliant).",
       "Do réserver Overpass 800 aux titres, à la marque et aux cartouches de signalétique, et Atkinson Hyperlegible Next à tout le reste.",
-      "Do garder des cibles tactiles d'au moins 2.6rem et l'anneau de focus de 3px `accent`.",
+      "Do garder des cibles tactiles d'au moins 2.75rem et l'anneau de focus de 3px `accent`.",
       "Do fournir chaque nouvelle couleur en clair et en sombre, et couper les transitions sous `prefers-reduced-motion`.",
       "Do ramener un écran hérité aux jetons et à la grammaire du réseau quand on le redessine."
     ],

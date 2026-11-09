@@ -44,3 +44,6 @@ img, svg, video { max-width: 100%; height: auto; }
 }
 .encart > :first-child, aside > :first-child { margin-top: 0; }
 .encart > :last-child, aside > :last-child { margin-bottom: 0; }
+/* Mesure (#173) : un texte courant ne dépasse pas ~75 caractères par ligne (`ch` : chasse du « 0 », plus large que la lettre moyenne). */
+/* Hors encarts et tableaux, déjà plus étroits. */
+:is(p, li, figcaption):not(:is(table, .encart, aside) *) { max-width: var(--kit-mesure); }

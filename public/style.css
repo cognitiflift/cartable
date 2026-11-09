@@ -424,3 +424,58 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .bloc-erreur { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1.2rem; margin:.5rem 0; }
 .bloc-erreur .erreur { min-height:0; margin:0; font-weight:600; }
 .bloc-erreur button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }
+
+/* Mon réseau : la carte de ligne (#185). 5 sur 7, coins de 18px, cadre de .3rem à la couleur de la Catégorie, trois
+   calques et un héros en parallaxe, la ligne de la Leçon à l'avant du décor, le terminus par-dessus le héros. */
+.collection h4.cl-groupe { border-top:0; padding-top:.4rem; }
+.collection .cartes-reseau { display:grid; grid-template-columns:repeat(auto-fill, minmax(8.5rem, 12.5rem)); gap:1.1rem .9rem; justify-content:center; padding:.6rem 0 1.1rem; }
+.collection .cartes-reseau li + li { border-top:0; }
+.carte-ligne-carte { container-type:inline-size; --px:0; --py:0; --sur-ligne:var(--sur-accent); position:relative; display:block; width:100%; aspect-ratio:5/7; padding:0; border:0; border-radius:18px; background:none; color:var(--sur-nuit); font:inherit; text-align:left; cursor:pointer; perspective:700px; -webkit-tap-highlight-color:transparent; touch-action:pan-y; }
+.carte-ligne-carte:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+.cl-incl { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform:rotateY(calc(var(--px) * 10deg)) rotateX(calc(var(--py) * -10deg)); }
+.carte-ligne-carte.actif .cl-incl { transition:transform .08s linear; }
+.carte-ligne-carte.retournee .cl-incl { transform:rotateY(180deg); }
+.cl-face { position:absolute; inset:0; border-radius:18px; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
+.cl-avant { box-shadow:0 10px 26px rgb(var(--ombre) / .25); }
+.cl-cadre { position:absolute; inset:0; overflow:hidden; border-radius:18px; background:var(--nuit); }
+.cl-calque { position:absolute; inset:0; transition:transform .5s cubic-bezier(.2,.8,.2,1); pointer-events:none; }
+.cl-calque svg { display:block; width:100%; height:100%; overflow:visible; }
+.cl-l1 { transform:translate(calc(var(--px) * -4px), calc(var(--py) * -4px)) scale(1.06); }
+.cl-l2 { transform:translate(calc(var(--px) * 7px), calc(var(--py) * 7px)); }
+.cl-heros { transform:translate(calc(var(--px) * 14px), calc(var(--py) * 14px)); }
+.cl-heros svg { filter:drop-shadow(0 .35rem .5rem rgb(var(--ombre) / .35)); }
+.carte-ligne-carte.actif .cl-calque { transition:transform .08s linear; }
+.cl-bord { position:absolute; inset:0; border-radius:18px; box-shadow:inset 0 0 0 .3rem var(--ligne); pointer-events:none; }
+/* La ligne : même grammaire que celle de l'accueil (ligneLecon), à l'échelle de la carte ; le trait sort du cadre. */
+.cl-ligne { position:absolute; left:0; right:0; top:58%; padding:0 .3rem 0 0; --st:min(1.35rem, calc(66cqw / var(--n))); }
+.cl-ligne .ligne { min-height:0; }
+.cl-ligne .ligne::before { content:""; flex:0 0 6cqw; height:.4rem; background:var(--ligne); box-shadow:0 0 0 .12rem var(--sur-nuit); }
+.cl-ligne .troncon { height:.4rem; min-width:0; margin:0 -.1rem; box-shadow:0 0 0 .12rem var(--sur-nuit); }
+.cl-ligne .station { width:var(--st); height:var(--st); border-width:calc(var(--st) * .2); box-shadow:0 0 0 .12rem var(--sur-nuit); }
+.cl-texte { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; padding:.7rem .75rem .6rem; border-radius:18px; background:linear-gradient(to bottom, rgb(var(--ombre) / .62), transparent 30%, transparent 78%, rgb(var(--ombre) / .55)); pointer-events:none; }
+.cl-titre { max-width:92%; font:800 .92rem/1.15 var(--police-titre); text-wrap:balance; overflow-wrap:anywhere; text-shadow:0 1px 5px rgb(var(--ombre) / .7); }
+.cl-etiquette { font-size:.78rem; line-height:1.2; color:var(--sur-nuit); text-shadow:0 1px 5px rgb(var(--ombre) / .7); }
+.cl-terminus { position:absolute; right:5cqw; top:68%; pointer-events:none; }
+.cl-terminus .terminus { box-shadow:0 0 0 .2rem var(--nuit); }
+.cl-reflet { position:absolute; inset:0; border-radius:18px; pointer-events:none; mix-blend-mode:soft-light; opacity:0; transition:opacity .3s; background:radial-gradient(circle at calc(50% + var(--px) * 50%) calc(50% + var(--py) * 50%), var(--sur-nuit), transparent 55%); }
+.carte-ligne-carte.actif .cl-reflet { opacity:.5; }
+.cl-dos { transform:rotateY(180deg); display:flex; flex-direction:column; gap:.45rem; padding:.9rem .8rem; overflow:auto; background:var(--carte); color:var(--texte); box-shadow:inset 0 0 0 .3rem var(--ligne), 0 10px 26px rgb(var(--ombre) / .25); }
+.cl-cartouche { align-self:flex-start; max-width:100%; padding:.3rem .5rem .22rem; border-radius:7px; background:var(--ligne); color:var(--sur-ligne); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; overflow-wrap:anywhere; }
+.cl-dos strong { font:800 1.15rem/1.15 var(--police-titre); text-wrap:balance; overflow-wrap:anywhere; }
+.cl-dos p { margin:0; font-size:.92rem; line-height:1.3; }
+.cl-dos small { margin-top:auto; font-size:.78rem; color:var(--doux); }
+/* Les boucles du décor (liste fermée de la Trousse) ne tournent que quand on regarde la carte, puis s'arrêtent. */
+@keyframes pc-tourne { to { transform:rotate(360deg); } }
+@keyframes pc-flamme { from { transform:scale(1, .82) skewX(-4deg); } to { transform:scale(1.08, 1.12) skewX(5deg); } }
+@keyframes pc-flotte { 50% { transform:translateY(-.5rem); } }
+@keyframes pc-eclair { 0%, 55%, 100% { opacity:.9; } 58% { opacity:.2; } 60% { opacity:1; } 64% { opacity:.35; } 66% { opacity:1; } }
+@keyframes pc-scint { 50% { opacity:.15; } }
+@keyframes pc-trace { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
+@keyframes pc-braise { from { transform:translate(0, 0); opacity:1; } to { transform:translate(var(--x, 0), -46px); opacity:0; } }
+.carte-ligne-carte.regarde .pc-a-tourne { animation:pc-tourne 7s linear infinite; }
+.carte-ligne-carte.regarde .pc-a-flamme { animation:pc-flamme .9s ease-in-out infinite alternate; }
+.carte-ligne-carte.regarde .pc-a-flotte { animation:pc-flotte 4.5s ease-in-out infinite; }
+.carte-ligne-carte.regarde .pc-a-eclair { animation:pc-eclair 3.4s linear infinite; }
+.carte-ligne-carte.regarde .pc-a-scintille { animation:pc-scint 2.4s ease-in-out infinite; }
+.carte-ligne-carte.regarde .pc-a-trace { stroke-dasharray:1; animation:pc-trace 3.2s ease-out both; }
+.carte-ligne-carte.regarde .pc-a-braise { animation:pc-braise 3s ease-out infinite; }

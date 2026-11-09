@@ -3,6 +3,7 @@ import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
@@ -631,7 +632,7 @@ function ligneBadge(b, estNouveau) {
 // Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. L'ouvrir efface « Nouveau » ; le mot d'accueil
 // s'affiche à la première ouverture.
 async function ecranBadges(profil) {
-  const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const { collection, nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
   barreNav(profil);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
@@ -651,6 +652,8 @@ async function ecranBadges(profil) {
       calendrierJours(calendrier),
       h('section', { className: 'collection', ariaLabel: 'Ma collection' },
         h('h3', {}, 'Ma collection'),
+        monReseau(cartesLigne),
+        h('h4', {}, 'Mes Badges'),
         commences.length
           ? h('ul', { className: 'lignes-badges' }, commences.map((b) => h('li', {},
             tete(b, h('p', {}, b.phrase)),
@@ -663,6 +666,66 @@ async function ecranBadges(profil) {
         aDecouvrir.length > 0 && [
           h('h4', {}, 'À découvrir'),
           h('ul', { className: 'badges-simples a-decouvrir' }, aDecouvrir.map((b) => h('li', {}, tete(b, h('p', {}, b.phrase)))))])));
+}
+
+// La carte de ligne (spec #182, #185) : une Leçon Acquise, gardée pour toujours. 5 sur 7, cadre à la couleur de la
+// Catégorie, trois calques (l1 fond, l2 décor, héros qui peut déborder) en parallaxe sous la ligne de la Leçon, dessinée
+// par `ligneLecon` (une station par Objectif) ; le terminus « Acquis ✓ » en est détaché pour passer au-dessus du héros.
+// Face : titre en haut, Catégorie en bas, sur un voile. Dos : cartouche, nom, ce que la carte salue, date. Un bouton :
+// toucher ou Entrée la retourne. Les calques sont déjà filtrés par le serveur ; la scène générique vient du code.
+const jourEnMots = (jour) => `le ${new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^1 /, '1er ')}`;
+const moinsDeMouvement = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DUREE_BOUCLES = 6000; // les boucles du décor s'arrêtent d'elles-mêmes
+
+function carteLigne(c) {
+  const cle = cleCategorieCarte(c.categorie), calques = calquesDeCarte(c), dos = dosCarteLigne(c, jourEnMots);
+  const ligne = ligneLecon({ objectifs: objectifsDeCarte(c.objectifs), maitrise: { palier: 'acquis', pourcentage: 100 } });
+  const terminus = ligne.querySelector('.terminus');
+  terminus.removeAttribute('title'); // pas de pourcentage : le terminus allumé est la seule annonce
+  terminus.remove();
+  const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
+  const el = h('button', { type: 'button', className: `carte-ligne-carte ${cle}`, ariaPressed: 'false', ariaLabel: libelleCarteLigne(c, jourEnMots),
+    style: `--ligne: var(--ligne-${cle}); --n: ${Math.max(1, c.objectifs ?? 1)}` },
+  h('div', { className: 'cl-incl' },
+    h('div', { className: 'cl-face cl-avant' },
+      h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', calques.l1), calque('cl-l2', calques.l2), h('div', { className: 'cl-ligne' }, ligne)),
+      h('div', { className: 'cl-bord', ariaHidden: 'true' }),
+      calque('cl-heros', calques.heros),
+      h('div', { className: 'cl-texte', ariaHidden: 'true' }, h('span', { className: 'cl-titre' }, c.titre), h('span', { className: 'cl-etiquette' }, c.categorie)),
+      h('div', { className: 'cl-terminus', ariaHidden: 'true' }, terminus),
+      h('div', { className: 'cl-reflet', ariaHidden: 'true' })),
+    h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
+      h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue), h('small', {}, dos.date))));
+  let arret;
+  const bouger = (x, y) => { el.style.setProperty('--px', x.toFixed(3)); el.style.setProperty('--py', y.toFixed(3)); };
+  const regarder = () => { el.classList.add('regarde'); clearTimeout(arret); arret = setTimeout(() => el.classList.remove('regarde'), DUREE_BOUCLES); };
+  const pointeur = (e) => { // inclinaison au pointeur et au toucher, de -1 à 1 depuis le centre
+    if (moinsDeMouvement()) return;
+    const r = el.getBoundingClientRect();
+    bouger(Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - .5) * 2)), Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - .5) * 2)));
+    el.classList.add('actif');
+  };
+  const repos = () => { bouger(0, 0); el.classList.remove('actif'); };
+  el.addEventListener('pointermove', pointeur);
+  el.addEventListener('pointerdown', pointeur);
+  el.addEventListener('pointerenter', regarder);
+  el.addEventListener('focus', regarder);
+  el.addEventListener('pointerleave', repos);
+  el.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') repos(); });
+  el.addEventListener('pointercancel', repos);
+  el.addEventListener('click', () => { const retournee = el.classList.toggle('retournee'); el.ariaPressed = String(retournee); regarder(); });
+  return el;
+}
+
+// « Mon réseau » : les cartes de ligne retournées, de la plus récente à la plus ancienne (le serveur les range ainsi).
+// Une carte prête mais pas encore retournée attend dans « Nouvelles cartes » (ticket suivant). Vide : une phrase, sans pression.
+function monReseau(cartesLigne) {
+  const visibles = cartesLigne.filter((c) => c.retourne);
+  return [
+    h('h4', { className: 'cl-groupe' }, 'Mon réseau'),
+    visibles.length
+      ? h('ul', { className: 'cartes-reseau', ariaLabel: 'Mon réseau' }, visibles.map((c) => h('li', {}, carteLigne(c))))
+      : h('p', { className: 'doux' }, 'Chaque Leçon Acquise ajoutera ici sa carte.')];
 }
 
 // Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour comme le bandeau de la semaine : pâle quand

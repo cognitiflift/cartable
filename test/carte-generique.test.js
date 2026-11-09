@@ -25,6 +25,15 @@ test('la couleur de la scène suit la Catégorie', () => {
   assert.match(sceneGenerique({ lecon: 'x', categorie: 'Cuisine' }).l1, /var\(--ligne-autre\)/);
 });
 
+test('aucun disque du héros ne sort du cadre : sur « Mon réseau » à 390 px, il flottait à côté de la carte', () => {
+  for (const lecon of ['x', 'a-1', '2026-11-10-les-volcans', 'zzz', 'volcans', 'troie']) {
+    const { heros } = sceneGenerique({ lecon, categorie: 'Sciences' });
+    for (const [, cx, r] of heros.matchAll(/<circle cx="([\d.-]+)"[^>]*\br="([\d.]+)"/g).map((m) => [m[0], Number(m[1]), Number(m[2])])) {
+      assert.ok(cx - r >= 0 && cx + r <= 200, `disque de centre ${cx} et de rayon ${r} hors du cadre (${lecon})`);
+    }
+  }
+});
+
 test('le héros déborde du cadre et la zone basse reste calme', () => {
   const { heros, l2 } = sceneGenerique({ lecon: 'x', categorie: 'Sciences' });
   assert.match(heros, /-\d|\b2[1-9]\d\b/); // une coordonnée hors du cadre 0–200

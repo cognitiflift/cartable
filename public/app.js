@@ -250,8 +250,8 @@ const SECTIONS_PARENT = [
   { titre: '💶 Coût des Leçons', bloc: 'reglages', replie: true, rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} pour ${foisProf(cout.total.tours)} où le prof a répondu, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${foisProf(l.tours)})`)), 'Aucune Leçon.')] },
-  // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', bloc: 'reglages', replie: true, rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs } }) => [
+// Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
+  { titre: '📈 Indicateurs', bloc: 'reglages', replie: true, rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs, cartes } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('p', {}, conclusionDesIndicateurs({ souvenir, retour, calibration })),
     h('details', { className: 'pour-les-curieux' }, h('summary', {}, 'Pour les curieux'),
@@ -276,6 +276,7 @@ const SECTIONS_PARENT = [
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
       h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
         ? `${pluriel(predictions.faites, 'faite')}, ${predictions.justes} juste${predictions.justes > 1 ? 's' : ''} (${predictions.pourcentage} %).` : 'aucune pour l’instant.'),
+      h('li', {}, 'Cartes de ligne : ', texteDesCartes(cartes)),
       h('li', {}, 'Questions : ', `${pluriel(qs.signalees, 'signalée')}, ${pluriel(qs.retablies, 'rétablie')} sur la période ; ${pluriel(qs.suspectes, 'suspecte')} en ce moment.`),
     ),
     h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
@@ -317,6 +318,16 @@ const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
 };
 
 // Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »
+  // Cartes de ligne (#190) dans « Pour les curieux » : retournement, composition, échecs et coût, en mots simples.
+const texteDesCartes = ({ pretes, nonRetourneesA7Jours: n7, delaiMedianHeures, composees, echecs, coutMoyenUsd }) => {
+  if (!pretes) return 'aucune carte prête pour l’instant.';
+  const delai = delaiMedianHeures === null ? 'aucune retournée' : delaiMedianHeures < 48 ? `retournées au bout de ${delaiMedianHeures} h d’habitude` : `retournées au bout de ${Math.round(delaiMedianHeures / 24)} jours d’habitude`;
+  return [`${pluriel(pretes, 'prête')}, ${delai}`,
+    n7.cartes ? `${n7.pourcentage} % pas encore retournées sept jours après (${n7.jamais} sur ${pluriel(n7.cartes, 'carte')})` : null,
+    composees.pourcentage === null ? null : `${composees.pourcentage} % dessinées sur mesure, le reste en scène de repli`,
+    echecs ? `${pluriel(echecs, 'dessin raté')}` : 'aucun dessin raté',
+    coutMoyenUsd === null ? null : `environ ${equivalentUsd(coutMoyenUsd)} par carte (indicatif)`].filter(Boolean).join(' ; ') + '.';
+};
 const partJeNeSaisPas = ({ reponses, jeNeSaisPas, pourcentage }, ou, vide) =>
   reponses ? `${pourcentage} % ${ou} (${jeNeSaisPas} sur ${pluriel(reponses, 'réponse')}).` : `${vide}.`;
 const MESURES_REBOND = [['nouvelle', 'page nouvelle'], ['revoir', 'Revoir'], ['defi', 'Défi'], ['reviser', 'Réviser']];

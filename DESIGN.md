@@ -215,6 +215,11 @@ components:
     textColor: "{colors.texte}"
     rounded: "{rounded.carte-ligne}"
     padding: "{spacing.carte-ligne}"
+  carte-collection:
+    backgroundColor: "{colors.nuit}"
+    textColor: "{colors.sur-nuit}"
+    rounded: "{rounded.carte-ligne}"
+    padding: "0.7rem"
   ma-semaine:
     backgroundColor: "{colors.carte}"
     rounded: "{rounded.carte-ligne}"

@@ -35,6 +35,8 @@ Règles de la composition (`server.js`, `composerCartes`) : une seule compositio
 | Composition à l'Acquisition, en arrière-plan, Sonnet | Aucun cadre : décision de coût, mesurée par le Coût d'un tour « carte » | Aucun cadre, hypothèse à mesurer |
 | Animations bornées, sans clignotement rapide (consigne de la Trousse) | WCAG 2.2, critères 2.2.2 et 2.3.1 | Norme |
 
+Mesure (ticket #190) : les choix de cette mise à jour se jugent dans les indicateurs de la Vue parent (`lib/indicateurs.js`, `cartes`), lus dans le fichier de cartes et dans le Coût des tours « carte » : cartes composées contre scènes de repli, échecs de composition (essais perdus) et coût moyen d'une carte (échecs compris). Ils ne demandent aucun suivi de plus de l'Élève.
+
 ## Considered Options
 
 - Un seul Modèle pour tout, celui du Profil : rejeté, il est soit trop faible pour les pages, soit trop cher pour les Propositions.

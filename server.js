@@ -702,16 +702,17 @@ async function api(req, res, segments) {
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
-      const [lecons, couts, evenements, badges] = await Promise.all([
-        store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug), store.lireBadges(slug)]);
-      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements, badges }));
+      const [lecons, couts, evenements, badges, cartes] = await Promise.all([
+        store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug), store.lireBadges(slug), store.lireCartes(slug)]);
+      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements, badges, cartes }));
     }
   } else if (r2 === 'indicateurs' && !id) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
     if (m === 'GET') {
       const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
-      const [evenements, lecons] = await Promise.all([store.lireEvenements(slug), store.leconsLues(slug, { maintenant })]);
-      return json(res, 200, indicateurs(evenements, { maintenant, lecons, ...periode }));
+      const [evenements, lecons, cartes, couts] = await Promise.all([
+        store.lireEvenements(slug), store.leconsLues(slug, { maintenant }), store.lireCartes(slug), store.lireCouts(slug)]);
+      return json(res, 200, indicateurs(evenements, { maintenant, lecons, cartes, couts, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
     // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.

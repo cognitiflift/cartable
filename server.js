@@ -22,7 +22,7 @@ import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, repar
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
-import { fusionnerCartes, retournerCarte, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
+import { fusionnerCartes, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
 import { consignesCarte, promptCarte } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
@@ -792,6 +792,17 @@ async function api(req, res, segments) {
       if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
       if (statut === 'pas-prete') throw new HttpError(409, "Cette carte n'est pas encore prête");
       return json(res, 200, { statut });
+    }
+  } else if (r2 === 'cartes' && id === 'son' && !r3) {
+    // Réglage du carillon (#187), éteint par défaut : lu et écrit depuis le Profil. Le fichier de cartes existe avant
+    // toute écriture (le premier calcul fixe la livraison : Paliers existants visibles d'emblée).
+    if (m === 'GET') return json(res, 200, { son: (await store.modifierCartes(slug, (f) => [f, f]))?.son === true });
+    if (m === 'PUT') {
+      const { son } = await lireCorps(req);
+      if (typeof son !== 'boolean') throw new HttpError(400, 'Le réglage du carillon est vrai ou faux');
+      await recalculerBadges(slug, maintenant);
+      const fichier = await store.modifierCartes(slug, (avant) => { const apres = reglerSon(avant, son); return [apres, apres]; });
+      return json(res, 200, { son: fichier.son === true });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));

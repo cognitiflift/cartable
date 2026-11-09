@@ -3776,6 +3776,18 @@ test('Cartes de ligne : une Leçon déjà Acquise à la livraison est écartée,
   assert.deepEqual(fichier.cartes, {});
 });
 
+test('Cartes : le carillon est éteint par défaut, se règle (vrai ou faux seulement) et se retrouve dans Mes badges', async () => {
+  const { slug } = await eleveRevisions('Cartes-Son', 1);
+  const son = (corps) => appel(`/api/eleves/${slug}/cartes/son`, 'PUT', corps, le('2026-11-03T12:00:00.000Z'));
+  assert.deepEqual((await appel(`/api/eleves/${slug}/cartes/son`, 'GET')).data, { son: false });
+  assert.deepEqual((await son({ son: true })).data, { son: true });
+  assert.equal((await appel(`/api/eleves/${slug}/cartes/son`, 'GET')).data.son, true);
+  assert.equal((await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data.son, true);
+  assert.equal((await son({ son: 'oui' })).status, 400);
+  assert.deepEqual((await son({ son: false })).data, { son: false });
+  assert.equal((await appel('/api/eleves/personne-ici/cartes/son', 'GET')).status, 404);
+});
+
 test('Cartes : les Paliers d\'avant la livraison sont visibles d\'emblée, les suivants à retourner ; ouvrir Mes badges ne les retourne pas', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Cartes-Paliers', 1); // lundi 2 novembre : une page terminée
   const badgesAvant = path.join(eleves, slug, 'badges.json');

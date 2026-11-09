@@ -5,6 +5,8 @@ import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 import { rangerCollection, rangDeCarte, crans, aFeuilleHolo, libelleCarteBadge, libelleADecouvrir, dosCarteBadge } from '/carte-badge-texte.js';
 import { artDeBadge } from '/carte-badge-art.js';
+import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
+import { jouerCarillon } from '/carillon.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
@@ -53,8 +55,8 @@ const pseudoCourant = () => localStorage.getItem('pseudo');
 // En-tête : le total d'Étoiles de l'Élève, qui ouvre Mes badges, puis son Profil. Le total vient de GET …/badges, lu une
 // fois par Élève puis mis à jour par l'accueil et Mes badges (retenirRecompenses), pour ne pas le relire à chaque écran.
 let recompensesConnues = null; // { slug, etoiles, nouveau }
-const retenirRecompenses = (profil, { totaux, nouveaux }) => {
-  recompensesConnues = { slug: profil.slug, etoiles: totaux?.etoiles ?? 0, nouveau: nouveaux?.length > 0 };
+const retenirRecompenses = (profil, { totaux, aRetourner }) => {
+  recompensesConnues = { slug: profil.slug, etoiles: totaux?.etoiles ?? 0, nouveau: contientNouveau(aRetourner) }; // « Nouveau » : tant qu'une carte attend (#187)
 };
 function barreNav(profil) {
   if (!profil) return nav.replaceChildren();
@@ -134,6 +136,25 @@ async function ecranNouvelEleve() {
   } }));
 }
 
+// Carillon du retournement (#187) : éteint par défaut, réglé ici une fois pour toutes. Il s'enregistre à part du reste du
+// Profil, tout de suite, et le dit.
+function reglageCarillon(profil) {
+  const etat = h('p', { className: 'doux', role: 'status' });
+  const case_ = h('input', { type: 'checkbox', name: 'carillon', disabled: true, onchange: async () => {
+    const voulu = case_.checked;
+    try {
+      const { son } = await api(`eleves/${profil.slug}/cartes/son`, { method: 'PUT', body: { son: voulu } });
+      case_.checked = son;
+      etat.textContent = son ? 'Le carillon est allumé.' : 'Le carillon est éteint.';
+    } catch {
+      case_.checked = !voulu;
+      etat.textContent = 'Le réglage n’a pas pu être enregistré. Réessaie.';
+    }
+  } });
+  api(`eleves/${profil.slug}/cartes/son`).then(({ son }) => { case_.checked = son; case_.disabled = false; }).catch(() => { etat.textContent = 'Le réglage du carillon n’a pas pu être lu.'; });
+  return h('div', { className: 'reglage-carillon' }, h('label', {}, case_, TEXTES_CEREMONIE.reglageSon), etat);
+}
+
 async function ecranProfil(profil) {
   // Pour le parent : Coût d'un tour cumulé (CONTEXT.md), un indicateur relatif du quota partagé de l'abonnement, pas de
   // l'argent dépensé : affiché en tokens, avec son équivalent indicatif au tarif de l'API. Jamais pendant la Séance.
@@ -141,7 +162,7 @@ async function ecranProfil(profil) {
   montrer(...formulaireProfil({ profil, titre: 'Mon profil', envoyer: async (champs) => {
     await api(`eleves/${profil.slug}`, { method: 'PUT', body: champs });
     location.hash = '#/';
-  } }), cout);
+  } }), reglageCarillon(profil), cout);
   const couts = await api(`eleves/${profil.slug}/couts`).catch(() => null);
   if (couts) {
     const { coutUsd, tours, entree, sortie, cacheLu, cacheEcrit } = couts.total;
@@ -631,14 +652,49 @@ function ligneBadge(b, estNouveau) {
 // Mes badges (#95) : en tête, le total d'Étoiles et de Fusées de l'Élève (#96) ; puis le calendrier des Jours
 // travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection : chaque Badge commencé en
 // ligne (`ligneBadge`), le dernier Palier gagné en premier ; les badges surprise trouvés ; puis, à découvrir, les
-// Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. L'ouvrir efface « Nouveau » ; le mot d'accueil
+// Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. Les Paliers à retourner attendent dans « Nouvelles cartes » ; le mot d'accueil
 // s'affiche à la première ouverture.
+// Cartes retournées dans cette visite mais pas encore ajoutées (« Fermer sans ajouter » : retournée, non rangée) : elles
+// restent dans « Nouvelles cartes », face visible, avec leur bouton d'ajout. À la prochaine visite, elles sont rangées.
+let cartesNonRangees = { slug: null, liste: [] };
+
 async function ecranBadges(profil) {
-  const { collection, nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
-  retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
-  barreNav(profil);
+  const donnees = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const { nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = donnees;
+  let { aRetourner = [] } = donnees;
+  if (cartesNonRangees.slug !== profil.slug) cartesNonRangees = { slug: profil.slug, liste: [] };
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
-  const { obtenues, aDecouvrir } = rangerCollection(collection);
+  const collection = h('section', { className: 'collection', ariaLabel: 'Ma collection' });
+  const afficherCollection = () => {
+    const nonRangees = cartesNonRangees.liste;
+    retenirRecompenses(profil, { totaux, aRetourner }); // « Nouveau » reste tant qu'une carte attend ; ouvrir Mes badges ne l'efface pas
+    barreNav(profil);
+    const enAttente = [...aRetourner, ...nonRangees];
+    const { obtenues, aDecouvrir } = rangerCollection(collectionRangee(donnees.collection, enAttente));
+    const attente = nouvellesCartes({ aRetourner, collection: donnees.collection, cartesLigne, nonRangees });
+    collection.replaceChildren(...garder([
+      h('h3', {}, 'Ma collection'),
+      attente.length > 0 && nouvellesCartesGroupe(attente, { son: donnees.son === true, slug: profil.slug, retourner: (c) => {
+        aRetourner = aRetourner.filter((x) => cleCarte(x) !== c.cle);
+        const l = c.type === 'ligne' && cartesLigne.find((x) => x.lecon === c.id);
+        if (l) l.retourne = new Date().toISOString(); // lue ici sans nouvel appel : la carte de ligne est retournée
+        cartesNonRangees.liste.push(c.type === 'ligne' ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier });
+        afficherCollection();
+      }, ranger: (c) => {
+        cartesNonRangees.liste = cartesNonRangees.liste.filter((x) => cleCarte(x) !== c.cle);
+        afficherCollection();
+      } }),
+      monReseau(cartesLigneRangees(cartesLigne, nonRangees)),
+      h('h4', {}, 'Mes Badges'),
+      obtenues.length
+        ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
+        : h('p', { className: 'doux' }, 'Ton premier Palier donnera ici sa carte.'),
+      aDecouvrir.length > 0 && [
+        h('h4', {}, 'À découvrir'),
+        h('ul', { className: 'cartes-reseau cartes-badges a-decouvrir', ariaLabel: 'À découvrir' }, aDecouvrir.map((b) => h('li', {}, carteADecouvrir(b))))]]));
+  };
+  afficherCollection();
+  const { obtenues } = rangerCollection(donnees.collection);
   montrer(
     h('p', {}, retourAccueil()),
     h('div', { className: 'badges-tete' },
@@ -646,18 +702,75 @@ async function ecranBadges(profil) {
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
         `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`)),
     accueil && obtenues.length > 0 && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
-    h('div', { className: 'badges-corps' },
-      calendrierJours(calendrier),
-      h('section', { className: 'collection', ariaLabel: 'Ma collection' },
-        h('h3', {}, 'Ma collection'),
-        monReseau(cartesLigne),
-        h('h4', {}, 'Mes Badges'),
-        obtenues.length
-          ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
-          : h('p', { className: 'doux' }, 'Ton premier Palier donnera ici sa carte.'),
-        aDecouvrir.length > 0 && [
-          h('h4', {}, 'À découvrir'),
-          h('ul', { className: 'cartes-reseau cartes-badges a-decouvrir', ariaLabel: 'À découvrir' }, aDecouvrir.map((b) => h('li', {}, carteADecouvrir(b))))])));
+    h('div', { className: 'badges-corps' }, calendrierJours(calendrier), collection));
+}
+
+// « Nouvelles cartes » : chaque Palier gagné et chaque carte de ligne attend face cachée (médaillon du Badge, ou 🚉, sans
+// dire le Palier) jusqu'au geste de l'Élève, même des jours plus tard, dans l'ordre qu'il veut. Toucher une carte ouvre
+// la cérémonie. Une carte retournée mais pas ajoutée reste ici, face visible, avec son bouton d'ajout.
+function nouvellesCartesGroupe(cartes, { son, slug, retourner, ranger }) {
+  const ajouter = (c) => (c.type === 'ligne' ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
+  return h('div', { className: 'cl-nouvelles' },
+    h('h4', { className: 'cl-groupe' }, TEXTES_CEREMONIE.titreGroupe),
+    h('ul', { className: 'cartes-reseau cartes-attente', ariaLabel: TEXTES_CEREMONIE.titreGroupe }, cartes.map((c) => h('li', {},
+      c.retournee
+        ? [c.type === 'ligne' ? carteLigne(c.ligne) : carteBadge(badgeAuPalier(c.badge, c.palier), false),
+          h('button', { type: 'button', className: 'cl-ajouter', onclick: () => ranger(c) }, ajouter(c))]
+        : carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner, ranger }))))));
+}
+
+function carteFaceCachee(c, ouvrir) {
+  return h('button', { type: 'button', className: `carte-ligne-carte carte-cachee ${c.type === 'ligne' ? 'ligne' : c.badge.surprise ? 'palier-unique' : 'palier-neutre'}`, ariaLabel: c.libelle, onclick: ouvrir },
+    h('span', { className: 'cl-cachee-face' },
+      h('span', { className: 'cl-medaillon', ariaHidden: 'true' }, c.medaillon),
+      h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau')));
+}
+
+// La cérémonie (spec #182, #187) : un dialogue plein écran sur le voile. La carte attend face cachée ; au geste, elle se
+// retourne (enregistré côté serveur, idempotent), ses couches entrent l'une après l'autre (ciel, décor, ligne, puis le
+// héros qui tombe), les stations s'allument une à une, une gerbe d'éclats part une seule fois, puis le nom, ce que la
+// carte salue et le bouton d'ajout. « Plus tard » ou Échap : la carte reste retournée mais non rangée. Les animations
+// sont bornées (moins de 3 s, aucun clignotement) et coupées sous prefers-reduced-motion : tout apparaît d'emblée.
+const DUREE_CEREMONIE = 2400;
+function ceremonie(c, { son, slug, retourner, ranger }) {
+  const ligne = c.type === 'ligne';
+  const badge = ligne ? null : badgeAuPalier(c.badge, c.palier);
+  const nom = ligne ? c.ligne.titre : `${c.badge.nom} · ${c.badge.surprise ? 'badge surprise' : `Palier ${c.palier}`}`;
+  const salue = ligne ? dosCarteLigne(c.ligne, jourEnMots).salue : (c.badge.phrase ?? 'Trouvé sans le chercher.');
+  const dlg = h('dialog', { className: 'cartes-ceremonie', ariaLabel: TEXTES_CEREMONIE.dialogue(ligne ? c.ligne.titre : c.badge.nom) });
+  const texte = h('div', { className: 'cer-texte', ariaLive: 'polite' }, h('p', {}, TEXTES_CEREMONIE.aide));
+  const scene = h('div', { className: 'cer-carte' });
+  const ok = h('button', { type: 'button', className: 'cer-ok', hidden: true, onclick: () => { dlg.close(); ranger(c); } }, ligne ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
+  const plusTard = h('button', { type: 'button', className: 'secondaire cer-plus-tard', onclick: () => dlg.close() }, TEXTES_CEREMONIE.fermer);
+  let retournee = false;
+  const dos = carteFaceCachee(c, () => {
+    if (retournee) return;
+    retournee = true;
+    api(`eleves/${slug}/cartes/retournement`, { method: 'POST', body: ligne ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier } }).catch(() => {});
+    jouerCarillon(ligne ? 4 : rangDeCarte(badge), { actif: son });
+    const vraie = ligne ? carteLigne(c.ligne) : carteBadge(badge, false);
+    vraie.classList.add('entree');
+    const stations = [...vraie.querySelectorAll('.cl-ligne .station')];
+    stations.forEach((st, i) => st.style.setProperty('--i', String(i)));
+    vraie.style.setProperty('--pas', `${Math.min(0.18, 1.2 / Math.max(stations.length, 1)).toFixed(3)}s`);
+    scene.replaceChildren(vraie, h('div', { className: 'cer-eclats', ariaHidden: 'true' }, Array.from({ length: 18 }, (_, i) => {
+      const a = (i / 18) * Math.PI * 2, d = 90 + (i % 3) * 30;
+      return h('i', { style: `--dx:${(Math.cos(a) * d).toFixed(0)}px; --dy:${(Math.sin(a) * d).toFixed(0)}px; animation-delay:${(1.5 + (i % 4) * 0.03).toFixed(2)}s` });
+    })));
+    retourner(c); // retournée : le groupe derrière la cérémonie la garde, non rangée, jusqu'à « Ajouter »
+    setTimeout(() => {
+      if (!dlg.isConnected) return;
+      texte.replaceChildren(h('h3', {}, nom), h('p', {}, salue));
+      ok.hidden = false;
+      ok.focus();
+    }, moinsDeMouvement() ? 0 : DUREE_CEREMONIE);
+  });
+  scene.append(dos);
+  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, plusTard));
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg);
+  dlg.showModal();
+  dos.focus();
 }
 
 // La carte de Badge (spec #182, #186) : la même carte que celle de ligne (5 sur 7, trois calques et un héros en
@@ -750,7 +863,7 @@ function carteLigne(c) {
 }
 
 // « Mon réseau » : les cartes de ligne retournées, de la plus récente à la plus ancienne (le serveur les range ainsi).
-// Une carte prête mais pas encore retournée attend dans « Nouvelles cartes » (ticket suivant). Vide : une phrase, sans pression.
+// Une carte prête mais pas encore retournée, ou retournée et pas ajoutée, attend dans « Nouvelles cartes ». Vide : une phrase, sans pression.
 function monReseau(cartesLigne) {
   const visibles = cartesLigne.filter((c) => c.retourne);
   return [

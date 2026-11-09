@@ -1,7 +1,9 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
+import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
   confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
@@ -38,7 +40,7 @@ const h = (tag, attrs = {}, ...enfants) => {
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (v !== false && v != null) el[k] = v;
   }
-  el.append(...garder(enfants));
+  el.append(...garder(enfants).flatMap((e) => [avecEmoji(e)].flat())); // emoji décoratifs masqués aux lecteurs d'écran (#168)
   return el;
 };
 const garder = (enfants) => enfants.flat(Infinity).filter((e) => e != null && e !== false);
@@ -160,58 +162,75 @@ const PALIERS_DE_MAITRISE = {
 
 // Vue parent (#77) : un écran par Élève, pour le parent, agrégé par le serveur (GET …/parent). Une section par clé
 // des agrégats : SECTIONS_PARENT en ajoute une sans toucher aux autres (indicateurs, #78).
-const equivalentUsd = (usd) => usd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+// Montant en dollars, dit en toutes lettres (« 1,23 dollars ») plutôt que par un sigle de devise.
+const equivalentUsd = (usd) => `${usd.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} dollars`;
+const foisProf = (n) => `${n} fois`;
 const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements) : h('p', { className: 'doux' }, vide));
 // Le parent ouvre la Leçon en aperçu (#/apercu/…) : ce n'est pas un retour de l'Élève pour les indicateurs (#78).
-const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/apercu/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
+const lienLecon = (lecon, titre) => h('a', { href: `#/apercu/${lecon}`, className: 'lien-lecon' }, `(${titre})`);
+const avecLecon = (texte, item) => h('li', {}, texte, ' ', lienLecon(item.lecon, item.titreLecon));
 const SECTIONS_PARENT = [
-  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
+  { titre: '🧠 Objectifs Retenus', bloc: 'retient', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
   // Soutien à l'autonomie (#158) : des questions ouvertes à poser, tirées des Objectifs Retenus récents, sans tour du prof.
-  { titre: '💬 Pour en parler avec lui', rendu: ({ pourEnParler: { invitations, autonomie } }) => [
+  { titre: '💬 Pour en parler avec lui', bloc: 'aide', rendu: ({ pourEnParler: { invitations, autonomie } }) => [
     listeOuVide(invitations.map((i) => avecLecon(i.texte, i)), 'Pas d’activité ces 7 derniers jours : rien à proposer pour l’instant.'),
     h('p', { className: 'doux' }, autonomie)] },
-  { titre: '🌱 Ce qui se consolide', rendu: ({ objectifs }) => [
+  { titre: '🌱 Ce qui se consolide', bloc: 'retient', rendu: ({ objectifs }) => [
     h('p', { className: 'doux' }, 'Objectifs atteints, pas encore Retenus : ils se consolident au fil des Révisions du jour.'),
     listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
-  { titre: '🔁 Ce qu’il revoit en ce moment', rendu: ({ questionsFragiles }) => listeOuVide(
-    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
+  // La Leçon et le pourcentage se disent une fois : une Leçon, puis ses Questions avec leur pourcentage compact (#164).
+  { titre: '🔁 Ce qu’il revoit en ce moment', bloc: 'aide', rendu: ({ questionsFragiles }) => {
+    const parLecon = new Map();
+    for (const q of questionsFragiles) {
+      if (!parLecon.has(q.lecon)) parLecon.set(q.lecon, { lecon: q.lecon, titreLecon: q.titreLecon, questions: [] });
+      parLecon.get(q.lecon).questions.push(q);
+    }
+    return [
+      questionsFragiles.length > 0 && h('p', { className: 'doux' }, 'Pour chaque Question : ses chances de s’en souvenir aujourd’hui.'),
+      listeOuVide([...parLecon.values()].map((l) => h('li', {}, h('a', { href: `#/apercu/${l.lecon}`, className: 'lien-lecon' }, l.titreLecon),
+        h('ul', {}, l.questions.map((q) => h('li', {}, `${q.enonce} (${q.pourcentage} %)`))))), 'Aucune : tout tient bien.')];
+  } },
   // Questions signalées et suspectes (#148) : le parent juge. Rétablir retire le signalement sans perte ; Signaler porte l'auteur parent.
-  { titre: '🚩 Questions signalées', rendu: ({ questionsSignalees }, contexte) => [
+  { titre: '🚩 Questions signalées', bloc: 'aide', rendu: ({ questionsSignalees }, contexte) => [
     h('p', { className: 'doux' }, 'Ces Questions ne sont plus posées ni comptées. Rétablir les remet en Révision du jour et dans la Maîtrise, sans rien perdre.'),
     listeOuVide(questionsSignalees.map((q) => h('li', { className: 'question-signalee' },
-      h('strong', {}, insecables(q.enonce)), ' ', h('a', { href: `#/apercu/${q.lecon}`, className: 'doux' }, `(${q.titreLecon})`),
+      h('strong', {}, insecables(q.enonce)), ' ', lienLecon(q.lecon, q.titreLecon),
       h('br'), `Bonne réponse attendue : ${q.bonne}`,
       h('br'), `${q.libelleRaison}, signalée par ${q.auteur === 'parent' ? 'toi' : 'l’Élève'} le ${new Date(q.date).toLocaleDateString('fr-BE')}.`,
       ' ', actionParent(contexte, 'Rétablir', `eleves/${contexte.slug}/parent/retablissements`, q))), 'Aucune Question signalée.')] },
-  { titre: '🔎 Questions à vérifier', rendu: ({ questionsSuspectes, questionsSignalables }, contexte) => [
+  { titre: '🔎 Questions à vérifier', bloc: 'aide', rendu: ({ questionsSuspectes, questionsSignalables }, contexte) => [
     h('p', { className: 'doux' }, 'L’appli les juge suspectes mais n’en retire aucune : c’est à toi de décider.'),
     listeOuVide(questionsSuspectes.map((q) => h('li', { className: 'question-suspecte' },
-      h('strong', {}, insecables(q.enonce)), ' ', h('a', { href: `#/apercu/${q.lecon}`, className: 'doux' }, `(${q.titreLecon})`),
+      h('strong', {}, insecables(q.enonce)), ' ', lienLecon(q.lecon, q.titreLecon),
       h('br'), `Bonne réponse attendue : ${q.bonne}`,
       q.motifs.map((m) => [h('br'), motifSuspect(m)]),
       h('br'), signalerParent(contexte, q))), 'Aucune Question suspecte.'),
     questionsSignalables.length > 0 && h('details', { className: 'signaler-parent' }, h('summary', {}, 'Signaler une autre Question'),
       questionsSignalables.map((l) => h('details', {}, h('summary', {}, l.titreLecon),
         h('ul', {}, l.questions.map((q) => h('li', {}, insecables(q.enonce), h('br'), signalerParent(contexte, { ...q, lecon: l.lecon })))))))] },
-  { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
+  // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).
+  { titre: '🏅 Badges', bloc: 'retient', rendu: ({ badges: { recents, etoiles, fusees } }) => [
+    h('p', {}, `⭐ ${pluriel(etoiles, 'Étoile')} · 🚀 ${pluriel(fusees, 'Fusée')} en tout.`),
+    listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${nomEtPalier(b)} · ${dateBadge(b.jour)}`)),
+      'Aucun Badge ces 7 derniers jours.')] },
+  { titre: '📆 Ces derniers jours', bloc: 'retient', rendu: ({ jours }) => !jours.some((j) => j.revisions || j.quiz)
+    ? h('p', { className: 'doux' }, 'Aucune Révision du jour ni quiz de page ces 7 derniers jours.')
+    : h('table', { className: 'vue-parent-jours' },
     h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
     jours.map((j) => h('tr', {},
       h('td', {}, new Date(`${j.jour}T12:00`).toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'short' })),
       h('td', {}, j.revisions ? `${j.revisions} (${j.justes} juste${j.justes > 1 ? 's' : ''})` : '–'),
       h('td', {}, j.quiz || '–')))) },
-  { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
+  { titre: '📅 Contrôles à venir', bloc: 'aide', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
     avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise : ${c.maitrise ? `${PALIERS_DE_MAITRISE[c.maitrise.palier].mot} (${c.maitrise.pourcentage} %)` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
-  // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).
-  { titre: '🏅 Badges', rendu: ({ badges: { recents, etoiles, fusees } }) => [
-    h('p', {}, `⭐ ${pluriel(etoiles, 'Étoile')} · 🚀 ${pluriel(fusees, 'Fusée')} en tout.`),
-    listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${nomEtPalier(b)} · ${dateBadge(b.jour)}`)),
-      'Aucun Badge ces 7 derniers jours.')] },
-  { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
-    h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
-    listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
+  { titre: '💶 Coût des Leçons', bloc: 'reglages', replie: true, rendu: ({ cout }) => [
+    h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} pour ${foisProf(cout.total.tours)} où le prof a répondu, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
+    listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${foisProf(l.tours)})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs } }) => [
+  { titre: '📈 Indicateurs', bloc: 'reglages', replie: true, rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
+    h('p', {}, conclusionDesIndicateurs({ souvenir, retour, calibration })),
+    h('details', { className: 'pour-les-curieux' }, h('summary', {}, 'Pour les curieux'),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
         ? `${souvenir.pourcentage} % (${souvenir.justes} sur ${pluriel(souvenir.reponses, 'réponse')})` : 'pas encore de Révision du jour.'),
@@ -219,7 +238,7 @@ const SECTIONS_PARENT = [
         ? `${retour.pourcentage} % (${retour.revenus} sur ${pluriel(retour.lecons, 'Leçon')})` : 'pas encore mesurable.',
         retour.enAttente ? ` ${pluriel(retour.enAttente, 'Leçon')} trop récente${retour.enAttente > 1 ? 's' : ''} pour le dire.` : ''),
       h('li', {}, 'Attente du prof : ', attente.tours
-        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'),
+        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (sur ${attente.tours} fois où le prof a répondu)` : 'le prof n’a pas encore répondu.'),
       h('li', {}, 'Objectifs Retenus il y a au moins 30 jours, encore Retenus : ', retenu30.objectifs
         ? `${retenu30.pourcentage} % (${retenu30.encoreRetenus} sur ${pluriel(retenu30.objectifs, 'Objectif')})` : 'pas encore mesurable.'),
       h('li', {}, '« Je ne sais pas » : ', partJeNeSaisPas(jeNeSaisPas.quiz, 'dans les quiz de page', 'aucun quiz de page'), ' ',
@@ -228,7 +247,7 @@ const SECTIONS_PARENT = [
         ? MESURES_REBOND.filter(([cle]) => reussiteParRebond[cle].quiz).map(([cle, mot]) =>
           `${mot} ${reussiteParRebond[cle].pourcentage} % (${pluriel(reussiteParRebond[cle].quiz, 'quiz')})`).join(' ; ') + '.'
         : 'pas encore de quiz.'),
-      h('li', {}, 'Planificateur de mémoire : ', texteDuPlanificateur(planificateur)),
+      h('li', {}, 'Méthode de calcul des rappels : ', texteDuPlanificateur(planificateur)),
       h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
       h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
@@ -236,17 +255,41 @@ const SECTIONS_PARENT = [
       h('li', {}, 'Questions : ', `${pluriel(qs.signalees, 'signalée')}, ${pluriel(qs.retablies, 'rétablie')} sur la période ; ${pluriel(qs.suspectes, 'suspecte')} en ce moment.`),
     ),
     h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
-    h('p', { className: 'doux' }, 'Pour chaque tranche de probabilité de se souvenir prédite avant la réponse, la part de réponses justes aux Révisions du jour.'),
-    h('ul', {}, calibration.map((t) => h('li', {}, `Prédit ${t.de} à ${t.a} % : `, t.reponses
-      ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % prédit en moyenne)` : 'aucune réponse.')))] },
+    h('p', { className: 'doux' }, 'Pour chaque tranche de chances de s’en souvenir annoncées par l’appli avant la réponse, la part de réponses justes aux Révisions du jour.'),
+    h('ul', {}, calibration.map((t) => h('li', {}, `Quand l’appli pensait qu’il s’en souviendrait à ${t.de}–${t.a} % : `, t.reponses
+      ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % annoncé en moyenne)` : 'aucune réponse.'))))] },
+  { titre: '🔔 Rappel dans ton calendrier', bloc: 'reglages', replie: true, rendu: (_agregats, { profil, moment }) => rappelCalendrier(profil, moment) },
 ];
+// Les trois blocs de la Vue parent (#164), dans l'ordre de la page ; chaque section de SECTIONS_PARENT dit le sien (`bloc`).
+// Une section `replie` s'ouvre à la demande (<details>) ; les autres restent ouvertes.
+const BLOCS_PARENT = [
+  { id: 'retient', titre: 'Ce qu’il retient' },
+  { id: 'aide', titre: 'Ce qui demande de l’aide' },
+  { id: 'reglages', titre: 'Réglages et coûts' },
+];
+// Sections repliées que le parent a ouvertes : gardées quand un geste (Rétablir, Signaler) recharge l'écran.
+const sectionsParentOuvertes = new Set();
+const sectionParent = ({ titre, replie, rendu }, agregats, contexte) => {
+  if (!replie) return h('section', { className: 'vue-parent' }, h('h4', {}, titre), rendu(agregats, contexte));
+  return h('details', { className: 'vue-parent section-repliable', open: sectionsParentOuvertes.has(`${contexte.slug}/${titre}`),
+    ontoggle: (e) => { if (!e.target.isConnected) return; const cle = `${contexte.slug}/${titre}`; if (e.target.open) sectionsParentOuvertes.add(cle); else sectionsParentOuvertes.delete(cle); } },
+  h('summary', {}, h('h4', {}, titre)), rendu(agregats, contexte));
+};
+// Le sommaire mène à un bloc sans toucher au hash (c'est celui du routeur) ; une cible repliée s'ouvre.
+const allerAuBloc = (id) => (e) => {
+  e.preventDefault();
+  const cible = document.getElementById(`bloc-${id}`);
+  cible.closest('details')?.setAttribute('open', '');
+  cible.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  cible.focus({ preventScroll: true });
+};
 
 // Planificateur de mémoire (#161), en mots : celui qui sert et pourquoi, avec la perte de prédiction de chacun (plus basse = mieux).
 const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
-  const nom = utilise === 'fsrs6' ? 'FSRS-6' : 'FSRS-5';
-  if (reponses < seuil) return `${nom} (il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour comparer, ${reponses} jusqu’ici).`;
-  const chiffres = `perte de prédiction ${String(fsrs5.perte).replace('.', ',')} pour FSRS-5, ${String(fsrs6.perte).replace('.', ',')} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}`;
-  return `${nom} (${chiffres}).`;
+  const base = `${utilise === 'fsrs6' ? 'FSRS-6, la plus récente' : 'FSRS-5, l’ancienne'}.`;
+  if (reponses < seuil) return `${base} Il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour la comparer à l’autre, ${reponses} jusqu’ici.`;
+  const erreur = (m) => String(m.perte).replace('.', ',');
+  return `${base} Elle est choisie parce qu’elle devine le mieux ce que l’Élève retient : erreur de prédiction (plus basse = mieux) ${erreur(fsrs5)} pour FSRS-5, ${erreur(fsrs6)} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}.`;
 };
 
 // Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »
@@ -282,7 +325,7 @@ function rappelCalendrier(profil, etat) {
   const libelle = (id) => etat.choix.find((c) => c.id === id).libelle;
   const dessiner = () => {
     const avecHeure = etat.moment && etat.moment in etat.heures;
-    zone.replaceChildren(
+    zone.replaceChildren(...garder([
       h('p', { className: 'doux' }, 'Le fichier se génère ici, sur cet appareil : rien n’est envoyé ni hébergé. Tu l’ouvres dans ton calendrier, qui te préviendra à l’heure choisie.'),
       h('div', { className: 'rappel-heures' }, Object.entries(etat.heures).map(([id, heure]) => h('label', {},
         `${libelle(id)} `,
@@ -294,7 +337,7 @@ function rappelCalendrier(profil, etat) {
       avecHeure
         ? [h('p', {}, `${profil.pseudo} a choisi : ${libelle(etat.moment).toLowerCase()}, à ${etat.heures[etat.moment].replace(':', ' h ')}.`),
           h('a', { className: 'bouton', href: `/api/eleves/${profil.slug}/moment/calendrier.ics`, download: `rappel-${profil.slug}.ics` }, 'Télécharger le fichier calendrier')]
-        : h('p', {}, `${profil.pseudo} n’a pas encore choisi son moment de révision (l’appli le lui propose après l’Objectif du jour). Il n’y a donc pas de fichier à télécharger pour l’instant.`));
+        : h('p', {}, `${profil.pseudo} n’a pas encore choisi son moment de révision (l’appli le lui propose après l’Objectif du jour). Il n’y a donc pas de fichier à télécharger pour l’instant.`)]));
   };
   dessiner();
   return zone;
@@ -303,18 +346,23 @@ function rappelCalendrier(profil, etat) {
 async function ecranParent(profil) {
   const agregats = await api(`eleves/${profil.slug}/parent`);
   const moment = await api(`eleves/${profil.slug}/moment/heures`);
-  const contexte = { slug: profil.slug, recharger: () => ecranParent(profil) };
+  const contexte = { slug: profil.slug, profil, moment, recharger: () => ecranParent(profil) };
   montrer(
     h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
-    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats, contexte))),
-    h('section', { className: 'vue-parent' }, h('h3', {}, '🔔 Rappel dans ton calendrier'), rappelCalendrier(profil, moment)));
+    h('nav', { className: 'sommaire-parent', 'aria-label': 'Sommaire de la Vue parent' },
+      BLOCS_PARENT.map(({ id, titre }) => h('a', { href: '#/parent', onclick: allerAuBloc(id) }, titre))),
+    BLOCS_PARENT.map(({ id, titre }) => h('section', { className: 'bloc-parent', id: `bloc-${id}`, tabIndex: -1 },
+      h('h3', {}, titre),
+      SECTIONS_PARENT.filter((section) => section.bloc === id).map((section) => sectionParent(section, agregats, contexte)))));
 }
 
 // Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0
 // (voir morceauxRecompensesLecon).
 const recompensesLecon = (l) => h('span', { className: 'etoiles' },
-  morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
+  morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre },
+    // Un emoji qui porte un sens garde un nom textuel : « Pages réussies : 3 », « Quiz réussi : obtenue »
+    titre ? nommer(texte, `${titre} : ${texte.replace(/\D+/g, '') || (classe === 'pleine' ? 'obtenue' : 'pas encore')}`) : texte)));
 
 // Lien « ← Mes leçons » des en-têtes d'écran et de la carte d'attente.
 const retourAccueil = () => h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons');
@@ -512,11 +560,11 @@ function maSemaine(profil, { calendrier, rythme, revisions, lecons, moment }) {
       h('span', { className: 'nom', ariaHidden: 'true' }, JOURS_SEMAINE[i]),
       tamponJour(journee),
       (gains.etoiles > 0 || gains.fusees > 0) && h('span', { className: 'gains' },
-        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, `⭐${gains.etoiles > 1 ? gains.etoiles : ''}`),
-        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, `🚀${gains.fusees > 1 ? gains.fusees : ''}`)),
+        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, nommer(`⭐${gains.etoiles > 1 ? gains.etoiles : ''}`, pluriel(gains.etoiles, 'Étoile'))),
+        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, nommer(`🚀${gains.fusees > 1 ? gains.fusees : ''}`, pluriel(gains.fusees, 'Fusée')))),
       gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
         gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
-      controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}` }, '📅')));
+      controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}`, ariaLabel: `Contrôle : ${l.titre}` }, '📅')));
   };
   const objectif = o.atteint
     ? h('strong', {}, 'Objectif du jour atteint')
@@ -529,18 +577,20 @@ function maSemaine(profil, { calendrier, rythme, revisions, lecons, moment }) {
       h('div', { className: 'semaine-titre' },
         h('h2', {}, `Salut ${profil.pseudo} !`),
         h('a', { href: '#/badges' }, 'Mon calendrier et mes badges')),
-      h('ol', { className: 'jours' }, joursDeLaSemaine(aujourdhui).map(caseJour))),
-    h('div', { className: 'semaine-cote' },
-      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
-        h('small', {}, serie,
+      h('ol', { className: 'jours' }, joursDeLaSemaine(aujourdhui).map(caseJour)),
+      // La série suit les sept jours, dans la colonne de gauche, en corps normal et en --texte (#166).
+      h('div', { className: 'serie-de-jours' },
+        h('p', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+        serieDeJours.jokersUtilises > 0 && h('p', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
         // Série repartie (#159) : la meilleure série et tous les Jours travaillés restent sous les yeux, à la place d'un « 0 » seul.
-        meilleureSerie > serieDeJours.jours && h('small', { className: 'serie-acquis' },
+        meilleureSerie > serieDeJours.jours && h('p', { className: 'serie-acquis' },
           `Ta meilleure série : ${pluriel(meilleureSerie, 'jour')} · ${pluriel(joursTravailles, 'jour')} travaillé${joursTravailles > 1 ? 's' : ''} en tout`),
         // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
-        reparation && h('small', { className: 'reparation' },
-          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`),
+        reparation && h('p', { className: 'reparation' },
+          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`))),
+    h('div', { className: 'semaine-cote' },
+      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
         moment && momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       boutonRevisions));
@@ -591,7 +641,7 @@ async function ecranBadges(profil) {
   const aDecouvrir = collection.filter((b) => !b.surprise && !b.palier);
   const tete = (b, ...detail) => h('div', { className: 'badge-tete' }, pastilleBadge(b, { ariaHidden: 'true', title: undefined }), h('div', {}, h('strong', {}, b.nom), ...detail));
   montrer(
-    h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
+    h('p', {}, retourAccueil()),
     h('div', { className: 'badges-tete' },
       h('h2', {}, 'Mes badges'),
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
@@ -631,7 +681,7 @@ function calendrierJours({ aujourdhui, jours }) {
   const bloc = h('section', { className: 'mon-calendrier', ariaLabel: 'Mon calendrier' });
   const detail = (journee) => {
     const faits = [journee.quiz && `${journee.quiz} quiz`, journee.revisions && pluriel(journee.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
-    const gains = [journee.gains.etoiles && `⭐ ${journee.gains.etoiles}`, journee.gains.fusees && `🚀 ${journee.gains.fusees}`].filter(Boolean).join(' · ');
+    const gains = [journee.gains.etoiles && `⭐ ${pluriel(journee.gains.etoiles, 'Étoile')}`, journee.gains.fusees && `🚀 ${pluriel(journee.gains.fusees, 'Fusée')}`].filter(Boolean).join(' · ');
     // Plusieurs Leçons : une liste plutôt qu'une phrase à virgules ; les gains en pastilles qui reviennent à la ligne.
     const lecons = journee.lecons.map((l) => l.titre);
     return [
@@ -731,7 +781,7 @@ function recapitulatifSemaine(profil, recap) {
 // le rendu du quiz du Kit, sans le prof. Chaque réponse part au serveur, qui la corrige lui-même et la journalise.
 // À la fin des Questions dues, un message le dit, et l'Élève peut continuer avec des Questions pas encore dues.
 async function ecranRevisions(profil) {
-  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'),
+  montrer(h('p', {}, retourAccueil()), h('h2', {}, '🧠 Mes révisions du jour'),
     revisionsDuJour(profil, { fin: h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons') }));
 }
 
@@ -1170,7 +1220,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       const { ensuite } = lecon; // titre prévu par le prof (lesson.json), ou annoncé par un ancien Retour de quiz
       contenu = h('div', { className: 'apres-quiz' },
         !retourFerme && h('div', { className: 'retour' },
-          h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
+          h('button', { className: 'secondaire fermer', title: 'Fermer', ariaLabel: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, h('strong', {}, '🏆 Leçon terminée'), h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),

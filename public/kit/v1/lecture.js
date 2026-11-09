@@ -5,7 +5,7 @@
 // (quiz.js) ajoute lui-même le bouton de la page et ceux des questions ; l'appli s'en sert pour les Révisions du jour.
 // La logique (voix, texte d'une question, découpage) est dans lecture-logique.js.
 import { choisirVoix, morceaux, texteDeBloc, FIN_DE_VERS } from './lecture-logique.js';
-import { el } from './dom.js';
+import { el, poser } from './dom.js';
 
 const synthese = globalThis.speechSynthesis ?? null;
 const ECOUTER = '🔊 Écouter';
@@ -29,7 +29,7 @@ const voix = () => voixPromise ??= new Promise((resolve) => {
 });
 
 const remettre = (bouton) => {
-  bouton.textContent = bouton.dataset.libelle;
+  poser(bouton, bouton.dataset.libelle);
   bouton.setAttribute('aria-pressed', 'false');
 };
 
@@ -47,7 +47,7 @@ async function lire(bouton, texte) {
   arreterLecture();
   const numero = ++lectures;
   boutonActif = bouton;
-  bouton.textContent = ARRETER;
+  poser(bouton, ARRETER);
   bouton.setAttribute('aria-pressed', 'true');
   const parties = morceaux(texte);
   parties.forEach((partie, i) => {

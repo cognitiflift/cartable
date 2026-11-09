@@ -4,7 +4,7 @@
 // atteint le titre (<h2>) de la partie suivante, ou le quiz, ou la fin de la page. Hors score : ni Confiance, ni
 // « Je ne sais pas », aucune couleur de juste ou de faux.
 import { lirePrediction, messagePrediction, texteDeRevelation, texteDePrediction } from './prediction-logique.js';
-import { el } from './dom.js';
+import { el, poser } from './dom.js';
 import { boutonLecture } from './lecture.js';
 
 export const SELECTEUR = 'script.cartable-prediction[type="application/json"]';
@@ -52,7 +52,7 @@ function rendrePrediction(p, { page, envoyer, lecture }) {
   });
   const note = el('p', { className: 'kit-prediction-note' }, 'Pas de note ici : dis ce que tu penses.');
   const reveler = () => {
-    revelation.textContent = texteDeRevelation(p, choisie);
+    poser(revelation, texteDeRevelation(p, choisie));
     note.hidden = true;
   };
   const carte = el('section', { className: 'kit-prediction', ariaLabel: 'Ton avis avant de lire' },

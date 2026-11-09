@@ -8,7 +8,7 @@ const d = (jour, heure = 12) => new Date(2026, 10, jour, heure).toISOString();
 const maintenant = new Date(2026, 10, 20, 12).getTime();
 const carte = (id, extra) => ({ lecon: id, etat: 'prete', essais: 1, prete: d(1), retourne: null, ...extra });
 const fichier = (...cartes) => ({ cartes: Object.fromEntries(cartes.map((c) => [c.lecon, c])) });
-const mesure = (cartes, couts) => indicateurs([], { maintenant, cartes, couts }).cartes;
+const mesure = (cartes) => indicateurs([], { maintenant, cartes }).cartes;
 
 test('sans fichier de cartes, des mesures vides', () => {
   assert.deepEqual(mesure(null), {
@@ -20,12 +20,12 @@ test('sans fichier de cartes, des mesures vides', () => {
 test('jamais retournées au bout de sept jours : seules les cartes prêtes depuis sept jours comptent', () => {
   const m = mesure(fichier(
     carte('a', { retourne: d(3) }), // retournée au bout de 2 jours
-    carte('b', { retourne: d(12) }), // retournée au bout de 11 jours : pas retournée au bout de sept
+    carte('b', { retourne: d(12) }), // retournée au bout de 11 jours : retournée, elle n'est pas « jamais retournée »
     carte('c'), // jamais
     carte('d', { prete: d(15) }), // trop récente (5 jours)
     carte('e', { etat: 'a-composer', prete: null }), // pas prête
   )).nonRetourneesA7Jours;
-  assert.deepEqual(m, { cartes: 3, jamais: 2, pourcentage: 67 });
+  assert.deepEqual(m, { cartes: 3, jamais: 1, pourcentage: 33 });
 });
 
 test('délai médian entre prête et retournée, en heures, sur les cartes retournées', () => {
@@ -52,9 +52,13 @@ test('cartes composées par l’agent contre scènes de repli, et échecs de com
   assert.equal(m.echecs, 4);
 });
 
-test('coût moyen d’une carte : coût des tours « carte » sur les cartes composées par l’agent', () => {
-  const couts = { parTache: { carte: { coutUsd: 0.3, tours: 4 } } };
-  const m = mesure(fichier(carte('a'), carte('b'), carte('c', { etat: 'generique' })), couts);
-  assert.equal(m.coutMoyenUsd, 0.15);
-  assert.equal(mesure(fichier(carte('c', { etat: 'generique' })), couts).coutMoyenUsd, null);
+test('coût moyen d’une carte : coût gardé sur les cartes, divisé par les cartes composées et génériques', () => {
+  const cout = (coutUsd) => ({ coutUsd, tours: 1 });
+  const m = mesure(fichier(
+    carte('a', { cout: cout(0.2) }), carte('b', { cout: cout(0.1) }), carte('c', { etat: 'generique', cout: cout(0.3) }),
+    carte('d', { etat: 'a-composer', prete: null, cout: cout(0.3) }), // tour d'échec compté dans le coût, carte pas encore comptée
+  ));
+  assert.equal(m.coutMoyenUsd, 0.3); // (0.2 + 0.1 + 0.3 + 0.3) / 3
+  assert.equal(mesure(fichier(carte('a'))).coutMoyenUsd, null); // aucun coût relevé
 });
+

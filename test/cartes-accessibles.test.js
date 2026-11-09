@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { libelleCarteLigne, sceneGenerique } from '../public/carte-ligne-texte.js';
+import { libelleCarteLigne } from '../public/carte-ligne-texte.js';
+import { sceneGenerique } from '../lib/carte-generique.js';
 import { libelleCarteBadge, libelleADecouvrir } from '../public/carte-badge-texte.js';
 import { artDeBadge, IDS_FAMILLES } from '../public/carte-badge-art.js';
 import { nouvellesCartes, TEXTES_CEREMONIE } from '../public/nouvelles-cartes.js';
@@ -34,9 +35,11 @@ test('Cartes : une carte face cachée n\'est ni sans nom ni bavarde : elle dit q
 });
 
 test('Cartes : le dessin (scène générique, art des Badges) est masqué aux lecteurs d\'écran et ne porte aucun texte', () => {
-  const scene = sceneGenerique({ lecon: 'l1', titre: 'Les volcans', categorie: 'Sciences', objectifs: 3 });
+  const scene = sceneGenerique({ lecon: 'l1', categorie: 'Sciences' });
   const familles = IDS_FAMILLES.map((id) => artDeBadge({ id, nom: id, palier: 'or' }, 3));
-  for (const svg of [scene.l1, scene.l2, scene.heros, ...familles.flatMap((a) => [a.l1, a.l2, a.heros])]) {
+  // La scène générique vient du serveur : son svg est masqué par le div de calque (vérifié plus bas), pas par un attribut.
+  for (const svg of Object.values(scene)) assert.doesNotMatch(svg, /<(title|desc|text)\b/);
+  for (const svg of familles.flatMap((a) => [a.l1, a.l2, a.heros])) {
     assert.match(svg, /^<svg [^>]*aria-hidden="true"[^>]*focusable="false"/);
     assert.doesNotMatch(svg, /<(title|desc|text)\b/);
   }

@@ -1,6 +1,8 @@
 // Carillon du retournement (spec #182, ticket #187) : synthétisé par Web Audio, aucun fichier. Éteint par défaut, joué
 // seulement au retournement et seulement si l'Élève l'a activé (réglage du Profil). Plus long à mesure que le Palier
 // monte : d'une note (bronze) à cinq (diamant et surprise), en gamme pentatonique.
+// Une carte de ligne sonne toujours au rang 4, le plus long (voir app.js) : une Leçon Acquise est un aboutissement sans
+// Palier à graduer ; ce rang fixe est un choix de conception, sans cadre, hypothèse à mesurer (docs/cadres-scientifiques.md).
 
 const GAMME = [0, 2, 4, 7, 9]; // demi-tons depuis le do
 const PAS = 0.11; // secondes entre deux notes

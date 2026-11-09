@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fusionnerCartes, retournerCarte, commencerComposition, reprendreCompositions, terminerComposition, echouerComposition, generiquesEpuisees, prochaineAComposer, aRetourner, vueCartes } from '../lib/cartes.js';
+import { fusionnerCartes, reglerSon, ajouterCoutCarte, retournerCarte, commencerComposition, reprendreCompositions, terminerComposition, echouerComposition, generiquesEpuisees, prochaineAComposer, aRetourner, vueCartes } from '../lib/cartes.js';
 
 const T0 = Date.parse('2026-11-10T12:00:00.000Z');
 const T1 = Date.parse('2026-11-11T12:00:00.000Z');
@@ -156,4 +156,25 @@ test('terminer ou échouer une carte qui n’est pas « en composition » ne cha
   assert.equal(terminerComposition(f, 'a', CALQUES, T2), f);
   assert.equal(echouerComposition(f, 'a', T2), f);
   assert.equal(echouerComposition(f, 'zzz', T2), f);
+});
+
+test('le réglage du son crée un fichier sans livraison : le premier calcul la fixe et garde le son', () => {
+  const regle = reglerSon(null, true);
+  assert.equal(regle.livraison, null);
+  assert.equal(regle.son, true);
+  const { fichier } = fusionnerCartes(regle, { lecons: [lecon('a', 'acquis')], badges: badges({ x: { bronze: {} } }), maintenant: T0 });
+  assert.equal(fichier.livraison, '2026-11-10T12:00:00.000Z');
+  assert.equal(fichier.son, true);
+  assert.deepEqual(fichier.ecartees, ['a']);
+  assert.deepEqual(fichier.cartes, {});
+  assert.deepEqual(fichier.paliers, { 'x/bronze': { retourne: '2026-11-10T12:00:00.000Z' } });
+});
+
+test('le coût d\'un tour « carte » est gardé sur la carte, même si la Leçon disparaît', () => {
+  const premier = fusionnerCartes(null, { lecons: [], badges: badges(), maintenant: T0 }).fichier;
+  const avec = fusionnerCartes(premier, { lecons: [lecon('b', 'acquis')], badges: badges(), maintenant: T1 }).fichier;
+  const un = ajouterCoutCarte(avec, 'b', { coutUsd: 0.1 });
+  const deux = ajouterCoutCarte(un, 'b', { coutUsd: 0.05 });
+  assert.deepEqual(deux.cartes.b.cout, { coutUsd: 0.15, tours: 2 });
+  assert.equal(ajouterCoutCarte(deux, 'absente', { coutUsd: 1 }), deux);
 });

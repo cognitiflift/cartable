@@ -22,7 +22,7 @@ import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, repar
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
-import { fusionnerCartes, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
+import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
 import { consignesCarte, promptCarte } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
@@ -180,21 +180,26 @@ function composerCartes(slug) {
 // réponse illisible ou une panne est un échec de la tentative. Le Coût du tour, réussi ou non, est rattaché à la Leçon.
 async function composerUneCarte(slug, carte) {
   let calques = null;
+  const couts = []; // gardés aussi sur la carte : ils survivent à la suppression de la Leçon
   try {
     const [titres, cwd] = await Promise.all([store.titresObjectifs(slug, carte.lecon), store.preparerDossierCarte(slug)]);
     const { reponse, cout } = await lancerAgent({ cwd, prompt: promptCarte(carte, titres), consignes: consignesCarte(), tache: 'carte', teach: false });
     await store.ajouterCoutLecon(slug, carte.lecon, cout).catch(() => {});
+    couts.push(cout);
     const lu = lireCalques(reponse, carte.lecon);
     if (lu.ok) calques = lu.calques;
     else console.error(`Carte de ${slug}/${carte.lecon} : calque refusé (${lu.erreurs.slice(0, 3).join(' ; ')})`);
   } catch (e) {
     console.error(`Carte de ${slug}/${carte.lecon} : ${e.message}`);
-    if (e.cout) await store.ajouterCoutLecon(slug, carte.lecon, e.cout).catch(() => {});
+    if (e.cout) {
+      await store.ajouterCoutLecon(slug, carte.lecon, e.cout).catch(() => {});
+      couts.push(e.cout);
+    }
   }
   await store.viderDossierCarte(slug).catch(() => {});
   await store.modifierCartes(slug, (avant) => {
-    const apres = calques ? terminerComposition(avant, carte.lecon, calques, Date.now()) : echouerComposition(avant, carte.lecon, Date.now());
-    return [apres, null];
+    const composee = calques ? terminerComposition(avant, carte.lecon, calques, Date.now()) : echouerComposition(avant, carte.lecon, Date.now());
+    return [couts.reduce((f, cout) => ajouterCoutCarte(f, carte.lecon, cout), composee), null];
   });
 }
 
@@ -559,6 +564,17 @@ async function recalculerBadges(slug, maintenant) {
   return { nouveaux, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
 }
 
+// Livraison des cartes (#183) : le premier calcul écarte les Leçons déjà Acquises, il doit donc précéder l'événement qui
+// peut en faire une (le score d'un quiz) : sans cela, la Leçon qui devient Acquise au tout premier quiz serait écartée
+// avec les anciennes. Appelée avant d'enregistrer un score ; sans effet une fois la livraison fixée. Les Badges ne sont
+// ni écrits ni annoncés ici : leurs Paliers déjà justifiés servent seulement à les rendre visibles d'emblée.
+async function fixerLivraison(slug, maintenant) {
+  if ((await store.lireCartes(slug))?.livraison) return;
+  const [lecons, evenements, avantBadges] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug), store.lireBadges(slug)]);
+  const { fichier: badges } = fusionnerBadges(avantBadges, calculerBadges({ lecons, evenements, maintenant }), maintenant);
+  await store.modifierCartes(slug, (avant) => [avant?.livraison ? avant : fusionnerCartes(avant, { lecons, badges, maintenant }).fichier, null]);
+}
+
 // Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
 // [{ id, nom, palier, jour }].
 async function annoncerBadges(slug, maintenant) {
@@ -710,9 +726,9 @@ async function api(req, res, segments) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
     if (m === 'GET') {
       const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
-      const [evenements, lecons, cartes, couts] = await Promise.all([
-        store.lireEvenements(slug), store.leconsLues(slug, { maintenant }), store.lireCartes(slug), store.lireCouts(slug)]);
-      return json(res, 200, indicateurs(evenements, { maintenant, lecons, cartes, couts, ...periode }));
+      const [evenements, lecons, cartes] = await Promise.all([
+        store.lireEvenements(slug), store.leconsLues(slug, { maintenant }), store.lireCartes(slug)]);
+      return json(res, 200, indicateurs(evenements, { maintenant, lecons, cartes, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
     // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.
@@ -795,13 +811,12 @@ async function api(req, res, segments) {
       return json(res, 200, { statut });
     }
   } else if (r2 === 'cartes' && id === 'son' && !r3) {
-    // Réglage du carillon (#187), éteint par défaut : lu et écrit depuis le Profil. Le fichier de cartes existe avant
-    // toute écriture (le premier calcul fixe la livraison : Paliers existants visibles d'emblée).
+    // Réglage du carillon (#187), éteint par défaut : lu et écrit depuis le Profil. Le réglage ne calcule rien : s'il crée
+    // le fichier, c'est sans livraison (le premier calcul la fixera, voir fusionnerCartes).
     if (m === 'GET') return json(res, 200, { son: (await store.modifierCartes(slug, (f) => [f, f]))?.son === true });
     if (m === 'PUT') {
       const { son } = await lireCorps(req);
       if (typeof son !== 'boolean') throw new HttpError(400, 'Le réglage du carillon est vrai ou faux');
-      await recalculerBadges(slug, maintenant);
       const fichier = await store.modifierCartes(slug, (avant) => { const apres = reglerSon(avant, son); return [apres, apres]; });
       return json(res, 200, { son: fichier.son === true });
     }
@@ -833,7 +848,9 @@ async function api(req, res, segments) {
         return json(res, 200, lecon);
       }
     } else if (r3 === 'scores' && m === 'POST') {
-      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant });
+      const corps = await lireCorps(req);
+      await fixerLivraison(slug, maintenant); // avant le score : une Acquisition de ce quiz donne sa carte
+      const lecon = await store.enregistrerScore(slug, id, corps, { maintenant });
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {

@@ -58,7 +58,8 @@
 
 /* Quiz */
 .kit-quiz { margin: 2rem 0; display: flex; flex-direction: column; gap: 1rem; }
-.kit-quiz-question { border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-carte); padding: 1rem 1.1rem; margin: 0; }
+/* Mesure (#173) : au plus ~75 caractères par ligne ; `ch` est la chasse du « 0 », ~1,5 fois la lettre moyenne : 45ch donnent ~75 caractères (mesuré). */
+.kit-quiz-question { border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-carte); padding: 1rem 1.1rem; margin: 0; max-width: calc(45ch + 2.2rem + 2px); }
 /* L'énoncé à l'intérieur de la carte, et non posé sur sa bordure (rendu natif de <legend>) : il peut tenir sur
    plusieurs lignes sur un téléphone. */
 .kit-quiz-question legend { float: left; width: 100%; padding: 0; margin-bottom: .4rem; font-weight: 600; }
@@ -66,7 +67,7 @@
 .kit-quiz-image { display: block; max-width: 100%; max-height: 40vh; width: auto; margin: 0 auto .6rem; border-radius: 8px; }
 /* Revoir la figure (spec #123) : sous l'énoncé, un bouton secondaire de DESIGN.md (filet, 600, 10px), qui déplie sur
    place une copie de la figure de la page et la replie ; ouvert, il prend un filet accent (comme « Les deux autres
-   voies »). La copie est une carte simple sur le fond, dans la carte de la question ; ses règles sont ici et non dans
+   voies »). La copie n'est pas une seconde carte dans la carte de la question (#173) : un fond, sans filet ; ses règles sont ici et non dans
    base.css, pour que les Révisions du jour de l'appli la montrent aussi. */
 .kit-revoir { margin-bottom: .6rem; }
 .kit-revoir-bouton {
@@ -75,7 +76,7 @@
 }
 .kit-revoir-bouton:hover { border-color: var(--kit-accent); }
 .kit-revoir-bouton[aria-expanded="true"] { border-color: var(--kit-accent); }
-.kit-revoir .kit-quiz-figure { margin: .5rem 0 0; padding: .8rem; border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-fond); text-align: center; }
+.kit-revoir .kit-quiz-figure { margin: .5rem 0 0; padding: .8rem; border-radius: 10px; background: var(--kit-fond); text-align: center; }
 .kit-revoir .kit-quiz-figure[hidden] { display: none; }
 .kit-revoir .kit-quiz-figure img, .kit-revoir .kit-quiz-figure svg { display: block; max-width: 100%; height: auto; max-height: 40vh; width: auto; margin: 0 auto; border-radius: 8px; }
 .kit-revoir .kit-quiz-figure blockquote { margin: 0 auto; max-width: 34rem; padding: .4rem .6rem; text-align: left; font-size: 1.05rem; line-height: 1.7; text-wrap: pretty; }
@@ -120,11 +121,14 @@
 .kit-signaler-raison { font: inherit; font-weight: 600; min-height: 2.6rem; padding: .4rem .9rem; border-radius: 10px; cursor: pointer; border: 1px solid var(--kit-bord); background: var(--kit-carte); color: var(--kit-texte); }
 .kit-signaler-raison:hover:not(:disabled) { border-color: var(--kit-accent); }
 .kit-signaler-message { margin: .2rem 0 0; font-size: .9rem; color: var(--kit-doux); }
+/* Valider (#173) : l'action principale du quiz, le bouton plein du Kit (DESIGN.md : fond accent, texte sur-accent, 700),
+   plus visible que « Je ne sais pas ». Désactivé (composant inactif, exempté de WCAG 1.4.3), il est atténué. */
 .kit-quiz-valider {
-  font: inherit; font-weight: 600; align-self: flex-start; padding: .5rem 1.1rem; border-radius: 999px; cursor: pointer;
-  border: 2px solid var(--kit-accent); background: var(--kit-accent-doux); color: var(--kit-texte);
+  font: inherit; font-weight: 700; align-self: flex-start; min-height: 2.6rem; padding: .5rem 1.3rem; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--kit-accent-fort); background: var(--kit-accent-fort); color: var(--kit-sur-accent);
 }
-.kit-quiz-valider:disabled { opacity: .5; cursor: default; }
+.kit-quiz-valider:hover:not(:disabled) { background: color-mix(in srgb, var(--kit-accent-fort) 88%, var(--kit-encre-noire)); }
+.kit-quiz-valider:disabled { opacity: .55; cursor: default; }
 .kit-quiz-valider[hidden] { display: none; }
 
 /* Texte à trous : la phrase avec ses trous, puis la banque de mots. */
@@ -145,7 +149,9 @@
 .kit-ordre-element { display: flex; gap: .4rem; align-items: center; }
 .kit-ordre-element .kit-ordre-texte { flex: 1; }
 .kit-ordre-fleche { font: inherit; padding: .4rem .5rem; border-radius: 8px; border: 1px solid var(--kit-bord); background: var(--kit-carte); cursor: pointer; }
-.kit-ordre-fleche:disabled { opacity: .35; cursor: default; }
+/* Désactivée (#173) : un contour en tirets de `doux` (au moins 3:1 sur la carte et le fond, WCAG 1.4.11), au lieu d'une opacité
+   qui le ramenait à 2:1 ; le tireté la distingue sans la couleur (WCAG 1.4.1). */
+.kit-ordre-fleche:disabled { border-style: dashed; border-color: var(--kit-doux); background: var(--kit-fond); cursor: default; filter: grayscale(1); }
 
 /* Associer : deux colonnes ; deux éléments reliés portent le même numéro. */
 .kit-associer { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem .8rem; }
@@ -171,7 +177,7 @@
 
 /* Réfléchis puis dévoile : la réponse dévoilée, puis le souvenir (« je l'avais »…). Meilleure explication : sa consigne. */
 .kit-devoile-consigne, .kit-explication-consigne { margin: 0; color: var(--kit-doux); }
-.kit-devoile-reponse { margin: 0; padding: .6rem .9rem; border: 1px dashed var(--kit-accent); border-radius: 10px; }
+.kit-devoile-reponse { margin: 0; padding: .6rem .9rem; border-radius: 10px; background: var(--kit-accent-doux); }
 .kit-devoile-reponse[hidden], .kit-devoile-souvenir[hidden] { display: none; }
 .kit-devoile-souvenir { display: flex; flex-direction: column; gap: .5rem; }
 
@@ -193,7 +199,7 @@
 .kit-prediction .kit-prediction-note { margin-top: .6rem; color: var(--kit-doux); font-size: .9rem; }
 .kit-prediction-note[hidden] { display: none; }
 .kit-prediction-revelation { margin-top: .6rem; }
-.kit-prediction-revelation:not(:empty) { padding: .6rem .9rem; border-radius: 10px; background: var(--kit-carte); border: 1px dashed var(--kit-accent); }
+.kit-prediction-revelation:not(:empty) { padding: .6rem .9rem; border-radius: 10px; background: var(--kit-carte); }
 .kit-prediction-fin { height: 1px; }
 
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }

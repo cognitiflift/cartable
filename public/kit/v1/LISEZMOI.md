@@ -332,6 +332,8 @@ Règles : au plus **une Prédiction par partie et deux par page** ; jamais dans 
 
 Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction, la raison de la réponse fausse choisie s'il y en a une, et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
 
+**Emoji et lecteurs d'écran.** Les emoji de ton texte, des consignes et des boutons du Kit sont masqués aux lecteurs d'écran (ils restent à l'écran) : le nom d'un bouton est son texte. Ne mets donc jamais d'information seulement dans un emoji, et ne fais pas de bouton d'un emoji seul.
+
 Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases complètes, dans des blocs (`<p>`, titres, listes, `<figcaption>`, `<aside>`, l'extrait de texte `<blockquote>` d'une figure) : ce sont eux qui sont lus, dans l'ordre. Le quiz, les crédits des figures (`kit-credit`), les schémas `<svg>` et ce qui est caché ne sont pas lus ; les émojis non plus.
 
 L'appli transmet le réglage à la page dans son adresse (`…/0002-le-magma.html?lecture=1`). Ajout compatible de la version 1 : une page déjà écrite avec le Kit en profite sans changement.

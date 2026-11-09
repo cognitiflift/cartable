@@ -1,6 +1,7 @@
 import { rendreQuestion } from '/kit/v1/question.js';
 import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
+import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
@@ -31,7 +32,7 @@ const h = (tag, attrs = {}, ...enfants) => {
     if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (v !== false && v != null) el[k] = v;
   }
-  el.append(...garder(enfants));
+  el.append(...garder(enfants).flatMap((e) => [avecEmoji(e)].flat())); // emoji décoratifs masqués aux lecteurs d'écran (#168)
   return el;
 };
 const garder = (enfants) => enfants.flat(Infinity).filter((e) => e != null && e !== false);
@@ -307,7 +308,9 @@ async function ecranParent(profil) {
 // Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0
 // (voir morceauxRecompensesLecon).
 const recompensesLecon = (l) => h('span', { className: 'etoiles' },
-  morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre }, texte)));
+  morceauxRecompensesLecon(l).map(({ texte, titre, classe }) => h('span', { className: classe, title: titre },
+    // Un emoji qui porte un sens garde un nom textuel : « Pages réussies : 3 », « Quiz réussi : obtenue »
+    titre ? nommer(texte, `${titre} : ${texte.replace(/\D+/g, '') || (classe === 'pleine' ? 'obtenue' : 'pas encore')}`) : texte)));
 
 // Lien « ← Mes leçons » des en-têtes d'écran et de la carte d'attente.
 const retourAccueil = () => h('a', { className: 'retour-accueil', href: '#/' }, '← Mes leçons');
@@ -481,11 +484,11 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
       h('span', { className: 'nom', ariaHidden: 'true' }, JOURS_SEMAINE[i]),
       tamponJour(journee),
       (gains.etoiles > 0 || gains.fusees > 0) && h('span', { className: 'gains' },
-        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, `⭐${gains.etoiles > 1 ? gains.etoiles : ''}`),
-        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, `🚀${gains.fusees > 1 ? gains.fusees : ''}`)),
+        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, nommer(`⭐${gains.etoiles > 1 ? gains.etoiles : ''}`, pluriel(gains.etoiles, 'Étoile'))),
+        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, nommer(`🚀${gains.fusees > 1 ? gains.fusees : ''}`, pluriel(gains.fusees, 'Fusée')))),
       gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
         gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
-      controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}` }, '📅')));
+      controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}`, ariaLabel: `Contrôle : ${l.titre}` }, '📅')));
   };
   const objectif = o.atteint
     ? h('strong', {}, 'Objectif du jour atteint')
@@ -603,7 +606,7 @@ function calendrierJours({ aujourdhui, jours }) {
   const bloc = h('section', { className: 'mon-calendrier', ariaLabel: 'Mon calendrier' });
   const detail = (journee) => {
     const faits = [journee.quiz && `${journee.quiz} quiz`, journee.revisions && pluriel(journee.revisions, 'Révision') + ' du jour'].filter(Boolean).join(' · ');
-    const gains = [journee.gains.etoiles && `⭐ ${journee.gains.etoiles}`, journee.gains.fusees && `🚀 ${journee.gains.fusees}`].filter(Boolean).join(' · ');
+    const gains = [journee.gains.etoiles && `⭐ ${pluriel(journee.gains.etoiles, 'Étoile')}`, journee.gains.fusees && `🚀 ${pluriel(journee.gains.fusees, 'Fusée')}`].filter(Boolean).join(' · ');
     // Plusieurs Leçons : une liste plutôt qu'une phrase à virgules ; les gains en pastilles qui reviennent à la ligne.
     const lecons = journee.lecons.map((l) => l.titre);
     return [
@@ -1142,7 +1145,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       const { ensuite } = lecon; // titre prévu par le prof (lesson.json), ou annoncé par un ancien Retour de quiz
       contenu = h('div', { className: 'apres-quiz' },
         !retourFerme && h('div', { className: 'retour' },
-          h('button', { className: 'secondaire fermer', title: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
+          h('button', { className: 'secondaire fermer', title: 'Fermer', ariaLabel: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, h('strong', {}, '🏆 Leçon terminée'), h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),

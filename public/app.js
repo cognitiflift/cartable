@@ -543,18 +543,20 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
       h('div', { className: 'semaine-titre' },
         h('h2', {}, `Salut ${profil.pseudo} !`),
         h('a', { href: '#/badges' }, 'Mon calendrier et mes badges')),
-      h('ol', { className: 'jours' }, joursDeLaSemaine(aujourdhui).map(caseJour))),
-    h('div', { className: 'semaine-cote' },
-      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
-        h('small', {}, serie,
+      h('ol', { className: 'jours' }, joursDeLaSemaine(aujourdhui).map(caseJour)),
+      // La série suit les sept jours, dans la colonne de gauche, en corps normal et en --texte (#166).
+      h('div', { className: 'serie-de-jours' },
+        h('p', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+        serieDeJours.jokersUtilises > 0 && h('p', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
         // Série repartie (#159) : la meilleure série et tous les Jours travaillés restent sous les yeux, à la place d'un « 0 » seul.
-        meilleureSerie > serieDeJours.jours && h('small', { className: 'serie-acquis' },
+        meilleureSerie > serieDeJours.jours && h('p', { className: 'serie-acquis' },
           `Ta meilleure série : ${pluriel(meilleureSerie, 'jour')} · ${pluriel(joursTravailles, 'jour')} travaillé${joursTravailles > 1 ? 's' : ''} en tout`),
         // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
-        reparation && h('small', { className: 'reparation' },
-          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`),
+        reparation && h('p', { className: 'reparation' },
+          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`))),
+    h('div', { className: 'semaine-cote' },
+      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
         momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },

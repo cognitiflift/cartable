@@ -175,6 +175,22 @@ _Avoid_: niveau (confusion avec Niveau de Leçon et Niveau de scolarité)
 **Mes badges**:
 Écran de l'Élève, ouvert depuis la carte de l'Objectif du jour sur l'accueil : un calendrier des Jours travaillés (toucher un jour montre ce qui a été fait et gagné, sans les scores) et la collection des Badges (chaque Badge commencé en ligne, ses Paliers en stations et le chemin vers le prochain sans chiffre ; à découvrir avec ce qu'ils saluent, sans décompte ; surprise cachés). Un Badge reste marqué « Nouveau » tant que l'Élève n'a pas ouvert Mes badges depuis qu'il l'a gagné.
 
+**Carte**:
+Ce que l'Élève collectionne dans Mes badges, de deux sortes : la **carte de Badge** (une par Famille et par badge surprise, dessinée dans l'appli, au cadre de la couleur du Palier atteint) et la **Carte de ligne**. Définitive, comme un Palier : elle reste à l'Élève quoi qu'il arrive à la Leçon ou au compte qui l'a fait gagner. Une carte est gagnée par un acte (un Palier, une Leçon Acquise), jamais obtenue au hasard : la couleur d'un Palier n'est pas une rareté.
+_Avoid_: loot, pack, tirage, rareté, butin
+
+**Carte de ligne**:
+Carte unique gagnée la première fois qu'une Leçon (libre ou de révision) devient Acquise, composée par l'agent pour son sujet (type de tâche **carte**, en arrière-plan) : trois calques de dessin, la ligne de la Leçon (ses stations sont ses Objectifs) et le terminus « ACQUIS ✓ » dessinés par l'appli. Après deux tentatives ratées, l'appli la dessine elle-même en **scène générique**. Les Leçons déjà Acquises à la livraison des cartes n'en ont pas.
+
+**Mon réseau**:
+La grille des Cartes de ligne de l'Élève dans Mes badges, de la plus récente à la plus ancienne, au-dessus des cartes de Badge. Sans décompte, sans jauge.
+
+**Carte à retourner**:
+Carte gagnée et prête (carte de ligne composée, Palier gagné depuis la livraison) que l'Élève n'a pas encore retournée : elle attend face cachée dans « Nouvelles cartes », autant de temps qu'il le veut. Le retournement ouvre la cérémonie, enregistré une fois pour toutes ; « Nouveau » reste affiché tant qu'il reste une carte à retourner.
+
+**Trousse**:
+La consigne de composition donnée à l'agent pour une Carte de ligne (format, zones calmes, symboles plutôt que silhouettes exactes, animations d'une liste fermée, JSON de trois calques). L'appli filtre ce qui revient et n'en garde que le conforme.
+
 **Niveau de Leçon**:
 Avancée de l'Élève dans une Leçon libre : nombre d'Objectifs atteints plus un (on commence au niveau 1). Sans maximum : quand tous les Objectifs actuels sont atteints, l'agent propose à l'Élève d'élargir la mission, ce qui ajoute des Objectifs. Ne mesure pas ce que l'Élève sait (c'est la Maîtrise) mais jusqu'où il est allé.
 _Avoid_: niveau tout court (confusion avec Niveau de scolarité), étape

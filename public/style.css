@@ -310,6 +310,26 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .revisions { max-width:46rem; margin:1rem 0; }
 .revision-origine { margin:0; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
+/* Vue parent (#164) : un sommaire de trois ancres, puis trois blocs en cartes simples (14px, filet, sans ombre) ; les
+   sections du dernier bloc se replient (<details>, chevron du dépliant des Objectifs). */
+.sommaire-parent { display:flex; flex-wrap:wrap; gap:.2rem 1.4rem; max-width:46rem; margin:.4rem 0 1.4rem; }
+.sommaire-parent a { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
+.bloc-parent { max-width:46rem; margin:1.2rem 0; padding:.2rem 1rem .6rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; scroll-margin-top:1rem; }
+.bloc-parent:focus-visible { outline-offset:3px; }
+.bloc-parent h3 { margin:1rem 0 .3rem; font:800 1.2rem/1.2 var(--police-titre); }
+.bloc-parent .vue-parent { margin:.5rem 0; padding-top:.9rem; border-top:1px dashed var(--bord); }
+.bloc-parent h4 { margin:0 0 .5rem; font:700 1rem/1.3 var(--police-titre); }
+.bloc-parent ul { margin:.3rem 0; padding-left:1.2rem; }
+.bloc-parent ul ul { margin:.1rem 0 .3rem; }
+.lien-lecon { display:inline-block; min-height:1.5rem; line-height:1.5rem; color:var(--accent); font-weight:600; }
+.section-repliable > summary { display:flex; align-items:center; gap:.45rem; min-height:2.75rem; cursor:pointer; list-style:none; }
+.section-repliable > summary::-webkit-details-marker { display:none; }
+.section-repliable > summary::before { content:""; width:.45rem; height:.45rem; border-right:2px solid; border-bottom:2px solid; transform:translateY(-.1rem) rotate(-45deg); transition:transform .2s ease-out; }
+.section-repliable[open] > summary::before { transform:translateY(.1rem) rotate(45deg); }
+.section-repliable > summary h4 { margin:0; }
+@media (prefers-reduced-motion: reduce) { .section-repliable > summary::before { transition:none; } }
+details.pour-les-curieux summary { padding-block:.7rem; cursor:pointer; font-weight:700; color:var(--doux); }
+details.pour-les-curieux summary:hover { color:var(--texte); }
 .rappel-heures { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin:.5rem 0 .8rem; }
 .rappel-heures label { display:flex; flex-direction:column; gap:.2rem; font-weight:600; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }

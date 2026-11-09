@@ -144,7 +144,7 @@
 .kit-ordre { list-style: decimal; margin: 0; padding-left: 1.6rem; display: flex; flex-direction: column; gap: .5rem; }
 .kit-ordre-element { display: flex; gap: .4rem; align-items: center; }
 .kit-ordre-element .kit-ordre-texte { flex: 1; }
-.kit-ordre-fleche { font: inherit; padding: .4rem .5rem; border-radius: 8px; border: 1px solid var(--kit-bord); background: var(--kit-carte); cursor: pointer; }
+.kit-ordre-fleche { font: inherit; min-width: 2.75rem; min-height: 2.75rem; padding: .4rem .5rem; border-radius: 8px; border: 1px solid var(--kit-bord); background: var(--kit-carte); cursor: pointer; }
 .kit-ordre-fleche:disabled { opacity: .35; cursor: default; }
 
 /* Associer : deux colonnes ; deux éléments reliés portent le même numéro. */

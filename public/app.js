@@ -563,7 +563,7 @@ async function ecranBadges(profil) {
   const aDecouvrir = collection.filter((b) => !b.surprise && !b.palier);
   const tete = (b, ...detail) => h('div', { className: 'badge-tete' }, pastilleBadge(b, { ariaHidden: 'true', title: undefined }), h('div', {}, h('strong', {}, b.nom), ...detail));
   montrer(
-    h('p', {}, h('a', { href: '#/' }, '← Mes leçons')),
+    h('p', {}, retourAccueil()),
     h('div', { className: 'badges-tete' },
       h('h2', {}, 'Mes badges'),
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
@@ -703,7 +703,7 @@ function recapitulatifSemaine(profil, recap) {
 // le rendu du quiz du Kit, sans le prof. Chaque réponse part au serveur, qui la corrige lui-même et la journalise.
 // À la fin des Questions dues, un message le dit, et l'Élève peut continuer avec des Questions pas encore dues.
 async function ecranRevisions(profil) {
-  montrer(h('p', {}, h('a', { href: '#/' }, '← Mes leçons')), h('h2', {}, '🧠 Mes révisions du jour'),
+  montrer(h('p', {}, retourAccueil()), h('h2', {}, '🧠 Mes révisions du jour'),
     revisionsDuJour(profil, { fin: h('button', { className: 'secondaire', onclick: () => (location.hash = '#/') }, '← Mes leçons') }));
 }
 

@@ -462,7 +462,7 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 @keyframes pc-tourne { to { transform:rotate(360deg); } }
 @keyframes pc-flamme { from { transform:scale(1, .82) skewX(-4deg); } to { transform:scale(1.08, 1.12) skewX(5deg); } }
 @keyframes pc-flotte { 50% { transform:translateY(-.5rem); } }
-@keyframes pc-eclair { 0%, 55%, 100% { opacity:.9; } 58% { opacity:.2; } 60% { opacity:1; } 64% { opacity:.35; } 66% { opacity:1; } }
+@keyframes pc-eclair { 0%, 55%, 100% { opacity:.9; } 58% { opacity:.6; } 60% { opacity:1; } 64% { opacity:.65; } 66% { opacity:1; } } /* la lueur varie d'au plus 40 % : jamais un éclair (WCAG 2.3.1) */
 @keyframes pc-scint { 50% { opacity:.15; } }
 @keyframes pc-trace { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
 @keyframes pc-braise { from { transform:translate(0, 0); opacity:1; } to { transform:translate(var(--x, 0), -46px); opacity:0; } }
@@ -535,7 +535,7 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .cer-texte p { margin:0; color:var(--sur-nuit-doux); }
 .cer-ok { min-height:2.75rem; padding:.55rem 1.2rem; border:0; border-radius:12px; background:var(--nouveau); color:var(--sur-nouveau); font:800 1.15rem var(--police); cursor:pointer; }
 .cer-ok[hidden] { display:none; }
-.cer-plus-tard { background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
+.cer-plus-tard { min-height:2.75rem; padding-inline:1.2rem; background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
 
 /* La carte entre couche par couche : retournement, ciel, décor, ligne, puis le héros qui tombe ; les stations
    s'allument une à une. L'état de fin est l'état naturel (fond « backwards ») : la carte reste inclinable ensuite. */
@@ -556,3 +556,4 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 @media (prefers-reduced-motion: reduce) { .cer-eclats { display:none; } .cl-cachee-face { transition:none; } }
 .cartes-ceremonie { background:color-mix(in srgb, var(--nuit) 88%, transparent); }
 @media (max-width: 480px) { header button.secondaire { white-space:nowrap; } .compteur-etoiles .nouveau { margin-left:.1rem; padding:0 .35rem; } }
+.cartes-ceremonie :focus-visible { outline-color:var(--sur-nuit); } /* sur le voile sombre, l'accent (encre en thème clair) ne se voit pas */

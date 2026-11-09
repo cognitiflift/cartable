@@ -258,8 +258,8 @@ const BLOCS_PARENT = [
 const sectionsParentOuvertes = new Set();
 const sectionParent = ({ titre, replie, rendu }, agregats, contexte) => {
   if (!replie) return h('section', { className: 'vue-parent' }, h('h4', {}, titre), rendu(agregats, contexte));
-  return h('details', { className: 'vue-parent section-repliable', open: sectionsParentOuvertes.has(titre),
-    ontoggle: (e) => { if (e.target.open) sectionsParentOuvertes.add(titre); else sectionsParentOuvertes.delete(titre); } },
+  return h('details', { className: 'vue-parent section-repliable', open: sectionsParentOuvertes.has(`${contexte.slug}/${titre}`),
+    ontoggle: (e) => { if (!e.target.isConnected) return; const cle = `${contexte.slug}/${titre}`; if (e.target.open) sectionsParentOuvertes.add(cle); else sectionsParentOuvertes.delete(cle); } },
   h('summary', {}, h('h4', {}, titre)), rendu(agregats, contexte));
 };
 // Le sommaire mène à un bloc sans toucher au hash (c'est celui du routeur) ; une cible repliée s'ouvre.
@@ -338,7 +338,7 @@ async function ecranParent(profil) {
     h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
     h('nav', { className: 'sommaire-parent', 'aria-label': 'Sommaire de la Vue parent' },
-      BLOCS_PARENT.map(({ id, titre }) => h('a', { href: `#bloc-${id}`, onclick: allerAuBloc(id) }, titre))),
+      BLOCS_PARENT.map(({ id, titre }) => h('a', { href: '#/parent', onclick: allerAuBloc(id) }, titre))),
     BLOCS_PARENT.map(({ id, titre }) => h('section', { className: 'bloc-parent', id: `bloc-${id}`, tabIndex: -1 },
       h('h3', {}, titre),
       SECTIONS_PARENT.filter((section) => section.bloc === id).map((section) => sectionParent(section, agregats, contexte)))));

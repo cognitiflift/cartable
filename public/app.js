@@ -226,7 +226,7 @@ const SECTIONS_PARENT = [
         ? MESURES_REBOND.filter(([cle]) => reussiteParRebond[cle].quiz).map(([cle, mot]) =>
           `${mot} ${reussiteParRebond[cle].pourcentage} % (${pluriel(reussiteParRebond[cle].quiz, 'quiz')})`).join(' ; ') + '.'
         : 'pas encore de quiz.'),
-      h('li', {}, 'Planificateur de mémoire, ', texteDuPlanificateur(planificateur)),
+      h('li', {}, 'Méthode de calcul des rappels : ', texteDuPlanificateur(planificateur)),
       h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
       h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
@@ -241,7 +241,7 @@ const SECTIONS_PARENT = [
 
 // Planificateur de mémoire (#161), en mots : celui qui sert et pourquoi, avec la perte de prédiction de chacun (plus basse = mieux).
 const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
-  const base = `méthode de calcul des rappels utilisée : ${utilise === 'fsrs6' ? 'FSRS-6, la plus récente' : 'FSRS-5, l’ancienne'}.`;
+  const base = `${utilise === 'fsrs6' ? 'FSRS-6, la plus récente' : 'FSRS-5, l’ancienne'}.`;
   if (reponses < seuil) return `${base} Il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour la comparer à l’autre, ${reponses} jusqu’ici.`;
   const erreur = (m) => String(m.perte).replace('.', ',');
   return `${base} Elle est choisie parce qu’elle devine le mieux ce que l’Élève retient : erreur de prédiction (plus basse = mieux) ${erreur(fsrs5)} pour FSRS-5, ${erreur(fsrs6)} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}.`;

@@ -398,7 +398,7 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Solidité.** Méta-analyse ou consensus pour la norme. Étude isolée pour la taille au pouce, mesurée chez des adultes, pas chez des enfants.
 
-**Où dans Cartable.** « Cibles tactiles confortables pour la tablette » (`PRODUCT.md`) ; « cibles tactiles d’au moins 2.75rem » (`DESIGN.md`, ticket #167 : seuil relevé de 2.6rem à 44 px, le niveau AAA 2.5.5, plus strict que le AA de 24 px) ; boutons de 2.75rem (`public/style.css`) ; à 390 px, la barre de navigation (🎒, étoiles, Mon profil, Changer, 🌗), « ← Mes leçons », la Vue parent (liens de Leçon, Rétablir/Signaler, listes), le sélecteur de page de la Séance et les flèches d’ordre du Kit sont à 44 px au moins, sans changer la grille ; les liens dans une phrase de Leçon (notes, glossaire, sources) restent sous l’exception « lien en ligne » de 2.5.8 ; aucune saisie au clavier pendant une Séance (ADR 0002).
+**Où dans Cartable.** « Cibles tactiles confortables pour la tablette » (`PRODUCT.md`) ; « cibles tactiles d'au moins 2.75rem » (`DESIGN.md`, ticket #167 : seuil relevé de 2.6rem à 44 px, le niveau AAA 2.5.5, plus strict que le AA de 24 px) ; boutons de 2.75rem (`public/style.css`) ; à 390 px, la barre de navigation (🎒, étoiles, Mon profil, Changer, 🌗), « ← Mes leçons », la Vue parent (liens de Leçon, Rétablir/Signaler, listes), le sélecteur de page de la Séance et les flèches d'ordre du Kit sont à 44 px au moins, sans changer la grille ; les liens dans une phrase de Leçon (notes, glossaire, sources) restent sous l’exception « lien en ligne » de 2.5.8 ; aucune saisie au clavier pendant une Séance (ADR 0002).
 
 ## Décisions sans fondement écrit
 

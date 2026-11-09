@@ -7,6 +7,7 @@ import {
   confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
 } from '/nouvelle-lecon-texte.js';
 import { RAISONS_SIGNALEMENT } from '/kit/v1/quiz-logique.js';
+import { ErreurApi, chargerProfil, avecAttente, lireEnParallele } from '/chargement.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -14,13 +15,19 @@ let config;
 let quitterEcran = () => {}; // nettoyage de l'écran précédent (écouteurs)
 
 const api = async (url, options = {}) => {
-  const res = await fetch(`/api/${url}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json' },
-    body: options.body && JSON.stringify(options.body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.erreur || 'Erreur');
+  let res;
+  try {
+    res = await fetch(`/api/${url}`, {
+      ...options,
+      headers: { 'Content-Type': 'application/json' },
+      body: options.body && JSON.stringify(options.body),
+    });
+  } catch {
+    throw new ErreurApi('Pas de réponse du serveur', 0); // réseau coupé ou serveur arrêté
+  }
+  // Une panne peut répondre autre chose que du JSON : le statut compte plus que le corps.
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ErreurApi(data?.erreur || 'Erreur', res.status);
   return data;
 };
 
@@ -395,21 +402,32 @@ function carteLecon(l, { enTete = false } = {}) {
       h('ul', {}, objectifs.map((o) => h('li', {}, station(o), h('span', {}, o.texte, h('small', {}, etatStation(o).libelle)))))));
 }
 
+// Une erreur à la place d'un bloc, annoncée comme une alerte, avec de quoi repartir (#169).
+const blocErreur = (texte) => h('div', { className: 'bloc-erreur', role: 'alert' },
+  h('p', { className: 'erreur' }, texte), h('button', { className: 'secondaire', onclick: () => route() }, 'Réessayer'));
+
+// L'accueil lit cinq choses, chacune pour son compte. Les Leçons et les Révisions sont l'essentiel : en échec, une erreur
+// avec « Réessayer » prend la place du bloc. Rythme, badges et moment sont accessoires : le bloc est omis ou dit en une phrase
+// qu'il n'a pas pu s'afficher, sans bloquer l'Élève.
 async function ecranAccueil(profil) {
-  const [lecons, revisions, rythme, badges, moment] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`), api(`eleves/${profil.slug}/moment`)]);
-  retenirRecompenses(profil, badges);
+  const lire = (chemin) => api(`eleves/${profil.slug}/${chemin}`);
+  const lectures = await lireEnParallele({ lecons: lire('lecons'), revisions: lire('revisions'), rythme: lire('rythme'), badges: lire('badges'), moment: lire('moment') });
+  const lecons = lectures.lecons.valeur ?? [];
+  const { revisions: { valeur: revisions }, rythme: { valeur: rythme }, badges: { valeur: badges }, moment: { valeur: moment } } = lectures;
+  if (badges) retenirRecompenses(profil, badges);
   barreNav(profil);
   // « Où j'en étais ? » : la Leçon à la dernière activité la plus récente passe en tête, hors de sa Catégorie (#141).
   const enTete = lecons.reduce((recente, l) => (l.derniereActivite > recente.derniereActivite ? l : recente), lecons[0]);
   const parCategorie = Object.groupBy(lecons.filter((l) => l !== enTete), (l) => l.categorie);
   montrer(
-    recapitulatifSemaine(profil, rythme.recapitulatif),
-    maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons, moment),
+    recapitulatifSemaine(profil, rythme?.recapitulatif),
+    maSemaine(profil, { calendrier: badges?.calendrier, rythme, revisions, lecons, moment }),
     h('div', { className: 'lecons-tete' },
       h('h2', {}, 'Mes leçons'),
       // Une action en retrait, sauf quand le réseau est vide : c'est alors la seule chose à faire, et le seul bouton plein.
-      h('button', { className: lecons.length ? 'bouton-nouvelle' : 'bouton-nouvelle plein', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
-    lecons.length === 0 && h('div', { className: 'reseau-vide' },
+      h('button', { className: lectures.lecons.erreur || lecons.length ? 'bouton-nouvelle' : 'bouton-nouvelle plein', onclick: () => (location.hash = '#/nouvelle-lecon') }, '✨ Apprendre quelque chose de nouveau')),
+    lectures.lecons.erreur && blocErreur('Tes leçons n’ont pas pu s’afficher. Ce n’est pas de ta faute : réessaie dans un instant.'),
+    !lectures.lecons.erreur && lecons.length === 0 && h('div', { className: 'reseau-vide' },
       h('div', { className: 'ligne en-travaux' }, h('span', { className: 'travaux' }, 'Ton réseau est encore vide'), h('span', { className: 'terminus' }, 'Acquis')),
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
     enTete && h('section', { className: 'categorie reprise', style: styleLigne(enTete.categorie) },
@@ -470,7 +488,20 @@ function momentDeRevision(profil, etat) {
   return zone;
 }
 
-function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours, reparation, meilleureSerie, joursTravailles }, dues, lecons, moment) {
+function maSemaine(profil, { calendrier, rythme, revisions, lecons, moment }) {
+  const boutonRevisions = revisions
+    ? h('button', { className: `bouton-revisions${revisions.dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
+      h('strong', {}, 'Mes révisions du jour',
+        revisions.dues > 0 && h('span', { className: 'compte' }, String(revisions.dues), h('span', { className: 'cache' }, revisions.dues > 1 ? ' questions' : ' question'))),
+      h('small', {}, revisions.dues ? 'à revoir aujourd’hui' : 'Rien à revoir aujourd’hui'))
+    : blocErreur('Tes révisions du jour n’ont pas pu s’afficher.');
+  if (!calendrier || !rythme) {
+    return h('section', { className: 'ma-semaine' },
+      h('div', { className: 'semaine-jours' }, h('h2', {}, `Salut ${profil.pseudo} !`), h('p', { className: 'doux' }, 'Ta semaine n’a pas pu s’afficher pour le moment.')),
+      h('div', { className: 'semaine-cote' }, boutonRevisions));
+  }
+  const { aujourdhui, jours } = calendrier;
+  const { objectifDuJour: o, serieDeJours, reparation, meilleureSerie, joursTravailles } = rythme;
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
   const caseJour = (jour, i) => {
@@ -510,12 +541,9 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
         // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
         reparation && h('small', { className: 'reparation' },
           `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`),
-        momentDeRevision(profil, moment)),
+        moment && momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
-      h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
-        h('strong', {}, 'Mes révisions du jour',
-          dues > 0 && h('span', { className: 'compte' }, String(dues), h('span', { className: 'cache' }, dues > 1 ? ' questions' : ' question'))),
-        h('small', {}, dues ? 'à revoir aujourd’hui' : 'Rien à revoir aujourd’hui'))));
+      boutonRevisions));
 }
 
 // Badges (#95) : un emoji dans une pastille à la couleur de son Palier ; grisé tant qu'il n'est pas obtenu.
@@ -1224,31 +1252,59 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     h('div', { className: 'seance' }, panneau, calque, fiche, revisions));
 }
 
+let chargements = 0; // numéro de la navigation en cours : une plus ancienne ne dessine plus rien
 async function route() {
   quitterEcran();
   arreterLecture(); // une lecture à voix haute des Révisions du jour s'arrête en changeant d'écran
   quitterEcran = () => {};
   document.title = 'Cartable'; // un écran qui a son propre titre le pose lui-même
+  const moi = ++chargements;
+  app.ariaBusy = 'true';
   try {
-    config ??= await api('config');
-    const [, page, id, sousPage] = location.hash.split('/');
-    if (page === 'nouvel-eleve') return await ecranNouvelEleve();
-    const slug = pseudoCourant();
-    const profil = slug && (await api(`eleves/${slug}`).catch(() => null));
-    document.documentElement.classList.toggle('espacement-lettres', !!profil?.espacementLettres); // réglage du Profil (#160)
-    if (!profil) return await ecranChoix();
-    barreNav(profil);
-    if (page === 'profil') return await ecranProfil(profil);
-    if (page === 'parent') return await ecranParent(profil);
-    if (page === 'nouvelle-lecon') return ecranNouvelleLecon(profil);
-    if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
-    if (page === 'apercu') return await ecranSession(profil, id, null, { apercu: true });
-    if (page === 'revisions') return await ecranRevisions(profil);
-    if (page === 'badges') return await ecranBadges(profil);
-    return await ecranAccueil(profil);
+    await avecAttente(() => afficherEcran(), {
+      afficher: () => { if (moi === chargements) indicateurAttente(); },
+      masquer: () => { if (moi === chargements) retirerAttente(); },
+    });
   } catch (e) {
-    montrer(h('div', {}, h('p', { className: 'erreur' }, 'Impossible de charger cet écran pour le moment. Vérifie que l’appli tourne encore, puis réessaie.'), h('button', { className: 'secondaire', onclick: () => route() }, 'Réessayer')));
+    if (moi !== chargements) return; // une navigation plus récente a pris la main
+    montrer(blocErreur('Impossible de charger cet écran pour le moment. Vérifie que l’appli tourne encore, puis réessaie.'));
+  } finally {
+    if (moi === chargements) app.ariaBusy = 'false';
   }
+}
+
+// Indicateur d'attente, posé seulement si le chargement traîne (DELAI_ATTENTE_MS) : une carte avec la ligne « en travaux »
+// (ses pointillés s'arrêtent sous prefers-reduced-motion) et une phrase ; la zone d'état #etat l'annonce sans prendre le focus.
+const zoneEtat = document.getElementById('etat');
+function indicateurAttente() {
+  montrer(h('section', { className: 'carte attente-chargement', style: '--ligne: var(--ligne-autre)' },
+    h('div', { ariaHidden: 'true' }, ligneLecon({ objectifs: [] })),
+    h('p', { className: 'doux' }, 'Chargement en cours…')));
+  zoneEtat.textContent = 'Chargement en cours…';
+}
+function retirerAttente() {
+  zoneEtat.textContent = '';
+  app.querySelector('.attente-chargement')?.remove();
+}
+
+async function afficherEcran() {
+  config ??= await api('config');
+  const [, page, id, sousPage] = location.hash.split('/');
+  if (page === 'nouvel-eleve') return await ecranNouvelEleve();
+  // 404 : Profil introuvable, on choisit l'Élève. Toute autre erreur (500, réseau) remonte au message d'erreur du
+  // routeur, qui garde le pseudo choisi pour que « Réessayer » reprenne au même endroit.
+  const { profil } = await chargerProfil((slug) => api(`eleves/${slug}`), pseudoCourant());
+  document.documentElement.classList.toggle('espacement-lettres', !!profil?.espacementLettres); // réglage du Profil (#160)
+  if (!profil) return await ecranChoix();
+  barreNav(profil);
+  if (page === 'profil') return await ecranProfil(profil);
+  if (page === 'parent') return await ecranParent(profil);
+  if (page === 'nouvelle-lecon') return ecranNouvelleLecon(profil);
+  if (page === 'lecon') return await ecranSession(profil, id, sousPage && decodeURIComponent(sousPage));
+  if (page === 'apercu') return await ecranSession(profil, id, null, { apercu: true });
+  if (page === 'revisions') return await ecranRevisions(profil);
+  if (page === 'badges') return await ecranBadges(profil);
+  return await ecranAccueil(profil);
 }
 
 window.addEventListener('hashchange', route);

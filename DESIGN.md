@@ -405,6 +405,10 @@ Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
 - **Acquis ✓ :** pilule `retenu` sur le mot de Maîtrise, là où aucune ligne ne l'accompagne. Sur une carte de ligne comme dans l'en-tête de la Séance, une Leçon acquise ne le dit qu'une fois : par le terminus allumé, qui porte la Maîtrise en infobulle.
 - **Niveau :** cartouche de ligne foncée, capitales Overpass.
 
+### Attente de chargement et bloc d'erreur
+- **Indicateur d'attente (`attente-chargement`) :** une carte simple de 24rem au plus, jamais rouge, posée à la place de l'écran quand le chargement dépasse 400 ms (jamais sur une réponse rapide, pour éviter le clignotement). Elle dessine la ligne « en travaux » avec `ligneLecon` à la couleur `ligne-autre`, ses pointillés avançant (coupés sous `prefers-reduced-motion`), et la phrase « Chargement en cours… » en `doux`. La zone d'état `#etat` (`role="status"`, masquée à l'œil) l'annonce sans prendre le focus ; `main` porte `aria-busy` pendant le chargement.
+- **Bloc d'erreur (`bloc-erreur`) :** à la place d'un bloc en échec ou de l'écran entier, une phrase en `rouge` annoncée comme alerte (`role="alert"`) et un bouton secondaire « Réessayer » de 2.75rem de haut. Sans Profil lisible (500, réseau), l'Élève choisi est gardé : « Qui es-tu ? » n'apparaît que pour un Profil introuvable.
+
 ### Cards / Containers
 - **Corner Style:** 18px (carte de ligne, bandeau), 14px (carte simple).
 - **Background:** `carte` sur `fond`.

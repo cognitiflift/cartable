@@ -22,6 +22,7 @@ import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, repar
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
+import { fusionnerCartes, retournerCarte, reprendreCompositions, vueCartes } from './lib/cartes.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
 import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
@@ -492,7 +493,12 @@ async function recalculerBadges(slug, maintenant) {
     const fusion = fusionnerBadges(avant, calcul, maintenant);
     return [fusion.fichier, fusion];
   });
-  return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+  // Cartes de ligne (#183) : au même endroit, une Leçon devenue Acquise enregistre sa carte « à composer ».
+  const cartes = await store.modifierCartes(slug, (avant) => {
+    const fusion = fusionnerCartes(avant, { lecons, badges: fichier, maintenant });
+    return [fusion.fichier, fusion.fichier];
+  });
+  return { nouveaux, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
 }
 
 // Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
@@ -711,10 +717,23 @@ async function api(req, res, segments) {
     // le calendrier des Jours travaillés (#99), sans aucun score. Ouverture de l'écran (?ouverture=1) : la réponse
     // montre encore « Nouveau » et le mot d'accueil, effacés pour la suite.
     if (m === 'GET') {
-      const { fichier, calcul, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
+      const { fichier, calcul, cartes, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
       if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
       const jours = calendrier({ lecons, evenements, paliers: paliersObtenus(fichier, calcul), maintenant });
-      return json(res, 200, { ...vueMesBadges(fichier, calcul), totaux, calendrier: jours });
+      return json(res, 200, { ...vueMesBadges(fichier, calcul), ...vueCartes(cartes), totaux, calendrier: jours });
+    }
+  } else if (r2 === 'cartes' && id === 'retournement' && !r3) {
+    // Retournement d'une carte (#183) : { type: 'ligne', id } ou { type: 'palier', id, palier } ; idempotent.
+    if (m === 'POST') {
+      const { type, id: carte, palier } = await lireCorps(req);
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, { statut: 'introuvable' }];
+        const r = retournerCarte(avant, { type, id: carte, palier }, maintenant);
+        return [r.fichier, r];
+      });
+      if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
+      if (statut === 'pas-prete') throw new HttpError(409, "Cette carte n'est pas encore prête");
+      return json(res, 200, { statut });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
@@ -780,4 +799,5 @@ const serveur = http.createServer(async (req, res) => {
   }
 });
 
+await store.reprendreCartes(reprendreCompositions);
 serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT })));

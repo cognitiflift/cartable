@@ -3579,6 +3579,87 @@ test('Calendrier de Mes badges (#99) : Jours travaillés, ce qui a été fait et
   assert.doesNotMatch(JSON.stringify(calendrier), /score|%/i);
 });
 
+// Cartes de ligne (#183) : une Leçon qui devient Acquise après la livraison enregistre une carte « à composer »,
+// définitive ; les Leçons déjà Acquises à la livraison sont écartées ; rien n'est composé ici.
+const cartesDe = async (slug, date, ouverture = false) => (await appel(`/api/eleves/${slug}/badges${ouverture ? '?ouverture=1' : ''}`, 'GET', undefined, le(date))).data;
+
+test('Cartes de ligne : fichier absent, réponse valide, sans carte', async () => {
+  await appel('/api/eleves', 'POST', { pseudo: 'Cartes-Vide', age: 11, niveau: 'Primaire 6' });
+  assert.equal(await existe(path.join(eleves, 'cartes-vide', 'cartes.json')), false);
+  const vue = await cartesDe('cartes-vide', '2026-10-03T10:00:00.000Z');
+  assert.deepEqual([vue.cartesLigne, vue.aRetourner, vue.son], [[], [], false]);
+});
+
+test('Cartes de ligne : une Leçon qui devient Acquise après la livraison donne une carte, qui reste', async () => {
+  const { slug, lecon } = await leconAcquise('Cartes-Acquise', ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
+  // La livraison a eu lieu avant : fichier de cartes déjà là, la Leçon n'y est pas écartée.
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify({ version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: {}, paliers: {} }));
+  const vue = await cartesDe(slug, '2026-10-03T10:00:00.000Z');
+  assert.equal(vue.cartesLigne.length, 1);
+  assert.deepEqual({ ...vue.cartesLigne[0] }, {
+    lecon: lecon.id, titre: 'Les volcans', categorie: vue.cartesLigne[0].categorie, objectifs: 3, jourAcquisition: '2026-10-03',
+    etat: 'a-composer', essais: 0, calques: null, prete: null, retourne: null,
+  });
+  assert.deepEqual(vue.aRetourner.filter((c) => c.type === 'ligne'), []); // pas prête : pas de carte de ligne à retourner
+  // La Leçon redescend, puis est supprimée : la carte reste, une seule.
+  assert.equal((await cartesDe(slug, '2027-03-01T10:00:00.000Z')).cartesLigne.length, 1);
+  await fs.rm(path.join(eleves, slug, 'lecons', lecon.id), { recursive: true });
+  const fin = await cartesDe(slug, '2027-03-02T10:00:00.000Z');
+  assert.deepEqual(fin.cartesLigne.map((c) => c.titre), ['Les volcans']);
+  // Pas encore de composition : la carte reste « à composer ».
+  assert.equal(fin.cartesLigne[0].etat, 'a-composer');
+});
+
+test('Cartes de ligne : une Leçon déjà Acquise à la livraison est écartée, même si elle redescend puis redevient Acquise', async () => {
+  const { slug, url } = await leconAcquise('Cartes-Ecartee', ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
+  assert.deepEqual((await cartesDe(slug, '2026-10-03T10:00:00.000Z')).cartesLigne, []); // livraison : déjà Acquise
+  assert.equal((await appel(url, 'GET', undefined, le('2027-03-01T10:00:00.000Z'))).data.maitrise.palier !== 'acquis', true);
+  assert.deepEqual((await cartesDe(slug, '2027-03-01T10:00:00.000Z')).cartesLigne, []);
+  // Elle redevient Acquise (nouveaux quiz réussis, Questions rejouées) : toujours aucune carte.
+  const dates = ['2027-03-02T10:00:00.000Z', '2027-03-03T10:00:00.000Z'];
+  for (const date of dates) await appel(`${url}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2, 3] }, le(date));
+  await fs.writeFile(path.join(eleves, slug, 'lecons', url.split('/').pop(), 'questions.json'), JSON.stringify(banqueParObjectif(dates)));
+  assert.equal((await appel(url, 'GET', undefined, le('2027-03-04T10:00:00.000Z'))).data.maitrise.palier, 'acquis');
+  assert.deepEqual((await cartesDe(slug, '2027-03-04T10:00:00.000Z')).cartesLigne, []);
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8'));
+  assert.equal(fichier.ecartees.length, 1);
+  assert.deepEqual(fichier.cartes, {});
+});
+
+test('Cartes : les Paliers d\'avant la livraison sont visibles d\'emblée, les suivants à retourner ; ouvrir Mes badges ne les retourne pas', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Cartes-Paliers', 1); // lundi 2 novembre : une page terminée
+  const badgesAvant = path.join(eleves, slug, 'badges.json');
+  await quizDuJour(slug, lecon, '2026-11-03T12:00:00.000Z'); // le fichier de Badges existe : pas de Palier encore
+  const avant = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data;
+  assert.deepEqual(avant.aRetourner, []);
+  const contenuAvant = await fs.readFile(badgesAvant, 'utf8');
+  await quizDuJour(slug, lecon, '2026-11-04T12:00:00.000Z'); // Régulier bronze, gagné après la livraison
+  const vue = (await appel(`/api/eleves/${slug}/badges?ouverture=1`, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
+  assert.deepEqual(vue.aRetourner, [{ type: 'palier', id: 'regulier', palier: 'bronze' }]);
+  // Ouvrir Mes badges n'efface pas la carte à retourner.
+  assert.equal((await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-04T13:01:00.000Z'))).data.aRetourner.length, 1);
+  assert.notEqual(await fs.readFile(badgesAvant, 'utf8'), contenuAvant); // le fichier de Badges garde sa forme (voir plus bas)
+  const retourner = (corps, date = '2026-11-05T09:00:00.000Z') => appel(`/api/eleves/${slug}/cartes/retournement`, 'POST', corps, le(date));
+  assert.equal((await retourner({ type: 'palier', id: 'regulier', palier: 'bronze' })).status, 200);
+  assert.equal((await retourner({ type: 'palier', id: 'regulier', palier: 'bronze' }, '2026-11-06T09:00:00.000Z')).status, 200); // idempotent
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8'));
+  assert.equal(fichier.paliers['regulier/bronze'].retourne, '2026-11-05T09:00:00.000Z');
+  assert.deepEqual((await cartesDe(slug, '2026-11-06T10:00:00.000Z')).aRetourner, []);
+  assert.equal((await retourner({ type: 'palier', id: 'regulier', palier: 'diamant' })).status, 404);
+  assert.equal((await retourner({ type: 'ligne', id: 'inconnue' })).status, 404);
+  assert.equal((await appel('/api/eleves/personne-ici/cartes/retournement', 'POST', { type: 'ligne', id: 'x' })).status, 404);
+});
+
+test('Cartes : les Paliers déjà gagnés à la livraison sont visibles sans retournement ; le fichier de Badges est inchangé', async () => {
+  const { slug, lecons } = await eleveRevisions('Cartes-Anciens', 1);
+  for (const jour of ['03', '04']) await appel(`/api/eleves/${slug}/lecons/${lecons[0].id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
+  const vue = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data;
+  assert.equal(vue.collection.find((b) => b.id === 'regulier').palier, 'bronze');
+  assert.deepEqual(vue.aRetourner, []);
+  const badges = JSON.parse(await fs.readFile(path.join(eleves, slug, 'badges.json'), 'utf8'));
+  assert.deepEqual(Object.keys(badges.badges.regulier.bronze).sort(), ['ajoute', 'jour']); // aucune migration
+});
+
 test('Badges : Élève inconnu', async () => {
   assert.equal((await appel('/api/eleves/personne-ici/badges')).status, 404);
 });

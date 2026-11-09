@@ -3,6 +3,8 @@ import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import { rangerCollection, rangDeCarte, crans, aFeuilleHolo, libelleCarteBadge, libelleADecouvrir, dosCarteBadge } from '/carte-badge-texte.js';
+import { artDeBadge } from '/carte-badge-art.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
@@ -636,37 +638,61 @@ async function ecranBadges(profil) {
   retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
   barreNav(profil);
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
-  const dernierJour = (b) => b.paliers.filter((p) => p.jour).at(-1).jour;
-  const commences = collection.filter((b) => !b.surprise && b.palier).sort((x, y) => dernierJour(y).localeCompare(dernierJour(x)));
-  const surprises = collection.filter((b) => b.surprise);
-  const aDecouvrir = collection.filter((b) => !b.surprise && !b.palier);
-  const tete = (b, ...detail) => h('div', { className: 'badge-tete' }, pastilleBadge(b, { ariaHidden: 'true', title: undefined }), h('div', {}, h('strong', {}, b.nom), ...detail));
+  const { obtenues, aDecouvrir } = rangerCollection(collection);
   montrer(
     h('p', {}, retourAccueil()),
     h('div', { className: 'badges-tete' },
       h('h2', {}, 'Mes badges'),
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
         `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`)),
-    accueil && (commences.length > 0 || surprises.length > 0) && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
+    accueil && obtenues.length > 0 && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
     h('div', { className: 'badges-corps' },
       calendrierJours(calendrier),
       h('section', { className: 'collection', ariaLabel: 'Ma collection' },
         h('h3', {}, 'Ma collection'),
         monReseau(cartesLigne),
         h('h4', {}, 'Mes Badges'),
-        commences.length
-          ? h('ul', { className: 'lignes-badges' }, commences.map((b) => h('li', {},
-            tete(b, h('p', {}, b.phrase)),
-            ligneBadge(b, (palier) => estNouveau(b, palier)))))
-          : h('p', { className: 'doux' }, 'Ton premier Palier dessinera ici la ligne de son Badge.'),
-        surprises.length > 0 && [
-          h('h4', {}, 'Surprises trouvées'),
-          h('ul', { className: 'badges-simples' }, surprises.map((b) => h('li', {},
-            tete(b, h('p', {},`Badge surprise · ${dateBadge(b.jour)}`, estNouveau(b, b.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))))))],
+        obtenues.length
+          ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
+          : h('p', { className: 'doux' }, 'Ton premier Palier donnera ici sa carte.'),
         aDecouvrir.length > 0 && [
           h('h4', {}, 'À découvrir'),
-          h('ul', { className: 'badges-simples a-decouvrir' }, aDecouvrir.map((b) => h('li', {}, tete(b, h('p', {}, b.phrase)))))])));
+          h('ul', { className: 'cartes-reseau cartes-badges a-decouvrir', ariaLabel: 'À découvrir' }, aDecouvrir.map((b) => h('li', {}, carteADecouvrir(b))))])));
 }
+
+// La carte de Badge (spec #182, #186) : la même carte que celle de ligne (5 sur 7, trois calques et un héros en
+// parallaxe, reflet, retournement), dessinée à la main (`artDeBadge`), au cadre de la couleur du Palier atteint, avec
+// autant de crans que la Famille a de Paliers (allumés jusqu'au Palier atteint). L'or et le diamant ont une feuille
+// holographique qui suit le pointeur. Le dos dit ce que le Badge salue, la date, le prochain Palier en mots, puis la
+// ligne de Badge (`ligneBadge`), seule jauge du système, sans chiffre ; ses noms de Palier sont dits par le texte
+// alternatif. Une surprise est violette (`palier-unique`).
+function carteBadge(b, nouveau) {
+  const palier = b.surprise ? 'unique' : b.palier, art = artDeBadge(b, rangDeCarte(b)), dos = dosCarteBadge(b, jourEnMots);
+  const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
+  const el = h('button', { type: 'button', className: `carte-ligne-carte carte-badge-carte ${palier}`, ariaPressed: 'false',
+    ariaLabel: `${libelleCarteBadge(b, jourEnMots, nouveau)} ${dos.prochain}`, style: `--ligne: var(--palier-${palier}); --sur-ligne: var(--sur-accent)` },
+  h('div', { className: 'cl-incl' },
+    h('div', { className: 'cl-face cl-avant' },
+      h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', art.l1), calque('cl-l2', art.l2)),
+      h('div', { className: 'cl-bord', ariaHidden: 'true' }),
+      calque('cl-heros', art.heros),
+      h('div', { className: 'cl-texte', ariaHidden: 'true' }, h('span', { className: 'cl-titre' }, b.nom),
+        h('span', { className: 'cl-bas' }, h('span', { className: b.surprise ? 'cl-etiquette mot' : 'cl-etiquette' }, b.surprise ? 'Surprise' : b.emoji),
+          h('span', { className: 'cl-crans' }, crans(b).map((allume) => h('i', { className: allume ? '' : 'vide' }))))),
+      h('div', { className: 'cl-reflet', ariaHidden: 'true' }),
+      aFeuilleHolo(b) && h('div', { className: 'cl-holo', ariaHidden: 'true' }),
+      nouveau && h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau')),
+    h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
+      h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue),
+      !b.surprise && ligneBadge(b, () => false),
+      h('small', {}, dos.date, ' ', dos.prochain))));
+  animerCarte(el);
+  return el;
+}
+
+// « À découvrir » : une carte hachurée, sans dessin ni décompte, qui dit ce que le Badge salue.
+const carteADecouvrir = (b) => h('div', { className: 'carte-badge-carte verrou', role: 'group', ariaLabel: libelleADecouvrir(b) },
+  h('div', { className: 'cl-face', ariaHidden: 'true' }, h('span', { className: 'cl-emoji' }, b.emoji), h('strong', {}, b.nom), h('p', {}, b.phrase)));
 
 // La carte de ligne (spec #182, #185) : une Leçon Acquise, gardée pour toujours. 5 sur 7, cadre à la couleur de la
 // Catégorie, trois calques (l1 fond, l2 décor, héros qui peut déborder) en parallaxe sous la ligne de la Leçon, dessinée
@@ -676,6 +702,29 @@ async function ecranBadges(profil) {
 const jourEnMots = (jour) => `le ${new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^1 /, '1er ')}`;
 const moinsDeMouvement = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DUREE_BOUCLES = 6000; // les boucles du décor s'arrêtent d'elles-mêmes
+
+// L'inclinaison au pointeur et au toucher, le retournement (toucher ou Entrée) et les boucles du décor, qui ne tournent
+// que quand on regarde la carte : partagés par la carte de ligne et la carte de Badge.
+function animerCarte(el) {
+  let arret;
+  const bouger = (x, y) => { el.style.setProperty('--px', x.toFixed(3)); el.style.setProperty('--py', y.toFixed(3)); };
+  const regarder = () => { el.classList.add('regarde'); clearTimeout(arret); arret = setTimeout(() => el.classList.remove('regarde'), DUREE_BOUCLES); };
+  const pointeur = (e) => { // inclinaison au pointeur et au toucher, de -1 à 1 depuis le centre
+    if (moinsDeMouvement()) return;
+    const r = el.getBoundingClientRect();
+    bouger(Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - .5) * 2)), Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - .5) * 2)));
+    el.classList.add('actif');
+  };
+  const repos = () => { bouger(0, 0); el.classList.remove('actif'); };
+  el.addEventListener('pointermove', pointeur);
+  el.addEventListener('pointerdown', pointeur);
+  el.addEventListener('pointerenter', regarder);
+  el.addEventListener('focus', regarder);
+  el.addEventListener('pointerleave', repos);
+  el.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') repos(); });
+  el.addEventListener('pointercancel', repos);
+  el.addEventListener('click', () => { const retournee = el.classList.toggle('retournee'); el.ariaPressed = String(retournee); regarder(); });
+}
 
 function carteLigne(c) {
   const cle = cleCategorieCarte(c.categorie), calques = calquesDeCarte(c), dos = dosCarteLigne(c, jourEnMots);
@@ -696,24 +745,7 @@ function carteLigne(c) {
       h('div', { className: 'cl-reflet', ariaHidden: 'true' })),
     h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
       h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue), h('small', {}, dos.date))));
-  let arret;
-  const bouger = (x, y) => { el.style.setProperty('--px', x.toFixed(3)); el.style.setProperty('--py', y.toFixed(3)); };
-  const regarder = () => { el.classList.add('regarde'); clearTimeout(arret); arret = setTimeout(() => el.classList.remove('regarde'), DUREE_BOUCLES); };
-  const pointeur = (e) => { // inclinaison au pointeur et au toucher, de -1 à 1 depuis le centre
-    if (moinsDeMouvement()) return;
-    const r = el.getBoundingClientRect();
-    bouger(Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - .5) * 2)), Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - .5) * 2)));
-    el.classList.add('actif');
-  };
-  const repos = () => { bouger(0, 0); el.classList.remove('actif'); };
-  el.addEventListener('pointermove', pointeur);
-  el.addEventListener('pointerdown', pointeur);
-  el.addEventListener('pointerenter', regarder);
-  el.addEventListener('focus', regarder);
-  el.addEventListener('pointerleave', repos);
-  el.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') repos(); });
-  el.addEventListener('pointercancel', repos);
-  el.addEventListener('click', () => { const retournee = el.classList.toggle('retournee'); el.ariaPressed = String(retournee); regarder(); });
+  animerCarte(el);
   return el;
 }
 

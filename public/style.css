@@ -353,13 +353,6 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .collection ul { list-style:none; margin:0; padding:0; }
 .collection li + li, .collection h4 { border-top:1px dashed var(--bord); }
 .collection h4 { margin:0; padding:1rem 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; color:var(--doux); }
-.badge-tete { display:flex; align-items:flex-start; gap:.8rem; }
-.badge-tete .pastille-badge { flex:none; }
-.badge-tete strong { display:block; margin-top:.2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
-.badge-tete p { margin:.15rem 0 0; color:var(--doux); line-height:1.35; }
-.lignes-badges li { padding:.9rem 0 .4rem; }
-.badges-simples li { padding:.8rem 0; }
-.a-decouvrir strong { color:var(--doux); }
 .ligne-badge { margin:.7rem 0 0; padding:0 1.9rem 3.2rem; }
 .ligne-badge .bronze { --palier:var(--palier-bronze); } .ligne-badge .argent { --palier:var(--palier-argent); }
 .ligne-badge .or { --palier:var(--palier-or); } .ligne-badge .diamant { --palier:var(--palier-diamant); }
@@ -428,8 +421,9 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 /* Mon réseau : la carte de ligne (#185). 5 sur 7, coins de 18px, cadre de .3rem à la couleur de la Catégorie, trois
    calques et un héros en parallaxe, la ligne de la Leçon à l'avant du décor, le terminus par-dessus le héros. */
 .collection h4.cl-groupe { border-top:0; padding-top:.4rem; }
-.collection .cartes-reseau { display:grid; grid-template-columns:repeat(auto-fill, minmax(8.5rem, 12.5rem)); gap:1.1rem .9rem; justify-content:center; padding:.6rem 0 1.1rem; }
+.collection .cartes-reseau { display:grid; grid-template-columns:repeat(auto-fill, minmax(8.5rem, 1fr)); gap:1.1rem .9rem; padding:.6rem 0 1.1rem; }
 .collection .cartes-reseau li + li { border-top:0; }
+.collection .cartes-reseau li { width:100%; max-width:12.5rem; justify-self:center; }
 .carte-ligne-carte { container-type:inline-size; --px:0; --py:0; --sur-ligne:var(--sur-accent); position:relative; display:block; width:100%; aspect-ratio:5/7; padding:0; border:0; border-radius:18px; background:none; color:var(--sur-nuit); font:inherit; text-align:left; cursor:pointer; perspective:700px; -webkit-tap-highlight-color:transparent; touch-action:pan-y; }
 .carte-ligne-carte:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
 .cl-incl { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform:rotateY(calc(var(--px) * 10deg)) rotateX(calc(var(--py) * -10deg)); }
@@ -479,3 +473,37 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .carte-ligne-carte.regarde .pc-a-scintille { animation:pc-scint 2.4s ease-in-out infinite; }
 .carte-ligne-carte.regarde .pc-a-trace { stroke-dasharray:1; animation:pc-trace 3.2s ease-out both; }
 .carte-ligne-carte.regarde .pc-a-braise { animation:pc-braise 3s ease-out infinite; }
+
+/* Mes badges : la carte de Badge (#186). Même carte que celle de ligne ; le cadre prend la couleur du Palier atteint
+   (la surprise : violet unique), les crans du bas s'allument jusqu'à lui, l'or et le diamant ont une feuille
+   holographique qui suit le pointeur. Au dos, la ligne de Badge est la seule jauge, sans noms (le texte alternatif les dit). */
+.carte-badge-carte { --ligne:var(--palier-bronze); }
+.carte-badge-carte .cl-texte { padding-bottom:.55rem; }
+.cl-bas { display:flex; align-items:center; justify-content:space-between; gap:.4rem; }
+.carte-badge-carte .cl-etiquette { font-size:1.2rem; line-height:1; text-shadow:none; }
+.cl-crans { display:flex; gap:.25rem; padding:.28rem .4rem; border-radius:999px; background:rgb(var(--ombre) / .55); }
+.cl-crans i { width:.6rem; height:.6rem; border-radius:50%; background:var(--ligne); box-shadow:0 0 0 .1rem var(--sur-nuit); }
+.cl-crans i.vide { background:transparent; box-shadow:none; border:.14rem dashed var(--station-vide); }
+.carte-badge-carte .nouveau { position:absolute; top:.55rem; right:.55rem; margin:0; box-shadow:0 0 0 .15rem var(--nuit); }
+.carte-badge-carte .cl-titre { max-width:80%; }
+.carte-badge-carte .cl-dos { gap:.25rem; padding:.65rem .6rem .55rem; }
+.carte-badge-carte .cl-dos strong { font-size:.92rem; line-height:1.15; }
+.carte-badge-carte .cl-dos p { font-size:.78rem; line-height:1.25; }
+.carte-badge-carte .cl-etiquette.mot { font-size:.78rem; }
+.cl-dos .ligne-badge { flex:none; margin:.35rem 0 .15rem; padding:0 .5rem; --st:1rem; }
+.cl-dos .ligne-badge .station { width:var(--st); height:var(--st); margin:0; border-width:.2rem; }
+.cl-dos .ligne-badge .station-nom { display:none; }
+.cl-dos .ligne-badge .troncon { min-width:0; }
+.carte-badge-carte .cl-dos small { margin-top:auto; line-height:1.2; }
+/* La feuille holographique : un dégradé de jetons qui suit le pointeur (--px, --py) ; fixe, mais présent, sous
+   prefers-reduced-motion. Aucun éclat : un reflet lent, qui ne clignote pas. */
+.cl-holo { position:absolute; inset:0; border-radius:18px; pointer-events:none; mix-blend-mode:color-dodge; opacity:.2; transition:opacity .3s, background-position .5s cubic-bezier(.2,.8,.2,1);
+  background:linear-gradient(115deg, transparent 20%, var(--palier-diamant) 34%, var(--palier-unique) 44%, var(--nouveau) 54%, var(--retenu) 64%, transparent 78%) calc(50% + var(--px) * 40%) calc(50% + var(--py) * 40%) / 260% 260%; }
+.carte-badge-carte.actif .cl-holo { opacity:.55; transition:opacity .3s, background-position .08s linear; }
+/* À découvrir : une carte hachurée qui dit ce que le Badge salue, sans dessin ni décompte. */
+.carte-badge-carte.verrou { position:relative; aspect-ratio:5/7; border-radius:18px; border:.3rem dashed var(--station-vide); background:repeating-linear-gradient(45deg, var(--carte) 0 .5rem, color-mix(in srgb, var(--hachure) 14%, var(--carte)) .5rem 1rem); color:var(--texte); }
+.carte-badge-carte.verrou .cl-face { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4rem; padding:.7rem; text-align:center; }
+.carte-badge-carte.verrou .cl-emoji { font-size:2rem; line-height:1; filter:grayscale(1); opacity:.6; }
+.carte-badge-carte.verrou strong { font:800 1.15rem/1.15 var(--police-titre); color:var(--doux); text-wrap:balance; }
+.carte-badge-carte.verrou p { margin:0; font-size:.92rem; line-height:1.25; color:var(--doux); }
+@media (prefers-reduced-motion: reduce) { .cl-holo { transition:none; } }

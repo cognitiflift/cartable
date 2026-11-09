@@ -483,6 +483,15 @@ Une Leçon Acquise gardée pour toujours, dessinée par `carteLigne` (`public/ap
 - **Boucles du décor :** les classes d'animation `pc-a-*` de la Trousse ne tournent que pendant 6 secondes après le survol, le focus ou le retournement.
 - **Scène générique :** quand l'agent n'a rien composé, l'appli dessine un ciel de la Catégorie, deux collines et une étoile à pointes (une de plus que d'Objectifs, de 5 à 9), toujours la même pour la même Leçon.
 
+### La carte de Badge (Mes Badges)
+Un Badge gagné, dessiné à la main par `carteBadge` (`public/app.js`) ; son texte, ses crans et le Palier montré viennent de `public/carte-badge-texte.js`, ses trois calques de `public/carte-badge-art.js` (une carte par Famille, une pour les surprises). C'est la carte de ligne, avec ces écarts :
+- **Cadre :** la couleur du Palier atteint (`palier-bronze`, `palier-argent`, `palier-or`, `palier-diamant`) ; une surprise est `palier-unique`, violette. La grille montre le Palier le plus haut, jamais une carte par Palier.
+- **Dessin :** trois calques et un héros, par Famille ; le Palier l'enrichit (stations allumées, étoiles, halos). Couleurs par `var(--jeton)` seulement, aucun texte de police dans le dessin ; l'emoji de la surprise est son héros.
+- **Crans :** en bas de la face, une pastille par Palier de la Famille dans un cartouche sombre, allumée (couleur du Palier) jusqu'au Palier atteint, en pointillé au-delà.
+- **Feuille holographique :** or et diamant seulement. Un dégradé de jetons (`palier-diamant`, `palier-unique`, `nouveau`, `retenu`) qui suit le pointeur, lent, sans éclat ; il reste fixe sous `prefers-reduced-motion`.
+- **Dos :** cartouche du Palier, nom, ce que le Badge salue, la ligne de Badge (`ligneBadge`, seule jauge, sans chiffre, ses noms de Palier dits par le texte alternatif), la date et le prochain Palier en mots.
+- **À découvrir :** une carte hachurée (filet pointillé `station-vide`, rayures de `hachure`), emoji grisé, nom et phrase en `doux`, sans dessin ni décompte. Les surprises non trouvées n'ont pas de carte.
+
 ### Vue parent
 Un `h2` de page, puis un **sommaire** de trois ancres (liens `accent`, graisse 700, 2.75rem de haut, sur une ligne qui passe à la suivante) et trois **blocs** : « Ce qu'il retient », « Ce qui demande de l'aide », « Réglages et coûts ». Un bloc est une carte simple (14px, filet `bord`, sans ombre) dont le titre est un `h3` en Overpass 800 (1.2rem) ; ses sections sont des `h4` en Overpass 700 (1rem), séparées par un filet pointillé `bord`. Dans le dernier bloc, chaque section est un `details` dont le `summary` porte le `h4` et le chevron du dépliant des Objectifs (il garde son état ouvert quand un geste recharge l'écran). Les liens de Leçon sont en `accent`, graisse 600, 1.5rem de haut au moins ; le sommaire n'écrit pas dans le hash (celui du routeur) et ouvre une cible repliée. Aucune couleur nouvelle.
 

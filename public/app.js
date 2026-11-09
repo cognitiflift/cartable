@@ -763,7 +763,7 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
     if (retournee) return;
     retournee = true;
     api(`eleves/${slug}/cartes/retournement`, { method: 'POST', body: ligne ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier } }).catch(() => {});
-    jouerCarillon(ligne ? 4 : rangDeCarte(badge), { actif: son });
+    jouerCarillon(ligne ? 4 : rangDeCarte(badge) /* carte de ligne : rang fixe, le plus long (voir public/carillon.js) */, { actif: son });
     const vraie = ligne ? carteLigne(c.ligne) : carteBadge(badge, false);
     vraie.classList.add('entree');
     const stations = [...vraie.querySelectorAll('.cl-ligne .station')];

@@ -2,6 +2,8 @@
 // par Famille et un pour les surprises, dessinés à la main, sans image ni police. `rang` (1 à 4) est le Palier : il allume
 // des stations, ajoute des étoiles et des halos. Couleurs : `var(--jeton)` seulement. Sans DOM.
 
+import { CATEGORIES_CARTE } from './categories-carte.js';
+
 const sv = (c) => `<svg viewBox="0 0 200 280" aria-hidden="true" focusable="false">${c}</svg>`;
 const graine = (s) => { let h = 1779033703 ^ s.length; for (const c of s) { h = Math.imul(h ^ c.charCodeAt(0), 3432918353); h = (h << 13) | (h >>> 19); } return () => { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; }; };
 const n1 = (x) => x.toFixed(1);
@@ -12,7 +14,7 @@ const gare = (cx, cy, etat, r = 7) => etat === 'retenu' ? `<circle cx="${cx}" cy
 const astres = (r, n) => Array.from({ length: n }, () => `<circle cx="${n1(r() * 200)}" cy="${n1(r() * 280)}" r="${n1(0.5 + r() * 1.1)}" fill="var(--sur-nuit)" opacity="${(0.25 + r() * 0.5).toFixed(2)}"/>`).join('');
 const fond = (r, n, teinte, extra = '') => `<rect width="200" height="280" fill="var(--nuit)"/><circle cx="150" cy="70" r="${60 + n * 10}" fill="${teinte}" opacity="${(0.1 + n * 0.03).toFixed(2)}"/>${astres(r, 18 + n * 12)}${extra}`;
 const etoile = (cx, cy, R, fill, trait = 3) => `<polygon points="${Array.from({ length: 10 }, (_, i) => { const a = i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? R * 0.45 : R; return `${n1(cx + Math.cos(a) * rr)},${n1(cy + Math.sin(a) * rr)}`; }).join(' ')}" fill="${fill}" stroke="var(--sur-nuit)" stroke-width="${trait}" stroke-linejoin="round"/>`;
-const CATEGORIES = ['francais', 'mathematiques', 'sciences', 'histoire', 'geographie', 'langues'];
+const CATEGORIES = CATEGORIES_CARTE.slice(0, 6); // l'Explorateur compte six Catégories : les Arts n'y sont pas
 // Un tampon : un rectangle et une coche, sans texte (la carte dit les mots en HTML).
 const tampon = (x, y, w, fill, coche) => `<g transform="rotate(-5 ${x + w / 2} ${y + 20})"><rect x="${x}" y="${y}" width="${w}" height="40" rx="8" fill="${fill}" stroke="var(--sur-nuit)" stroke-width="3"/><path d="M${x + w / 2 - 14} ${y + 21} l9 9 l19 -20" fill="none" stroke="${coche}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></g>`;
 

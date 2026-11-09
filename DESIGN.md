@@ -197,7 +197,7 @@ components:
     textColor: "{colors.sur-nuit}"
     rounded: "{rounded.pilule}"
     padding: "0.3rem 0.9rem"
-    height: "2.6rem"
+    height: "2.75rem"
   carte-ligne:
     backgroundColor: "{colors.carte}"
     textColor: "{colors.texte}"
@@ -357,7 +357,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 Une colonne centrée de 1200px au plus, avec une marge latérale fluide (`clamp(1rem, 3vw, 2rem)`), partagée par l'en-tête et le contenu. L'accueil se lit de haut en bas : le bandeau de la semaine, puis l'en-tête « Mes leçons » avec le bouton « Apprendre quelque chose de nouveau » aligné à droite, puis « Tu en étais là » : la Leçon à la dernière activité la plus récente, seule et sur toute la largeur, sa carte cerclée « vous êtes ici » et son Continuer plein. Viennent ensuite une section par Catégorie, sans cette Leçon (une Catégorie qui n'avait qu'elle disparaît).
 
-Le bandeau de la semaine est une grille de deux colonnes : les sept jours (une grille de 7 colonnes égales) et, à droite, une colonne de 16 à 20rem pour l'Objectif du jour, la série et les Révisions du jour. Sous 860px (tablette), le bandeau se resserre pour que « Mes leçons » remonte : la colonne passe dessous et l'Objectif du jour et les Révisions s'y mettent côte à côte, les jours perdent leur hauteur minimale et les marges se réduisent (à 820px, 268px de bandeau au lieu de 339px). Sous 520px, il se resserre encore (tampons de 2rem, gains empilés, lien du calendrier masqué, Objectif et Révisions de nouveau l'un sous l'autre).
+Le bandeau de la semaine est une grille de deux colonnes : les sept jours (une grille de 7 colonnes égales) et, à droite, une colonne de 16 à 20rem pour l'Objectif du jour (avec le moment de révision) et les Révisions du jour. La colonne de gauche porte le salut, les sept jours puis la série, en corps normal et en `texte` ; les cases de jours n'ont pas de hauteur minimale, leur hauteur suit leur contenu. Sous 860px (tablette), le bandeau se resserre pour que « Mes leçons » remonte : la colonne de droite passe dessous et l'Objectif du jour et les Révisions s'y mettent côte à côte, les marges se réduisent (à 820px, 268px de bandeau au lieu de 339px). Sous 520px, il se resserre encore (tampons de 2rem, gains empilés, lien du calendrier masqué, Objectif et Révisions de nouveau l'un sous l'autre).
 
 Les cartes de ligne d'une Catégorie forment une grille fluide (`minmax(min(100%, 31rem), 1fr)`, écart 1rem) : deux colonnes sur grand écran, une sur tablette en portrait et sur téléphone. Les Catégories elles-mêmes se posent sur la même grille (`.reseau`) : une Catégorie à une seule Leçon prend une colonne, si bien que deux Catégories à une Leçon qui se suivent partagent un rang au lieu de laisser chacune une demi-rangée vide ; une Catégorie à plusieurs Leçons prend toute la largeur. L'ordre des Catégories reste celui de la configuration. Les titres de Leçon et la prochaine station gardent les espaces insécables du français (guillemets, « : ; ? ! »), pour qu'aucun signe ne reste seul en début de ligne. Toutes les cartes ont la même anatomie : tête (Niveau, nom, mot de Maîtrise), ligne, pied (prochaine station, contrôle, récompenses, Continuer), puis le dépliant des Objectifs.
 
@@ -370,7 +370,7 @@ Le système est plat, avec un soupçon de pose : les cartes de ligne et le bande
 ### Shadow Vocabulary
 - **Pose de carte de ligne** (`--ombre-carte` : `0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon, en Séance les cartes posées sur la Page de leçon (bulle du prof, Retour de quiz, Leçon terminée), le Cadrage et la carte d'attente de Nouvelle leçon.
 - **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine et le calendrier de Mes badges.
-- **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station. La carte de la Leçon en tête prend le même anneau, détouré du `fond` (`0 0 0 .2rem var(--fond), 0 0 0 .42rem var(--ligne)`), en plus de sa pose.
+- **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station. La carte de la Leçon en tête prend un anneau simple de 2px `ligne` (`0 0 0 2px var(--ligne)`), en plus de sa pose, et son titre au corps des autres cartes : elle ne pèse pas plus que l'Objectif du jour (#166).
 - **Découpe du terminus** (`box-shadow: 0 0 0 .2rem var(--carte)`) : sépare le cartouche du trait.
 - **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau et le calendrier.
 
@@ -386,7 +386,7 @@ Le trait de ligne est une barre de 0.55rem d'épaisseur, coupée en tronçons en
 ## Components
 
 ### Buttons
-Francs et pleins, toujours à au moins 2.6–2.75rem de haut pour le doigt.
+Francs et pleins, toujours à au moins 2.75rem (44 px) de haut pour le doigt.
 - **Shape:** coins doux (10px de base ; 12px pour les boutons d'accueil et Continuer).
 - **Bouton plein :** fond `accent`, texte `sur-accent`, graisse 700. Au survol, l'accent se mélange de 12 % d'encre ; transition de fond 0.15s.
 - **Bouton secondaire :** fond `carte`, filet `bord`, texte `texte`, graisse 600 ; au survol, 6 % d'encre. Dans l'en-tête, il devient transparent avec un filet `sur-nuit` à 32 % et un survol `sur-nuit` à 10 %.
@@ -434,7 +434,7 @@ La Page de leçon remplit l'écran sous un en-tête de Séance qui situe l'Élè
 - **En-tête :** « ← Mes leçons », le cartouche de Niveau et le nom de la Leçon (Title), le mot de Maîtrise (rien quand la Leçon est acquise : le terminus allumé le dit), puis la ligne de la Leçon (`ligneLecon`, prochaine station en « vous êtes ici ») et « Ma fiche ». Sous 640px, la ligne passe sur sa propre rangée.
 - **Bulle du prof :** carte 18px à pose légère, au centre, sur le `voile` quand une page est dessous ; Réponses proposées en boutons pleins de 12px.
 - **Prédiction (Page de leçon, Kit) :** carte 14px comme les questions du quiz, filet d'accent de 1px tout autour (jamais un filet épais d'un seul côté) et teinte `accent-doux`, posée avant une partie de la page. Ses réponses sont des boutons de 2.75rem de haut au contour neutre ; la réponse choisie prend le contour `texte` des réponses du quiz avant correction. Jamais de vert ni de rouge : elle est hors score, il n'y a pas de faute à craindre. La révélation s'ouvre dans la carte, sous un filet pointillé d'accent, sans rien déplacer au-dessus.
-- **Retour de quiz :** carte 18px à pose légère en bas à droite, bouton ✕ secondaire de 2.6rem, au-dessus du Rebond.
+- **Retour de quiz :** carte 18px à pose légère en bas à droite, bouton ✕ secondaire de 2.75rem, au-dessus du Rebond.
 - **Leçon terminée :** carte 18px à pose légère, « 🏆 Leçon terminée » en Title Overpass, score du Défi et récompenses dessous.
 
 ### Le bandeau de la semaine
@@ -444,7 +444,7 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
 - **Jour réparé :** 🩹 en exposant sur le tampon, à la place de 🛡️ (une Série de jours réparée, pas un Joker).
-- **Notes sous l'Objectif du jour :** `small` en `doux`, sans reproche. La réparation proposée le jour du retour (🩹, avancement « 4/10 révisions ou 0/2 pages ») ; après une série repartie, « Ta meilleure série » et les jours travaillés en tout.
+- **Série sous les sept jours (#166) :** paragraphes en corps normal et en `texte`, sans reproche : la série et les jokers, le message du joker qui a protégé la série. La réparation proposée le jour du retour (🩹, avancement « 4/10 révisions ou 0/2 pages ») ; après une série repartie, « Ta meilleure série » et les jours travaillés en tout.
 - **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
 - **Moment de révision :** sous l'Objectif du jour, une question fermée en boutons secondaires (le choix en cours cerclé de 2px `accent`), proposée une fois par jour ; ensuite une ligne `doux` « Je reviens : … » et un lien « Changer » en texte `accent`, sans fond.
 
@@ -454,6 +454,9 @@ L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusé
 - **Mot d'accueil :** à la première ouverture, une phrase en gras sous le titre ; c'est l'appli qui parle, jamais la bulle du prof.
 - **Collection :** une carte simple (14px, filet), titrée « Ma collection » en Headline (1.45rem), dont les rangées sont séparées par des tirets. Chaque Badge commencé (au moins un Palier) est une **ligne de Badge** (`ligneBadge` dans `public/app.js`), le dernier Palier gagné en premier : la pastille du Badge et son nom (Overpass 800, 1.2rem), la phrase qui dit ce qu'il salue en `doux`, puis la ligne. Viennent ensuite, sous des titres de groupe en `doux` (Overpass 800, 1.2rem), « Surprises trouvées » (pastille `palier-unique`, nom, date) et « À découvrir » : les Badges sans Palier, pastille grisée, nom en `doux` et phrase, sans ligne ni décompte. Les surprises non trouvées restent cachées.
 - **Ligne de Badge :** la grammaire de la ligne, avec ses Paliers (bronze, argent, or, diamant ; trois pour certaines familles) pour stations, également espacées. Une station atteinte est la station blanche cerclée de la couleur de son Palier ; le prochain Palier est une station vide entourée du halo « vous êtes ici » en `doux` : la couleur d'un Palier ne se montre qu'une fois gagné. Le trait est en `doux` (aucune couleur de Catégorie) jusqu'au dernier Palier obtenu ; le tronçon vers le prochain se remplit en partie, selon le chemin fait d'après le meilleur compte atteint, qui ne recule jamais. Aucun chiffre ni pourcentage n'est affiché : c'est la seule jauge du système. Sous chaque station, son Palier (0.92rem, gras et `texte` une fois atteint), sa date courte et, s'il vient d'être gagné, la pastille « Nouveau ». La ligne entière porte un texte alternatif en mots (« Mémoire : bronze le 2 octobre 2026, argent le 6 octobre 2026 ; à mi-chemin du Palier or »).
+
+### Vue parent
+Un `h2` de page, puis un **sommaire** de trois ancres (liens `accent`, graisse 700, 2.75rem de haut, sur une ligne qui passe à la suivante) et trois **blocs** : « Ce qu'il retient », « Ce qui demande de l'aide », « Réglages et coûts ». Un bloc est une carte simple (14px, filet `bord`, sans ombre) dont le titre est un `h3` en Overpass 800 (1.2rem) ; ses sections sont des `h4` en Overpass 700 (1rem), séparées par un filet pointillé `bord`. Dans le dernier bloc, chaque section est un `details` dont le `summary` porte le `h4` et le chevron du dépliant des Objectifs (il garde son état ouvert quand un geste recharge l'écran). Les liens de Leçon sont en `accent`, graisse 600, 1.5rem de haut au moins ; le sommaire n'écrit pas dans le hash (celui du routeur) et ouvre une cible repliée. Aucune couleur nouvelle.
 
 ### Propositions et Cadrage (Nouvelle leçon)
 - **Proposition :** carte simple cliquable (14px, filet, pas d'ombre). Elle porte la couleur de sa Catégorie par `--ligne`, seulement sur sa puce. Son type est dit en mots dans une cartouche de signalétique (Overpass 800, 0.74rem, capitales), dont le libellé vient de `public/nouvelle-lecon-texte.js` : **Prolonge ta ligne** (une suite) en aplat de ligne foncée, comme le cartouche de Niveau, puisqu'elle prolonge une ligne déjà ouverte (jamais « Pour aller plus loin », qui est le Dépassement d'une Page de leçon) ; **Nouveau sujet** en filet `station-vide`, texte `doux`, comme le terminus éteint : il reste gris, le jaune `nouveau` étant réservé à ce qui vient d'arriver. « 🎒 Au programme » est un mot gras à côté, sans pastille. Puis le titre (Overpass 800, 1.15rem), la Catégorie en `doux` derrière sa puce, et l'accroche.
@@ -471,7 +474,7 @@ L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusé
 - **Do** donner à chaque Leçon sa couleur de Catégorie par la variable `--ligne` posée sur sa carte ou sa section, à partir des jetons `ligne-*`.
 - **Do** dire l'état d'un Objectif avec les quatre stations (vide, hachurée, blanche, verte) et doubler l'image d'un texte (titre, `aria-label`, ou mots dans le dépliant).
 - **Do** réserver Overpass 800 aux titres, à la marque et aux cartouches de signalétique, et Atkinson Hyperlegible Next à tout le reste.
-- **Do** garder des cibles tactiles d'au moins 2.6rem et l'anneau de focus de 3px `accent`.
+- **Do** garder des cibles tactiles d'au moins 2.75rem et l'anneau de focus de 3px `accent`.
 - **Do** fournir chaque nouvelle couleur en clair et en sombre, et couper les transitions sous `prefers-reduced-motion`.
 - **Do** ramener un écran hérité aux jetons et à la grammaire du réseau quand on le redessine.
 

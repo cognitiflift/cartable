@@ -51,14 +51,14 @@ h2 { margin-top:1.5rem; font-family:var(--police-titre); font-weight:800; letter
 .cache { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 header { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.65rem clamp(1rem, 3vw, 2rem); background:var(--nuit); color:var(--sur-nuit); }
 @media (prefers-color-scheme: dark) { header { border-bottom:1px solid var(--bord); } }
-header h1 { margin:0; font:800 1.35rem/1 var(--police-titre); letter-spacing:-.01em; } header h1 a { color:inherit; text-decoration:none; }
+header h1 { margin:0; font:800 1.35rem/1 var(--police-titre); letter-spacing:-.01em; } header h1 a { display:inline-flex; align-items:center; justify-content:center; min-width:2.75rem; min-height:2.75rem; color:inherit; text-decoration:none; }
 .entete-droite, #nav { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:.5rem; }
 #nav .qui { color:var(--sur-nuit-doux); margin:0 .3rem 0 .4rem; }
 @media (max-width: 899px) { #nav .age { display:none; } }
-header button.secondaire { background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
+header button.secondaire { min-width:2.75rem; min-height:2.75rem; background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
 header button.secondaire:hover { background:color-mix(in srgb, var(--sur-nuit) 10%, transparent); }
 header :focus-visible { outline-color:var(--sur-nuit); } /* l'accent, couleur d'encre, ne se voit pas sur la nuit */
-.compteur-etoiles { display:inline-flex; align-items:center; gap:.35rem; min-height:2.6rem; padding:.3rem .9rem; border-radius:999px; background:color-mix(in srgb, var(--sur-nuit) 12%, transparent); color:var(--sur-nuit); font-weight:800; font-variant-numeric:tabular-nums; text-decoration:none; transition:background .15s; }
+.compteur-etoiles { display:inline-flex; align-items:center; gap:.35rem; min-height:2.75rem; padding:.3rem .9rem; border-radius:999px; background:color-mix(in srgb, var(--sur-nuit) 12%, transparent); color:var(--sur-nuit); font-weight:800; font-variant-numeric:tabular-nums; text-decoration:none; transition:background .15s; }
 .compteur-etoiles:hover { background:color-mix(in srgb, var(--sur-nuit) 20%, transparent); }
 .compteur-etoiles .nouveau { margin-left:.15rem; }
 main { max-width:1200px; margin:0 auto; padding:1.2rem clamp(1rem, 3vw, 2rem) 3rem; }
@@ -82,7 +82,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .semaine-titre h2 { margin:0; font-size:1.45rem; line-height:1.1; }
 .semaine-titre a { font-size:.9rem; font-weight:600; }
 .jours { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.35rem; }
-.jours > .jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; min-height:6.3rem; }
+.jours > .jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; }
 .jour.aujourdhui { background:color-mix(in srgb, var(--accent) 9%, transparent); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .jour .nom, .calendrier-grille .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
 .jour.aujourdhui .nom { color:var(--accent); }
@@ -96,6 +96,10 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .gains .controle-jour { text-decoration:none; }
 .gain-badge .pastille-badge { width:1.6em; height:1.6em; border-width:2px; font-size:.85em; }
 .semaine-cote { display:flex; flex-direction:column; gap:.6rem; }
+/* La série (#166) : sous les sept jours, dans la colonne de gauche, en corps normal et en --texte (WCAG 1.4.3). */
+.serie-de-jours { margin-top:.8rem; color:var(--texte); }
+.serie-de-jours p { margin:0; line-height:1.4; }
+.serie-de-jours p + p { margin-top:.25rem; }
 .objectif-du-jour strong { display:block; line-height:1.3; text-wrap:balance; }
 .objectif-du-jour small { display:block; color:var(--doux); margin-top:.15rem; }
 .objectif-du-jour.atteint strong { color:var(--vert); }
@@ -104,9 +108,9 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .moment-revision small { display:block; }
 .moment-choix strong { display:block; color:var(--texte); margin-bottom:.35rem; }
 .moment-boutons { display:flex; flex-wrap:wrap; gap:.4rem; }
-.moment-boutons button { min-height:2.6rem; }
+.moment-boutons button { min-height:2.75rem; }
 .moment-boutons button[aria-pressed="true"] { border-color:var(--accent); border-width:2px; }
-.moment-lien { background:transparent; border-color:transparent; color:var(--accent); padding:.35rem .5rem; min-height:2.6rem; }
+.moment-lien { background:transparent; border-color:transparent; color:var(--accent); padding:.35rem .5rem; min-height:2.75rem; }
 .moment-lien:hover { background:color-mix(in srgb, var(--accent) 8%, transparent); }
 .bouton-revisions { display:flex; flex-direction:column; align-items:flex-start; gap:.05rem; width:100%; padding:.7rem 1rem; border-radius:12px; text-align:left; }
 .bouton-revisions strong { display:flex; align-items:center; gap:.5rem; width:100%; }
@@ -116,12 +120,12 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 /* Des Questions dues : un contour accent, pas un bouton plein (le seul plein est le Continuer de la Leçon en tête). */
 .bouton-revisions:not(.secondaire) { background:var(--carte); color:var(--texte); border:2px solid var(--accent); }
 .bouton-revisions:not(.secondaire):hover { background:color-mix(in srgb, var(--accent) 8%, var(--carte)); }
-.recapitulatif { position:relative; margin:0 0 1rem; padding-right:2.6rem; }
+.recapitulatif { position:relative; margin:0 0 1rem; padding-right:3.25rem; }
 .recapitulatif strong { display:block; }
-.recapitulatif .fermer { position:absolute; top:.5rem; right:.5rem; padding:.1rem .5rem; }
+.recapitulatif .fermer { position:absolute; top:.25rem; right:.25rem; min-width:2.75rem; min-height:2.75rem; padding:.1rem .5rem; }
 /* Tablette : le bandeau se resserre pour que « Mes leçons » remonte ; l'Objectif du jour et Révisions passent côte à côte. */
-@media (max-width: 860px) { .ma-semaine { grid-template-columns:1fr; gap:.75rem; padding:.85rem 1.1rem .95rem; } .semaine-titre { margin-bottom:.45rem; } .jours > .jour { min-height:0; padding:.35rem .15rem .4rem; } .semaine-cote { flex-direction:row; align-items:center; gap:1rem; } .objectif-du-jour { flex:1; min-width:0; } .bouton-revisions { width:auto; min-width:15rem; flex:none; } }
-@media (max-width: 520px) { .ma-semaine { padding:.8rem .7rem; gap:.6rem; } .semaine-titre { margin-bottom:.4rem; } .semaine-titre a { display:none; } .jours { gap:.15rem; } .jours > .jour { min-height:0; padding:.35rem 0; } .tampon { width:2rem; height:2rem; font-size:.9rem; } .gains { font-size:.72rem; flex-direction:column; align-items:center; gap:0; } .objectif-du-jour small { display:inline; } .objectif-du-jour small + small { display:block; margin-top:.15rem; } .objectif-du-jour strong { font-size:.95rem; } .semaine-cote { flex-direction:column; align-items:stretch; gap:.6rem; } .bouton-revisions { width:100%; min-width:0; flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .bouton-revisions strong { width:auto; } .bouton-revisions .compte { margin-left:0; } .lecons-tete { margin-top:1.4rem; } .bouton-nouvelle:not(.plein) { margin-left:-.7rem; text-align:left; } }
+@media (max-width: 860px) { .ma-semaine { grid-template-columns:1fr; gap:.75rem; padding:.85rem 1.1rem .95rem; } .semaine-titre { margin-bottom:.45rem; } .jours > .jour { padding:.35rem .15rem .4rem; } .serie-de-jours { margin-top:.6rem; } .semaine-cote { flex-direction:row; align-items:center; gap:1rem; } .objectif-du-jour { flex:1; min-width:0; } .bouton-revisions { width:auto; min-width:15rem; flex:none; } }
+@media (max-width: 520px) { .ma-semaine { padding:.8rem .7rem; gap:.6rem; } .semaine-titre { margin-bottom:.4rem; } .semaine-titre a { display:none; } .jours { gap:.15rem; } .jours > .jour { padding:.35rem 0; } .tampon { width:2rem; height:2rem; font-size:.9rem; } .gains { font-size:.72rem; flex-direction:column; align-items:center; gap:0; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.95rem; } .semaine-cote { flex-direction:column; align-items:stretch; gap:.6rem; } .bouton-revisions { width:100%; min-width:0; flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .bouton-revisions strong { width:auto; } .bouton-revisions .compte { margin-left:0; } .lecons-tete { margin-top:1.4rem; } .bouton-nouvelle:not(.plein) { margin-left:-.7rem; text-align:left; } }
 
 /* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
 .lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }
@@ -138,8 +142,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 /* Tu en étais là : la Leçon à la dernière activité la plus récente, en tête, cerclée comme « vous êtes ici ». */
 .reprise { margin-bottom:2.2rem; }
 .reprise-categorie { margin-left:-.35rem; font:600 1rem/1.2 var(--police); color:var(--doux); }
-.lecon.en-tete { box-shadow:0 0 0 .2rem var(--fond), 0 0 0 .42rem var(--ligne), var(--ombre-carte); }
-.lecon.en-tete h4 { font-size:1.45rem; }
+.lecon.en-tete { box-shadow:0 0 0 2px var(--ligne), var(--ombre-carte); }
 .lecons-grille { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 31rem), 1fr)); gap:1rem; }
 /* Le réseau : sur la même grille que les cartes, une Catégorie à une seule Leçon prend une colonne, pour que deux
    Catégories à une Leçon qui se suivent partagent un rang au lieu de laisser chacune une demi-rangée vide ; une
@@ -204,7 +207,7 @@ details.objectifs li small { display:block; color:var(--doux); font-size:.82rem;
 .reseau-vide p { margin:.8rem 0 0; color:var(--doux); }
 header h1 { white-space:nowrap; } #nav { flex-wrap:nowrap; }
 @media (max-width: 480px) { header { padding-inline:.75rem; gap:.5rem; } header h1 .nom-appli { display:none; } .entete-droite, #nav { gap:.35rem; } header button.secondaire { padding:.45rem .6rem; font-size:.9rem; } .compteur-etoiles { padding:.3rem .7rem; } }
-@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2, .nouvelle-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon.en-tete h4 { font-size:1.3rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
+@media (max-width: 640px) { #nav .qui { display:none; } .lecons-tete h2, .nouvelle-tete h2 { font-size:1.6rem; } .lecon { padding:.95rem 1rem .4rem; } .lecon h4 { font-size:1.15rem; } .lecon-tete { flex-wrap:wrap; } .lecon-tete h4 { flex-basis:calc(100% - 6rem); } }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; animation:none !important; } }
 
 /* Séance : l'en-tête situe l'Élève sur la ligne de sa Leçon (ligneLecon, à la couleur de sa Catégorie) avec le mot de
@@ -214,17 +217,17 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .seance-tete { display:flex; align-items:center; flex-wrap:wrap; gap:.35rem 1rem; padding:.35rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
 /* Lien « ← Mes leçons » des en-têtes (Séance, Nouvelle leçon, carte d'attente) */
 .retour-accueil { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
-.seance-tete .retour-accueil { min-height:2.6rem; white-space:nowrap; }
+.seance-tete .retour-accueil { min-height:2.75rem; white-space:nowrap; }
 .seance-titre { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .7rem; min-width:0; }
 .seance-titre h2 { margin:0; font-size:1.3rem; line-height:1.2; text-wrap:balance; }
 .seance-titre .maitrise { margin-top:0; }
 .seance-tete .ligne { flex:1 1 14rem; min-width:min(100%, 12rem); max-width:28rem; }
-.seance-tete .fiche-ouvrir { min-height:2.6rem; }
+.seance-tete .fiche-ouvrir { min-height:2.75rem; }
 .seance-tete .erreur { flex-basis:100%; min-height:0; }
 .seance-tete .erreur:empty { display:none; }
 .seance { position:relative; flex:1; min-height:0; border:1px solid var(--bord); border-radius:14px; overflow:hidden; background:var(--carte); }
 .panneau { display:flex; flex-direction:column; height:100%; background:var(--carte); }
-.panneau select { margin:.4rem; } .panneau iframe { flex:1; border:0; }
+.panneau select { min-height:2.75rem; margin:.4rem; } .panneau iframe { flex:1; border:0; }
 .fiche { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; background:var(--carte); }
 .fiche-barre { display:flex; align-items:center; gap:.6rem; padding:.4rem .6rem; border-bottom:1px solid var(--bord); }
 .fiche-barre button { margin-left:auto; } .fiche iframe { flex:1; border:0; }
@@ -237,7 +240,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .choix button { min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; }
 .apres-quiz { position:absolute; right:1rem; bottom:1rem; width:min(360px, calc(100% - 2rem)); display:flex; flex-direction:column; gap:.6rem; }
 .retour { position:relative; padding:.9rem 3.2rem .9rem 1.1rem; white-space:pre-wrap; max-height:40vh; overflow-y:auto; background:var(--carte); color:var(--texte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-carte); }
-.retour .fermer { position:absolute; top:.35rem; right:.35rem; width:2.6rem; height:2.6rem; padding:0; line-height:1; }
+.retour .fermer { position:absolute; top:.35rem; right:.35rem; width:2.75rem; height:2.75rem; padding:0; line-height:1; }
 /* Rebond : la suite recommandée est un bouton plein (l'action), les autres Rebonds des boutons secondaires. */
 .apres-quiz > button { display:flex; flex-direction:column; align-items:center; gap:.1rem; min-height:2.75rem; padding:.6rem 1.15rem; border-radius:12px; text-wrap:balance; }
 .action-suivante { font-weight:800; }
@@ -305,8 +308,28 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .attente-actions button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }
 .carte-attente.echec h2 { color:var(--rouge); }
 .revisions { max-width:46rem; margin:1rem 0; }
-.revision-origine { margin:0; }
+.revision-origine { margin:0; } .revision-origine a { display:inline-flex; align-items:center; min-height:2.75rem; }
 .vue-parent { max-width:46rem; margin:1rem 0; }
+/* Vue parent (#164) : un sommaire de trois ancres, puis trois blocs en cartes simples (14px, filet, sans ombre) ; les
+   sections du dernier bloc se replient (<details>, chevron du dépliant des Objectifs). */
+.sommaire-parent { display:flex; flex-wrap:wrap; gap:.2rem 1.4rem; max-width:46rem; margin:.4rem 0 1.4rem; }
+.sommaire-parent a { display:inline-flex; align-items:center; min-height:2.75rem; font-weight:700; }
+.bloc-parent { max-width:46rem; margin:1.2rem 0; padding:.2rem 1rem .6rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; scroll-margin-top:1rem; }
+.bloc-parent:focus-visible { outline-offset:3px; }
+.bloc-parent h3 { margin:1rem 0 .3rem; font:800 1.2rem/1.2 var(--police-titre); }
+.bloc-parent .vue-parent { margin:.5rem 0; padding-top:.9rem; border-top:1px dashed var(--bord); }
+.bloc-parent h4 { margin:0 0 .5rem; font:700 1rem/1.3 var(--police-titre); }
+.bloc-parent ul { margin:.3rem 0; padding-left:1.2rem; }
+.bloc-parent ul ul { margin:.1rem 0 .3rem; }
+.lien-lecon { display:inline-block; min-height:1.5rem; line-height:1.5rem; color:var(--accent); font-weight:600; }
+.section-repliable > summary { display:flex; align-items:center; gap:.45rem; min-height:2.75rem; cursor:pointer; list-style:none; }
+.section-repliable > summary::-webkit-details-marker { display:none; }
+.section-repliable > summary::before { content:""; width:.45rem; height:.45rem; border-right:2px solid; border-bottom:2px solid; transform:translateY(-.1rem) rotate(-45deg); transition:transform .2s ease-out; }
+.section-repliable[open] > summary::before { transform:translateY(.1rem) rotate(45deg); }
+.section-repliable > summary h4 { margin:0; }
+@media (prefers-reduced-motion: reduce) { .section-repliable > summary::before { transition:none; } }
+details.pour-les-curieux summary { padding-block:.7rem; cursor:pointer; font-weight:700; color:var(--doux); }
+details.pour-les-curieux summary:hover { color:var(--texte); }
 .rappel-heures { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin:.5rem 0 .8rem; }
 .rappel-heures label { display:flex; flex-direction:column; gap:.2rem; font-weight:600; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }
@@ -382,4 +405,7 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 /* Vue parent, Questions signalées et suspectes (#148) : une liste, des actions discrètes en boutons secondaires. */
 .question-signalee, .question-suspecte { margin-bottom:.8rem; }
 .actions-parent { display:inline-flex; flex-wrap:wrap; align-items:center; gap:.4rem; margin-top:.3rem; }
-.actions-parent button { min-height:2.5rem; }
+.actions-parent button { min-height:2.75rem; }
+/* Cibles tactiles de la Vue parent (#167) : liens de Leçon, listes et champs à au moins 2.75rem, sans changer la grille. */
+.vue-parent a { display:inline-flex; align-items:center; min-height:2.75rem; }
+.vue-parent :is(select, input, summary) { min-height:2.75rem; }

@@ -230,7 +230,7 @@ Pour apprendre ce qui distingue des catégories. Le Kit mélange les éléments 
 
 ## Ce que fait le Kit
 
-Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux ; dans le quiz d'une page, hors Pré-test, il invite d'abord à deviner, « Pas sûr ? Devine, puis dis « pas sûr » », et place « Je ne sais pas » en bouton secondaire après les réponses), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
+Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux ; dans le quiz d'une page, hors Pré-test, il invite d'abord à deviner, « Pas sûr ? Devine, puis dis « pas sûr » », et place « Je ne sais pas » en bouton secondaire après les réponses ; « Valider » est le bouton plein du quiz, la ligne de texte reste sous ~75 caractères et le contenu ouvert dans une question, comme la figure revue, n'est pas une seconde carte), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
 
 ## Figure
 

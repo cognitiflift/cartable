@@ -64,8 +64,8 @@ function barreNav(profil) {
   const compteur = h('a', { className: 'compteur-etoiles', href: '#/badges', title: 'Mes badges' },
     h('span', { ariaHidden: 'true' }, '⭐'),
     h('span', { className: 'nombre' }, connues ? String(connues.etoiles) : '…'),
-    h('span', { className: 'cache' }, ' Étoiles, voir mes badges'),
-    connues?.nouveau && h('span', { className: 'nouveau' }, 'Nouveau'));
+    h('span', { className: 'cache' }, connues?.nouveau ? ' Étoiles, voir mes badges : une nouvelle carte attend' : ' Étoiles, voir mes badges'),
+    connues?.nouveau && h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau'));
   nav.replaceChildren(compteur,
     h('span', { className: 'qui' }, `${profil.pseudo} · ${profil.niveau}`, h('span', { className: 'age' }, ` · ${profil.age} ans`)),
     h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, 'Mon profil'),
@@ -712,11 +712,15 @@ function nouvellesCartesGroupe(cartes, { son, slug, retourner, ranger }) {
   const ajouter = (c) => (c.type === 'ligne' ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
   return h('div', { className: 'cl-nouvelles' },
     h('h4', { className: 'cl-groupe' }, TEXTES_CEREMONIE.titreGroupe),
-    h('ul', { className: 'cartes-reseau cartes-attente', ariaLabel: TEXTES_CEREMONIE.titreGroupe }, cartes.map((c) => h('li', {},
-      c.retournee
-        ? [c.type === 'ligne' ? carteLigne(c.ligne) : carteBadge(badgeAuPalier(c.badge, c.palier), false),
-          h('button', { type: 'button', className: 'cl-ajouter', onclick: () => ranger(c) }, ajouter(c))]
-        : carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner, ranger }))))));
+    h('ul', { className: 'cartes-reseau cartes-attente', ariaLabel: TEXTES_CEREMONIE.titreGroupe }, cartes.map((c) => {
+      const li = h('li', {},
+        c.retournee
+          ? [c.type === 'ligne' ? carteLigne(c.ligne) : carteBadge(badgeAuPalier(c.badge, c.palier), false),
+            h('button', { type: 'button', className: 'cl-ajouter', onclick: () => ranger(c) }, ajouter(c))]
+          : carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner, ranger })));
+      li.dataset.cle = c.cle; // retrouver la carte quand la cérémonie se ferme (le groupe a été redessiné)
+      return li;
+    })));
 }
 
 function carteFaceCachee(c, ouvrir) {
@@ -737,6 +741,7 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
   const badge = ligne ? null : badgeAuPalier(c.badge, c.palier);
   const nom = ligne ? c.ligne.titre : `${c.badge.nom} · ${c.badge.surprise ? 'badge surprise' : `Palier ${c.palier}`}`;
   const salue = ligne ? dosCarteLigne(c.ligne, jourEnMots).salue : (c.badge.phrase ?? 'Trouvé sans le chercher.');
+  const ouvreur = document.activeElement; // la carte qui a ouvert : le focus lui revient à la fermeture
   const dlg = h('dialog', { className: 'cartes-ceremonie', ariaLabel: TEXTES_CEREMONIE.dialogue(ligne ? c.ligne.titre : c.badge.nom) });
   const texte = h('div', { className: 'cer-texte', ariaLive: 'polite' }, h('p', {}, TEXTES_CEREMONIE.aide));
   const scene = h('div', { className: 'cer-carte' });
@@ -757,6 +762,7 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
       const a = (i / 18) * Math.PI * 2, d = 90 + (i % 3) * 30;
       return h('i', { style: `--dx:${(Math.cos(a) * d).toFixed(0)}px; --dy:${(Math.sin(a) * d).toFixed(0)}px; animation-delay:${(1.5 + (i % 4) * 0.03).toFixed(2)}s` });
     })));
+    vraie.focus(); // le dos retourné est retiré de la scène : le focus suit la vraie carte (ses boucles tournent, bornées)
     retourner(c); // retournée : le groupe derrière la cérémonie la garde, non rangée, jusqu'à « Ajouter »
     setTimeout(() => {
       if (!dlg.isConnected) return;
@@ -767,7 +773,13 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
   });
   scene.append(dos);
   dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, plusTard));
-  dlg.addEventListener('close', () => dlg.remove());
+  // À la fermeture, le focus revient à l'Élève là où il était : la carte retournée de « Nouvelles cartes » (le groupe est
+  // redessiné pendant la cérémonie, l'ancien bouton n'existe plus), ou, une fois la carte ajoutée, au titre du groupe.
+  dlg.addEventListener('close', () => {
+    dlg.remove();
+    const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.collection h3');
+    if (cible) { if (!cible.matches('button, a')) cible.tabIndex = -1; cible.focus(); }
+  });
   document.body.append(dlg);
   dlg.showModal();
   dos.focus();

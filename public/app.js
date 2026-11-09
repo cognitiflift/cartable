@@ -298,7 +298,7 @@ async function ecranParent(profil) {
   const moment = await api(`eleves/${profil.slug}/moment/heures`);
   const contexte = { slug: profil.slug, recharger: () => ecranParent(profil) };
   montrer(
-    h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
+    h('h2', { className: 'vue-parent-titre' }, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
     SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats, contexte))),
     h('section', { className: 'vue-parent' }, h('h3', {}, '🔔 Rappel dans ton calendrier'), rappelCalendrier(profil, moment)));

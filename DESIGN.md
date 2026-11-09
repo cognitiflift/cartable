@@ -83,9 +83,21 @@ typography:
     fontWeight: 800
     lineHeight: 1.1
     letterSpacing: "-0.01em"
+  display-mobile:
+    fontFamily: "Overpass, Atkinson Hyperlegible Next, system-ui, sans-serif"
+    fontSize: "1.6rem"
+    fontWeight: 800
+    lineHeight: 1.1
+    letterSpacing: "-0.01em"
   title:
     fontFamily: "Overpass, Atkinson Hyperlegible Next, system-ui, sans-serif"
     fontSize: "1.3rem"
+    fontWeight: 800
+    lineHeight: 1.2
+    letterSpacing: "-0.01em"
+  title-mobile:
+    fontFamily: "Overpass, Atkinson Hyperlegible Next, system-ui, sans-serif"
+    fontSize: "1.15rem"
     fontWeight: 800
     lineHeight: 1.2
     letterSpacing: "-0.01em"
@@ -338,13 +350,15 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 **Character:** Overpass, dessinée d'après la signalétique routière, donne aux titres et aux cartouches la voix d'un panneau de station ; Atkinson Hyperlegible Next, dessinée pour les lecteurs malvoyants, porte tout ce qui se lit, y compris pour un Élève dyslexique. Les deux sont servies par l'appli (`public/polices/`, licence SIL OFL), en sous-ensembles latin et latin étendu, `font-display: swap`.
 
 ### Hierarchy
-- **Display** (Overpass 800, 2rem, 1.1 ; 1.6rem sous 640px) : le titre « Mes leçons ».
-- **Headline** (Overpass 800, 1.45rem, 1.1) : le salut du bandeau de la semaine ; les autres titres de section (`h2`) prennent la même voix Overpass 800.
-- **Title** (Overpass 800, 1.3rem, 1.2 ; 1.15rem sous 640px) : le nom d'une Leçon sur sa carte de ligne, équilibré (`text-wrap: balance`). Les noms de Catégorie sont à 1.2rem, précédés de leur puce de couleur.
+- **Display** (Overpass 800, 2rem, 1.1 ; `display-mobile` 1.6rem sous 640px) : le titre « Mes leçons » et celui de la Vue parent.
+- **Headline** (Overpass 800, 1.45rem, 1.1) : le salut du bandeau de la semaine ; les autres titres de section (`h2`) prennent la même voix Overpass 800 ; sur la Vue parent, ses sections (`h3`).
+- **Title** (Overpass 800, 1.3rem, 1.2 ; `title-mobile` 1.15rem sous 640px) : le nom d'une Leçon sur sa carte de ligne, équilibré (`text-wrap: balance`). Les noms de Catégorie sont à 1.2rem, précédés de leur puce de couleur.
 - **Marque** (Overpass 800, 1.35rem, 1) : « 🎒 Cartable » dans l'en-tête.
 - **Body** (Atkinson 400, 17px, 1.5) : tout le texte courant ; les détails (prochaine station, Objectifs) passent à 1.3–1.35 d'interligne.
-- **Petit texte d'action** (Atkinson 700, 0.92rem) : « Voir les Objectifs », contrôle à venir, « Terminée ».
+- **Petit texte d'action** (Atkinson 700, 0.92rem) : « Voir les Objectifs », contrôle à venir, « Terminée », et tout texte secondaire (maîtrise, compteurs, détails d'Objectif, étape du Cadrage).
 - **Label signalétique** (Overpass 800, 0.74rem, 0.07em, capitales) : le terminus « ACQUIS » et les noms de jours du bandeau. Le cartouche de Niveau est à 0.78rem, 0.04em.
+
+**La règle de l'échelle.** Toute taille de texte de `public/style.css` est un niveau ci-dessus ; `test/style.test.js` échoue sur toute autre. Seules exceptions : les tailles en `em` de la pastille d'un Badge, relatives au texte qui la porte. Sur la Vue parent, chaque niveau voisin vaut au moins 1,25 fois le précédent : corps 17px, section 1.45rem (×1,36), titre 2rem (×1,38).
 
 ### Named Rules
 **La règle de la signalétique.** Les capitales espacées sont réservées aux cartouches de signalétique du réseau (terminus, Niveau, noms de jours) ; aucun texte courant, aucun titre n'est en capitales.

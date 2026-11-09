@@ -856,15 +856,23 @@
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Le titre « Mes leçons » (1.6rem sous 640px)."
+        "purpose": "Les titres « Mes leçons » et de la Vue parent."
+      },
+      "display-mobile": {
+        "displayName": "Display mobile",
+        "purpose": "Display sous 640px (1.6rem)."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Le salut du bandeau de la semaine et les titres de section."
+        "purpose": "Le salut du bandeau de la semaine et les titres de section, dont ceux de la Vue parent."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Le nom d'une Leçon sur sa carte de ligne (1.15rem sous 640px)."
+        "purpose": "Le nom d'une Leçon sur sa carte de ligne."
+      },
+      "title-mobile": {
+        "displayName": "Title mobile",
+        "purpose": "Title sous 640px (1.15rem)."
       },
       "title-categorie": {
         "displayName": "Titre de Catégorie",

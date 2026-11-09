@@ -3249,6 +3249,9 @@ test('Indicateurs : ouvrir une Leçon puis revenir la semaine d\'après compte d
 
 test('Indicateurs : une Leçon lue sans être ouverte par l\'Élève (vue parent, autre écran) ne compte pas comme un retour', async () => {
   const { slug, lecons: [a] } = await eleveRevisions('Indic-Lue', 1);
+  // La préparation de l'Élève laisse des événements à l'heure réelle : sans les ôter, le test dépendrait du jour où il tourne
+  // (le 9 novembre 2026, J+7 de la première ouverture, ils comptaient comme un retour).
+  await fs.rm(path.join(eleves, slug, 'evenements.jsonl'), { force: true });
   await appel(`/api/eleves/${slug}/lecons/${a.id}?ouverture=1`, 'GET', undefined, le('2026-11-02T12:00:00.000Z'));
   await appel(`/api/eleves/${slug}/lecons/${a.id}`, 'GET', undefined, le('2026-11-10T12:00:00.000Z')); // le parent la lit
   const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-30`, 'GET', undefined, le('2026-11-30T12:00:00.000Z'));

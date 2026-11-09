@@ -11,7 +11,7 @@
   --kit-police: "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --kit-police-titre: "Overpass", "Atkinson Hyperlegible Next", system-ui, sans-serif;
   --kit-fond: #f2f4f8; --kit-texte: #14182b; --kit-doux: #4f566c; --kit-carte: #fff; --kit-bord: #dde1ea;
-  --kit-accent: #262a7a; --kit-sur-accent: #fff; --kit-encre-noire: #000;
+  --kit-mesure: 45ch; --kit-accent: #262a7a; --kit-sur-accent: #fff; --kit-encre-noire: #000;
   --kit-juste: #15803d; --kit-faux: #b42318;
   --kit-espacement-lettres: .12em; --kit-espacement-mots: .16em; /* WCAG 1.4.12 : valeurs de DESIGN.md (espacement-lettres, espacement-mots) */
   color-scheme: light dark;
@@ -59,7 +59,7 @@
 /* Quiz */
 .kit-quiz { margin: 2rem 0; display: flex; flex-direction: column; gap: 1rem; }
 /* Mesure (#173) : au plus ~75 caractères par ligne ; `ch` est la chasse du « 0 », ~1,5 fois la lettre moyenne : 45ch donnent ~75 caractères (mesuré). */
-.kit-quiz-question { border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-carte); padding: 1rem 1.1rem; margin: 0; max-width: calc(45ch + 2.2rem + 2px); }
+.kit-quiz-question { border: 1px solid var(--kit-bord); border-radius: 14px; background: var(--kit-carte); padding: 1rem 1.1rem; margin: 0; max-width: calc(var(--kit-mesure) + 2.2rem + 2px); }
 /* L'énoncé à l'intérieur de la carte, et non posé sur sa bordure (rendu natif de <legend>) : il peut tenir sur
    plusieurs lignes sur un téléphone. */
 .kit-quiz-question legend { float: left; width: 100%; padding: 0; margin-bottom: .4rem; font-weight: 600; }

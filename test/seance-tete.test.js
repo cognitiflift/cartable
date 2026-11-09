@@ -24,7 +24,11 @@ test('Séance : le sélecteur de la fiche a la même cible tactile', () => {
 });
 
 test('Séance à 390 px : le titre se range sur la ligne du lien, la ligne de progression vient en dessous', () => {
-  const mobile = css.match(/@media \(max-width: 640px\) \{[^\n]*\.seance-tete[^\n]*\}/)?.[0] ?? '';
+  const debut = css.indexOf('@media (max-width: 640px) { .seance-tete');
+  assert.ok(debut >= 0, 'bloc @media 640px de .seance-tete');
+  let prof = 0, fin = debut;
+  for (; fin < css.length; fin++) { if (css[fin] === '{') prof++; if (css[fin] === '}' && --prof === 0) break; }
+  const mobile = css.slice(debut, fin + 1);
   assert.match(mobile, /\.seance-titre \{ display:contents/);
   assert.match(mobile, /\.seance-tete \.ligne \{[^}]*order:/);
   assert.match(mobile, /\.seance-titre h2 \{[^}]*text-overflow:ellipsis/);

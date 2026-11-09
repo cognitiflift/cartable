@@ -75,9 +75,10 @@ test('Kit : le texte de Valider (sur-accent) tient 4,5:1 sur l\'aplat accent-for
 
 test('Kit : le texte courant tient dans une mesure d\'environ 75 caractères', () => {
   const q = regle(quiz, '.kit-quiz-question');
-  assert.match(q, /max-width:\s*calc\(\d+ch/, 'la carte d\'une question borne sa mesure en ch');
-  const t = regle(base, 'p, li, figcaption');
-  assert.match(t, /max-width:\s*\d+ch/, 'texte de la page borné');
+  assert.match(q, /max-width:\s*calc\(var\(--kit-mesure\)/, 'la carte d\'une question borne sa mesure par --kit-mesure');
+  assert.match(quiz, /--kit-mesure:\s*45ch/, 'la mesure est un jeton, en ch');
+  const t = regle(base, ':is(p, li, figcaption):not(:is(table, .encart, aside) *)');
+  assert.match(t, /max-width:\s*var\(--kit-mesure\)/, 'texte de la page borné, hors encarts et tableaux');
 });
 
 test('Kit : aucune carte dans une carte (revoir la figure, dévoilé, révélation de la Prédiction)', () => {

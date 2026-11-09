@@ -1093,7 +1093,8 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       cadre);
     fiche.style.display = '';
   };
-  const boutonFiche = h('button', { className: 'secondaire fiche-ouvrir', ariaLabel: 'Ma fiche', onclick: ouvrirFiche }, '📋', h('span', { className: 'fiche-libelle' }, ' Ma fiche'));
+  const LIBELLE_FICHE = 'Ma fiche'; // en icône à 390 px : le libellé reste dit au lecteur d'écran
+  const boutonFiche = h('button', { className: 'secondaire fiche-ouvrir', ariaLabel: LIBELLE_FICHE, onclick: ouvrirFiche }, '📋', h('span', { className: 'fiche-libelle' }, ` ${LIBELLE_FICHE}`));
 
   // En-tête de Séance : l'Élève est sur la ligne de sa Leçon, à la couleur de sa Catégorie, comme sur sa carte
   // d'accueil : Niveau, nom, mot de Maîtrise (Acquis : dit par le terminus allumé), puis la ligne et sa prochaine station.

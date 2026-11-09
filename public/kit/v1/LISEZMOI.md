@@ -72,6 +72,8 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
   - Pour un `qcm` :
     - `reponses` : 2 à 5 réponses en texte. Le Kit les mélange : n'écris pas « toutes les réponses ci-dessus ».
     - `bonne` : index (à partir de 0) de la bonne réponse dans `reponses`.
+    - Les réponses fausses sont **plausibles** : tirées d'idées reçues ou d'erreurs fréquentes d'un élève de cet âge, de même longueur et de même forme que la bonne (jamais absurdes, jamais « toutes les réponses »). Sans elles, l'élève reconnaît la bonne réponse au lieu de la retrouver. Cela vaut pour tout QCM, y compris `"explication"`.
+    - `raisons` (facultatif) : « pourquoi c'est faux ». Une liste de la même longueur que `reponses` : pour chaque réponse fausse, une phrase courte qui dit pourquoi elle est fausse, et `null` à la place de la bonne réponse. Quand l'élève choisit une réponse fausse, le Kit montre la raison de cette réponse, puis l'`explication` ; après « Je ne sais pas », seule l'explication s'affiche. La Banque de Questions garde les raisons, les Révisions du jour les montrent et la Lecture à voix haute les lit. Une liste qui n'a pas la longueur de `reponses` est ignorée, une entrée mal formée (ou posée sur la bonne réponse) aussi ; la question reste. Une page sans `raisons` s'affiche comme avant. Exemple : `"reponses": ["Par le cratère", "Par les racines", "Par les nuages"], "bonne": 0, "raisons": [null, "Les racines sont sous terre : la lave en sort au contraire.", "Les nuages sont dans le ciel, pas dans le volcan."]`.
   - Pour les autres formats : leurs champs propres, décrits plus bas.
   - `explication` : une ou deux phrases, montrées après la réponse, juste ou fausse.
   - `bonus` (facultatif) : `true` pour la question bonus 🚀 du Dépassement, hors score. Une page qui a un Dépassement en a 1, sur son encart « Pour aller plus loin » ; la réussir rapporte une Fusée (les anciennes pages à 2 ou 3 questions bonus en demandent 2 réussies). Un énoncé qui commence par 🚀 compte aussi comme question bonus ; n'écris pas le 🚀 dans l'énoncé, le Kit l'affiche.
@@ -81,7 +83,7 @@ Un seul quiz par page, dans `<script type="application/json" id="cartable-quiz">
 
 Une question mal formée, ou d'un `type` inconnu, est ignorée : le reste du quiz s'affiche, et l'appli te la signale au tour suivant avec la raison. Il faut au moins une question hors bonus. Au plus 50 questions par quiz (les suivantes sont ignorées) ; un `id` de plus de 100 caractères ou un texte de plus de 500 caractères est coupé.
 
-Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, la `figure` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`) et la lecture à voix haute. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
+Ajouts compatibles de la version 1 : « Je ne sais pas » (résultat `jeNeSaisPas`), l'`image` d'une question, la `figure` d'une question, les formats de rappel actif (résultats `type`, `points` et `detail`), la lecture à voix haute et les `raisons` des réponses fausses d'un QCM. Une page écrite avant eux s'affiche et s'enregistre comme avant ; un lecteur de résultats d'avant les ignore sans erreur (`choisie` et `bonne` restent du texte). Une évolution incompatible passerait par une version 2 (ADR 0004).
 
 ## Formats de rappel actif
 
@@ -186,7 +188,7 @@ Pour un « pourquoi ? » : plusieurs explications d'un phénomène, une seule ju
 }
 ```
 
-- `reponses` et `bonne` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne.
+- `reponses`, `bonne` et `raisons` : comme pour un `qcm`. Les explications fausses sont plausibles (idées reçues, confusions fréquentes), de la même longueur que la bonne, chacune avec sa raison.
 
 ### Associer : `"type": "associer"`
 
@@ -228,7 +230,7 @@ Pour apprendre ce qui distingue des catégories. Le Kit mélange les éléments 
 
 ## Ce que fait le Kit
 
-Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
+Il affiche les questions dans leur format, mélange les réponses (ou les mots, ou les éléments), propose aussi « Je ne sais pas » (compté comme faux ; dans le quiz d'une page, hors Pré-test, il invite d'abord à deviner, « Pas sûr ? Devine, puis dis « pas sûr » », et place « Je ne sais pas » en bouton secondaire après les réponses), demande à l'élève après chaque choix s'il est « sûr » ou « pas sûr » (sa Confiance, hors score), corrige chaque réponse avec son explication, calcule le score sans les questions bonus et, une fois toutes les questions répondues, envoie le score, les Objectifs couverts, le bonus et les résultats par question (avec la Confiance) à l'appli. Tu n'as rien à écrire pour cela.
 
 ## Figure
 
@@ -298,13 +300,45 @@ Chaque page contient au moins un visuel qui explique (photo d'œuvre, d'objet ou
 
 Après ton tour, l'appli télécharge chaque image déclarée (PNG, JPEG, GIF ou WebP, 5 Mo au plus ; un fichier SVG distant est refusé : dessine plutôt le schéma toi-même en SVG dans la page) dans le dossier `images/` de la Leçon et réécrit son adresse dans la page, pour qu'elle reste affichée hors ligne. Une image injoignable, trop lourde, ou un fichier qui n'est pas une image, est retirée de la page (la légende reste) et te sera signalée au tour suivant : remplace-la par une autre image qui marche ou par un schéma SVG. Pour une image trop lourde, reprends l'image de partage déjà réduite de sa source (`og:image`, à défaut `twitter:image`), jamais le fichier original en pleine résolution. Sur une page qui porte sur un sujet réel, remplace-la par une autre photo : un schéma SVG n'y est permis que si tu ne trouves aucune photo qui marche, et la légende le dit alors.
 
+## Prédiction
+
+Ajout compatible de la version 1 : une page sans Prédiction s'affiche comme avant. Avant une partie de la page, une question courte où l'élève dit ce qu'il pense, **sans note** : le Kit ne la corrige pas tout de suite, et la révélation (« Tu avais pensé… ; en fait… ») s'ouvre quand l'élève atteint le titre `<h2>` suivant (la partie suivante) ou le quiz. Elle ne compte ni dans le score, ni dans la Banque de Questions, ni dans la Maîtrise, ni dans les Étoiles ; pas de Confiance, pas de « Je ne sais pas » : on devine.
+
+Déclare-la en données, à l'endroit où elle doit s'afficher, juste sous le titre de la partie qu'elle prépare (plusieurs déclarations possibles dans la page, chacune dans son `<script>`) :
+
+```html
+<h2>Que devient la lave ?</h2>
+<script type="application/json" class="cartable-prediction">
+{
+  "id": "p1",
+  "enonce": "Que fait la lave quand elle refroidit ?",
+  "reponses": ["Elle durcit en roche", "Elle redevient du magma", "Elle s'évapore"],
+  "bonne": 0,
+  "revelation": "La lave qui refroidit durcit et devient une roche, comme le basalte."
+}
+</script>
+<p>…la partie, qui dit la réponse…</p>
+<h2>Autre partie</h2>
+```
+
+- `id` : identifiant court, unique dans la page et stable (`p1`, `p2`…), commençant par une lettre.
+- `enonce` : la question.
+- `reponses` : 2 ou 3 réponses en texte (le Kit ne les mélange pas). `bonne` : index (à partir de 0) de la bonne réponse.
+- `revelation` : une phrase qui dit ce qu'il en est. Le Kit la fait précéder de « Tu avais pensé « … » ; en fait, tu avais raison » ou « c'était « … » ». La partie qui suit la Prédiction doit donc donner la réponse.
+
+Règles : au plus **une Prédiction par partie et deux par page** ; jamais dans le Pré-test (le Kit l'y ignore) ni dans une page Revoir. Ne la répète pas dans le quiz. Une déclaration mal formée (identifiant absent ou en double, moins de 2 ou plus de 3 réponses, `bonne` hors liste, texte vide) est ignorée : la page reste utilisable. Quand l'élève répond, le Kit envoie à l'appli `{ "type": "cartable-prediction", "page", "id", "juste" }` ; l'appli le note comme événement daté, seulement pour les indicateurs du parent (Prédictions faites et justes). La Lecture à voix haute lit la Prédiction avec son propre bouton « 🔊 Écouter », puis sa révélation une fois montrée.
+
 ## Lecture à voix haute
 
-Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
+Quand le Profil de l'élève l'active, le Kit ajoute un bouton « 🔊 Écouter la page » en haut de la page et un bouton « 🔊 Écouter » sous l'énoncé de chaque question ; chacun devient « ⏹ Arrêter » pendant la lecture. Une question est lue avec ses propositions (dans l'ordre alphabétique, jamais la réponse attendue) puis, une fois corrigée, avec sa correction, la raison de la réponse fausse choisie s'il y en a une, et son explication. Tu n'as rien à écrire : le Kit s'en charge (`lecture.js`, logique dans `lecture-logique.js`), avec la synthèse vocale du navigateur et une voix de l'appareil (française si elle existe), sans que rien ne sorte de l'appareil.
 
 Pour qu'elle soit agréable à écouter, écris le texte de la page en phrases complètes, dans des blocs (`<p>`, titres, listes, `<figcaption>`, `<aside>`, l'extrait de texte `<blockquote>` d'une figure) : ce sont eux qui sont lus, dans l'ordre. Le quiz, les crédits des figures (`kit-credit`), les schémas `<svg>` et ce qui est caché ne sont pas lus ; les émojis non plus.
 
 L'appli transmet le réglage à la page dans son adresse (`…/0002-le-magma.html?lecture=1`). Ajout compatible de la version 1 : une page déjà écrite avec le Kit en profite sans changement.
+
+## Espacement des lettres
+
+Quand le Profil de l'élève l'active, l'appli ajoute `?espacement=1` à l'adresse de la page et le Kit agrandit l'espacement des lettres (0,12 em) et des mots (0,16 em), valeurs de WCAG 1.4.12. Tu n'as rien à écrire. Ne fixe pas la hauteur d'un bloc de texte et n'écris pas de `letter-spacing` sur le texte courant : le réglage doit pouvoir s'y appliquer sans perte. Les schémas `<svg>` ne sont pas touchés. Ajout compatible de la version 1 : une page ouverte sans le réglage est inchangée.
 
 ## Style de base
 

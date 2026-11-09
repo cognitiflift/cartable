@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { slugify } from '../lib/store.js';
-import { lireQuiz, messageScore } from '../public/kit/v1/quiz-logique.js';
+import { contenuAServir } from '../lib/variantes.js';
+import { lireQuiz, messageScore, corriger } from '../public/kit/v1/quiz-logique.js';
 
 let serveur, base, dossier, eleves;
 const elevesDuDepot = path.join(import.meta.dirname, '..', 'eleves');
@@ -37,7 +38,10 @@ before(async () => {
   await fs.writeFile(path.join(dossier, 'faux-variantes.mjs'), `import fs from 'node:fs';
 const demandes = JSON.parse(fs.readFileSync('questions-a-varier.json', 'utf8'));
 const malFormees = fs.existsSync(process.argv[2]);
-const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication });
+const avecRaisons = fs.existsSync(process.argv[3]);
+const variante = (q, n) => ({ enonce: q.enonce + ' (variante ' + n + ')', reponses: [...q.reponses].reverse(), bonne: q.reponses.length - 1 - q.bonne, explication: q.explication,
+  // \`variantes-raisons\` : la variante 1 donne une raison à chaque réponse, la bonne comprise (écartée) ; la variante 2 une liste mal formée (écartée, la variante reste).
+  ...(avecRaisons && { raisons: n === 1 ? q.reponses.map((_, i) => 'Raison ' + i) : ['une seule'] }) });
 const sortie = Object.fromEntries(demandes.map((q) => [q.cle, [
   ...(malFormees ? [] : [variante(q, 1), variante(q, 2)]),
   { enonce: q.enonce + ' (mal formée)', reponses: q.reponses, bonne: 9, explication: '' },
@@ -62,7 +66,7 @@ if [ "$(basename "$PWD")" = variantes ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
     exit 0
   fi
-  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees'
+  node '${dossier}/faux-variantes.mjs' '${dossier}/variantes-mal-formees' '${dossier}/variantes-raisons'
   echo '{"result":"ok","session_id":"s-var","is_error":false,"total_cost_usd":0.01,"modelUsage":{"claude-haiku-test":{"costUSD":0.01}}}'
   exit 0
 fi
@@ -1123,6 +1127,26 @@ test('Lecture à voix haute : coupée par défaut, réglée à la création et d
   assert.equal((await appel('/api/eleves/voix-test')).data.lectureVoixHaute, false);
   await attendrePropositions('voix-defaut');
   await attendrePropositions('voix-test');
+});
+
+test('Espacement des lettres : coupé par défaut, réglé à la création et dans le Profil, 400 si ce n\'est pas oui ou non', async () => {
+  const defaut = await appel('/api/eleves', 'POST', { pseudo: 'Esp-Defaut', age: 7, niveau: 'Primaire 2' });
+  assert.equal(defaut.data.espacementLettres, false);
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Esp-Invalide', age: 7, niveau: 'Primaire 2', espacementLettres: 'oui' })).status, 400);
+  const cree = await appel('/api/eleves', 'POST', { pseudo: 'Esp-Test', age: 7, niveau: 'Primaire 2', espacementLettres: true });
+  assert.equal(cree.data.espacementLettres, true);
+  assert.equal((await appel('/api/eleves/esp-test', 'PUT', { espacementLettres: 1 })).status, 400);
+  assert.equal((await appel('/api/eleves/esp-test', 'PUT', { age: 8 })).data.espacementLettres, true, 'un autre réglage ne le change pas');
+  assert.equal((await appel('/api/eleves/esp-test', 'PUT', { espacementLettres: false })).data.espacementLettres, false);
+  assert.equal((await appel('/api/eleves/esp-test')).data.espacementLettres, false);
+  await attendrePropositions('esp-defaut');
+  await attendrePropositions('esp-test');
+});
+
+test('Espacement des lettres : un Élève existant sans ce réglage ne l\'a pas', async () => {
+  await fs.mkdir(path.join(eleves, 'ancien-esp', 'lecons'), { recursive: true });
+  await fs.writeFile(path.join(eleves, 'ancien-esp', 'profil.json'), JSON.stringify({ pseudo: 'Ancien-Esp', slug: 'ancien-esp', age: 10, niveau: 'Primaire 5' }));
+  assert.equal((await appel('/api/eleves/ancien-esp')).data.espacementLettres, false);
 });
 
 test('Lecture à voix haute : un Élève existant sans ce réglage ne l\'a pas', async () => {
@@ -2204,7 +2228,7 @@ test('Révisions du jour : une réponse est corrigée par le serveur et journali
   const { questions } = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
   const [q1, q2] = questions;
   assert.deepEqual(q1.journal.at(-1), { date: LENDEMAIN, juste: true, sur: true, origine: 'revision' });
-  assert.deepEqual(q2.journal.at(-1), { date: LENDEMAIN, juste: false, sur: true, origine: 'revision' });
+  assert.deepEqual(q2.journal.at(-1), { date: LENDEMAIN, juste: false, sur: true, choisie: 'De la glace', origine: 'revision' });
   // Ratée : de nouveau due le lendemain. Sue : plusieurs jours plus tard.
   assert.equal(q2.prochaineRevision, '2026-11-04T12:00:00.000Z');
   assert.ok(Date.parse(q1.prochaineRevision) >= Date.parse('2026-11-06T12:00:00.000Z'), q1.prochaineRevision);
@@ -2416,6 +2440,16 @@ test('Maîtrise : « acquis » porté par le préambule de relais et le résumé
   assert.match(await fs.readFile(path.join(dossier, 'args-propositions'), 'utf8'), /\) : Maîtrise \d+ %, acquis/);
 });
 
+test('Difficulté visée : le préambule de relais porte la réussite récente et la consigne de la page suivante', async () => {
+  const avant = (jours) => new Date(Date.now() - jours * JOUR_MS).toISOString();
+  const { slug, lecon, url } = await leconAcquise('Difficulte-Visee', [avant(2), avant(1)]);
+  assert.equal((await avecFichier('objectifs', () => appel(`${url}/messages`, 'POST', { texte: 'Page suivante' }))).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Réussite récente : 100 % en moyenne sur les 2 derniers quiz de cette Leçon.*plus difficile/);
+  await attendrePropositions(slug);
+});
+
 test('Vue parent : un contrôle à venir porte « acquis » comme la lecture de sa Leçon de révision', async () => {
   const dates = ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z'];
   const { slug, lecon, url } = await leconAcquise('Acquis-Parent', dates, { fichiers: [{ nom: 'lecon.pdf', data: PDF }], dateControle: '2026-10-20' });
@@ -2599,6 +2633,32 @@ test('Variantes : une Révision du jour sert la Question ou une variante ; la r�
   ]);
   // Même état de mémoire : la Question (et donc ses variantes) n'est plus due aujourd'hui.
   assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+});
+
+test('Variantes : leurs raisons sont gardées pour les réponses fausses seulement, une raison mal formée est écartée sans perdre la Variante, et la Révision du jour les sert', async () => {
+  const { slug, lecons: [lecon], quiz, avecVariantes } = await eleveVariantes('Var-Raisons');
+  await quiz(lecon);
+  await avecFichier('variantes-raisons', async () => {
+    await quiz(lecon);
+    await avecVariantes(lecon);
+  });
+  const args = await fs.readFile(path.join(dossier, 'args-variantes'), 'utf8');
+  assert.match(args, /raison pour chaque réponse fausse[^]*plausibles|plausibles[^]*raison pour chaque réponse fausse/);
+  const q1 = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(BANQUE_DATE))).data.questions.find((q) => q.id === 'q1');
+  // Variante 1 : réponses inversées, la bonne est la dernière ; sa raison est écartée (null). Variante 2 : raisons mal formées, absentes.
+  assert.equal(q1.variantes.length, 2);
+  assert.deepEqual(q1.variantes[0].raisons, ['Raison 0', null]);
+  assert.equal(Object.hasOwn(q1.variantes[1], 'raisons'), false);
+  // La Révision du jour sert la Variante avec ses raisons ; le Kit en tire celle de la réponse fausse choisie.
+  let servie = null;
+  for (let i = 0; i < 30 && !servie; i++) {
+    const { data } = await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN));
+    const q = data.questions.find((x) => x.id === 'q1');
+    if (q.variante === 0) servie = q;
+  }
+  assert.ok(servie, 'variante 1 jamais servie');
+  assert.deepEqual(servie.raisons, ['Raison 0', null]);
+  assert.equal(corriger(lireQuiz({ objectifs: [1], questions: [servie] }).questions[0], 0).raison, 'Raison 0');
 });
 
 test('Variantes : une Question réécrite par le prof perd ses Variantes, qui sont redemandées', async () => {
@@ -2892,6 +2952,28 @@ test('Visuels : un schéma SVG illisible est signalé au prof au tour suivant se
   assert.doesNotMatch(await argsDe(lecon), /Schémas à reprendre/);
 });
 
+test('Pages courtes : une page ou une partie trop longue est signalée au prof au tour suivant seulement, sans toucher à la page (#156)', async () => {
+  const mots = (n) => Array(n).fill('mot').join(' ');
+  const html = `<h1>Troie</h1><p>${mots(850)}</p><figure class="kit-figure" id="f"><figcaption>${mots(300)}</figcaption></figure><aside class="encart">${mots(300)}</aside>`;
+  const lecon = await avecPageImages({ page: html, manifeste: [] },
+    async () => (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'page trop longue' })).data);
+  assert.doesNotMatch(await argsDe(lecon), /Pages à raccourcir/);
+  await message(lecon, 'ok');
+  const signale = await argsDe(lecon);
+  assert.match(signale, /Pages à raccourcir/);
+  assert.ok(signale.includes('- 0002-images.html, page trop longue : 850 mots'), signale);
+  assert.ok(signale.includes('- 0002-images.html, partie trop longue sans titre : 850 mots d\'un seul tenant sous « Troie »'), signale);
+  assert.equal(await lirePage(lecon, '0002-images.html'), html);
+  assert.equal(Object.hasOwn((await appel('/api/eleves/zoe-test/lecons')).data.find((l) => l.id === lecon.id), 'longueursAReprendre'), false);
+  await message(lecon, 'ok');
+  assert.doesNotMatch(await argsDe(lecon), /Pages à raccourcir/);
+});
+
+test('Pages : la consigne du prof donne les bornes de 800 et de 200 mots (#156)', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les volcans' })).data;
+  assert.match(await argsDe(lecon), /Pages : [^\n]*au plus 800 mots[^\n]*200 mots d'un seul tenant sans titre/);
+});
+
 // Formats « réfléchis puis dévoile » et « meilleure explication » (spec #48, ticket #72).
 const quizDevoile = {
   objectifs: [1],
@@ -2934,6 +3016,44 @@ test('Dévoile et meilleure explication : « à moitié » vaut 0,5 et revient l
   assert.equal(pas.data.bonne, 'De la roche fondue sous terre.');
   assert.equal((await repondre('e1', 0)).data.juste, true);
   for (const choisie of [0, 'oui', ['avais']]) assert.equal((await repondre('d1', choisie)).status, 400, JSON.stringify(choisie));
+});
+
+// « Pourquoi c'est faux » (spec #145, ticket #149).
+const quizRaisons = {
+  objectifs: [1],
+  questions: [{
+    id: 'q1', enonce: 'Par où la lave quitte-t-elle le volcan ?', reponses: ['Par le cratère', 'Par les racines', 'Par les nuages'], bonne: 0,
+    raisons: [null, 'Les racines sont sous terre.', 'Les nuages sont dans le ciel.'], explication: 'Le cratère.',
+  }],
+};
+
+test('Pourquoi c\'est faux : la Banque garde les raisons et la Révision du jour les sert, une raison mal formée est écartée sans perdre la Question', async () => {
+  const lecon = await leconBanque();
+  const url = `/api/eleves/zoe-test/lecons/${lecon.id}`;
+  const corps = (quiz) => { const { type, ...c } = messageScore(lireQuiz(quiz), { q1: 0 }, '0002-raisons.html', { q1: false }); return c; };
+  await ecrirePageQuiz(lecon, '0002-raisons.html', quizRaisons);
+  const r = await appel(`${url}/scores`, 'POST', corps(quizRaisons), le(BANQUE_DATE));
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.data.questions[0].contenu.raisons, quizRaisons.questions[0].raisons);
+  await attendrePropositions('zoe-test');
+  // La série du jour est plafonnée (SERIE_MAX) et les Questions des autres tests la remplissent : on vérifie ce que la Révision sert pour cette Question.
+  assert.deepEqual(contenuAServir(r.data.questions[0], () => 0).raisons, quizRaisons.questions[0].raisons);
+
+  // Mal formées (pas de la longueur des réponses), elles disparaissent de la Banque ; la Question reste.
+  await ecrirePageQuiz(lecon, '0002-raisons.html', { ...quizRaisons, questions: [{ ...quizRaisons.questions[0], raisons: ['une seule'] }] });
+  const apres = await appel(`${url}/scores`, 'POST', corps(quizRaisons), le(LENDEMAIN));
+  assert.equal(apres.data.questions[0].journal.length, 2);
+  assert.equal(Object.hasOwn(apres.data.questions[0].contenu, 'raisons'), false);
+});
+
+test('Pourquoi c\'est faux : la consigne demande des réponses fausses plausibles pour tout QCM, avec leur raison, aux pages comme aux Variantes', async () => {
+  const lecon = (await appel('/api/eleves/zoe-test/lecons', 'POST', { sujet: 'les marées' })).data;
+  const args = await argsDe(lecon);
+  assert.match(args, /pour tout QCM[^]*réponses fausses plausibles[^]*idées reçues ou[^]*erreurs fréquentes[^]*de même longueur et de même forme que la bonne/);
+  assert.match(args, /"raisons"/);
+  const doc = await (await fetch(`${base}/kit/v1/LISEZMOI.md`)).text();
+  assert.match(doc, /`raisons`/);
+  assert.match(doc, /pourquoi c'est faux/i);
 });
 
 test('Dévoile et meilleure explication : la consigne dit quand les utiliser, et le Kit les documente', async () => {
@@ -3040,6 +3160,24 @@ test('Vue parent : les Objectifs Retenus, et les Objectifs fragiles (atteints ma
   });
 });
 
+test('Vue parent : « Pour en parler avec lui » tire au plus trois invitations des Objectifs Retenus des Leçons travaillées ces 7 derniers jours, et garde une phrase fixe sur l\'autonomie', async () => {
+  const { slug } = await eleveRevisions('Parent-Parler', 0);
+  const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}/scores`;
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1] }, le('2026-10-01T10:00:00.000Z'));
+  await appel(url, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2] }, le('2026-10-02T10:00:00.000Z'));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-03T10:00:00.000Z'));
+  assert.deepEqual(data.pourEnParler.invitations, [
+    { lecon: lecon.id, titreLecon: 'Les volcans', texte: 'Demande-lui de t’expliquer : Nommer les parties d’un volcan' },
+  ]);
+  assert.match(data.pourEnParler.autonomie, /s’organiser et à expliquer/);
+  assert.match(data.pourEnParler.autonomie, /refaire les exercices/);
+  // Dix jours plus tard : plus d'activité récente, donc aucune invitation inventée, mais la phrase fixe reste.
+  const { data: plusTard } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-13T10:00:00.000Z'));
+  assert.deepEqual(plusTard.pourEnParler.invitations, []);
+  assert.ok(plusTard.pourEnParler.autonomie);
+});
+
 test('Vue parent : les Questions fragiles (moins de 80 % de chances de s\'en souvenir aujourd\'hui), la plus fragile d\'abord', async () => {
   const { slug } = await eleveRevisions('Parent-Questions', 0);
   const lecon = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data);
@@ -3117,6 +3255,31 @@ test('Indicateurs : une Leçon lue sans être ouverte par l\'Élève (vue parent
   assert.deepEqual(data.retour, { lecons: 1, revenus: 0, enAttente: 0, pourcentage: 0 });
 });
 
+// Mesures « avant » du ticket #147 : « Je ne sais pas », réussite selon le Rebond qui a créé la page, révisions des jours dus.
+test('Indicateurs : « Je ne sais pas », réussite par Rebond et révisions des jours dus, lues dans les journaux', async () => {
+  const { slug } = await eleveRevisions('Indic-Mesures', 0);
+  const l = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom: 'page.pdf', data: Buffer.from('%PDF-1.4 faux').toString('base64') }] }, le('2026-11-02T10:00:00.000Z'))).data;
+  const url = `/api/eleves/${slug}/lecons/${l.id}`;
+  const quiz = (page, corps, date) => appel(`${url}/scores`, 'POST', { page, ...corps }, le(date));
+  const questions = [
+    { id: 'q1', enonce: 'A ?', choisie: 'Je ne sais pas', bonne: 'x', juste: false, jeNeSaisPas: true },
+    { id: 'q2', enonce: 'B ?', choisie: 'x', bonne: 'x', juste: true },
+  ];
+  await quiz((await appel(url)).data.pages.at(-1), { score: 50, questions }, '2026-11-02T11:00:00.000Z');
+  await appel(`${url}/retours`, 'POST', { score: 50, questions }, le('2026-11-02T11:00:00.000Z'));
+  assert.equal((await appel(`${url}/rebonds`, 'POST', { action: 'revoir' }, le('2026-11-02T12:00:00.000Z'))).status, 200);
+  await quiz((await appel(url)).data.pages.at(-1), { score: 90 }, '2026-11-03T11:00:00.000Z');
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs?du=2026-11-01&au=2026-11-05`, 'GET', undefined, le('2026-11-05T12:00:00.000Z'));
+  assert.deepEqual(data.jeNeSaisPas.quiz, { reponses: 2, jeNeSaisPas: 1, pourcentage: 50 });
+  assert.deepEqual(data.jeNeSaisPas.revision, { reponses: 0, jeNeSaisPas: 0, pourcentage: null });
+  assert.equal(data.reussiteParRebond.nouvelle.pourcentage, 50);
+  assert.deepEqual(data.reussiteParRebond.revoir, { quiz: 1, pourcentage: 90 });
+  assert.deepEqual(data.reussiteParRebond.defi, { quiz: 0, pourcentage: null });
+  // La Vue parent porte les mêmes mesures.
+  const parent = (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-11-05T12:00:00.000Z'))).data;
+  assert.deepEqual(parent.indicateurs.reussiteParRebond.revoir, { quiz: 1, pourcentage: 90 });
+});
+
 test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le temps d\'attente', async () => {
   const { slug } = await eleveRevisions('Indic-Attente', 0);
   const lecon = (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' })).data;
@@ -3125,6 +3288,20 @@ test('Indicateurs : chaque tour du prof attendu par l\'Élève compte dans le te
   assert.equal(attente.tours, 2);
   assert.ok(attente.moyenneSecondes >= 0 && attente.maxSecondes >= attente.medianeSecondes);
   await attendrePropositions(slug);
+});
+
+test('Indicateurs : la calibration de la mémoire compare la probabilité prédite à la réponse en Révision du jour', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Indic-Calibration', 1);
+  const reviser = (choisie) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie }, le(LENDEMAIN));
+  await reviser(0);
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(data.calibration.reduce((t, x) => t + x.reponses, 0), 1);
+  const tranche = data.calibration.find((t) => t.reponses);
+  assert.equal(tranche.justes, 1);
+  assert.equal(tranche.pourcentage, 100);
+  assert.ok(tranche.predit >= tranche.de && tranche.predit <= tranche.a);
+  for (const t of data.calibration.filter((x) => !x.reponses)) assert.equal(t.pourcentage, null);
+  assert.deepEqual(data.retenu30, { objectifs: 0, encoreRetenus: 0, pourcentage: null });
 });
 
 test('Vue parent : les indicateurs des 28 derniers jours y figurent', async () => {
@@ -3146,6 +3323,9 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.deepEqual(lundi.data, {
     objectifDuJour: { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true },
     serieDeJours: { jours: 1, jokers: 3, jokersUtilises: 0, aujourdhui: true },
+    reparation: null,
+    meilleureSerie: 1,
+    joursTravailles: 1,
     recapitulatif: null,
   });
   // Mardi 3 : quatre Révisions du jour, pas encore l'objectif ; la série d'hier tient, la journée n'est pas finie.
@@ -3165,7 +3345,42 @@ test('Rythme : Objectif du jour, série de jours et récapitulatif de la semaine
   assert.equal((await appel(url, 'GET', undefined, le('2026-11-10T12:00:00.000Z'))).data.recapitulatif, null);
 });
 
-test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls la série des jours manqués', async () => {
+// Réparation de la Série de jours (#159) : une pause qui dépasse les Jokers d'un seul jour se répare le jour du retour
+// en atteignant deux fois l'Objectif du jour ; le jour réparé a sa marque dans le calendrier de Mes badges.
+test('Rythme : réparer sa série le jour du retour (deux fois l\'Objectif du jour), meilleure série et Jours travaillés', async () => {
+  // Lundi 2 novembre : une page terminée. Mardi 3, mercredi 4 et jeudi 5 couverts par les 3 Jokers ; vendredi 6 non couvert.
+  const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Reparation', 1);
+  const url = `/api/eleves/${slug}/rythme`;
+  const samedi = '2026-11-07T12:00:00.000Z';
+  const rythme = async () => (await appel(url, 'GET', undefined, le(samedi))).data;
+  // Samedi 7, rien encore : la série est repartie, la réparation est proposée, la meilleure série reste sous les yeux.
+  const avant = await rythme();
+  assert.equal(avant.serieDeJours.jours, 0);
+  assert.deepEqual(avant.reparation, { jourManque: '2026-11-06', serieAvant: 1, revisions: 0, revisionsVisees: 10, pages: 0, pagesVisees: 2 });
+  assert.equal(avant.meilleureSerie, 1);
+  assert.equal(avant.joursTravailles, 1);
+  // Neuf Révisions du jour : pas encore deux fois l'objectif.
+  const reviser = (i) => appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 }, le(samedi));
+  for (let i = 0; i < 9; i++) assert.equal((await reviser(i)).status, 200);
+  const presque = await rythme();
+  assert.equal(presque.reparation.revisions, 9);
+  assert.equal(presque.serieDeJours.jours, 1);
+  // La dixième : la série d'avant reprend (1 jour + le retour), le jour manqué est réparé et compte comme couvert.
+  await reviser(9);
+  const apres = await rythme();
+  assert.equal(apres.reparation, null);
+  assert.deepEqual(apres.serieDeJours, { jours: 2, jokers: 0, jokersUtilises: 4, aujourdhui: true });
+  assert.equal(apres.meilleureSerie, 2);
+  const { calendrier } = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le(samedi))).data;
+  assert.deepEqual(calendrier.jours.filter((j) => j.repare).map((j) => [j.jour, j.joker]), [['2026-11-06', false]]);
+  assert.deepEqual(calendrier.jours.filter((j) => j.joker).map((j) => j.jour), ['2026-11-03', '2026-11-04', '2026-11-05']);
+  // Dimanche 8 : plus de réparation à proposer, et le jour réparé reste réparé.
+  const dimanche = (await appel(url, 'GET', undefined, le('2026-11-08T12:00:00.000Z'))).data;
+  assert.equal(dimanche.reparation, null);
+  assert.equal(dimanche.serieDeJours.jours, 2);
+});
+
+test('Rythme : 3 Jokers par semaine dès la première,qui protègent tout seuls la série des jours manqués', async () => {
   const { slug, lecons: [lecon] } = await eleveRevisions('Rythme-Jokers', 1); // lundi 2 novembre : une page terminée
   const page = (jour) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le(`2026-11-${jour}T12:00:00.000Z`));
   for (const jour of ['03', '04', '05', '06', '07', '08']) assert.equal((await page(jour)).status, 201);
@@ -3177,6 +3392,102 @@ test('Rythme : 3 Jokers par semaine dès la première, qui protègent tout seuls
   const mardi = (await appel(url, 'GET', undefined, le('2026-11-10T18:00:00.000Z'))).data;
   assert.deepEqual(mardi.serieDeJours, { jours: 8, jokers: 2, jokersUtilises: 1, aujourdhui: true });
   assert.deepEqual(mardi.objectifDuJour, { revisions: 0, revisionsVisees: 5, pages: 1, pagesVisees: 1, atteint: true });
+});
+
+// Moment de révision (#154) : une question fermée posée une fois par jour, après l'Objectif du jour atteint.
+test('Moment de révision : proposé une seule fois par jour, après l\'Objectif du jour atteint, et la valeur est fermée', async () => {
+  const { slug } = await eleveRevisions('Moment-Api', 1); // lundi 2 novembre : une page terminée, Objectif du jour atteint
+  const url = `/api/eleves/${slug}/moment`;
+  const lundi = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(lundi.status, 200);
+  assert.equal(lundi.data.moment, null);
+  assert.equal(lundi.data.aProposer, true);
+  assert.deepEqual(lundi.data.choix.map((c) => c.id), ['apres-ecole', 'apres-repas', 'matin', 'week-end', 'je-ne-sais-pas']);
+  // Déjà proposé : pas une seconde fois le même jour, sans que l'Élève ait rien choisi.
+  assert.equal((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.aProposer, false);
+  // Valeur inconnue refusée, rien d'enregistré.
+  assert.equal((await appel(url, 'PUT', { moment: 'minuit' }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(url, 'PUT', {}, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.moment, null);
+  // « Je ne sais pas » est une réponse valide ; l'Élève peut ensuite changer ou retirer son choix.
+  assert.equal((await appel(url, 'PUT', { moment: 'je-ne-sais-pas' }, le(BANQUE_DATE))).data.moment, 'je-ne-sais-pas');
+  assert.equal((await appel(url, 'PUT', { moment: 'matin' }, le(BANQUE_DATE))).data.moment, 'matin');
+  assert.equal((await appel(url, 'GET', undefined, le(BANQUE_DATE))).data.moment, 'matin');
+  assert.equal((await appel(url, 'PUT', { moment: null }, le(BANQUE_DATE))).data.moment, null);
+  // Le lendemain, l'Objectif du jour n'est pas atteint : rien à proposer.
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.aProposer, false);
+});
+
+test('Moment de révision : proposé de nouveau le jour suivant, quand l\'Objectif du jour y est atteint', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Moment-Jours', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  for (let i = 0; i < 5; i++) await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: i % 2 ? 'q1' : 'q2', choisie: 1 }, le(LENDEMAIN));
+  const mardi = await appel(url, 'GET', undefined, le(LENDEMAIN));
+  assert.equal(mardi.data.aProposer, true);
+  assert.equal((await appel(url, 'GET', undefined, le(LENDEMAIN))).data.aProposer, false);
+});
+
+// Rappel calendrier (#155) : le parent règle l'heure de chaque moment et télécharge un fichier iCalendar.
+test('Rappel calendrier : heures réglables, gardées pour l\'Élève, et refus des valeurs mal formées', async () => {
+  const { slug } = await eleveRevisions('Rappel-Heures', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  const depart = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(depart.data.heures['apres-ecole'], '16:30'); // valeur proposée
+  // La lecture de la Vue parent ne consomme pas la question du jour de l'Élève (ici déjà posée par le GET ci-dessus).
+  const { slug: autre } = await eleveRevisions('Rappel-Lecture', 1);
+  assert.equal((await appel(`/api/eleves/${autre}/moment/heures`, 'GET', undefined, le(BANQUE_DATE))).data.heures.matin, '07:30');
+  assert.equal((await appel(`/api/eleves/${autre}/moment`, 'GET', undefined, le(BANQUE_DATE))).data.aProposer, true);
+  assert.deepEqual(Object.keys(depart.data.heures).sort(), ['apres-ecole', 'apres-repas', 'matin', 'week-end']);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { matin: '25:00' } }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { minuit: '08:00' } }, le(BANQUE_DATE))).status, 400);
+  assert.equal((await appel(`${url}/heures`, 'PUT', { heures: { matin: 'sept heures' } }, le(BANQUE_DATE))).status, 400);
+  const ok = await appel(`${url}/heures`, 'PUT', { heures: { 'apres-ecole': '17:15' } }, le(BANQUE_DATE));
+  assert.equal(ok.data.heures['apres-ecole'], '17:15');
+  assert.equal(ok.data.heures.matin, '07:30');
+  // Gardées, y compris quand l'Élève change de moment.
+  await appel(url, 'PUT', { moment: 'apres-ecole' }, le(BANQUE_DATE));
+  const relu = await appel(url, 'GET', undefined, le(BANQUE_DATE));
+  assert.equal(relu.data.heures['apres-ecole'], '17:15');
+  assert.equal(relu.data.moment, 'apres-ecole');
+});
+
+test('Rappel calendrier : fichier iCalendar quotidien, alarme, heure locale, suit le moment choisi', async () => {
+  const { slug } = await eleveRevisions('Rappel-Ics', 1);
+  const url = `/api/eleves/${slug}/moment`;
+  await appel(url, 'PUT', { moment: 'apres-repas' }, le(BANQUE_DATE));
+  await appel(`${url}/heures`, 'PUT', { heures: { 'apres-repas': '19:45' } }, le(BANQUE_DATE));
+  const res = await fetch(`${base}${url}/calendrier.ics`, { headers: le(BANQUE_DATE) });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^text\/calendar/);
+  assert.match(res.headers.get('content-disposition'), /attachment; filename="[^"]+\.ics"/);
+  const ics = await res.text();
+  assert.ok(ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n'));
+  assert.ok(!/[^\r]\n/.test(ics), 'fins de ligne CRLF');
+  for (const ligne of ['VERSION:2.0', 'BEGIN:VEVENT', 'RRULE:FREQ=DAILY', 'BEGIN:VALARM', 'ACTION:DISPLAY', 'END:VALARM', 'END:VEVENT']) assert.ok(ics.includes(`\r\n${ligne}\r\n`), ligne);
+  assert.match(ics, /\r\nDTSTART:\d{8}T194500\r\n/); // heure locale flottante, ni Z ni TZID
+  assert.match(ics, /\r\nUID:[^\r]+\r\n/);
+  assert.match(ics, /\r\nDTSTAMP:\d{8}T\d{6}Z\r\n/);
+  assert.match(ics, /\r\nTRIGGER:-?PT0S\r\n/);
+  // Suit le moment choisi.
+  await appel(url, 'PUT', { moment: 'matin' }, le(BANQUE_DATE));
+  assert.match(await (await fetch(`${base}${url}/calendrier.ics`, { headers: le(BANQUE_DATE) })).text(), /\r\nDTSTART:\d{8}T073000\r\n/);
+});
+
+test('Rappel calendrier : sans moment choisi, ou « Je ne sais pas », pas de fichier vide', async () => {
+  const { slug } = await eleveRevisions('Rappel-Vide', 1);
+  const url = `/api/eleves/${slug}/moment/calendrier.ics`;
+  assert.equal((await fetch(`${base}${url}`, { headers: le(BANQUE_DATE) })).status, 409);
+  await appel(`/api/eleves/${slug}/moment`, 'PUT', { moment: 'je-ne-sais-pas' }, le(BANQUE_DATE));
+  const res = await fetch(`${base}${url}`, { headers: le(BANQUE_DATE) });
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).erreur, /moment/i);
+  assert.equal((await fetch(`${base}/api/eleves/personne-ici/moment/calendrier.ics`)).status, 404);
+});
+
+test('Moment de révision : Élève inconnu', async () => {
+  assert.equal((await appel('/api/eleves/personne-ici/moment')).status, 404);
+  assert.equal((await appel('/api/eleves/personne-ici/moment', 'PUT', { moment: 'matin' })).status, 404);
 });
 
 test('Rythme : Élève inconnu', async () => {
@@ -3257,9 +3568,9 @@ test('Calendrier de Mes badges (#99) : Jours travaillés, ce qui a été fait et
   assert.equal(calendrier.aujourdhui, '2026-11-05');
   const volcans = { id: lecon.id, titre: 'Les volcans' };
   assert.deepEqual(calendrier.jours, [
-    { jour: '2026-11-02', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } },
-    { jour: '2026-11-03', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 1, fusees: 0, paliers: [] } },
-    { jour: '2026-11-04', etat: 'plein', joker: false, lecons: [volcans], quiz: 1, revisions: 0,
+    { jour: '2026-11-02', etat: 'plein', joker: false, repare: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } },
+    { jour: '2026-11-03', etat: 'plein', joker: false, repare: false, lecons: [volcans], quiz: 1, revisions: 0, gains: { etoiles: 1, fusees: 0, paliers: [] } },
+    { jour: '2026-11-04', etat: 'plein', joker: false, repare: false, lecons: [volcans], quiz: 1, revisions: 0,
       gains: { etoiles: 1, fusees: 0, paliers: [{ id: 'regulier', emoji: '📅', nom: 'Régulier', palier: 'bronze' }] } },
   ]);
   assert.doesNotMatch(JSON.stringify(calendrier), /score|%/i);
@@ -3612,4 +3923,262 @@ test('Annonce des Badges : la fin de Révision du jour qui fait atteindre un Pal
   const { recompenses } = (await terminerRevision(slug, '2026-11-04T12:00:00.000Z')).data;
   assert.deepEqual(recompenses.paliers, [{ id: 'retour-gagnant', palier: 'bronze', jour: '2026-11-04' }]);
   assert.equal(recompenses.annonce, '🏅 Nouveau badge : Retour gagnant, bronze !');
+});
+
+// Signaler une Question (spec #145, ticket #146) : l'Élève signale une Question après sa correction ; elle sort des
+// Révisions du jour, de la Maîtrise et de Retenu, son journal reste entier, et le prof la reçoit une fois.
+const signalements = (slug) => `/api/eleves/${slug}/signalements`;
+const evenementsDe = async (slug) => (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+
+test('Signaler une Question : le serveur enregistre raison, auteur Élève et date, et refuse une raison inconnue (400)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Enreg', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'reponse-fausse' };
+  for (const raison of ['au-hasard', undefined, 3, '']) {
+    assert.equal((await appel(signalements(slug), 'POST', { ...corps, raison }, le(LENDEMAIN))).status, 400, String(raison));
+  }
+  assert.equal((await appel(signalements(slug), 'POST', { ...corps, id: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await appel(signalements(slug), 'POST', { ...corps, lecon: undefined }, le(LENDEMAIN))).status, 400);
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(lue.questions.find((q) => q.id === 'q1').signalement, undefined);
+
+  assert.equal((await appel(signalements(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+  const apres = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(apres.questions.find((q) => q.id === 'q1').signalement, { raison: 'reponse-fausse', auteur: 'eleve', date: LENDEMAIN });
+  assert.equal(apres.questions.find((q) => q.id === 'q2').signalement, undefined);
+  // Événement daté, pour les indicateurs.
+  const evenement = (await evenementsDe(slug)).find((e) => e.type === 'signalement');
+  assert.deepEqual(evenement, { type: 'signalement', date: LENDEMAIN, lecon: lecon.id, raison: 'reponse-fausse' });
+});
+
+test('Signaler une Question : plus servie ni comptée dans les Questions dues, journal intact, hors Maîtrise', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Sort', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  const q2Avant = avant.questions.find((q) => q.id === 'q2');
+  assert.equal((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.dues, 2);
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q2', raison: 'pas-claire' }, le(LENDEMAIN));
+  const revisions = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(revisions.dues, 1);
+  assert.deepEqual(revisions.questions.map((q) => q.id), ['q1']);
+  assert.equal((await appel(`/api/eleves/${slug}/revisions?suite=1`, 'GET', undefined, le(LENDEMAIN))).data.questions.some((q) => q.id === 'q2'), false);
+  const apres = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(apres.questions.find((q) => q.id === 'q2').journal, q2Avant.journal);
+  // La Maîtrise est celle de la seule q1 : q2, « Je ne sais pas », ne la tire plus vers le bas.
+  assert.ok(apres.maitrise.pourcentage > avant.maitrise.pourcentage, `${apres.maitrise.pourcentage} > ${avant.maitrise.pourcentage}`);
+});
+
+test('Signaler une Question : une Question signalée ne bloque plus Retenu', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Retenu', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const page = '0002-volcans.html';
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  // q1 et q2 couvrent l'Objectif 1 : q1 tenue sur trois semaines, q2 ratée la veille.
+  const reponse = (jour, juste) => ({ date: `${jour}T10:00:00.000Z`, juste, ...(juste && { sur: true }), origine: 'quiz' });
+  banque[`${page}#q1`].contenu.objectifs = [1];
+  banque[`${page}#q1`].journal = [reponse('2026-09-01', true), reponse('2026-09-05', true), reponse('2026-09-20', true)];
+  banque[`${page}#q2`].contenu.objectifs = [1];
+  banque[`${page}#q2`].journal = [reponse('2026-09-20', false)];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+  const maintenant = le('2026-09-21T10:00:00.000Z');
+  // L'Objectif 1 est atteint (un quiz à 100 % qui le couvre, sans résultats par question).
+  await appel(`${url}/scores`, 'POST', { score: 100, page: '0003-volcans.html', objectifs: [1] }, le('2026-09-20T11:00:00.000Z'));
+  const retenu = async () => (await appel(url, 'GET', undefined, maintenant)).data.objectifs[0].retenu;
+  assert.equal(await retenu(), false, 'une Question oubliée empêche Retenu');
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page, id: 'q2', raison: 'reponse-fausse' }, maintenant);
+  assert.equal(await retenu(), true, 'signalée, elle ne pèse plus');
+});
+
+test('Signaler une Question : le préambule de relais la donne au prof une seule fois, avec la raison', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Prof', 1);
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'pas-claire' }, le(LENDEMAIN));
+  const envoyer = () => appel(`/api/eleves/${slug}/lecons/${lecon.id}/messages`, 'POST', { texte: 'Page suivante' });
+  assert.equal((await avecFichier('objectifs', envoyer)).status, 200);
+  const prompt = await argsDe(lecon);
+  assert.match(prompt, /Passage de relais/);
+  assert.match(prompt, /Questions signalées par l'élève/);
+  assert.match(prompt, /« Où sort la lave \? » \(0002-volcans\.html\) : bonne réponse « Par le cratère » ; raison : la question n'est pas claire/);
+  assert.match(prompt, /réécris-les/);
+  assert.equal(prompt.split('raison : ').length, 2, 'une seule Question signalée listée');
+  // Une seule fois.
+  assert.equal((await avecFichier('objectifs', envoyer)).status, 200);
+  assert.doesNotMatch(await argsDe(lecon), /Questions signalées/);
+  // Toujours signalée tant que son contenu n'a pas changé.
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`)).data;
+  assert.equal(lue.questions.find((q) => q.id === 'q1').signalement.raison, 'pas-claire');
+});
+
+test('Signaler une Question : rejouée avec un nouveau contenu et un score, elle perd son signalement', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Signal-Reecrite', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  await appel(signalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'image-differente' }, le(LENDEMAIN));
+  const reecrit = { ...quizBanque, questions: quizBanque.questions.map((q) => (q.id === 'q1' ? { ...q, enonce: 'Par où sort la lave ?' } : q)) };
+  const dir = path.join(eleves, slug, 'lecons', lecon.id, 'lessons');
+  await fs.writeFile(path.join(dir, '0002-volcans.html'), `<script type="application/json" id="cartable-quiz">${JSON.stringify(reecrit)}</script>`);
+  const apres = (await appel(`${url}/scores`, 'POST', corpsBanque('0002-volcans.html'), le(LENDEMAIN))).data;
+  const q1 = apres.questions.find((q) => q.id === 'q1');
+  assert.equal(q1.signalement, undefined);
+  assert.equal(q1.contenu.enonce, 'Par où sort la lave ?');
+  assert.equal(q1.journal.length, 2);
+});
+
+// Prédiction (spec #145, ticket #157) : le Kit envoie un résultat, l'appli le note comme événement daté, rien d'autre.
+const predictions = (slug) => `/api/eleves/${slug}/predictions`;
+
+test('Prédiction : le serveur note un événement daté et ne touche ni la Banque ni les scores', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Prediction-Enreg', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'pred-1', juste: true };
+  assert.equal((await appel(predictions(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+  assert.equal((await appel(predictions(slug), 'POST', { ...corps, id: 'pred-2', juste: false }, le(LENDEMAIN))).status, 200);
+  const evenements = (await evenementsDe(slug)).filter((e) => e.type === 'prediction');
+  assert.deepEqual(evenements, [
+    { type: 'prediction', date: LENDEMAIN, lecon: lecon.id, juste: true },
+    { type: 'prediction', date: LENDEMAIN, lecon: lecon.id, juste: false },
+  ]);
+  const apres = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.deepEqual(apres.questions.map((q) => q.id), avant.questions.map((q) => q.id));
+  assert.deepEqual(apres.scores, avant.scores);
+  assert.equal(apres.maitrise.pourcentage, avant.maitrise.pourcentage);
+});
+
+test('Prédiction : un résultat mal formé est refusé (400) et ne laisse aucun événement', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Prediction-Refus', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'pred-1', juste: true };
+  for (const mauvais of [{ juste: 'oui' }, { juste: undefined }, { id: '' }, { id: 3 }, { page: undefined }, { lecon: undefined }]) {
+    assert.equal((await appel(predictions(slug), 'POST', { ...corps, ...mauvais }, le(LENDEMAIN))).status, 400, JSON.stringify(mauvais));
+  }
+  assert.equal((await appel(predictions(slug), 'POST', { ...corps, lecon: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await evenementsDe(slug)).some((e) => e.type === 'prediction'), false);
+});
+
+test('Prédiction : les indicateurs de la Vue parent comptent les Prédictions faites et justes', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Prediction-Parent', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'pred-1' };
+  await appel(predictions(slug), 'POST', { ...corps, juste: true }, le(LENDEMAIN));
+  await appel(predictions(slug), 'POST', { ...corps, id: 'pred-2', juste: false }, le(LENDEMAIN));
+  const { data } = await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(LENDEMAIN));
+  assert.deepEqual(data.indicateurs.predictions, { faites: 2, justes: 1, pourcentage: 50 });
+});
+
+// FSRS-6 (#161) : adopté pour un Élève seulement s'il prédit mieux que FSRS-5 sur ses Révisions du jour, avec assez de réponses.
+const banqueDeRevisions = (nombre, juste) => Object.fromEntries(Array.from({ length: nombre }, (_, i) => [`0002-volcans.html#p${i}`, {
+  id: `p${i}`, page: '0002-volcans.html',
+  contenu: { enonce: `Planificateur ${i} ?`, reponses: ['a', 'b'], bonne: 0, explication: '' },
+  journal: [{ date: '2026-10-01T10:00:00.000Z', juste: true, origine: 'quiz' }, { date: '2026-10-31T10:00:00.000Z', juste, origine: 'revision' }],
+}]));
+
+test('Planificateur : FSRS-5 pour un Élève sans assez de réponses en Révision du jour, comparaison exposée', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Planif-Peu', 1);
+  await fs.writeFile(path.join(eleves, slug, 'lecons', lecon.id, 'questions.json'), JSON.stringify(banqueDeRevisions(5, true)));
+  const maintenant = le('2026-10-31T12:00:00.000Z');
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, maintenant);
+  assert.equal(data.planificateur.utilise, 'fsrs5');
+  assert.equal(data.planificateur.reponses, 5);
+  assert.ok(data.planificateur.fsrs6.perte < data.planificateur.fsrs5.perte);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, maintenant)).data.planificateur, 'fsrs5');
+});
+
+test('Planificateur : FSRS-6 pour un Élève dont il prédit mieux les réponses, sans migration, la mémoire le suit', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Planif-Beaucoup', 1);
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const maintenant = le('2026-10-31T12:00:00.000Z');
+  await fs.writeFile(fichier, JSON.stringify(banqueDeRevisions(5, true)));
+  const avant = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, maintenant)).data.questions.find((q) => q.id === 'p0');
+  await fs.writeFile(fichier, JSON.stringify(banqueDeRevisions(200, true)));
+  const { data } = await appel(`/api/eleves/${slug}/indicateurs`, 'GET', undefined, maintenant);
+  assert.equal(data.planificateur.utilise, 'fsrs6');
+  assert.equal(data.planificateur.reponses, 200);
+  const lue = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, maintenant)).data;
+  assert.equal(lue.planificateur, 'fsrs6');
+  // Le même journal, rejoué avec l'autre planificateur : une autre prochaine révision, sans aucune migration du fichier.
+  assert.notEqual(lue.questions.find((q) => q.id === 'p0').prochaineRevision, avant.prochaineRevision);
+  assert.deepEqual(Object.keys(JSON.parse(await fs.readFile(fichier, 'utf8'))['0002-volcans.html#p0']), ['id', 'page', 'contenu', 'journal']);
+  // Le résumé de la liste des Leçons n'expose pas le planificateur.
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`, 'GET', undefined, maintenant)).data[0].planificateur, undefined);
+});
+
+// Vue parent : Questions signalées, suspectes, Rétablir et Signaler (spec #145, ticket #148).
+const parentSignalements = (slug) => `/api/eleves/${slug}/parent/signalements`;
+const parentRetablissements = (slug) => `/api/eleves/${slug}/parent/retablissements`;
+const vueParentDe = async (slug, date) => (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le(date))).data;
+
+test('Vue parent : le parent signale une Question (auteur parent), elle est listée avec sa bonne réponse et sa raison', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Signale', 1);
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'reponse-fausse' };
+  assert.equal((await vueParentDe(slug, LENDEMAIN)).questionsSignalees.length, 0);
+  for (const raison of ['au-hasard', undefined, '']) {
+    assert.equal((await appel(parentSignalements(slug), 'POST', { ...corps, raison }, le(LENDEMAIN))).status, 400, String(raison));
+  }
+  assert.equal((await appel(parentSignalements(slug), 'POST', { ...corps, id: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await appel(parentSignalements(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+
+  const vue = await vueParentDe(slug, LENDEMAIN);
+  assert.deepEqual(vue.questionsSignalees, [{
+    lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'q1', enonce: 'Où sort la lave ?', bonne: 'Par le cratère',
+    raison: 'reponse-fausse', libelleRaison: 'La bonne réponse me semble fausse', auteur: 'parent', date: LENDEMAIN,
+  }]);
+  // Plus signalable ; les autres Questions le restent.
+  assert.deepEqual(vue.questionsSignalables.flatMap((l) => l.questions.map((q) => q.id)), ['q2']);
+  const evenement = (await evenementsDe(slug)).find((e) => e.type === 'signalement');
+  assert.deepEqual(evenement, { type: 'signalement', date: LENDEMAIN, lecon: lecon.id, raison: 'reponse-fausse', auteur: 'parent' });
+  // Comme celle de l'Élève : plus servie.
+  assert.deepEqual((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.questions.map((q) => q.id), ['q2']);
+});
+
+test('Vue parent : Rétablir retire le signalement sans perte (Révision du jour, Maîtrise, journal) et note un événement', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Retablit', 1);
+  const url = `/api/eleves/${slug}/lecons/${lecon.id}`;
+  const avant = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  const corps = { lecon: lecon.id, page: '0002-volcans.html', id: 'q1' };
+  assert.equal((await appel(parentRetablissements(slug), 'POST', corps, le(LENDEMAIN))).status, 409, 'pas signalée');
+  await appel(signalements(slug), 'POST', { ...corps, raison: 'pas-claire' }, le(LENDEMAIN)); // signalée par l'Élève
+  assert.equal((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.dues, 1);
+  assert.equal((await appel(parentRetablissements(slug), 'POST', { ...corps, id: 'inconnue' }, le(LENDEMAIN))).status, 404);
+  assert.equal((await appel(parentRetablissements(slug), 'POST', { ...corps, lecon: undefined }, le(LENDEMAIN))).status, 400);
+  assert.equal((await appel(parentRetablissements(slug), 'POST', corps, le(LENDEMAIN))).status, 200);
+
+  const apres = (await appel(url, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.equal(apres.questions.find((q) => q.id === 'q1').signalement, undefined);
+  assert.deepEqual(apres.questions.find((q) => q.id === 'q1').journal, avant.questions.find((q) => q.id === 'q1').journal);
+  assert.deepEqual(apres.maitrise, avant.maitrise);
+  assert.equal((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data.dues, 2);
+  assert.deepEqual((await vueParentDe(slug, LENDEMAIN)).questionsSignalees, []);
+  assert.deepEqual((await evenementsDe(slug)).find((e) => e.type === 'retablissement'), { type: 'retablissement', date: LENDEMAIN, lecon: lecon.id });
+  // Les indicateurs comptent la Question signalée puis rétablie.
+  assert.deepEqual((await vueParentDe(slug, LENDEMAIN)).indicateurs.questionsSignalees, { signalees: 1, retablies: 1, suspectes: 0 });
+});
+
+test('Vue parent : une Question suspecte est montrée sans être retirée ni stockée, et le parent peut la signaler', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Suspecte', 1);
+  const fichier = path.join(eleves, slug, 'lecons', lecon.id, 'questions.json');
+  const banque = JSON.parse(await fs.readFile(fichier, 'utf8'));
+  const cle = '0002-volcans.html#q1';
+  const rep = (jour, juste, variante) => ({ date: `2026-10-0${jour}T10:00:00.000Z`, juste, origine: 'revision', ...(variante !== undefined && { variante }) });
+  // Question d'origine réussie deux fois, sa Variante ratée deux fois sur deux.
+  banque[cle].journal = [rep(1, true), rep(2, true), rep(3, false, 0), rep(4, false, 0)];
+  await fs.writeFile(fichier, JSON.stringify(banque));
+
+  const vue = await vueParentDe(slug, LENDEMAIN);
+  assert.equal(vue.questionsSuspectes.length, 1);
+  assert.deepEqual(vue.questionsSuspectes[0], {
+    lecon: lecon.id, titreLecon: 'Les volcans', page: '0002-volcans.html', id: 'q1', enonce: 'Où sort la lave ?', bonne: 'Par le cratère',
+    motifs: [{ type: 'variante', variante: 0, ratees: 2, reponses: 2, origine: { ratees: 0, reponses: 2 } }],
+  });
+  assert.equal(vue.indicateurs.questionsSignalees.suspectes, 1);
+  // Jamais retirée d'office : toujours dans la Banque, sans signalement.
+  assert.equal(JSON.parse(await fs.readFile(fichier, 'utf8'))[cle].signalement, undefined);
+  // Signalée par le parent : elle quitte la liste des suspectes.
+  await appel(parentSignalements(slug), 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', raison: 'pas-claire' }, le(LENDEMAIN));
+  assert.deepEqual((await vueParentDe(slug, LENDEMAIN)).questionsSuspectes, []);
+});
+
+test('Vue parent : la réponse fausse choisie en Révision du jour est gardée au journal (pour repérer les Questions suspectes)', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Parent-Choisie', 1);
+  const reponse = await appel(`/api/eleves/${slug}/revisions`, 'POST', { lecon: lecon.id, page: '0002-volcans.html', id: 'q1', choisie: 1, sur: true }, le(LENDEMAIN));
+  assert.equal(reponse.data.juste, false);
+  const journal = (await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'GET', undefined, le(LENDEMAIN))).data.questions.find((q) => q.id === 'q1').journal;
+  assert.equal(journal.at(-1).choisie, 'Par les racines');
+  assert.equal(journal.at(-1).sur, true);
 });

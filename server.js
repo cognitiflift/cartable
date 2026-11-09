@@ -4,7 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStore, HttpError, NIVEAUX, CATEGORIES, NOMBRE_PROPOSITIONS_DEFAUT, MODELES, MODELE_DEFAUT, QUIZ_REUSSI, etoilesGagnees, fuseesGagnees, horsPretest } from './lib/store.js';
 import { resultatQuiz } from './lib/resultats.js';
-import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneQuestionsFragiles, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
+import { consigneDifficulte } from './lib/difficulte.js';
+import { lancerAgent, consignesLecon, consignesPropositions, consignesVariantes, extraireChoix, actionRetourQuiz, promptDemarrageLibre, consigneRebond, consigneDernierQuiz, consignePremierTour, consigneImagesRetirees, consigneQuestionsIgnorees, consigneSchemasAReprendre, consigneLongueursAReprendre, consigneQuestionsFragiles, consigneQuestionsSignalees, questionsASignaler, consignePreparation, REBONDS, preambuleRelais, resumeScore, RELAIS } from './lib/agent.js';
 import { messageDemarrage } from './lib/demarrage.js';
 import { texteRetourQuiz, texteRetourPretest, phraseBadges } from './lib/retour.js';
 import { ecartPretest } from './lib/pretest.js';
@@ -17,12 +18,13 @@ import { revisionsDuJour } from './lib/revisions.js';
 import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
-import { activiteParJour, objectifDuJour, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
+import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, reparationDeSerie, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
+import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -99,11 +101,14 @@ function preambule(prompt, lecon, { resultatsQuiz = true } = {}) {
     const m = lecon.maitrise; // null après un Pré-test seul
     lignes.push(`[Scores aux quiz : ${lecon.scores.slice(-5).map(resumeScore).join(' ; ')}.${m ? ` Maîtrise : ${m.pourcentage} %, ${m.palier}.` : ''}]`);
     if (resultatsQuiz) lignes.push(...consigneDernierQuiz(lecon.scores.at(-1), null, lecon));
+    lignes.push(...consigneDifficulte(lecon.scores));
   }
   lignes.push(...consigneQuestionsFragiles(lecon.questions));
+  lignes.push(...consigneQuestionsSignalees(lecon.questions));
   lignes.push(...consigneImagesRetirees(lecon.imagesRetirees));
   lignes.push(...consigneQuestionsIgnorees(lecon.questionsIgnorees));
   lignes.push(...consigneSchemasAReprendre(lecon.schemasAReprendre));
+  lignes.push(...consigneLongueursAReprendre(lecon.longueursAReprendre));
   if (!lecon.objectifs.length) {
     lignes.push(`[Cette Leçon n'a pas encore d'Objectifs : ajoute dans lesson.json la liste "objectifs", alignée sur les « Success looks like » de MISSION.md, et indique dans chaque quiz les numéros des Objectifs qu'il couvre.]`);
   }
@@ -153,7 +158,7 @@ async function chronometrer(slug, id, maintenant, operation) {
   }
 }
 
-async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant }) {
+async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLecon, tache, resultatsQuiz = true, maintenant, rebond }) {
   try {
     const profil = await store.lireEleve(slug);
     const lecon = await store.lireLecon(slug, id);
@@ -168,7 +173,9 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
       modele: profil.modele,
       tache: tache ?? (lecon.pages.length ? 'page' : 'premiereSeance'),
     });
-    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant });
+    // Les Questions signalées que ce tour a données au prof (#146) ne lui seront plus données.
+    if (!premier) await store.signalementsTransmis(slug, id, questionsASignaler(lecon.questions).map((q) => `${q.page}#${q.id}`)).catch((e) => console.error(`Signalements de ${id} : ${e.message}`));
+    return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant, rebond });
   } catch (e) {
     if (e instanceof HttpError) throw e;
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
@@ -181,7 +188,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
 // à sa mission) : événement `mission-elargie` daté de `maintenant`, pour le badge surprise « Mission élargie » (#97).
 // L'Élève accepte d'élargir par une Réponse proposée libre du prof (voir lib/agent.js), pas par une action de l'appli :
 // c'est donc l'ajout d'Objectifs, constaté après le tour, qui marque l'élargissement.
-async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant }) {
+async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout, maintenant, rebond = 'nouvelle' }) {
   const { texte, choix } = extraireChoix(reponse);
   // Images déclarées par le prof rapatriées dans la Leçon ; celles retirées sont signalées au tour suivant (une fois).
   // Celles d'avant ce tour restent à signaler tant que son prompt ne les a pas portées (premier tour : pas de préambule).
@@ -203,7 +210,15 @@ async function conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, eta
     return [];
   });
   const schemasAReprendre = [...(premier ? lecon.schemasAReprendre : []), ...schemas];
-  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre }, cout });
+  // Pages et parties trop longues des pages écrites par ce tour (ticket #156) : signalées de même, page intacte.
+  const longueurs = await store.longueursAReprendreDepuis(slug, id, pagesAvant).catch((e) => {
+    console.error(`Longueur des pages de ${id} : ${e.message}`);
+    return [];
+  });
+  const longueursAReprendre = [...(premier ? lecon.longueursAReprendre : []), ...longueurs];
+  // Rebond qui a fait créer les pages de ce tour (#147) : « nouvelle » sauf Revoir, Défi et Réviser.
+  const pages = await store.pagesEcritesDepuis(slug, id, pagesAvant).catch(() => []);
+  await store.enregistrerTour(slug, id, { sessionId, question: affiche, reponse: texte, details: choix && { choix }, etatLecon: { ...etatLecon, imagesRetirees, questionsIgnorees, schemasAReprendre, longueursAReprendre }, cout, pagesRebond: { pages, rebond } });
   relancerPropositions(slug);
   const apres = await store.lireLecon(slug, id);
   if (apres.mode === 'libre' && lecon.objectifs.length > 0 && apres.objectifs.length > lecon.objectifs.length) {
@@ -232,7 +247,7 @@ function preparerPageSuivante(slug, id) {
       const cwd = await store.preparerDossierPreparation(slug, id);
       const { reponse, sessionId, cout } = await lancerAgent({
         cwd,
-        prompt: `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz: false })}\n\n${consignePreparation(prevision, lecon)}`,
+        prompt: `/mattpocock-skills:teach ${preambuleRelais(lecon, { resultatsQuiz: false, signalements: false })}\n\n${consignePreparation(prevision, lecon)}`,
         consignes: consignesLecon(profil),
         modele: profil.modele,
         tache: 'rebond',
@@ -280,7 +295,7 @@ async function adopterPreparation(slug, id, preparation, action, maintenant) {
   await store.adopterPreparation(slug, id);
   await store.noterPreparation(slug, { lecon: id, action, utilisee: true });
   const { reponse, sessionId, cout } = preparation;
-  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant });
+  return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant, rebond: REBOND_DE_PAGE[action] });
 }
 
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
@@ -490,6 +505,8 @@ async function annoncerBadges(slug, maintenant) {
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
 // consigne du prof et la phrase de l'Élève. Choisir le Défi le met en cours jusqu'au Retour de quiz suivant ;
 // choisir Réviser ouvre la phase Réviser jusqu'au Défi réussi.
+// Rebond qui crée la page, tel que les indicateurs le comptent (#147) ; les autres (Étape suivante, Commencer) créent une page nouvelle.
+const REBOND_DE_PAGE = { revoir: 'revoir', defi: 'defi', reviser: 'reviser' };
 const ETAT_APRES_REBOND = { defi: { defiEnCours: true }, reviser: { reviserEnCours: true } };
 
 async function rebond(slug, id, { action }, maintenant) {
@@ -502,7 +519,7 @@ async function rebond(slug, id, { action }, maintenant) {
     const preparation = await prendrePreparation(slug, id);
     if (preparation && preparationUtilisable(preparation.prevision, action, lecon)) return adopterPreparation(slug, id, preparation, action, maintenant);
     await ecarterPreparation(slug, id, preparation);
-    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action], maintenant });
+    return tourDuProf({ slug, id, prompt: consigneRebond(action, lecon), affiche: REBONDS[action].phrase, premier: false, tache: 'rebond', resultatsQuiz: false, etatLecon: ETAT_APRES_REBOND[action], maintenant, rebond: REBOND_DE_PAGE[action] });
   }));
   preparerPageSuivante(slug, id);
   return apres;
@@ -573,9 +590,51 @@ async function api(req, res, segments) {
       varierQuestions(slug, corps.lecon);
       return json(res, 200, reponse);
     }
+  } else if (r2 === 'signalements' && !id) {
+    // Signaler une Question (#146), en quiz de page ou en Révision du jour : une raison de la liste fermée du Kit, jamais
+    // de tour du prof (il reçoit le signalement au tour suivant de la Leçon).
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const signalement = await store.signalerQuestion(slug, corps, { maintenant });
+      await noterEvenement(slug, { type: 'signalement', date: signalement.date, lecon: corps.lecon, raison: signalement.raison });
+      return json(res, 200, signalement);
+    }
+  } else if (r2 === 'predictions' && !id) {
+    // Prédiction du Kit (#157) : l'Élève a dit ce qu'il pensait avant une partie de la page. Seulement un événement daté,
+    // pour les indicateurs : ni score, ni Banque, ni Maîtrise, ni tour du prof.
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const { lecon, page, id: prediction, juste } = await lireCorps(req);
+      if (typeof lecon !== 'string') throw new HttpError(400, 'Leçon manquante');
+      if (![page, prediction].every((t) => typeof t === 'string' && t.trim() && t.length <= 200)) throw new HttpError(400, 'Prédiction mal formée');
+      if (typeof juste !== 'boolean') throw new HttpError(400, 'Résultat manquant');
+      await store.lireLecon(slug, lecon, { maintenant });
+      const date = new Date(maintenant).toISOString();
+      await noterEvenement(slug, { type: 'prediction', date, lecon, juste });
+      return json(res, 200, { date, juste });
+    }
   } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
     if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
+  } else if (r2 === 'parent' && id === 'signalements' && !r3) {
+    // Le parent signale lui-même une Question (#148) : même liste fermée de raisons, auteur parent, jamais de tour du prof.
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const signalement = await store.signalerQuestion(slug, corps, { maintenant, auteur: 'parent' });
+      await noterEvenement(slug, { type: 'signalement', date: signalement.date, lecon: corps.lecon, raison: signalement.raison, auteur: 'parent' });
+      return json(res, 200, signalement);
+    }
+  } else if (r2 === 'parent' && id === 'retablissements' && !r3) {
+    // Rétablir une Question signalée (#148) : le signalement est retiré, la mémoire se recalcule depuis le journal.
+    if (m === 'POST') {
+      await store.lireEleve(slug);
+      const corps = await lireCorps(req);
+      const reponse = await store.retablirQuestion(slug, corps);
+      await noterEvenement(slug, { type: 'retablissement', date: new Date(maintenant).toISOString(), lecon: corps.lecon });
+      return json(res, 200, reponse);
+    }
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
@@ -587,7 +646,8 @@ async function api(req, res, segments) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
     if (m === 'GET') {
       const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
-      return json(res, 200, indicateurs(await store.lireEvenements(slug), { maintenant, ...periode }));
+      const [evenements, lecons] = await Promise.all([store.lireEvenements(slug), store.leconsLues(slug, { maintenant })]);
+      return json(res, 200, indicateurs(evenements, { maintenant, lecons, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
     // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.
@@ -600,8 +660,51 @@ async function api(req, res, segments) {
       return json(res, 200, {
         objectifDuJour: objectifDuJour(activite, maintenant),
         serieDeJours: serieDeJours(activite, maintenant),
+        // Réparation proposée aujourd'hui (#159) ; meilleure série et total des Jours travaillés, montrés après une série repartie.
+        reparation: reparationDeSerie(activite, maintenant),
+        meilleureSerie: meilleureSerie(activite, maintenant).meilleure,
+        joursTravailles: joursTravailles(lecons).filter((j) => j <= jourLocal(maintenant)).length,
         recapitulatif: recapitulatifSemaine(lecons, maintenant, { joursActifs: [...joursDesEvenements(evenements)] }),
       });
+    }
+  } else if (r2 === 'moment' && id === 'heures' && !r3) {
+    // Rappel calendrier (#155) : le parent règle l'heure de chaque moment (lib/moment.js), gardée dans le fichier du moment.
+    // Lecture pour la Vue parent : ne marque pas la question du jour comme posée (GET …/moment le fait, pour l'Élève).
+    if (m === 'GET') {
+      const f = await store.modifierMoment(slug, (x) => [x, x]);
+      return json(res, 200, { moment: f.moment, choix: MOMENTS, heures: heuresDe(f.heures) });
+    }
+    if (m === 'PUT') {
+      const { heures } = await lireCorps(req);
+      const valides = validerHeures(heures);
+      return json(res, 200, await store.modifierMoment(slug, (f) => {
+        const reglees = { ...f.heures, ...valides };
+        return [{ ...f, heures: reglees }, { moment: f.moment, aProposer: false, choix: MOMENTS, heures: heuresDe(reglees) }];
+      }));
+    }
+  } else if (r2 === 'moment' && id === 'calendrier.ics' && !r3) {
+    // Fichier iCalendar du rappel (#155), généré ici et rendu tel quel : rien n'est envoyé ni hébergé (ADR 0001).
+    if (m === 'GET') {
+      const [profil, f] = await Promise.all([store.lireEleve(slug), store.modifierMoment(slug, (x) => [x, x])]);
+      const ics = fichierIcal({ moment: f.moment, heures: f.heures, pseudo: profil.pseudo, maintenant });
+      res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `attachment; filename="rappel-${slug}.ics"` });
+      return res.end(ics);
+    }
+  } else if (r2 === 'moment' && !id) {
+    // Moment de révision (#154) : proposé une fois par jour, une fois l'Objectif du jour atteint ; valeur fermée (lib/moment.js).
+    const jour = jourLocal(maintenant);
+    if (m === 'GET') {
+      const lecons = await store.leconsLues(slug, { maintenant });
+      const atteint = objectifDuJour(activiteParJour(lecons), maintenant).atteint;
+      return json(res, 200, await store.modifierMoment(slug, (f) => {
+        const aProposer = atteint && f.proposeLe !== jour;
+        return [aProposer ? { ...f, proposeLe: jour } : f, { moment: f.moment, aProposer, choix: MOMENTS, heures: heuresDe(f.heures) }];
+      }));
+    }
+    if (m === 'PUT') {
+      const { moment } = await lireCorps(req);
+      const valeur = validerMoment(moment === undefined ? 'inconnu' : moment);
+      return json(res, 200, await store.modifierMoment(slug, (f) => [{ ...f, moment: valeur, proposeLe: jour }, { moment: valeur, aProposer: false, choix: MOMENTS, heures: heuresDe(f.heures) }]));
     }
   } else if (r2 === 'badges' && !id) {
     // Mes badges (#95) : la collection, recalculée et fusionnée à la lecture, les totaux d'Étoiles et de Fusées (#96) et

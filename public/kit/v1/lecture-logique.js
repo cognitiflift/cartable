@@ -96,6 +96,7 @@ export function texteDeQuestion(q, correction = null) {
   if (correction) {
     if (correction.juste) parties.push('Bravo !');
     else parties.push(estPartiel(correction) ? 'Juste en partie.' : null, `La bonne réponse : ${phrase(correction.bonne)}`);
+    if (correction.raison) parties.push(phrase(correction.raison));
     if (correction.explication) parties.push(phrase(correction.explication));
   }
   return parties.filter(Boolean).join(' ');

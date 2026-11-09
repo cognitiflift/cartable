@@ -21,8 +21,8 @@ L'appli prend donc la mémoire en charge, dans l'esprit des ADR 0002 et 0003 : l
 - Garder la Maîtrise comme moyenne des derniers scores avec une pénalité linéaire : rejeté, elle ne correspond pas à l'oubli réel et ne récompense pas la régularité.
 - Une Leçon terminée qui sort des révisions : rejeté, c'est justement après le contrôle que l'oubli commence.
 - Révisions par Leçon plutôt que mélangées : rejeté, l'entrelacement (Rohrer & Taylor 2007) apprend à reconnaître de quoi il s'agit.
-- Paramètres FSRS optimisés pour chaque Élève : écarté pour l'instant, trop peu de réponses par Élève ; le journal permettra de le faire plus tard.
-- Rappels hors de l'appli (notifications) : écarté, l'appli reste locale (ADR 0001).
+- Paramètres FSRS optimisés pour chaque Élève : écarté pour l'instant, trop peu de réponses par Élève ; le journal permettra de le faire plus tard. Mise à jour (#161) : l'appli compare désormais FSRS-5 et FSRS-6, chacun avec ses paramètres par défaut, sur le journal de chaque Élève. Elle ne passe un Élève à FSRS-6 que si celui-ci prédit mieux (perte logarithmique plus basse) les réponses en Révision du jour, et seulement à partir de 200 réponses comparables (seuil sans cadre, hypothèse à mesurer, voir `docs/cadres-scientifiques.md`). Sans assez de réponses, FSRS-5 reste. Le planificateur n'est jamais stocké : il se recalcule à chaque lecture depuis les journaux, donc changer de planificateur ne demande aucune migration, et la Maîtrise, Retenu et les Révisions du jour suivent celui qui est choisi. Le planificateur utilisé et la comparaison sont exposés dans les indicateurs de la Vue parent. L'optimisation des paramètres par Élève reste hors scope.
+- Rappels hors de l'appli (notifications) : écarté, l'appli reste locale (ADR 0001). Mise à jour (#154) : l'appli demande désormais à l'Élève, dans une liste fermée, quand il reviendra (Moment de révision) et le lui rappelle sur l'accueil ; rien ne sort de l'appareil. Mise à jour (#155) : le rappel reste hors de l'appli, dans le calendrier du parent et à son initiative : la Vue parent règle l'heure de chaque moment et télécharge un fichier iCalendar généré localement (événement récurrent avec alarme) ; l'appli n'envoie ni n'héberge rien (ADR 0001).
 
 ## Consequences
 
@@ -41,3 +41,14 @@ Les formats où l'Élève répond en plusieurs éléments (texte à trous, ordre
 Juste après une réponse, la courbe d'oubli donne une probabilité de se souvenir de 100 %, quelle que soit la stabilité : un quiz raté à l'instant affichait une Leçon « 100 % acquis ». Une Question dont la dernière réponse est « à revoir » (fausse sans crédit partiel, ou « Je ne sais pas ») compte donc 0 dans la Maîtrise, jusqu'à une réponse juste ou juste en partie (quiz de page ou Révision du jour) ; elle suit ensuite la courbe d'oubli. La probabilité exposée par chaque Question (`rappel`) et le planificateur ne changent pas.
 
 Options écartées : calculer la probabilité au moins un jour après la dernière réponse (une Question ratée vaudrait encore 79 % le lendemain, FSRS supposant la correction lue) ; compter 0 pour les Objectifs pas encore interrogés (mélange « ce que je sais » et « jusqu'où je suis allé », rejeté par l'ADR 0003).
+
+## Mise à jour du 2026-11-08 : Questions signalées (spec #145, ticket #146)
+
+Le prof est un modèle de langage et l'appli ne valide que la forme des Questions : une Question fausse ou ambiguë revient chaque jour et fait compter faux un Élève qui sait. L'Élève peut donc **signaler** une Question après sa correction, en quiz de page comme en Révision du jour, en choisissant une raison dans une liste fermée tenue par l'appli (le serveur refuse toute autre valeur, dans l'esprit de l'ADR 0002).
+
+- Le signalement (raison, auteur, date) est rangé sur la Question dans la Banque, à côté de son journal, qui reste entier : la mémoire se recalcule toujours depuis lui.
+- Une Question signalée n'est plus servie en Révision du jour ni comptée dans les Questions dues, et elle sort de la Maîtrise et de Retenu, comme si la Leçon ne l'avait pas. Choix volontaire, contraire à une Question `horsRevision` (visuel introuvable, qui compte encore) : une Question peut-être fausse ne doit pas peser sur ce que l'Élève sait.
+- Le préambule de relais du tour suivant la donne au prof une seule fois (énoncé, bonne réponse, raison), avec la demande de la réécrire ou de dire qu'elle est juste. Elle perd son signalement quand son nouveau contenu arrive avec un score ; une Question réécrite perd ses variantes, comme avant.
+- Un événement daté `signalement` est noté pour les indicateurs.
+
+Écarté pour ce ticket : retirer la Question de la Banque (le journal serait perdu) ; un champ de texte libre (saisie libre écartée par l'ADR 0002).

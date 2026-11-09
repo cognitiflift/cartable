@@ -6,6 +6,7 @@ import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
   confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
 } from '/nouvelle-lecon-texte.js';
+import { RAISONS_SIGNALEMENT } from '/kit/v1/quiz-logique.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -94,9 +95,10 @@ function formulaireProfil({ profil, titre, envoyer }) {
   const preparerPages = h('input', { name: 'preparerPages', type: 'checkbox', checked: profil?.preparerPages ?? true });
   const modele = h('select', { name: 'modele' }, config.modeles.map((m) => h('option', { value: m.id, selected: m.id === (profil?.modele ?? config.modeleDefaut) }, `${m.libelle} — ${m.description}`)));
   const lectureVoixHaute = h('input', { name: 'lectureVoixHaute', type: 'checkbox', checked: profil?.lectureVoixHaute ?? false });
+  const espacementLettres = h('input', { name: 'espacementLettres', type: 'checkbox', checked: profil?.espacementLettres ?? false });
   const form = h('form', { className: 'colonne', onsubmit: async (ev) => {
     ev.preventDefault();
-    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked, preparerPages: preparerPages.checked }); } catch (e) { erreur.textContent = e.message; }
+    try { await envoyer({ pseudo: pseudo.value, age: age.value, niveau: niveau.value, nombrePropositions: nombrePropositions.value, modele: modele.value, lectureVoixHaute: lectureVoixHaute.checked, espacementLettres: espacementLettres.checked, preparerPages: preparerPages.checked }); } catch (e) { erreur.textContent = e.message; }
   } },
     !profil && h('label', {}, 'Pseudo', h('br'), pseudo),
     h('label', {}, 'Âge', h('br'), age),
@@ -104,6 +106,7 @@ function formulaireProfil({ profil, titre, envoyer }) {
     h('label', {}, "Nombre d'idées de leçons proposées (2 à 10)", h('br'), nombrePropositions),
     h('label', {}, 'Modèle', h('br'), modele),
     h('label', {}, lectureVoixHaute, ' 🔊 Lecture à voix haute des pages et des questions (avec la voix de cet appareil)'),
+    h('label', {}, espacementLettres, ' Espacement des lettres et des mots agrandi (pour lire plus facilement)'),
     h('label', {}, preparerPages, ' Préparer la page suivante pendant le quiz (plus rapide, coûte parfois un tour de plus)'),
     h('button', {}, profil ? 'Enregistrer' : 'Créer'),
     erreur);
@@ -155,18 +158,40 @@ const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements)
 // Le parent ouvre la Leçon en aperçu (#/apercu/…) : ce n'est pas un retour de l'Élève pour les indicateurs (#78).
 const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/apercu/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
 const SECTIONS_PARENT = [
+  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
+  // Soutien à l'autonomie (#158) : des questions ouvertes à poser, tirées des Objectifs Retenus récents, sans tour du prof.
+  { titre: '💬 Pour en parler avec lui', rendu: ({ pourEnParler: { invitations, autonomie } }) => [
+    listeOuVide(invitations.map((i) => avecLecon(i.texte, i)), 'Pas d’activité ces 7 derniers jours : rien à proposer pour l’instant.'),
+    h('p', { className: 'doux' }, autonomie)] },
+  { titre: '🌱 Ce qui se consolide', rendu: ({ objectifs }) => [
+    h('p', { className: 'doux' }, 'Objectifs atteints, pas encore Retenus : ils se consolident au fil des Révisions du jour.'),
+    listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
+  { titre: '🔁 Ce qu’il revoit en ce moment', rendu: ({ questionsFragiles }) => listeOuVide(
+    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
+  // Questions signalées et suspectes (#148) : le parent juge. Rétablir retire le signalement sans perte ; Signaler porte l'auteur parent.
+  { titre: '🚩 Questions signalées', rendu: ({ questionsSignalees }, contexte) => [
+    h('p', { className: 'doux' }, 'Ces Questions ne sont plus posées ni comptées. Rétablir les remet en Révision du jour et dans la Maîtrise, sans rien perdre.'),
+    listeOuVide(questionsSignalees.map((q) => h('li', { className: 'question-signalee' },
+      h('strong', {}, insecables(q.enonce)), ' ', h('a', { href: `#/apercu/${q.lecon}`, className: 'doux' }, `(${q.titreLecon})`),
+      h('br'), `Bonne réponse attendue : ${q.bonne}`,
+      h('br'), `${q.libelleRaison}, signalée par ${q.auteur === 'parent' ? 'toi' : 'l’Élève'} le ${new Date(q.date).toLocaleDateString('fr-BE')}.`,
+      ' ', actionParent(contexte, 'Rétablir', `eleves/${contexte.slug}/parent/retablissements`, q))), 'Aucune Question signalée.')] },
+  { titre: '🔎 Questions à vérifier', rendu: ({ questionsSuspectes, questionsSignalables }, contexte) => [
+    h('p', { className: 'doux' }, 'L’appli les juge suspectes mais n’en retire aucune : c’est à toi de décider.'),
+    listeOuVide(questionsSuspectes.map((q) => h('li', { className: 'question-suspecte' },
+      h('strong', {}, insecables(q.enonce)), ' ', h('a', { href: `#/apercu/${q.lecon}`, className: 'doux' }, `(${q.titreLecon})`),
+      h('br'), `Bonne réponse attendue : ${q.bonne}`,
+      q.motifs.map((m) => [h('br'), motifSuspect(m)]),
+      h('br'), signalerParent(contexte, q))), 'Aucune Question suspecte.'),
+    questionsSignalables.length > 0 && h('details', { className: 'signaler-parent' }, h('summary', {}, 'Signaler une autre Question'),
+      questionsSignalables.map((l) => h('details', {}, h('summary', {}, l.titreLecon),
+        h('ul', {}, l.questions.map((q) => h('li', {}, insecables(q.enonce), h('br'), signalerParent(contexte, { ...q, lecon: l.lecon })))))))] },
   { titre: '📆 Ces derniers jours', rendu: ({ jours }) => h('table', { className: 'vue-parent-jours' },
     h('tr', {}, h('th', {}, 'Jour'), h('th', {}, 'Révisions du jour'), h('th', {}, 'Quiz de page')),
     jours.map((j) => h('tr', {},
       h('td', {}, new Date(`${j.jour}T12:00`).toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'short' })),
       h('td', {}, j.revisions ? `${j.revisions} (${j.justes} juste${j.justes > 1 ? 's' : ''})` : '–'),
       h('td', {}, j.quiz || '–')))) },
-  { titre: '🧠 Objectifs Retenus', rendu: ({ objectifs }) => listeOuVide(objectifs.retenus.map((o) => avecLecon(o.texte, o)), 'Aucun Objectif Retenu pour l’instant.') },
-  { titre: '🌱 Objectifs fragiles', rendu: ({ objectifs }) => [
-    h('p', { className: 'doux' }, 'Atteints, mais pas encore Retenus : à retravailler un autre jour.'),
-    listeOuVide(objectifs.fragiles.map((o) => avecLecon(o.texte, o)), 'Aucun.')] },
-  { titre: '❓ Questions fragiles', rendu: ({ questionsFragiles }) => listeOuVide(
-    questionsFragiles.map((q) => avecLecon(`${q.enonce} : ${q.pourcentage} % de chances de s’en souvenir`, q)), 'Aucune : tout tient bien.') },
   { titre: '📅 Contrôles à venir', rendu: ({ controles }) => listeOuVide(controles.map((c) =>
     avecLecon(`${new Date(`${c.dateControle}T12:00`).toLocaleDateString('fr-BE')} (${texteControle(c.joursAvant)}) : Maîtrise : ${c.maitrise ? `${PALIERS_DE_MAITRISE[c.maitrise.palier].mot} (${c.maitrise.pourcentage} %)` : 'pas encore évaluée'}, ${pluriel(c.questionsDues, 'question')} à revoir aujourd’hui`, c)), 'Aucun contrôle prévu.') },
   // Badges (#100) : ceux des 7 derniers jours et les totaux, en lecture seule (rien n'y change « Nouveau » dans Mes badges).
@@ -178,7 +203,7 @@ const SECTIONS_PARENT = [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, souvenir, retour, attente } }) => [
+  { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
@@ -187,15 +212,96 @@ const SECTIONS_PARENT = [
         ? `${retour.pourcentage} % (${retour.revenus} sur ${pluriel(retour.lecons, 'Leçon')})` : 'pas encore mesurable.',
         retour.enAttente ? ` ${pluriel(retour.enAttente, 'Leçon')} trop récente${retour.enAttente > 1 ? 's' : ''} pour le dire.` : ''),
       h('li', {}, 'Attente du prof : ', attente.tours
-        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'))] },
+        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'),
+      h('li', {}, 'Objectifs Retenus il y a au moins 30 jours, encore Retenus : ', retenu30.objectifs
+        ? `${retenu30.pourcentage} % (${retenu30.encoreRetenus} sur ${pluriel(retenu30.objectifs, 'Objectif')})` : 'pas encore mesurable.'),
+      h('li', {}, '« Je ne sais pas » : ', partJeNeSaisPas(jeNeSaisPas.quiz, 'dans les quiz de page', 'aucun quiz de page'), ' ',
+        partJeNeSaisPas(jeNeSaisPas.revision, 'aux Révisions du jour', 'aucune Révision du jour')),
+      h('li', {}, 'Réussite des quiz selon la page : ', MESURES_REBOND.some(([cle]) => reussiteParRebond[cle].quiz)
+        ? MESURES_REBOND.filter(([cle]) => reussiteParRebond[cle].quiz).map(([cle, mot]) =>
+          `${mot} ${reussiteParRebond[cle].pourcentage} % (${pluriel(reussiteParRebond[cle].quiz, 'quiz')})`).join(' ; ') + '.'
+        : 'pas encore de quiz.'),
+      h('li', {}, 'Planificateur de mémoire : ', texteDuPlanificateur(planificateur)),
+      h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
+        ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
+      h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
+        ? `${pluriel(predictions.faites, 'faite')}, ${predictions.justes} juste${predictions.justes > 1 ? 's' : ''} (${predictions.pourcentage} %).` : 'aucune pour l’instant.'),
+      h('li', {}, 'Questions : ', `${pluriel(qs.signalees, 'signalée')}, ${pluriel(qs.retablies, 'rétablie')} sur la période ; ${pluriel(qs.suspectes, 'suspecte')} en ce moment.`),
+    ),
+    h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
+    h('p', { className: 'doux' }, 'Pour chaque tranche de probabilité de se souvenir prédite avant la réponse, la part de réponses justes aux Révisions du jour.'),
+    h('ul', {}, calibration.map((t) => h('li', {}, `Prédit ${t.de} à ${t.a} % : `, t.reponses
+      ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % prédit en moyenne)` : 'aucune réponse.')))] },
 ];
+
+// Planificateur de mémoire (#161), en mots : celui qui sert et pourquoi, avec la perte de prédiction de chacun (plus basse = mieux).
+const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
+  const nom = utilise === 'fsrs6' ? 'FSRS-6' : 'FSRS-5';
+  if (reponses < seuil) return `${nom} (il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour comparer, ${reponses} jusqu’ici).`;
+  const chiffres = `perte de prédiction ${String(fsrs5.perte).replace('.', ',')} pour FSRS-5, ${String(fsrs6.perte).replace('.', ',')} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}`;
+  return `${nom} (${chiffres}).`;
+};
+
+// Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »
+const partJeNeSaisPas = ({ reponses, jeNeSaisPas, pourcentage }, ou, vide) =>
+  reponses ? `${pourcentage} % ${ou} (${jeNeSaisPas} sur ${pluriel(reponses, 'réponse')}).` : `${vide}.`;
+const MESURES_REBOND = [['nouvelle', 'page nouvelle'], ['revoir', 'Revoir'], ['defi', 'Défi'], ['reviser', 'Réviser']];
+
+// Bouton d'action du parent sur une Question (Rétablir, Signaler) : envoie { lecon, page, id, …corps() } puis recharge l'écran.
+function actionParent(contexte, libelle, url, q, corps = () => ({})) {
+  const erreur = h('span', { className: 'erreur', role: 'alert' });
+  const bouton = h('button', { className: 'secondaire', type: 'button', onclick: async () => {
+    bouton.disabled = true;
+    try { await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, ...corps() } }); await contexte.recharger(); }
+    catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+  } }, libelle);
+  return h('span', { className: 'actions-parent' }, bouton, erreur);
+}
+// « Signaler » côté parent : une raison de la liste fermée du Kit (comme pour l'Élève), auteur parent.
+function signalerParent(contexte, q) {
+  const raison = h('select', { ariaLabel: 'Raison du signalement' }, RAISONS_SIGNALEMENT.map((r) => h('option', { value: r.id }, r.libelle)));
+  return h('span', { className: 'actions-parent' }, raison, ' ',
+    actionParent(contexte, 'Signaler', `eleves/${contexte.slug}/parent/signalements`, q, () => ({ raison: raison.value })));
+}
+// Motif d'une Question suspecte, en mots.
+const motifSuspect = (m) => (m.type === 'reponse-fausse-sure'
+  ? `Même réponse fausse « ${m.choisie} » choisie « sûr » à ${m.jours} jours différents, alors qu’un Objectif qu’elle couvre est Retenu.`
+  : `La Variante ${m.variante + 1} est ratée ${m.ratees} fois sur ${m.reponses}, la Question d’origine ${m.origine.ratees} sur ${m.origine.reponses}.`);
+
+// Rappel dans le calendrier du parent (#155) : le parent règle l'heure de chaque moment, puis télécharge un fichier
+// iCalendar généré par le serveur, à importer dans son propre calendrier. Sans moment choisi par l'Élève, on l'explique.
+function rappelCalendrier(profil, etat) {
+  const zone = h('div', {});
+  const libelle = (id) => etat.choix.find((c) => c.id === id).libelle;
+  const dessiner = () => {
+    const avecHeure = etat.moment && etat.moment in etat.heures;
+    zone.replaceChildren(
+      h('p', { className: 'doux' }, 'Le fichier se génère ici, sur cet appareil : rien n’est envoyé ni hébergé. Tu l’ouvres dans ton calendrier, qui te préviendra à l’heure choisie.'),
+      h('div', { className: 'rappel-heures' }, Object.entries(etat.heures).map(([id, heure]) => h('label', {},
+        `${libelle(id)} `,
+        h('input', { type: 'time', value: heure, required: true, onchange: async (e) => {
+          if (!e.target.value) { e.target.value = etat.heures[id]; return; }
+          Object.assign(etat, await api(`eleves/${profil.slug}/moment/heures`, { method: 'PUT', body: { heures: { [id]: e.target.value } } }));
+          dessiner();
+        } })))),
+      avecHeure
+        ? [h('p', {}, `${profil.pseudo} a choisi : ${libelle(etat.moment).toLowerCase()}, à ${etat.heures[etat.moment].replace(':', ' h ')}.`),
+          h('a', { className: 'bouton', href: `/api/eleves/${profil.slug}/moment/calendrier.ics`, download: `rappel-${profil.slug}.ics` }, 'Télécharger le fichier calendrier')]
+        : h('p', {}, `${profil.pseudo} n’a pas encore choisi son moment de révision (l’appli le lui propose après l’Objectif du jour). Il n’y a donc pas de fichier à télécharger pour l’instant.`));
+  };
+  dessiner();
+  return zone;
+}
 
 async function ecranParent(profil) {
   const agregats = await api(`eleves/${profil.slug}/parent`);
+  const moment = await api(`eleves/${profil.slug}/moment/heures`);
+  const contexte = { slug: profil.slug, recharger: () => ecranParent(profil) };
   montrer(
     h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
-    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats))));
+    SECTIONS_PARENT.map(({ titre, rendu }) => h('section', { className: 'vue-parent' }, h('h3', {}, titre), rendu(agregats, contexte))),
+    h('section', { className: 'vue-parent' }, h('h3', {}, '🔔 Rappel dans ton calendrier'), rappelCalendrier(profil, moment)));
 }
 
 // Étoiles et Fusées d'une Leçon : « ⭐ n · 🚀 n » en Leçon libre, « ☆☆☆ · 🚀 n » en Leçon de révision, sans Fusée à 0
@@ -290,7 +396,7 @@ function carteLecon(l, { enTete = false } = {}) {
 }
 
 async function ecranAccueil(profil) {
-  const [lecons, revisions, rythme, badges] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`)]);
+  const [lecons, revisions, rythme, badges, moment] = await Promise.all([api(`eleves/${profil.slug}/lecons`), api(`eleves/${profil.slug}/revisions`), api(`eleves/${profil.slug}/rythme`), api(`eleves/${profil.slug}/badges`), api(`eleves/${profil.slug}/moment`)]);
   retenirRecompenses(profil, badges);
   barreNav(profil);
   // « Où j'en étais ? » : la Leçon à la dernière activité la plus récente passe en tête, hors de sa Catégorie (#141).
@@ -298,7 +404,7 @@ async function ecranAccueil(profil) {
   const parCategorie = Object.groupBy(lecons.filter((l) => l !== enTete), (l) => l.categorie);
   montrer(
     recapitulatifSemaine(profil, rythme.recapitulatif),
-    maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons),
+    maSemaine(profil, badges.calendrier, rythme, revisions.dues, lecons, moment),
     h('div', { className: 'lecons-tete' },
       h('h2', {}, 'Mes leçons'),
       // Une action en retrait, sauf quand le réseau est vide : c'est alors la seule chose à faire, et le seul bouton plein.
@@ -335,11 +441,36 @@ const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atte
 // `debut` (calendrier de Mes badges) : le premier Jour de l'Élève ; un jour d'avant est neutre (« avant »), sans le
 // contour en tirets d'un jour vide, pour ne pas se lire comme un jour manqué.
 const classeJour = ({ jour, etat }, aujourdhui, debut = '') => `jour ${etat}${jour === aujourdhui ? ' aujourdhui' : ''}${jour > aujourdhui ? ' futur' : ''}${jour < debut ? ' avant' : ''}`;
-const lectureJour = (nom, { jour, etat, joker }, aujourdhui, debut = '') => [nom, jour === aujourdhui && "aujourd'hui", jour < debut ? 'avant ton premier jour' : ETATS_JOUR[etat], joker && 'protégé par un joker'].filter(Boolean).join(', ');
+const lectureJour = (nom, { jour, etat, joker, repare }, aujourdhui, debut = '') => [nom, jour === aujourdhui && "aujourd'hui", jour < debut ? 'avant ton premier jour' : ETATS_JOUR[etat], joker && 'protégé par un joker', repare && 'jour réparé'].filter(Boolean).join(', ');
 // Sans `jour`, un tampon muet : la légende du calendrier.
-const tamponJour = ({ jour, joker }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'));
+const tamponJour = ({ jour, joker, repare }) => h('span', { className: 'tampon', ariaHidden: 'true' }, jour ? String(Number(jour.slice(8))) : '', joker && h('span', { className: 'joker' }, '🛡️'), repare && h('span', { className: 'joker' }, '🩹'));
 
-function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours }, dues, lecons) {
+// Mon moment de révision (#154) : une liste fermée de moments, proposée une fois par jour après l'Objectif du jour
+// atteint (`aProposer`), puis rappelée dans le bandeau ; l'Élève peut le changer ou le retirer, sans être relancé.
+function momentDeRevision(profil, etat) {
+  const libelle = (id) => etat.choix.find((c) => c.id === id)?.libelle;
+  const zone = h('div', { className: 'moment-revision' });
+  const enregistrer = async (moment) => {
+    Object.assign(etat, await api(`eleves/${profil.slug}/moment`, { method: 'PUT', body: { moment } }));
+    dessiner(false);
+  };
+  const choix = (question) => h('div', { className: 'moment-choix', role: 'group', ariaLabel: question },
+    h('strong', {}, question),
+    h('div', { className: 'moment-boutons' }, etat.choix.map((c) =>
+      h('button', { className: 'secondaire', ariaPressed: String(etat.moment === c.id), onclick: () => enregistrer(c.id) }, c.libelle))));
+  const dessiner = (ouvert) => {
+    zone.replaceChildren(ouvert
+      ? h('div', {}, choix('Quand reviendras-tu ?'),
+        h('button', { className: 'moment-lien', onclick: () => (etat.moment ? enregistrer(null) : dessiner(false)) }, etat.moment ? 'Ne plus en choisir' : 'Plus tard'))
+      : etat.moment
+        ? h('small', {}, `🕐 Je reviens : ${libelle(etat.moment).toLowerCase()} `, h('button', { className: 'moment-lien', onclick: () => dessiner(true) }, 'Changer'))
+        : h('button', { className: 'moment-lien', onclick: () => dessiner(true) }, 'Choisir mon moment de révision'));
+  };
+  dessiner(etat.aProposer);
+  return zone;
+}
+
+function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJours, reparation, meilleureSerie, joursTravailles }, dues, lecons, moment) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
   const caseJour = (jour, i) => {
@@ -372,7 +503,14 @@ function maSemaine(profil, { aujourdhui, jours }, { objectifDuJour: o, serieDeJo
       h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
         h('small', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`)),
+        serieDeJours.jokersUtilises > 0 && h('small', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
+        // Série repartie (#159) : la meilleure série et tous les Jours travaillés restent sous les yeux, à la place d'un « 0 » seul.
+        meilleureSerie > serieDeJours.jours && h('small', { className: 'serie-acquis' },
+          `Ta meilleure série : ${pluriel(meilleureSerie, 'jour')} · ${pluriel(joursTravailles, 'jour')} travaillé${joursTravailles > 1 ? 's' : ''} en tout`),
+        // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
+        reparation && h('small', { className: 'reparation' },
+          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`),
+        momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       h('button', { className: `bouton-revisions${dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
         h('strong', {}, 'Mes révisions du jour',
@@ -454,7 +592,7 @@ async function ecranBadges(profil) {
 // montre à côté ce qui a été fait et gagné, sans score ; aujourd'hui est montré à l'ouverture.
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const moisSuivant = (mois, n) => { const [a, m] = mois.split('-').map(Number); const d = new Date(a, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
+const jourSansRien = (jour) => ({ jour, etat: 'vide', joker: false, repare: false, lecons: [], quiz: 0, revisions: 0, gains: { etoiles: 0, fusees: 0, paliers: [] } });
 function calendrierJours({ aujourdhui, jours }) {
   const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
   const duJour = (jour) => parJour.get(jour) ?? jourSansRien(jour);
@@ -474,9 +612,10 @@ function calendrierJours({ aujourdhui, jours }) {
       lecons.length > 1 && h('ul', { className: 'lecons-du-jour', ariaLabel: 'Leçons' }, lecons.map((titre) => h('li', {}, `📚 ${titre}`))),
       faits && h('p', {}, faits),
       journee.joker && h('p', {}, '🛡️ Un joker a protégé ta série de jours ce jour-là.'),
+      journee.repare && h('p', {}, '🩹 Tu as réparé ta série de jours ce jour-là.'),
       (gains || journee.gains.paliers.length > 0) && h('div', { className: 'gains-du-jour' }, gains && h('span', {}, `Gagné : ${gains}`),
         journee.gains.paliers.map((p) => h('span', { className: 'gain-badge' }, pastilleBadge(p, { ariaHidden: 'true', title: undefined }), nomEtPalier(p)))),
-      !faits && !journee.lecons.length && !journee.joker && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, journee.jour === aujourdhui ? 'Pas encore aujourd’hui.' : 'Rien ce jour-là.')];
+      !faits && !journee.lecons.length && !journee.joker && !journee.repare && !gains && !journee.gains.paliers.length && h('p', { className: 'doux' }, journee.jour === aujourdhui ? 'Pas encore aujourd’hui.' : 'Rien ce jour-là.')];
   };
   const afficher = (choisi, focaliser = true) => {
     const [a, m] = mois.split('-').map(Number);
@@ -523,8 +662,8 @@ function calendrierJours({ aujourdhui, jours }) {
             return bouton;
           })),
         h('p', { className: 'calendrier-legende' },
-          [['pale', 'travaillé'], ['plein', 'Objectif du jour atteint'], ['vide', 'joker', true]].map(([etat, mot, joker]) =>
-            h('span', { className: `jour ${etat}` }, tamponJour({ joker }), mot)))),
+          [['pale', 'travaillé'], ['plein', 'Objectif du jour atteint'], ['vide', 'joker', true], ['vide', 'jour réparé', false, true]].map(([etat, mot, joker, repare]) =>
+            h('span', { className: `jour ${etat}` }, tamponJour({ joker, repare }), mot)))),
       h('div', { className: 'calendrier-detail', ariaLive: 'polite' },
         choisi ? detail(duJour(choisi)) : h('p', { className: 'doux' }, 'Touche un jour pour voir ce que tu as fait et gagné.')));
     // Après ‹ ou ›, le focus reste sur le même bouton (ou, désactivé au bout de l'historique, va à la grille) ; après un
@@ -616,6 +755,8 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
           // Copie de la figure de sa page (#126), dépliée d'office : reconstruite élément par élément, sans balisage.
           figure: construireFigure(document, q.figure),
           figureDepliee: true,
+          // Signaler (#146) : une raison de la liste fermée du Kit, enregistrée par le serveur.
+          signaler: (raison) => api(`eleves/${profil.slug}/signalements`, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, raison } }),
           quandCorrigee: async ({ choisie, sur }) => {
             try {
               await api(url, { method: 'POST', body: { lecon: q.lecon, page: q.page, id: q.id, choisie, sur, variante: q.variante } });
@@ -974,8 +1115,11 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     if (!lecon.pages.length || pagesAffichees === lecon.pages.join()) return;
     pagesAffichees = lecon.pages.join();
     // Le réglage de lecture à voix haute du Profil est transmis à la page dans son adresse (Kit, lecture.js).
-    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${profil.lectureVoixHaute ? '?lecture=1' : ''}`;
-    const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p) => h('option', { value: p }, p.replace(/\.html$/, ''))));
+    const reglages = new URLSearchParams();
+    if (profil.lectureVoixHaute) reglages.set('lecture', '1');
+    if (profil.espacementLettres) reglages.set('espacement', '1'); // espacement des lettres du Profil (#160)
+    const url = (p) => `/fichiers/${profil.slug}/${id}/lessons/${p}${reglages.size ? `?${reglages}` : ''}`;
+    const choix = h('select', { onchange: () => (iframe.src = url(choix.value)) }, lecon.pages.map((p, i) => h('option', { value: p }, `Page ${i + 1} sur ${lecon.pages.length}`)));
     choix.value = lecon.pages.includes(pageDemandee) ? pageDemandee : lecon.pages.at(-1);
     pageDemandee = null; // seulement à l'ouverture : une nouvelle page du prof s'affiche ensuite comme d'habitude
     iframe = h('iframe', { src: url(choix.value), title: 'Leçon' });
@@ -1042,10 +1186,36 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       lecon = await api(`eleves/${profil.slug}/lecons/${id}/scores`, { method: 'POST', body: corps });
       afficherEntete();
     } catch (e) { return (erreur.textContent = e.message); }
+    pagesScorees.add(corps.page);
+    for (const s of signalementsEnAttente.filter((x) => x.page === corps.page)) {
+      signalementsEnAttente.splice(signalementsEnAttente.indexOf(s), 1);
+      envoyerSignalement(s);
+    }
     tour({ texte: '⏳ Un instant…' }, () => api(`eleves/${profil.slug}/lecons/${id}/retours`, { method: 'POST', body: corps }));
   };
+  // Signalements de Questions du quiz de la page (#146), envoyés par le Kit : la Question n'est dans la Banque qu'une fois
+  // le score enregistré, donc ceux qui arrivent avant attendent. Le Kit confirme tout de suite à l'Élève.
+  const pagesScorees = new Set();
+  const signalementsEnAttente = [];
+  const envoyerSignalement = ({ page, id: question, raison }) =>
+    api(`eleves/${profil.slug}/signalements`, { method: 'POST', body: { lecon: id, page, id: question, raison } }).catch((e) => { erreur.textContent = e.message; });
+  const recevoirSignalement = (ev) => {
+    if (!iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-signalement') return;
+    const { page, id: question, raison } = ev.data;
+    if (pagesScorees.has(page)) envoyerSignalement({ page, id: question, raison });
+    else signalementsEnAttente.push({ page, id: question, raison });
+  };
+  // Prédictions de la page (#157), envoyées par le Kit : seulement un événement daté pour les indicateurs, jamais un score ;
+  // le parent qui ouvre la Leçon en aperçu n'en fait pas (il n'y a pas d'Élève qui répond).
+  const recevoirPrediction = (ev) => {
+    if (apercu || !iframe || ev.source !== iframe.contentWindow || ev.data?.type !== 'cartable-prediction') return;
+    const { page, id: prediction, juste } = ev.data;
+    api(`eleves/${profil.slug}/predictions`, { method: 'POST', body: { lecon: id, page, id: prediction, juste } }).catch(() => {});
+  };
+  window.addEventListener('message', recevoirSignalement);
+  window.addEventListener('message', recevoirPrediction);
   window.addEventListener('message', recevoirScore);
-  quitterEcran = () => window.removeEventListener('message', recevoirScore);
+  quitterEcran = () => { window.removeEventListener('message', recevoirScore); window.removeEventListener('message', recevoirSignalement); window.removeEventListener('message', recevoirPrediction); };
 
   afficherEntete();
   afficher();
@@ -1065,6 +1235,7 @@ async function route() {
     if (page === 'nouvel-eleve') return await ecranNouvelEleve();
     const slug = pseudoCourant();
     const profil = slug && (await api(`eleves/${slug}`).catch(() => null));
+    document.documentElement.classList.toggle('espacement-lettres', !!profil?.espacementLettres); // réglage du Profil (#160)
     if (!profil) return await ecranChoix();
     barreNav(profil);
     if (page === 'profil') return await ecranProfil(profil);
@@ -1076,7 +1247,7 @@ async function route() {
     if (page === 'badges') return await ecranBadges(profil);
     return await ecranAccueil(profil);
   } catch (e) {
-    montrer(h('p', { className: 'erreur' }, e.message));
+    montrer(h('div', {}, h('p', { className: 'erreur' }, 'Impossible de charger cet écran pour le moment. Vérifie que l’appli tourne encore, puis réessaie.'), h('button', { className: 'secondaire', onclick: () => route() }, 'Réessayer')));
   }
 }
 

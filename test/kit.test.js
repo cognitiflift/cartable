@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS } from '../public/kit/v1/quiz-logique.js';
+import { lireQuiz, libelleRevoir, corriger, messageScore, melanger, lireResultats, questionsIgnorees, reponseAttendue, JE_NE_SAIS_PAS, RAISONS_SIGNALEMENT, raisonSignalement, MESSAGE_SIGNALEMENT, inviterADeviner, INVITATION_A_DEVINER } from '../public/kit/v1/quiz-logique.js';
+import fs from 'node:fs/promises';
 
 const quiz = {
   objectifs: [1],
@@ -547,4 +548,70 @@ test('Kit : chaque format connaît la réponse entièrement juste, que le rendu 
   for (const q of lu.questions) assert.equal(corriger(q, reponseAttendue(q)).juste, true, q.type);
   // Pour un format à plusieurs éléments, c'est la réponse que l'Élève aurait donnée en touchant les bons éléments.
   assert.deepEqual(reponseAttendue(lu.questions.find((q) => q.type === 'ordre')), [0, 1, 2, 3]);
+});
+
+test('Kit : les raisons de signalement forment une liste fermée de trois valeurs, avec leur libellé pour l\'Élève et pour le prof (#146)', () => {
+  assert.deepEqual(RAISONS_SIGNALEMENT.map((r) => r.id), ['reponse-fausse', 'pas-claire', 'image-differente']);
+  assert.deepEqual(RAISONS_SIGNALEMENT.map((r) => r.libelle), ['La bonne réponse me semble fausse', 'La question n’est pas claire', 'L’image ne correspond pas']);
+  assert.equal(raisonSignalement('pas-claire').pourLeProf, 'la question n\'est pas claire');
+  for (const inconnue of ['au-hasard', '', undefined, null, 2, '__proto__', 'constructor']) assert.equal(raisonSignalement(inconnue), null, String(inconnue));
+  assert.equal(MESSAGE_SIGNALEMENT, 'Merci, le prof va la revoir.');
+});
+
+// « Pourquoi c'est faux » (spec #145, ticket #149) : une raison courte par réponse fausse d'un QCM.
+const avecRaisons = {
+  id: 'r1', enonce: 'Par où sort la lave ?', reponses: ['Par le cratère', 'Par les racines', 'Par les nuages'], bonne: 0,
+  raisons: [null, 'Les racines sont sous terre : la lave en sort au contraire.', 'Les nuages sont dans le ciel, pas dans le volcan.'],
+  explication: 'Par la cheminée puis le cratère.',
+};
+
+test('Kit : la raison de la réponse fausse choisie est donnée à la correction, pas pour une réponse juste ni après « Je ne sais pas »', () => {
+  const [q] = lireQuiz({ objectifs: [1], questions: [avecRaisons] }).questions;
+  assert.deepEqual(q.raisons, avecRaisons.raisons);
+  assert.equal(corriger(q, 1).raison, avecRaisons.raisons[1]);
+  assert.equal(corriger(q, 2).raison, avecRaisons.raisons[2]);
+  assert.equal(Object.hasOwn(corriger(q, 0), 'raison'), false);
+  assert.equal(Object.hasOwn(corriger(q, JE_NE_SAIS_PAS), 'raison'), false);
+  // Le même format sert au type « explication ».
+  const [e] = lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, type: 'explication' }] }).questions;
+  assert.equal(corriger(e, 1).raison, avecRaisons.raisons[1]);
+});
+
+test('Kit : une raison mal formée est ignorée, la question reste ; une page sans raisons est inchangée', () => {
+  const lire = (raisons) => lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, raisons }] }).questions[0];
+  // Pas une liste, ou pas de la longueur des réponses : toutes ignorées.
+  for (const raisons of ['parce que', { 1: 'x' }, ['seulement une'], [null, 'a', 'b', 'c']]) {
+    const q = lire(raisons);
+    assert.ok(q, JSON.stringify(raisons));
+    assert.equal(Object.hasOwn(q, 'raisons'), false, JSON.stringify(raisons));
+  }
+  // Une entrée mal formée est ignorée seule ; une raison attachée à la bonne réponse l'est aussi.
+  assert.deepEqual(lire(['Elle est juste', 42, 'Les nuages sont dans le ciel.']).raisons, [null, null, 'Les nuages sont dans le ciel.']);
+  assert.equal(Object.hasOwn(lire([null, 42, '  ']), 'raisons'), false);
+  const [sans] = lireQuiz({ objectifs: [1], questions: [{ ...avecRaisons, raisons: undefined }] }).questions;
+  assert.equal(Object.hasOwn(sans, 'raisons'), false);
+  assert.equal(Object.hasOwn(corriger(sans, 1), 'raison'), false);
+});
+
+test('Kit : le quiz d\'une page invite à deviner (« Je ne sais pas » au second plan) ; le Pré-test non, et le résultat ne change pas', () => {
+  const brut = { objectifs: [1], questions: [{ id: 'a', enonce: 'Q ?', reponses: ['x', 'y'], bonne: 0, explication: 'e' }] };
+  const page = lireQuiz(brut);
+  const pretest = lireQuiz({ ...brut, pretest: true });
+  assert.equal(inviterADeviner(page), true);
+  assert.equal(inviterADeviner(pretest), false, 'le Pré-test garde sa présentation');
+  assert.equal(INVITATION_A_DEVINER, 'Pas sûr ? Devine, puis dis « pas sûr »');
+  // « Je ne sais pas » envoie le même résultat qu'avant : jeNeSaisPas, fausse, sans Confiance.
+  const m = messageScore(page, { a: JE_NE_SAIS_PAS }, 'p.html', {});
+  assert.equal(m.questions[0].jeNeSaisPas, true);
+  assert.equal(m.questions[0].juste, false);
+  assert.equal('sur' in m.questions[0], false);
+});
+
+test('Kit : le rendu d\'une question n\'invite à deviner que si on le lui demande (Révisions du jour inchangées)', async () => {
+  const lire = (f) => fs.readFile(new URL(`../public/${f}`, import.meta.url), 'utf8');
+  const [question, quiz, app] = await Promise.all([lire('kit/v1/question.js'), lire('kit/v1/quiz.js'), lire('app.js')]);
+  assert.match(question, /inviterADeviner = false/, 'par défaut : présentation d\'avant');
+  assert.match(quiz, /inviterADeviner: inviterADeviner\(quiz\)/);
+  const debut = app.indexOf('rendreQuestion(q, {');
+  assert.doesNotMatch(app.slice(debut, debut + 900), /inviterADeviner/);
 });

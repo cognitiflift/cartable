@@ -3,26 +3,37 @@
 // qu'assembler le quiz et envoyer le message à l'appli.
 // Usage (voir LISEZMOI.md) : <script type="application/json" id="cartable-quiz">{…}</script>
 //                            <script type="module" src="/kit/v1/quiz.js"></script>
-import { lireQuiz, messageScore } from './quiz-logique.js';
+import { lireQuiz, messageScore, inviterADeviner } from './quiz-logique.js';
 import { el, rendreQuestion } from './question.js';
 import { lectureActivee } from './lecture-logique.js';
 import { ajouterLecturePage } from './lecture.js';
 import { copieDeFigure } from './figure.js';
+import { appliquerEspacement } from './espacement.js';
+import { montrerPredictions } from './prediction.js';
 
 function demarrer() {
+  appliquerEspacement(document, location.search); // espacement des lettres du Profil (#160)
   // Lecture à voix haute (#76), si le Profil de l'Élève l'active : un bouton pour la page, un par question.
   const lecture = lectureActivee(location.search);
   if (lecture) ajouterLecturePage();
   const source = document.getElementById('cartable-quiz');
-  if (!source) return;
   let quiz = null;
-  try {
-    quiz = lireQuiz(JSON.parse(source.textContent));
-  } catch (e) {
-    console.error('Kit : quiz illisible', e);
+  if (source) {
+    try {
+      quiz = lireQuiz(JSON.parse(source.textContent));
+    } catch (e) {
+      console.error('Kit : quiz illisible', e);
+    }
   }
-  const zone = el('section', { className: 'kit-quiz' });
-  source.after(zone);
+  const zone = source ? el('section', { className: 'kit-quiz' }) : null;
+  source?.after(zone);
+  // Prédictions (#157) : déclarées dans la page, hors du quiz ; l'appli est prévenue de chaque réponse. Pas de Prédiction
+  // dans le Pré-test.
+  montrerPredictions(document, {
+    page: location.pathname.split('/').pop(), lecture: Boolean(lecture), pretest: quiz?.pretest === true, zoneQuiz: zone,
+    envoyer: (message) => window.parent.postMessage(message, '*'),
+  });
+  if (!source) return;
   if (!quiz) {
     zone.append(el('p', { className: 'kit-quiz-erreur' }, 'Ce quiz ne peut pas s’afficher.'));
     return;
@@ -57,8 +68,13 @@ function demarrer() {
     zone.append(rendreQuestion(q, {
       legende: q.bonus ? '🚀 Bonus · ' : `${++numero}. `,
       lecture,
+      // Deviner plutôt que s'abstenir (#153) : hors Pré-test, invitation à deviner et « Je ne sais pas » secondaire.
+      inviterADeviner: inviterADeviner(quiz),
       // Figure de la page désignée par la question (spec #123) : une copie par question ; un id introuvable est ignoré.
       figure: copieDeFigure(document, q.figure),
+      // Signaler (#146) : seulement une question comptée d'un quiz qui entre dans la Banque (ni bonus, ni Pré-test) ;
+      // l'appli reçoit un message, comme pour le score, et l'enregistre.
+      signaler: q.bonus || quiz.pretest ? null : async (raison) => window.parent.postMessage({ type: 'cartable-signalement', page, id: q.id, raison }, '*'),
       quandCorrigee: ({ choisie, sur }) => {
         choix[q.id] = choisie;
         if (typeof sur === 'boolean') confiance[q.id] = sur;

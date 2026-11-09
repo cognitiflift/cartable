@@ -147,6 +147,8 @@ spacing:
   bloc: "2.2rem"
   page-max: "1200px"
   marge-page: "clamp(1rem, 3vw, 2rem)"
+  espacement-lettres: "0.12em"
+  espacement-mots: "0.16em"
 components:
   en-tete:
     backgroundColor: "{colors.nuit}"
@@ -347,6 +349,8 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 ### Named Rules
 **La règle de la signalétique.** Les capitales espacées sont réservées aux cartouches de signalétique du réseau (terminus, Niveau, noms de jours) ; aucun texte courant, aucun titre n'est en capitales.
 
+**La règle de l'espacement des lettres.** Un réglage du Profil, coupé par défaut, agrandit l'espacement des lettres (`--espacement-lettres`, 0.12em) et des mots (`--espacement-mots`, 0.16em), les valeurs que WCAG 1.4.12 demande de supporter. Il s'applique à l'appli, aux Pages de leçon, au quiz et aux Révisions du jour ; les schémas SVG n'y sont pas soumis. Le texte doit rester lisible sans perte avec ce réglage : pas de hauteur fixe sur un bloc de texte.
+
 **La règle des chiffres alignés.** Les compteurs (Étoiles, Fusées, dates des tampons, total de l'en-tête) sont en chiffres tabulaires.
 
 ## Layout
@@ -429,6 +433,7 @@ La signature du système. Le trait est à la couleur de la Catégorie jusqu'à l
 La Page de leçon remplit l'écran sous un en-tête de Séance qui situe l'Élève sur son réseau.
 - **En-tête :** « ← Mes leçons », le cartouche de Niveau et le nom de la Leçon (Title), le mot de Maîtrise (rien quand la Leçon est acquise : le terminus allumé le dit), puis la ligne de la Leçon (`ligneLecon`, prochaine station en « vous êtes ici ») et « Ma fiche ». Sous 640px, la ligne passe sur sa propre rangée.
 - **Bulle du prof :** carte 18px à pose légère, au centre, sur le `voile` quand une page est dessous ; Réponses proposées en boutons pleins de 12px.
+- **Prédiction (Page de leçon, Kit) :** carte 14px comme les questions du quiz, filet d'accent de 1px tout autour (jamais un filet épais d'un seul côté) et teinte `accent-doux`, posée avant une partie de la page. Ses réponses sont des boutons de 2.75rem de haut au contour neutre ; la réponse choisie prend le contour `texte` des réponses du quiz avant correction. Jamais de vert ni de rouge : elle est hors score, il n'y a pas de faute à craindre. La révélation s'ouvre dans la carte, sous un filet pointillé d'accent, sans rien déplacer au-dessus.
 - **Retour de quiz :** carte 18px à pose légère en bas à droite, bouton ✕ secondaire de 2.6rem, au-dessus du Rebond.
 - **Leçon terminée :** carte 18px à pose légère, « 🏆 Leçon terminée » en Title Overpass, score du Défi et récompenses dessous.
 
@@ -438,11 +443,14 @@ Du lundi au dimanche, un tampon rond par jour, avec le nom du jour en label sign
 - **Pâle (travaillé) :** aplat d'accent à 22 % sur la carte.
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
+- **Jour réparé :** 🩹 en exposant sur le tampon, à la place de 🛡️ (une Série de jours réparée, pas un Joker).
+- **Notes sous l'Objectif du jour :** `small` en `doux`, sans reproche. La réparation proposée le jour du retour (🩹, avancement « 4/10 révisions ou 0/2 pages ») ; après une série repartie, « Ta meilleure série » et les jours travaillés en tout.
 - **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
+- **Moment de révision :** sous l'Objectif du jour, une question fermée en boutons secondaires (le choix en cours cerclé de 2px `accent`), proposée une fois par jour ; ensuite une ligne `doux` « Je reviens : … » et un lien « Changer » en texte `accent`, sans fond.
 
 ### Mes badges
 L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusées à droite en chiffres tabulaires), puis deux colonnes (une seule sous 900px) : le calendrier à gauche, la collection à droite.
-- **Calendrier :** une carte comme le bandeau de la semaine (18px, pose du bandeau), le mois en titre entre deux boutons secondaires ‹ ›, les noms de jours en label signalétique, puis un tampon de jour par date, le même que le bandeau (`tamponJour` dans `public/app.js`) : vide, futur, pâle, plein, 🛡️ Joker, aujourd'hui. Les jours d'avant le premier jour de l'Élève sont neutres (« avant » : date atténuée, sans contour), pour ne pas se lire comme des jours manqués, et ne se touchent pas plus que les jours futurs. Sous la grille, une légende d'une ligne en `doux` reprend trois petits tampons muets : travaillé, Objectif du jour atteint, joker. Chaque jour est un bouton ; le jour touché est entouré d'un anneau `texte` détouré de la carte, comme « vous êtes ici » (aujourd'hui choisi garde sa teinte mais perd son cadre, pour ne pas se souligner deux fois), et son détail (Leçons en liste quand il y en a plusieurs, quiz, Révisions du jour, gains en pastilles qui reviennent à la ligne) s'affiche sous un filet pointillé. Aujourd'hui est montré à l'ouverture. Au clavier, la grille (nommée par son mois, titre de section) ne compte qu'un arrêt de tabulation, et les flèches passent d'un jour à l'autre, d'un mois à l'autre ; les jours font au moins 2.75rem de haut. Les dates n'écrivent l'année que quand ce n'est pas celle d'aujourd'hui.
+- **Calendrier :** une carte comme le bandeau de la semaine (18px, pose du bandeau), le mois en titre entre deux boutons secondaires ‹ ›, les noms de jours en label signalétique, puis un tampon de jour par date, le même que le bandeau (`tamponJour` dans `public/app.js`) : vide, futur, pâle, plein, 🛡️ Joker, 🩹 jour réparé, aujourd'hui. Les jours d'avant le premier jour de l'Élève sont neutres (« avant » : date atténuée, sans contour), pour ne pas se lire comme des jours manqués, et ne se touchent pas plus que les jours futurs. Sous la grille, une légende d'une ligne en `doux` reprend quatre petits tampons muets : travaillé, Objectif du jour atteint, joker, jour réparé. Chaque jour est un bouton ; le jour touché est entouré d'un anneau `texte` détouré de la carte, comme « vous êtes ici » (aujourd'hui choisi garde sa teinte mais perd son cadre, pour ne pas se souligner deux fois), et son détail (Leçons en liste quand il y en a plusieurs, quiz, Révisions du jour, gains en pastilles qui reviennent à la ligne) s'affiche sous un filet pointillé. Aujourd'hui est montré à l'ouverture. Au clavier, la grille (nommée par son mois, titre de section) ne compte qu'un arrêt de tabulation, et les flèches passent d'un jour à l'autre, d'un mois à l'autre ; les jours font au moins 2.75rem de haut. Les dates n'écrivent l'année que quand ce n'est pas celle d'aujourd'hui.
 - **Mot d'accueil :** à la première ouverture, une phrase en gras sous le titre ; c'est l'appli qui parle, jamais la bulle du prof.
 - **Collection :** une carte simple (14px, filet), titrée « Ma collection » en Headline (1.45rem), dont les rangées sont séparées par des tirets. Chaque Badge commencé (au moins un Palier) est une **ligne de Badge** (`ligneBadge` dans `public/app.js`), le dernier Palier gagné en premier : la pastille du Badge et son nom (Overpass 800, 1.2rem), la phrase qui dit ce qu'il salue en `doux`, puis la ligne. Viennent ensuite, sous des titres de groupe en `doux` (Overpass 800, 1.2rem), « Surprises trouvées » (pastille `palier-unique`, nom, date) et « À découvrir » : les Badges sans Palier, pastille grisée, nom en `doux` et phrase, sans ligne ni décompte. Les surprises non trouvées restent cachées.
 - **Ligne de Badge :** la grammaire de la ligne, avec ses Paliers (bronze, argent, or, diamant ; trois pour certaines familles) pour stations, également espacées. Une station atteinte est la station blanche cerclée de la couleur de son Palier ; le prochain Palier est une station vide entourée du halo « vous êtes ici » en `doux` : la couleur d'un Palier ne se montre qu'une fois gagné. Le trait est en `doux` (aucune couleur de Catégorie) jusqu'au dernier Palier obtenu ; le tronçon vers le prochain se remplit en partie, selon le chemin fait d'après le meilleur compte atteint, qui ne recule jamais. Aucun chiffre ni pourcentage n'est affiché : c'est la seule jauge du système. Sous chaque station, son Palier (0.92rem, gras et `texte` une fois atteint), sa date courte et, s'il vient d'être gagné, la pastille « Nouveau ». La ligne entière porte un texte alternatif en mots (« Mémoire : bronze le 2 octobre 2026, argent le 6 octobre 2026 ; à mi-chemin du Palier or »).

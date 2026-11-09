@@ -13,6 +13,7 @@
   --kit-fond: #f2f4f8; --kit-texte: #14182b; --kit-doux: #4f566c; --kit-carte: #fff; --kit-bord: #dde1ea;
   --kit-accent: #262a7a; --kit-sur-accent: #fff; --kit-encre-noire: #000;
   --kit-juste: #15803d; --kit-faux: #b42318;
+  --kit-espacement-lettres: .12em; --kit-espacement-mots: .16em; /* WCAG 1.4.12 : valeurs de DESIGN.md (espacement-lettres, espacement-mots) */
   color-scheme: light dark;
 }
 [data-categorie="francais"]      { --kit-accent: #c2410c; }
@@ -94,6 +95,9 @@
 .kit-quiz-reponse.kit-fausse { border-color: var(--kit-faux); background: var(--kit-faux-fond); }
 /* Réponse choisie, avant la correction : un contour neutre, qui ne ressemble ni à « juste » ni à « faux ». */
 .kit-quiz-reponse.kit-choisie:not(.kit-bonne, .kit-fausse) { border-color: var(--kit-texte); box-shadow: inset 0 0 0 1px var(--kit-texte); }
+.kit-quiz-invitation { margin: .2rem 0 0; color: var(--kit-doux); font-size: .95rem; }
+/* « Je ne sais pas » au second plan (#153) : un bouton secondaire de DESIGN.md (filet, 600, 10px) après les réponses. */
+.kit-quiz-reponse.kit-secondaire { align-self: flex-start; margin-top: .3rem; border-width: 1px; font-weight: 600; background: var(--kit-carte); color: var(--kit-doux); min-height: 2.6rem; }
 .kit-quiz-confiance { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; }
 .kit-quiz-confiance[hidden] { display: none; }
 .kit-quiz-sur { font: inherit; padding: .4rem .9rem; border: 1px solid var(--kit-accent); border-radius: 999px; background: var(--kit-carte); color: inherit; cursor: pointer; }
@@ -107,6 +111,15 @@
 .kit-quiz-retour.kit-faux { background: var(--kit-faux-fond); }
 /* Juste en partie (crédit partiel des formats à plusieurs éléments, spec #48) : entre juste et faux. */
 .kit-quiz-retour.kit-partiel { background: color-mix(in srgb, var(--kit-juste-fond) 50%, var(--kit-faux-fond)); }
+/* Signaler une Question (#146) : discret sous la correction, un bouton-lien ; les raisons sont des boutons secondaires. */
+.kit-signaler { margin-top: .5rem; }
+.kit-signaler[hidden], .kit-signaler-raisons[hidden], .kit-signaler-bouton[hidden] { display: none; }
+.kit-signaler-bouton { font: inherit; font-size: .9rem; min-height: 2.4rem; padding: .3rem .4rem; border: 0; background: none; color: var(--kit-doux); text-decoration: underline; cursor: pointer; }
+.kit-signaler-bouton:hover { color: var(--kit-texte); }
+.kit-signaler-raisons { display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; margin: .3rem 0; }
+.kit-signaler-raison { font: inherit; font-weight: 600; min-height: 2.6rem; padding: .4rem .9rem; border-radius: 10px; cursor: pointer; border: 1px solid var(--kit-bord); background: var(--kit-carte); color: var(--kit-texte); }
+.kit-signaler-raison:hover:not(:disabled) { border-color: var(--kit-accent); }
+.kit-signaler-message { margin: .2rem 0 0; font-size: .9rem; color: var(--kit-doux); }
 .kit-quiz-valider {
   font: inherit; font-weight: 600; align-self: flex-start; padding: .5rem 1.1rem; border-radius: 999px; cursor: pointer;
   border: 2px solid var(--kit-accent); background: var(--kit-accent-doux); color: var(--kit-texte);
@@ -162,7 +175,34 @@
 .kit-devoile-reponse[hidden], .kit-devoile-souvenir[hidden] { display: none; }
 .kit-devoile-souvenir { display: flex; flex-direction: column; gap: .5rem; }
 
+/* Prédiction (#157) : une carte de la page, avant une partie, hors score. Filet d’accent tout autour et teinte douce, pour la
+   distinguer d'une question du quiz ; jamais de vert ni de rouge : il n'y a pas de bonne note à craindre. Sa réponse
+   choisie prend le contour neutre des réponses du quiz avant correction. */
+.kit-prediction { margin: 1.5rem 0; padding: .9rem 1.1rem; border-radius: 14px; border: 1px solid var(--kit-accent); background: var(--kit-accent-doux); }
+.kit-prediction p { margin: 0; }
+.kit-prediction-etiquette { font-weight: 700; color: var(--kit-accent-fort); font-size: .95rem; }
+.kit-prediction .kit-prediction-enonce { font-weight: 600; margin: .3rem 0 .6rem; }
+.kit-prediction-reponses { display: flex; flex-direction: column; gap: .5rem; }
+.kit-prediction-reponse {
+  font: inherit; text-align: left; min-height: 2.75rem; padding: .6rem .9rem; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--kit-bord); background: var(--kit-carte); color: var(--kit-texte);
+}
+.kit-prediction-reponse:hover:not(:disabled) { border-color: var(--kit-accent); }
+.kit-prediction-reponse:disabled { cursor: default; }
+.kit-prediction-reponse.kit-choisie { border-color: var(--kit-texte); box-shadow: inset 0 0 0 1px var(--kit-texte); }
+.kit-prediction .kit-prediction-note { margin-top: .6rem; color: var(--kit-doux); font-size: .9rem; }
+.kit-prediction-note[hidden] { display: none; }
+.kit-prediction-revelation { margin-top: .6rem; }
+.kit-prediction-revelation:not(:empty) { padding: .6rem .9rem; border-radius: 10px; background: var(--kit-carte); border: 1px dashed var(--kit-accent); }
+.kit-prediction-fin { height: 1px; }
+
 .kit-quiz-note { color: var(--kit-doux); font-size: .9rem; margin: 0; }
 .kit-quiz-fin { text-align: center; }
 .kit-quiz-score { font: 800 1.4rem/1.2 var(--kit-police-titre); color: var(--kit-accent-fort); }
 .kit-quiz-erreur { color: var(--kit-faux); }
+
+/* Espacement des lettres (#160) : réglage du Profil, transmis par l'adresse de la page (espacement.js). Hérité par tout
+   le texte ; les schémas SVG ne sont pas touchés. */
+html.kit-espacement { letter-spacing: var(--kit-espacement-lettres); word-spacing: var(--kit-espacement-mots); }
+html.kit-espacement :is(h1, h2, h3, h4) { letter-spacing: var(--kit-espacement-lettres); }
+html.kit-espacement svg, html.kit-espacement svg * { letter-spacing: normal; word-spacing: normal; }

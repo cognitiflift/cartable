@@ -1093,7 +1093,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       cadre);
     fiche.style.display = '';
   };
-  const boutonFiche = h('button', { className: 'secondaire fiche-ouvrir', onclick: ouvrirFiche }, '📋 Ma fiche');
+  const boutonFiche = h('button', { className: 'secondaire fiche-ouvrir', ariaLabel: 'Ma fiche', onclick: ouvrirFiche }, '📋', h('span', { className: 'fiche-libelle' }, ' Ma fiche'));
 
   // En-tête de Séance : l'Élève est sur la ligne de sa Leçon, à la couleur de sa Catégorie, comme sur sa carte
   // d'accueil : Niveau, nom, mot de Maîtrise (Acquis : dit par le terminus allumé), puis la ligne et sa prochaine station.
@@ -1103,7 +1103,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
       retourAccueil(),
       h('div', { className: 'seance-titre' },
         lecon.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${lecon.niveauLecon}`),
-        h('h2', {}, lecon.titre),
+        h('h2', { title: lecon.titre }, lecon.titre),
         lecon.maitrise?.palier !== 'acquis' && badgeMaitrise(lecon.maitrise)),
       ligneLecon(lecon, { ici: true }),
       lecon.references.length > 0 && boutonFiche,

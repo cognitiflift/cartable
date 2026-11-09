@@ -18,6 +18,12 @@ test('Modèle selon la tâche : les Propositions et les Variantes passent toujou
   }
 });
 
+test('Modèle selon la tâche : la carte de ligne passe toujours par Sonnet, effort medium, secours Haiku, quel que soit le Profil', () => {
+  for (const profil of ['haiku', 'sonnet', 'opus']) {
+    assert.deepEqual(modeleDeLaTache('carte', profil), { modele: 'sonnet', effort: 'medium', secours: 'haiku' });
+  }
+});
+
 test('Modèle selon la tâche : chaque type de tâche a un Modèle de secours différent du Modèle principal', () => {
   for (const tache of TACHES) {
     for (const profil of ['haiku', 'sonnet', 'opus']) {

@@ -49,6 +49,23 @@ const sortie = Object.fromEntries(demandes.map((q) => [q.cle, [
 ]]));
 fs.writeFileSync('variantes.json', JSON.stringify(sortie));
 `);
+  // Dans le dossier d'une carte de ligne, il note chaque lancement (`lancements-carte`), ses arguments (`args-carte`) et
+  // le prompt reçu (`prompt-carte`), puis répond trois calques conformes (faux-carte.mjs, 0,5 $ le tour). `carte-attendre` le fait
+  // patienter, `carte-echouer` le fait échouer, `carte-refusee` lui fait rendre un SVG refusé par le filtre,
+  // `carte-premiere-refusee` seulement au premier lancement.
+  await fs.writeFile(path.join(dossier, 'faux-carte.mjs'), `import fs from 'node:fs';
+const prompt = process.argv[2];
+const id = /Identifiant de la carte : (\\S+)/.exec(prompt)[1];
+const lancements = fs.readFileSync(process.argv[3], 'utf8').trim().split('\\n').length;
+const refuse = fs.existsSync(process.argv[4]) || (fs.existsSync(process.argv[5]) && lancements === 1);
+const svg = (interieur) => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280">' + interieur + '</svg>';
+const calques = {
+  l1: svg('<defs><linearGradient id="' + id + '-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--nuit)"/><stop offset="1" stop-color="var(--ligne-sciences)"/></linearGradient></defs><rect width="200" height="280" fill="url(#' + id + '-ciel)"/>'),
+  l2: svg('<path d="M0 150 L60 100 L120 150 Z" fill="var(--encre-noire)"/>'),
+  heros: svg(refuse ? '<text x="1" y="1">volcan</text>' : '<path d="M40 200 L100 60 L230 200 Z" fill="var(--rouge)" class="pc-a-flamme" style="transform-origin:100px 200px"/>'),
+};
+console.log(JSON.stringify({ result: JSON.stringify(calques), session_id: 's-carte', is_error: false, total_cost_usd: 0.5, duration_ms: 1000, usage: { input_tokens: 10, output_tokens: 100 }, modelUsage: { 'claude-sonnet-test': { costUSD: 0.5 } } }));
+`);
   const faux = path.join(dossier, 'faux-claude.sh');
   await fs.writeFile(faux, `#!/bin/sh
 USAGE='"duration_ms":1000,"usage":{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}'
@@ -58,6 +75,18 @@ else
   COUT=',"total_cost_usd":0.25,'"$USAGE"',"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}'
 fi
 [ -e '${dossier}/sans-cout' ] && COUT=''
+if [ "$(basename "$PWD")" = carte ]; then
+  echo lancement >> '${dossier}/lancements-carte'
+  printf '%s\n' "$@" > '${dossier}/args-carte'
+  printf '%s' "$2" > '${dossier}/prompt-carte'
+  while [ -e '${dossier}/carte-attendre' ]; do sleep 0.05; done
+  if [ -e '${dossier}/carte-echouer' ]; then
+    echo '{"result":"You have hit your limit","is_error":true}'
+    exit 0
+  fi
+  node '${dossier}/faux-carte.mjs' "$2" '${dossier}/lancements-carte' '${dossier}/carte-refusee' '${dossier}/carte-premiere-refusee'
+  exit 0
+fi
 if [ "$(basename "$PWD")" = variantes ]; then
   echo lancement >> '${dossier}/lancements-variantes'
   printf '%s\n' "$@" > '${dossier}/args-variantes'
@@ -1524,7 +1553,7 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.equal(parId[a.id].titre, 'Les volcans');
   assert.equal(parId[a.id].total.coutUsd, 0.75);
   assert.deepEqual(Object.fromEntries(Object.entries(parId[a.id].parTache).map(([t, c]) => [t, c.tours])),
-    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0, variantes: 0 });
+    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0, variantes: 0, carte: 0 });
   assert.equal(parId[b.id].total.coutUsd, 0.5);
   assert.equal(parId[b.id].parTache.premiereSeance.tours, 2);
 
@@ -3606,8 +3635,129 @@ test('Cartes de ligne : une Leçon qui devient Acquise après la livraison donne
   await fs.rm(path.join(eleves, slug, 'lecons', lecon.id), { recursive: true });
   const fin = await cartesDe(slug, '2027-03-02T10:00:00.000Z');
   assert.deepEqual(fin.cartesLigne.map((c) => c.titre), ['Les volcans']);
-  // Pas encore de composition : la carte reste « à composer ».
-  assert.equal(fin.cartesLigne[0].etat, 'a-composer');
+  // La composition se fait en arrière-plan (#184) : la carte finit prête, même sans Leçon.
+  const prete = await sonderJusqua(async () => (await cartesDe(slug, '2027-03-02T10:00:00.000Z')).cartesLigne[0], (c) => c.etat === 'prete', 'Carte jamais prête');
+  assert.equal(prete.etat, 'prete');
+});
+
+// Composition des cartes de ligne par l'agent (#184), faux `claude` (voir faux-carte.mjs).
+const nbLancementsCartes = async () => (await fs.readFile(path.join(dossier, 'lancements-carte'), 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length;
+const carteDe = async (slug) => JSON.parse(await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8')).cartes;
+// Élève dont la Leçon vient de devenir Acquise : fichier de cartes déjà livré, carte non encore enregistrée ; les
+// traces des compositions précédentes sont effacées. `declencher()` enregistre la carte (un calcul de Badges).
+const eleveCarte = async (pseudo) => {
+  const { slug, lecon } = await leconAcquise(pseudo, ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify({ version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: {}, paliers: {} }));
+  for (const f of ['lancements-carte', 'args-carte', 'prompt-carte']) await fs.rm(path.join(dossier, f), { force: true });
+  const declencher = () => cartesDe(slug, '2026-10-03T10:00:00.000Z');
+  const etat = (id = lecon.id) => sonderJusqua(() => carteDe(slug), (c) => ['prete', 'generique'].includes(c[id]?.etat), 'Carte jamais composée');
+  return { slug, lecon, declencher, etat };
+};
+
+test('Carte de ligne : composée en arrière-plan par Sonnet, calques filtrés gardés, Coût rattaché à la Leçon', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Compose');
+  await avecFichier('carte-attendre', async () => {
+    const vue = await declencher(); // la réponse n'attend pas la composition
+    assert.equal(vue.cartesLigne[0].etat, 'a-composer');
+    await sonderJusqua(nbLancementsCartes, (n) => n === 1, 'Composition jamais lancée');
+    assert.equal((await carteDe(slug))[lecon.id].etat, 'en-composition');
+  });
+  const carte = (await etat())[lecon.id];
+  assert.equal(carte.etat, 'prete');
+  assert.equal(carte.essais, 1);
+  assert.deepEqual(Object.keys(carte.calques), ['l1', 'l2', 'heros']);
+  assert.match(carte.calques.l1, new RegExp(`id="${lecon.id}-ciel"`));
+  const args = await fs.readFile(path.join(dossier, 'args-carte'), 'utf8');
+  assert.match(args, /--model\nsonnet\n/);
+  assert.match(args, /--effort\nmedium\n/);
+  assert.match(args, /--fallback-model\nhaiku\n/);
+  assert.doesNotMatch(args, /--add-dir/);
+  const prompt = await fs.readFile(path.join(dossier, 'prompt-carte'), 'utf8');
+  assert.ok(prompt.includes(`Identifiant de la carte : ${lecon.id}`));
+  assert.match(prompt, /Sujet : Les volcans/);
+  assert.match(prompt, /var\(--ligne-sciences\)/);
+  assert.match(prompt, /Nommer les parties d’un volcan ; Expliquer une éruption ; Situer trois volcans/);
+  // Le Coût du tour est rattaché à la Leçon, avec son type de tâche.
+  const couts = (await appel(`/api/eleves/${slug}/couts`)).data;
+  const lecture = couts.lecons.find((l) => l.id === lecon.id);
+  assert.equal(lecture.parTache.carte.tours, 1);
+  assert.equal(lecture.parTache.carte.coutUsd, 0.5);
+  assert.equal(couts.parTache.carte.tours, 1);
+  // La carte est à retourner, et ne se recompose pas.
+  assert.deepEqual((await declencher()).aRetourner.filter((c) => c.type === 'ligne'), [{ type: 'ligne', id: lecon.id }]);
+  await pause();
+  assert.equal(await nbLancementsCartes(), 1);
+});
+
+test('Carte de ligne : un SVG refusé est un échec ; deux tentatives au plus, la seconde seulement après un échec', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Refusee');
+  await avecFichier('carte-premiere-refusee', async () => {
+    await declencher();
+    assert.equal((await etat())[lecon.id].etat, 'prete');
+  });
+  assert.equal(await nbLancementsCartes(), 2); // refusée, puis acceptée
+  assert.equal((await carteDe(slug))[lecon.id].essais, 2);
+  assert.equal((await appel(`/api/eleves/${slug}/couts`)).data.parTache.carte.tours, 2); // chaque tour compte
+});
+
+test('Carte de ligne : deux échecs donnent la scène générique, sans troisième appel à l\'agent', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Generique');
+  await avecFichier('carte-refusee', async () => {
+    await declencher();
+    assert.equal((await etat())[lecon.id].etat, 'generique');
+  });
+  assert.equal(await nbLancementsCartes(), 2);
+  const carte = (await carteDe(slug))[lecon.id];
+  assert.deepEqual(Object.keys(carte.calques), ['l1', 'l2', 'heros']);
+  assert.deepEqual((await cartesDe(slug, '2026-10-03T11:00:00.000Z')).aRetourner.filter((c) => c.type === 'ligne'), [{ type: 'ligne', id: lecon.id }]); // retournable
+  await pause();
+  assert.equal(await nbLancementsCartes(), 2);
+});
+
+test('Carte de ligne : une panne de l\'agent est un échec de la tentative, deux pannes donnent la scène générique', async () => {
+  const { lecon, declencher, etat } = await eleveCarte('Carte-Panne');
+  await avecFichier('carte-echouer', async () => {
+    await declencher();
+    assert.equal((await etat())[lecon.id].etat, 'generique');
+  });
+  assert.equal(await nbLancementsCartes(), 2);
+});
+
+test('Carte de ligne : après les tâches de Séance seulement, sans bloquer la Séance', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Apres-Seance');
+  const autre = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les pyramides' })).data);
+  await fs.rm(path.join(dossier, `demarre-${autre.id}`), { force: true });
+  await avecFichier('lent', async () => {
+    const tour = appel(`/api/eleves/${slug}/lecons/${autre.id}/messages`, 'POST', { texte: 'Encore' });
+    await sonderJusqua(() => existe(path.join(dossier, `demarre-${autre.id}`)), (d) => d, 'Tour jamais démarré');
+    await declencher(); // une Séance travaille : la carte attend
+    await pause(400);
+    assert.equal(await nbLancementsCartes(), 0);
+    assert.equal((await carteDe(slug))[lecon.id].etat, 'a-composer');
+    assert.equal((await appel(`/api/eleves/${slug}`)).status, 200); // l'Élève n'est pas bloqué
+    await fs.rm(path.join(dossier, 'lent'), { force: true });
+    assert.equal((await tour).status, 200);
+  });
+  assert.equal((await etat())[lecon.id].etat, 'prete'); // la Séance finie, la composition part
+  assert.equal(await nbLancementsCartes(), 1);
+});
+
+test('Carte de ligne : une seule composition à la fois par Élève, dans l\'ordre', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Une-Seule');
+  const dates = ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z'];
+  const seconde = await avecFichier('objectifs', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les pyramides' })).data);
+  for (const date of dates) await appel(`/api/eleves/${slug}/lecons/${seconde.id}/scores`, 'POST', { score: 100, page: '0001-volcans.html', objectifs: [1, 2, 3] }, le(date));
+  await fs.writeFile(path.join(eleves, slug, 'lecons', seconde.id, 'questions.json'), JSON.stringify(banqueParObjectif(dates)));
+  await avecFichier('carte-attendre', async () => {
+    await declencher(); // deux Leçons Acquises : deux cartes « à composer »
+    await sonderJusqua(nbLancementsCartes, (n) => n === 1, 'Composition jamais lancée');
+    await pause(400);
+    assert.equal(await nbLancementsCartes(), 1); // une seule à la fois
+    assert.deepEqual(Object.values(await carteDe(slug)).map((c) => c.etat).sort(), ['a-composer', 'en-composition']);
+  });
+  await etat(lecon.id);
+  await etat(seconde.id);
+  assert.equal(await nbLancementsCartes(), 2);
 });
 
 test('Cartes de ligne : une Leçon déjà Acquise à la livraison est écartée, même si elle redescend puis redevient Acquise', async () => {

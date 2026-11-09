@@ -348,7 +348,7 @@ async function ecranParent(profil) {
   const moment = await api(`eleves/${profil.slug}/moment/heures`);
   const contexte = { slug: profil.slug, profil, moment, recharger: () => ecranParent(profil) };
   montrer(
-    h('h2', {}, `👪 Vue parent : ${profil.pseudo}`),
+    h('h2', { className: 'vue-parent-titre' }, `👪 Vue parent : ${profil.pseudo}`),
     h('p', {}, h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, '← Profil')),
     h('nav', { className: 'sommaire-parent', 'aria-label': 'Sommaire de la Vue parent' },
       BLOCS_PARENT.map(({ id, titre }) => h('a', { href: '#/parent', onclick: allerAuBloc(id) }, titre))),

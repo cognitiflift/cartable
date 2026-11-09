@@ -409,3 +409,12 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 /* Cibles tactiles de la Vue parent (#167) : liens de Leçon, listes et champs à au moins 2.75rem, sans changer la grille. */
 .vue-parent a { display:inline-flex; align-items:center; min-height:2.75rem; }
 .vue-parent :is(select, input, summary) { min-height:2.75rem; }
+/* Chargement et pannes (#169) : l'indicateur d'attente est une carte simple avec la ligne « en travaux », jamais rouge ;
+   le bloc d'erreur prend la place du bloc en échec, avec « Réessayer ». */
+.attente-chargement { display:flex; flex-direction:column; gap:.8rem; max-width:24rem; margin:2rem 0; padding:1.2rem 1.4rem; }
+.attente-chargement p { margin:0; }
+.attente-chargement .ligne { margin:.2rem 0; }
+.attente-chargement .ligne.en-travaux::before { animation:travaux-avancent 1.4s linear infinite; }
+.bloc-erreur { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1.2rem; margin:.5rem 0; }
+.bloc-erreur .erreur { min-height:0; margin:0; font-weight:600; }
+.bloc-erreur button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }

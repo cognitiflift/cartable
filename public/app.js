@@ -2,6 +2,7 @@ import { rendreQuestion } from '/kit/v1/question.js';
 import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
   confirmationFichiers, messageSujet, FICHIERS_MANQUANTS,
@@ -153,7 +154,9 @@ const PALIERS_DE_MAITRISE = {
 
 // Vue parent (#77) : un écran par Élève, pour le parent, agrégé par le serveur (GET …/parent). Une section par clé
 // des agrégats : SECTIONS_PARENT en ajoute une sans toucher aux autres (indicateurs, #78).
-const equivalentUsd = (usd) => usd.toLocaleString('fr-BE', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+// Montant en dollars, dit en toutes lettres (« 1,23 dollars ») plutôt que par un sigle de devise.
+const equivalentUsd = (usd) => `${usd.toLocaleString('fr-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} dollars`;
+const foisProf = (n) => `${n} fois`;
 const listeOuVide = (elements, vide) => (elements.length ? h('ul', {}, elements) : h('p', { className: 'doux' }, vide));
 // Le parent ouvre la Leçon en aperçu (#/apercu/…) : ce n'est pas un retour de l'Élève pour les indicateurs (#78).
 const avecLecon = (texte, item) => h('li', {}, texte, ' ', h('a', { href: `#/apercu/${item.lecon}`, className: 'doux' }, `(${item.titreLecon})`));
@@ -200,11 +203,13 @@ const SECTIONS_PARENT = [
     listeOuVide(recents.map((b) => h('li', {}, `${b.emoji} ${nomEtPalier(b)} · ${dateBadge(b.jour)}`)),
       'Aucun Badge ces 7 derniers jours.')] },
   { titre: '💶 Coût des Leçons', rendu: ({ cout }) => [
-    h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} en ${pluriel(cout.total.tours, 'appel')} au prof, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
-    listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${pluriel(l.tours, 'appel')})`)), 'Aucune Leçon.')] },
+    h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} pour ${foisProf(cout.total.tours)} où le prof a répondu, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
+    listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${foisProf(l.tours)})`)), 'Aucune Leçon.')] },
   // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
   { titre: '📈 Indicateurs', rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
+    h('p', {}, conclusionDesIndicateurs({ souvenir, retour, calibration })),
+    h('details', { className: 'pour-les-curieux' }, h('summary', {}, 'Pour les curieux'),
     h('ul', {},
       h('li', {}, 'Souvenir aux Révisions du jour : ', souvenir.reponses
         ? `${souvenir.pourcentage} % (${souvenir.justes} sur ${pluriel(souvenir.reponses, 'réponse')})` : 'pas encore de Révision du jour.'),
@@ -212,7 +217,7 @@ const SECTIONS_PARENT = [
         ? `${retour.pourcentage} % (${retour.revenus} sur ${pluriel(retour.lecons, 'Leçon')})` : 'pas encore mesurable.',
         retour.enAttente ? ` ${pluriel(retour.enAttente, 'Leçon')} trop récente${retour.enAttente > 1 ? 's' : ''} pour le dire.` : ''),
       h('li', {}, 'Attente du prof : ', attente.tours
-        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (${pluriel(attente.tours, 'tour')})` : 'aucun tour.'),
+        ? `${attente.medianeSecondes} s d’habitude, ${attente.maxSecondes} s au plus (sur ${attente.tours} fois où le prof a répondu)` : 'le prof n’a pas encore répondu.'),
       h('li', {}, 'Objectifs Retenus il y a au moins 30 jours, encore Retenus : ', retenu30.objectifs
         ? `${retenu30.pourcentage} % (${retenu30.encoreRetenus} sur ${pluriel(retenu30.objectifs, 'Objectif')})` : 'pas encore mesurable.'),
       h('li', {}, '« Je ne sais pas » : ', partJeNeSaisPas(jeNeSaisPas.quiz, 'dans les quiz de page', 'aucun quiz de page'), ' ',
@@ -221,7 +226,7 @@ const SECTIONS_PARENT = [
         ? MESURES_REBOND.filter(([cle]) => reussiteParRebond[cle].quiz).map(([cle, mot]) =>
           `${mot} ${reussiteParRebond[cle].pourcentage} % (${pluriel(reussiteParRebond[cle].quiz, 'quiz')})`).join(' ; ') + '.'
         : 'pas encore de quiz.'),
-      h('li', {}, 'Planificateur de mémoire : ', texteDuPlanificateur(planificateur)),
+      h('li', {}, 'Planificateur de mémoire, ', texteDuPlanificateur(planificateur)),
       h('li', {}, 'Révisions les jours où des Questions étaient dues : ', revisionsDesJoursDus.jours
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
       h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
@@ -229,17 +234,17 @@ const SECTIONS_PARENT = [
       h('li', {}, 'Questions : ', `${pluriel(qs.signalees, 'signalée')}, ${pluriel(qs.retablies, 'rétablie')} sur la période ; ${pluriel(qs.suspectes, 'suspecte')} en ce moment.`),
     ),
     h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
-    h('p', { className: 'doux' }, 'Pour chaque tranche de probabilité de se souvenir prédite avant la réponse, la part de réponses justes aux Révisions du jour.'),
-    h('ul', {}, calibration.map((t) => h('li', {}, `Prédit ${t.de} à ${t.a} % : `, t.reponses
-      ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % prédit en moyenne)` : 'aucune réponse.')))] },
+    h('p', { className: 'doux' }, 'Pour chaque tranche de chances de s’en souvenir annoncées par l’appli avant la réponse, la part de réponses justes aux Révisions du jour.'),
+    h('ul', {}, calibration.map((t) => h('li', {}, `Quand l’appli pensait qu’il s’en souviendrait à ${t.de}–${t.a} % : `, t.reponses
+      ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % annoncé en moyenne)` : 'aucune réponse.'))))] },
 ];
 
 // Planificateur de mémoire (#161), en mots : celui qui sert et pourquoi, avec la perte de prédiction de chacun (plus basse = mieux).
 const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
-  const nom = utilise === 'fsrs6' ? 'FSRS-6' : 'FSRS-5';
-  if (reponses < seuil) return `${nom} (il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour comparer, ${reponses} jusqu’ici).`;
-  const chiffres = `perte de prédiction ${String(fsrs5.perte).replace('.', ',')} pour FSRS-5, ${String(fsrs6.perte).replace('.', ',')} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}`;
-  return `${nom} (${chiffres}).`;
+  const base = `méthode de calcul des rappels utilisée : ${utilise === 'fsrs6' ? 'FSRS-6, la plus récente' : 'FSRS-5, l’ancienne'}.`;
+  if (reponses < seuil) return `${base} Il faut ${pluriel(seuil, 'réponse')} aux Révisions du jour pour la comparer à l’autre, ${reponses} jusqu’ici.`;
+  const erreur = (m) => String(m.perte).replace('.', ',');
+  return `${base} Elle est choisie parce qu’elle devine le mieux ce que l’Élève retient : erreur de prédiction (plus basse = mieux) ${erreur(fsrs5)} pour FSRS-5, ${erreur(fsrs6)} pour FSRS-6, sur ${pluriel(reponses, 'réponse')}.`;
 };
 
 // Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »

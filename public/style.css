@@ -325,6 +325,8 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .section-repliable[open] > summary::before { transform:translateY(.1rem) rotate(45deg); }
 .section-repliable > summary h4 { margin:0; }
 @media (prefers-reduced-motion: reduce) { .section-repliable > summary::before { transition:none; } }
+details.pour-les-curieux summary { padding-block:.7rem; cursor:pointer; font-weight:700; color:var(--doux); }
+details.pour-les-curieux summary:hover { color:var(--texte); }
 .rappel-heures { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin:.5rem 0 .8rem; }
 .rappel-heures label { display:flex; flex-direction:column; gap:.2rem; font-weight:600; }
 .vue-parent-jours { border-collapse:collapse; } .vue-parent-jours th, .vue-parent-jours td { padding:.2rem .8rem; text-align:left; border-bottom:1px solid var(--bord); }

@@ -20,10 +20,10 @@ THESIS: chaque Leçon est une ligne du réseau, à la couleur de sa Catégorie, 
 
 OWN-WORLD: plan du réseau STIB. En-tête bleu nuit (#14182b) ; fond gris clair froid, cartes blanches (en sombre : fond #0f1220, cartes #1a1e30). Traits épais aux couleurs des Catégories du Kit, stations en anneau sur le trait, terminus « Acquis » en cartouche de signalétique. Overpass (signalétique) pour les titres et les noms de ligne, Atkinson Hyperlegible Next pour le texte, chiffres tabulaires. Une seule couleur pour ce qui est nouveau.
 
-STORY: l'Élève voit ses lignes, repère celle où il en était, lit sa prochaine station et touche Continuer. Il voit sa semaine tamponnée et son total d'Étoiles sans qu'ils lui volent la vedette.
+STORY: l'Élève voit ses lignes, repère celle où il en était, lit sa prochaine station et touche Continuer. Il voit son Objectif du jour, ses gains d'aujourd'hui et son total d'Étoiles sans qu'ils lui volent la vedette.
 
-FIRST VIEWPORT: en-tête bleu nuit : 🎒 Cartable, puis à droite le badge ⭐ total (→ Mes badges), Profil et Changer. Dessous, le bandeau de la semaine, lundi→dimanche : un tampon par jour (vide, pâle, plein, 🛡️), avec les ⭐ 🚀 et Badges du jour ; à droite, l'Objectif du jour, la série et les Révisions du jour (contour accent et pastille de compte s'il y a des Questions dues). Puis « Mes leçons » et, à droite, « ✨ Apprendre quelque chose de nouveau ». Puis les Catégories en cartes de ligne, deux colonnes sur grand écran : nom de la Leçon, palier de Maîtrise, ligne et stations, terminus, prochaine station, Étoiles et Fusées, Continuer, déplier les Objectifs.
+FIRST VIEWPORT: en-tête bleu nuit : 🎒 Cartable, puis à droite le badge ⭐ total (→ Mes badges), Profil et Changer. Dessous, le bandeau du jour : le salut et la série à gauche ; à droite, l'Objectif du jour avec les ⭐ 🚀 et Badges gagnés aujourd'hui, et les Révisions du jour (contour accent et pastille de compte s'il y a des Questions dues). Puis « Mes leçons » et, à droite, « ✨ Apprendre quelque chose de nouveau ». Puis les Catégories en cartes de ligne, deux colonnes sur grand écran : nom de la Leçon, palier de Maîtrise, ligne et stations, terminus, prochaine station, Étoiles et Fusées, Continuer, déplier les Objectifs.
 
-FORM: Plan du réseau, rang 1 de ma liste ordonnée (pick), avec ce que l'utilisateur a repris du Journal de classe (rang 3, tiré au sort) : le bandeau de la semaine. seed:bb990adead01b302
+FORM: Plan du réseau, rang 1 de ma liste ordonnée (pick), avec ce que l'utilisateur a repris du Journal de classe (rang 3, tiré au sort) : le bandeau du jour. seed:bb990adead01b302
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

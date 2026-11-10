@@ -207,3 +207,102 @@ test('Accueil : la carte de la Leçon attend face cachée dans son encart, la c�
   assert.equal(await existe('.cl-nouvelles'), false);
   assert.deepEqual(cdp.erreursPage, []);
 });
+
+// Ticket #197 : une carte pas encore composée s'ouvre sur l'attente (esquisse), puis se fond dans la cérémonie dès qu'elle
+// est prête, sans second geste ; le retournement n'est enregistré qu'à ce moment.
+async function eleveCartePasPrete(pseudo) {
+  const eleves = path.join(dossier, 'eleves');
+  const store = createStore(eleves);
+  const profil = await store.creerEleve({ pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecon = (await store.creerLecon(profil.slug, { sujet: 'Les volcans', mode: 'libre' })).id;
+  const carte = { lecon, titre: 'Les volcans', categorie: 'sciences', objectifs: 3, jourAcquisition: '2026-11-02', etat: 'en-composition', essais: 1, calques: null, prete: null, retourne: null };
+  const fichier = path.join(eleves, profil.slug, 'cartes.json');
+  const ecrire = (c) => fs.writeFile(fichier, JSON.stringify({ version: 1, livraison: '2026-10-01T10:00:00.000Z', son: false, ecartees: [], cartes: { [lecon]: c }, paliers: {} }));
+  await ecrire(carte);
+  const rendrePrete = () => ecrire({ ...carte, etat: 'prete', calques: sceneGenerique({ lecon, categorie: 'sciences' }), prete: '2026-11-02T10:00:00.000Z' });
+  return { slug: profil.slug, fichier, rendrePrete, lecon };
+}
+
+async function ouvrirAccueil(slug, { mouvementReduit = false } = {}) {
+  await cdp.envoyer('Emulation.setDeviceMetricsOverride', { width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
+  await cdp.envoyer('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mouvementReduit ? 'reduce' : 'no-preference' }] });
+  await cdp.envoyer('Page.navigate', { url: base });
+  await jusqua(() => cdp.evaluer(`document.readyState === 'complete' && !!document.getElementById('app')`), 'page chargée');
+  await cdp.evaluer(`localStorage.setItem('pseudo', ${JSON.stringify(slug)}); location.hash = '#/'; location.reload(); true`);
+  await jusqua(() => existe('.lecon .lecon-carte .carte-cachee'), 'dos de la carte dans l\'encart');
+}
+
+test('Attente : la carte pas prête s\'ouvre sur l\'esquisse, puis la cérémonie prend le relais dès qu\'elle est prête', { skip: raison, timeout: 40_000 }, async () => {
+  const { slug, fichier, rendrePrete, lecon } = await eleveCartePasPrete('Cdp-Attente');
+  await ouvrirAccueil(slug);
+  assert.equal(await cdp.evaluer(`document.querySelector('.lecon .lecon-carte .carte-cachee').disabled`), false, 'la carte en préparation se touche');
+  await clic('.lecon .lecon-carte .carte-cachee');
+  await jusqua(() => existe('dialog.cartes-ceremonie[open] .cer-carte .carte-cachee'), 'cérémonie ouverte sur le dos de la carte');
+  await clic('dialog.cartes-ceremonie .cer-carte .carte-cachee');
+  await jusqua(() => existe('dialog[open] .att-carte .att-in svg'), 'esquisse affichée');
+  assert.equal(await cdp.evaluer(`document.querySelector('dialog[open] .cer-texte').textContent`), 'Ta carte se prépare');
+  assert.equal(await existe('dialog[open] .cl-heros'), false, 'aucun héros annoncé');
+  assert.equal(await visible('dialog[open] .att-pause'), true, 'pause visible dès le départ');
+  assert.equal(await cdp.evaluer(`document.querySelector('dialog[open] .att-pause').hasAttribute('aria-pressed')`), false);
+  // La pause change seulement de libellé.
+  await clic('dialog[open] .att-pause');
+  assert.equal(await cdp.evaluer(`document.querySelector('dialog[open] .att-pause').textContent`), 'Reprendre');
+  assert.equal(await cdp.evaluer(`document.querySelector('dialog[open] .att-carte').classList.contains('pause')`), true);
+  await clic('dialog[open] .att-pause');
+  // Pas prête : rien n'est enregistré.
+  assert.equal(JSON.parse(await fs.readFile(fichier, 'utf8')).cartes[lecon].retourne, null);
+  await rendrePrete();
+  await jusqua(() => existe('dialog[open] .cer-carte .carte-ligne-carte.entree'), 'cérémonie sans second geste', 8000);
+  assert.equal(await existe('dialog[open] .att-carte'), false, 'l\'esquisse a cédé la place');
+  await jusqua(() => visible('dialog[open] .cer-ok'), 'bouton « Fermer » affiché', 6000);
+  await jusqua(async () => JSON.parse(await fs.readFile(fichier, 'utf8')).cartes[lecon].retourne, 'retournement enregistré');
+  await clic('dialog[open] .cer-ok');
+  await jusqua(async () => !(await existe('dialog[open]')) && await existe('.lecon .lecon-carte .carte-ligne-carte:not(.carte-cachee)'), 'carte rangée dans l\'encart');
+  assert.equal(await existe('.lecon .lecon-carte .cl-calque svg'), true, 'la carte rangée porte ses calques composés');
+  assert.deepEqual(cdp.erreursPage, []);
+});
+
+test('Attente : sous prefers-reduced-motion, l\'esquisse est fixe et complète, sans bouton Pause', { skip: raison, timeout: 40_000 }, async () => {
+  const { slug, rendrePrete } = await eleveCartePasPrete('Cdp-Attente-Reduit');
+  await ouvrirAccueil(slug, { mouvementReduit: true });
+  await clic('.lecon .lecon-carte .carte-cachee');
+  await jusqua(() => existe('dialog[open] .cer-carte .carte-cachee'), 'cérémonie ouverte');
+  await clic('dialog[open] .cer-carte .carte-cachee');
+  await jusqua(() => existe('dialog[open] .att-carte .att-in svg'), 'esquisse affichée');
+  assert.equal(await visible('dialog[open] .att-pause'), false, 'rien à arrêter');
+  assert.equal(await cdp.evaluer(`document.getAnimations().filter((a) => a.playState === 'running' && a.effect?.target?.closest?.('.att-carte')).length`), 0, 'aucune animation en cours');
+  assert.equal(await cdp.evaluer(`getComputedStyle(document.querySelector('dialog[open] .att-in .cadre')).strokeDashoffset`), '0px', 'tracé complet');
+  await rendrePrete();
+  await jusqua(() => visible('dialog[open] .cer-ok'), 'cérémonie jouée d\'emblée', 8000);
+  assert.deepEqual(cdp.erreursPage, []);
+});
+
+// Ticket #197 : sur le Retour de quiz, la carte gagnée est proposée face cachée, à côté de l'annonce. Elle s'ouvre au
+// geste, sur la page courante ; retournée, elle n'est plus proposée (rechargement compris).
+test('Retour de quiz : la carte de ligne gagnée est proposée face cachée, la cérémonie s\'ouvre sans quitter la page', { skip: raison, timeout: 40_000 }, async () => {
+  const { slug, fichier, rendrePrete, lecon } = await eleveCartePasPrete('Cdp-Retour');
+  await createStore(path.join(dossier, 'eleves')).enregistrerTour(slug, lecon, {
+    question: '📝 Quiz terminé : 90 %', reponse: 'Bravo !', details: { retourQuiz: { score: 90, action: 'terminee', nouvellesCartesLigne: [lecon] } }, etatLecon: { terminee: '2026-11-02T10:00:00.000Z' },
+  });
+  await cdp.envoyer('Emulation.setDeviceMetricsOverride', { width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
+  await cdp.envoyer('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  await cdp.envoyer('Page.navigate', { url: base });
+  await jusqua(() => cdp.evaluer(`document.readyState === 'complete' && !!document.getElementById('app')`), 'page chargée');
+  await cdp.evaluer(`localStorage.setItem('pseudo', ${JSON.stringify(slug)}); location.hash = ${JSON.stringify(`#/lecon/${lecon}`)}; location.reload(); true`);
+  await jusqua(() => existe('.apres-quiz .cartes-gain .carte-cachee'), 'carte proposée face cachée sur le Retour');
+  assert.equal(await existe('dialog[open]'), false, 'jamais ouverte d\'elle-même');
+  const adresse = await cdp.evaluer('location.hash');
+  await rendrePrete(); // la composition s'est terminée entre-temps : cérémonie immédiate
+  await clic('.apres-quiz .cartes-gain .carte-cachee');
+  await jusqua(() => existe('dialog.cartes-ceremonie[open] .cer-carte .carte-cachee'), 'cérémonie ouverte');
+  assert.equal(await cdp.evaluer('location.hash'), adresse, 'sans quitter la page');
+  await clic('dialog[open] .cer-carte .carte-cachee');
+  await jusqua(() => visible('dialog[open] .cer-ok'), 'bouton « Fermer » affiché', 6000);
+  assert.ok(JSON.parse(await fs.readFile(fichier, 'utf8')).cartes[lecon].retourne, 'retournement enregistré');
+  await clic('dialog[open] .cer-ok');
+  await jusqua(async () => !(await existe('dialog[open]')) && !(await visible('.apres-quiz .cartes-gain')), 'carte plus proposée');
+  await cdp.evaluer('location.reload(); true');
+  await jusqua(() => existe('.apres-quiz .retour'), 'Retour réaffiché');
+  assert.equal(await visible('.apres-quiz .cartes-gain'), false, 'après rechargement : plus à retourner');
+  assert.deepEqual(cdp.erreursPage, []);
+});

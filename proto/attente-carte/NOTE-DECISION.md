@@ -8,8 +8,8 @@ Lancer : `python3 -m http.server 8765` à la racine du dépôt, puis `http://127
 
 Format retenu par l'humain : **l'esquisse, rejouée en boucle** (autres variantes essayées et retirées : crescendo avec respiration, convoi, couches, crayonné, esquisse décalée élément par élément ; elles sont dans l'historique de la branche).
 
-- **Une carte, une scène** : la carte vierge est la carte face cachée (mêmes rayures, même 5/7). Elle s'esquisse **au trait** : cadre, étoiles, collines, rail et stations, héros, motif d'atelier, halo de la couleur de la Catégorie, un reflet.
-- **Boucle** : l'esquisse est jouée en entier à 1,15× (~6,3 s), reste posée un instant, s'efface en fondu (0,8 s) puis repart de zéro. Un tour : ~8 s. Elle ne s'emballe pas et ne monte pas en puissance : chaque tour est identique.
+- **Une carte, une scène** : la carte vierge est la carte face cachée (mêmes rayures, même 5/7). Elle s'esquisse **au trait** : cadre, étoiles, collines, rail et stations, motif d'atelier, halo de la couleur de la Catégorie, un reflet. **Aucun héros** : la carte finale a un héros propre à la Leçon, composé par l'agent ; l'esquisse n'en annonce pas un qui n'existerait pas, et le héros n'apparaît qu'avec la vraie carte (il « tombe » dans la cérémonie).
+- **Boucle** : l'esquisse est jouée en entier à 1,15× (~5,5 s), reste posée un instant, s'efface en fondu (0,8 s) puis repart de zéro. Un tour : ~7,6 s. Elle ne s'emballe pas et ne monte pas en puissance : chaque tour est identique.
 - **Transition sans coupure** : à l'arrivée de la carte, l'esquisse se met de profil (0,25 s, `rotateY(90°)`), la vraie carte revient du même angle avec le `cer-retourne` existant, puis les couches, le héros, la gerbe et les stations de la cérémonie d'aujourd'hui. **Sans second geste**.
 - **Durées** : 0 s (cérémonie actuelle), 3 s, 15 s, 60 s, échec (scène générique à 8 s, sans mot d'échec).
 - **Sorties** : « Plus tard » à tout moment ; **délai maximal** : texte calme « Ta carte arrive, elle t'attend sur l'accueil. », la boucle s'arrête, fermeture 4,5 s plus tard.
@@ -22,7 +22,7 @@ Format retenu par l'humain : **l'esquisse, rejouée en boucle** (autres variante
 | --- | --- | --- |
 | Occuper l'attente par le façonnage visible | Oui : esquisse au trait, couche par couche | Buell & Norton (2011), étude isolée sur adultes ; transposition = heuristique |
 | Variante par Catégorie | **Couleur de la Catégorie seule** (halo, cadre, rail : jetons `--ligne-*`, coût nul) pour toutes les Catégories ; **motifs d'atelier écartés** de la livraison. Ils ajoutent 3 dessins à maintenir et à tester par Catégorie pour une différence discrète à 390 px. À rouvrir si les Élèves les remarquent. | Aucun cadre, hypothèse à mesurer |
-| Boucle | Esquisse rejouée en boucle (~8 s par tour, fondu de 0,8 s) ; **immobile après 28 s** | Aucun cadre sur les durées ; WCAG 2.2.2 et 2.3.1 pour les bornes |
+| Boucle | Esquisse rejouée en boucle (~7,6 s par tour, fondu de 0,8 s) ; **immobile après 28 s** | Aucun cadre sur les durées ; WCAG 2.2.2 et 2.3.1 pour les bornes |
 | Délai maximal avant repli | **45 s** (le 60 s du prototype retombe sur le texte calme) ; au-delà, la carte arrive seule sur l'accueil | Aucun cadre, hypothèse à mesurer (journaux : durée réelle de composition) |
 | Échec | Silencieux : scène générique par la même transition | Choix de conception (#184) |
 | Pas de texte chiffré | Un seul texte, « Ta carte se prépare » | `PRODUCT.md` ; durée inconnue |

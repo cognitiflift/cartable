@@ -43,7 +43,7 @@
 .att-in .motif .trait { animation:att-trace 1.6s ease-in-out forwards; animation-delay:calc(1.6s + var(--i) * .7s); }
 .att-in .motif .point { animation:att-pop .5s ease-out forwards; animation-delay:calc(3s + var(--i) * .5s); }
 .att-in .halo { fill:var(--ligne); opacity:0; transform-box:fill-box; transform-origin:center; animation:att-halo 8s ease-out forwards; }
-.att-reflet { position:absolute; top:0; bottom:0; left:0; width:30%; background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--sur-nuit) 18%, transparent), transparent); animation:att-reflet 2.2s ease-in-out 7s 1 both; pointer-events:none; }
+.att-reflet { position:absolute; top:0; bottom:0; left:0; width:30%; background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--sur-nuit) 18%, transparent), transparent); animation:att-reflet 2.2s ease-in-out 5s 1 both; pointer-events:none; }
 .orbite { transform-box:fill-box; transform-origin:center; }
 /* Palier : une respiration lente des stations et du halo, sans éclat (l'éclat reste entre 60 % et 100 %) */
 .att-carte:not(.pose) .halo { animation:att-halo 8s ease-out forwards, att-respire 5s ease-in-out 8s infinite; }

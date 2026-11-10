@@ -44,7 +44,6 @@ function esquisse(cat) {
   const etoiles = [[60, 30], [92, 52], [126, 24], [150, 60], [76, 84], [168, 96], [40, 70]]
     .map(([x, y], i) => `<circle class="point etoile" cx="${x}" cy="${y}" r="${1 + (i % 3) * .5}" style="--i:${i}"/>`).join('');
   const stations = Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="station-s" cx="${26 + i * 30}" cy="162" r="9" style="--i:${i}"/>`).join('');
-  const pointes = '88,222 112,100 140,128 172,176 150,224';
   return `<svg viewBox="0 0 200 280" aria-hidden="true"><defs><radialGradient id="att-halo"><stop offset="0" stop-color="var(--ligne)" stop-opacity=".9"/><stop offset="1" stop-color="var(--ligne)" stop-opacity="0"/></radialGradient></defs>
     <circle class="halo" cx="100" cy="120" r="96" fill="url(#att-halo)"/>
     ${trait('M20 8 H180 a12 12 0 0 1 12 12 V260 a12 12 0 0 1 -12 12 H20 a12 12 0 0 1 -12 -12 V20 a12 12 0 0 1 12 -12 Z', 'cadre couleur')}
@@ -52,8 +51,6 @@ function esquisse(cat) {
     ${trait('M8 150 Q48 112 96 138 T192 128', 'colline', 0)}${trait('M8 172 Q60 140 110 164 T192 158', 'colline', 1)}
     <path class="remplit colline-f" d="M8 150 Q48 112 96 138 T192 128 V272 H8 Z"/>
     ${trait('M8 162 H192', 'rail couleur')}${stations}
-    <polygon class="remplit heros-f" points="${pointes}"/>
-    ${trait(`M${pointes.split(' ').join(' L')} Z`, 'heros', 0)}${trait('M112 100 L128 170 L150 224 M140 128 L128 170 L88 222', 'heros', 1)}
     <g class="motif">${motifDe(cat)}</g></svg><div class="att-reflet" aria-hidden="true"></div>`;
 }
 
@@ -127,7 +124,7 @@ function ouvrir() {
     // La boucle : l'esquisse jouée en entier (un peu accélérée), un fondu de sortie, puis elle repart de zéro. Un tour
     // dure TOUR + FONDU ms. Le premier passage est accéléré comme les suivants : la carte n'est dans le document qu'après
     // ce code, d'où apres(0) (sans cela, le fondu coupait un premier passage resté à vitesse normale).
-    const VITESSE = 1.15, TOUR = 7200, FONDU = 800;
+    const VITESSE = 1.15, TOUR = 6800, FONDU = 800;
     const accelerer = () => carte.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = VITESSE; });
     apres(0, accelerer);
     const tour = () => apres(TOUR, () => {

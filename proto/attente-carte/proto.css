@@ -105,3 +105,14 @@
 .d-gare { fill:var(--nuit); stroke:var(--sur-nuit); stroke-width:3.5; animation:d-gare 6s ease-in-out infinite; animation-delay:calc(var(--d, 0s) + 1s + var(--i) * .15s); }
 @keyframes d-pose { 0% { stroke-dashoffset:1; opacity:0; } 8% { opacity:.8; } 40% { stroke-dashoffset:0; opacity:.8; } 80% { stroke-dashoffset:0; opacity:.8; } 100% { stroke-dashoffset:0; opacity:0; } }
 @keyframes d-gare { 0% { opacity:.6; } 50% { opacity:1; } 100% { opacity:.6; } }
+
+/* E — Esquisse en boucle : chaque élément se trace, tient, puis s'efface doucement (6 s, décalés par --d).
+   Base = image fixe complète (mouvement réduit). */
+.e-trait { fill:none; stroke:var(--sur-nuit); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:1; stroke-dashoffset:0; animation:e-trace 6s ease-in-out infinite; animation-delay:var(--d, 0s); }
+.e-trait.cadre, .e-trait.rail { stroke:var(--ligne); stroke-width:2.6; }
+.e-point { fill:var(--sur-nuit); opacity:.9; transform-box:fill-box; transform-origin:center; animation:e-pop 6s ease-out infinite; animation-delay:var(--d, 0s); }
+.e-station { fill:var(--nuit); stroke:var(--sur-nuit); stroke-width:3; transform-box:fill-box; transform-origin:center; animation:e-pop 6s ease-out infinite; animation-delay:var(--d, 0s); }
+.e-fond { fill:var(--ligne); opacity:.4; animation:e-fond 6s ease-in-out infinite; animation-delay:var(--d, 0s); }
+@keyframes e-trace { 0% { stroke-dashoffset:1; opacity:0; } 3% { opacity:1; } 30% { stroke-dashoffset:0; opacity:1; } 78% { stroke-dashoffset:0; opacity:1; } 100% { stroke-dashoffset:0; opacity:0; } }
+@keyframes e-pop { 0% { opacity:0; transform:scale(.2); } 10% { opacity:.9; transform:scale(1); } 78% { opacity:.9; transform:scale(1); } 100% { opacity:0; transform:scale(1); } }
+@keyframes e-fond { 0% { opacity:0; } 30% { opacity:.4; } 78% { opacity:.4; } 100% { opacity:0; } }

@@ -82,8 +82,27 @@ function crayon() {
     <g style="--d:2.4s"><path class="d-trait ligne" pathLength="1" d="M10 174 H190" style="--i:0"/>${Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="d-gare" cx="${26 + i * 37}" cy="174" r="9" style="--i:${i}"/>`).join('')}</g>
     <g class="d-heros" style="--d:3s"><path class="d-trait ligne" pathLength="1" d="M88 232 L112 100 L142 130 L176 184 L152 234 Z" style="--i:0"/>${hachures(106, 120, 52, 100, 6, 'heros')}</g></svg>`;
 }
+// E « Esquisse en boucle » : le dessin de A (cadre, ciel, décor, ligne, héros), mais chaque élément se trace, tient, puis
+// s'efface doucement ; les éléments sont décalés, la carte se redessine en continu sur 6 s.
+function esquisseBoucle(cat) {
+  const t = (d, classe, delai) => `<path class="e-trait ${classe}" pathLength="1" d="${d}" style="--d:${delai}s"/>`;
+  const etoiles = [[60, 30], [92, 52], [126, 24], [150, 60], [76, 84], [168, 96], [40, 70]]
+    .map(([x, y], i) => `<circle class="e-point" cx="${x}" cy="${y}" r="${1 + (i % 3) * .5}" style="--d:${(.5 + i * .18).toFixed(2)}s"/>`).join('');
+  const stations = Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="e-station" cx="${26 + i * 30}" cy="162" r="9" style="--d:${(2 + i * .22).toFixed(2)}s"/>`).join('');
+  const pointes = '88,222 112,100 140,128 172,176 150,224';
+  return `<svg viewBox="0 0 200 280" aria-hidden="true">
+    ${t('M20 8 H180 a12 12 0 0 1 12 12 V260 a12 12 0 0 1 -12 12 H20 a12 12 0 0 1 -12 -12 V20 a12 12 0 0 1 12 -12 Z', 'cadre', 0)}
+    ${etoiles}
+    ${t('M8 150 Q48 112 96 138 T192 128', '', 1)}${t('M8 172 Q60 140 110 164 T192 158', '', 1.3)}
+    <path class="e-fond" d="M8 150 Q48 112 96 138 T192 128 V272 H8 Z" style="--d:1.4s"/>
+    ${t('M8 162 H192', 'rail', 1.8)}${stations}
+    <polygon class="e-fond" points="${pointes}" style="--d:3s"/>
+    ${t(`M${pointes.split(' ').join(' L')} Z`, '', 2.6)}${t('M112 100 L128 170 L150 224 M140 128 L128 170 L88 222', '', 3.1)}
+    <g class="motif">${motifDe(cat).replace(/class="trait /g, 'class="e-trait ').replace(/class="trait"/g, 'class="e-trait"').replace(/class="point"/g, 'class="e-point"').replace(/style="--i:(\d+)"/g, (_, i) => `style="--d:${(1.2 + i * .6).toFixed(1)}s"`)}</g></svg>`;
+}
 const VARIANTES = {
   A: { nom: 'Esquisse (crescendo)', dessin: esquisse },
+  E: { nom: 'Esquisse en boucle (6 s)', dessin: esquisseBoucle, boucle: true },
   B: { nom: 'Le convoi (boucle 6 s)', dessin: convoi, boucle: true },
   C: { nom: 'Les couches (boucle 6 s)', dessin: couches, boucle: true },
   D: { nom: 'Crayonné (boucle 6 s)', dessin: crayon, boucle: true },

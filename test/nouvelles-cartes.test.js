@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { reglerSon } from '../lib/cartes.js';
-import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau } from '../public/nouvelles-cartes.js';
+import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, emplacementCarte } from '../public/nouvelles-cartes.js';
 import { notesCarillon } from '../public/carillon.js';
 
 const PAL = ['bronze', 'argent', 'or', 'diamant'];
@@ -28,7 +28,7 @@ test('badgeAuPalier : la carte telle qu\'elle était à ce Palier', () => {
   assert.equal(badgeAuPalier(surprise, 'unique'), surprise);
 });
 
-test('collectionRangee : un Palier à retourner ou retourné non rangé ne se voit pas dans la grille', () => {
+test('collectionRangee : un Palier à retourner ne se voit pas dans la grille', () => {
   const col = [famille(2), famille(0, 'autre'), surprise];
   const v = collectionRangee(col, [{ type: 'palier', id: 'memoire', palier: 'or' }, { type: 'palier', id: 'autre', palier: 'bronze' }, { type: 'palier', id: 'mission', palier: 'unique' }]);
   assert.equal(v.find((b) => b.id === 'memoire').palier, 'argent');
@@ -36,22 +36,40 @@ test('collectionRangee : un Palier à retourner ou retourné non rangé ne se vo
   assert.equal(v.some((b) => b.id === 'mission'), false);
 });
 
-test('nouvellesCartes : face cachée avec médaillon, sans dire le Palier ; les non rangées sont face visible', () => {
+test('nouvellesCartes : face cachée avec médaillon, sans dire le Palier', () => {
   const col = [famille(2), surprise];
   const lignes = [{ lecon: 'troie', titre: 'Troie', retourne: null }];
   const n = nouvellesCartes({
     aRetourner: [{ type: 'ligne', id: 'troie' }, { type: 'palier', id: 'memoire', palier: 'or' }, { type: 'palier', id: 'mission', palier: 'unique' }],
-    collection: col, cartesLigne: lignes, nonRangees: [{ type: 'palier', id: 'memoire', palier: 'bronze' }],
+    collection: col, cartesLigne: lignes,
   });
-  assert.deepEqual(n.map((c) => c.medaillon), ['🚉', '🧠', '🗺️', '🧠']);
-  assert.deepEqual(n.map((c) => c.retournee), [false, false, false, true]);
-  for (const c of n.filter((x) => !x.retournee)) assert.doesNotMatch(c.libelle, /bronze|argent|\bor\b|diamant|unique/i);
+  assert.deepEqual(n.map((c) => c.medaillon), ['🚉', '🧠', '🗺️']);
+  for (const c of n) assert.doesNotMatch(c.libelle, /bronze|argent|\bor\b|diamant|unique/i);
   assert.match(n[0].libelle, /nouvelle carte/i);
 });
 
-test('cartesLigneRangees : seulement les cartes retournées et rangées', () => {
+test('cartesLigneRangees : seulement les cartes retournées (rangées d\'office à la fermeture de la cérémonie)', () => {
   const l = [{ lecon: 'a', retourne: 'x' }, { lecon: 'b', retourne: 'x' }, { lecon: 'c', retourne: null }];
-  assert.deepEqual(cartesLigneRangees(l, [{ type: 'ligne', id: 'b' }]).map((c) => c.lecon), ['a']);
+  assert.deepEqual(cartesLigneRangees(l).map((c) => c.lecon), ['a', 'b']);
+});
+
+test('emplacementCarte (encart de Leçon) : template, dos « Nouveau » (prête ou en composition), carte rangée', () => {
+  const lignes = [
+    { lecon: 'prete', titre: 'Troie', retourne: null, calques: { l1: '' } },
+    { lecon: 'compose', titre: 'Rome', retourne: null, calques: null },
+    { lecon: 'rangee', titre: 'Nil', retourne: '2026-11-05T10:00:00.000Z', calques: { l1: '' } },
+  ];
+  assert.deepEqual(emplacementCarte(lignes, 'jamais'), { etat: 'a-decouvrir' });
+  assert.deepEqual(emplacementCarte([], 'x'), { etat: 'a-decouvrir' });
+  const p = emplacementCarte(lignes, 'prete');
+  assert.equal(p.etat, 'a-retourner'); assert.equal(p.prete, true); assert.equal(p.medaillon, '🚉');
+  assert.match(p.libelle, /nouvelle carte.*Touche pour la retourner/i);
+  const c = emplacementCarte(lignes, 'compose');
+  assert.equal(c.etat, 'a-retourner'); assert.equal(c.prete, false);
+  assert.doesNotMatch(c.libelle, /Touche pour la retourner/);
+  assert.match(c.libelle, /prépar/i);
+  const r = emplacementCarte(lignes, 'rangee');
+  assert.equal(r.etat, 'rangee'); assert.equal(r.carte.lecon, 'rangee');
 });
 
 test('contientNouveau : tant qu\'une carte attend', () => {

@@ -36,10 +36,12 @@ async function jusqua(fn, message, delai = 10_000) {
 }
 
 // Un Élève dont la seule carte de ligne attend, composée (scène générique) et pas encore retournée.
-async function eleveAvecCarte(pseudo) {
+async function eleveAvecCarte(pseudo, { avecLecon = false } = {}) {
   const eleves = path.join(dossier, 'eleves');
-  const profil = await createStore(eleves).creerEleve({ pseudo, age: 11, niveau: 'Primaire 6' });
-  const carte = { lecon: '0001-volcans', titre: 'Les volcans', categorie: 'sciences', objectifs: 3, jourAcquisition: '2026-11-02', etat: 'generique', essais: 2, calques: sceneGenerique({ lecon: '0001-volcans', categorie: 'sciences' }), prete: '2026-11-02T10:00:00.000Z', retourne: null };
+  const store = createStore(eleves);
+  const profil = await store.creerEleve({ pseudo, age: 11, niveau: 'Primaire 6' });
+  const lecon = avecLecon ? (await store.creerLecon(profil.slug, { sujet: 'Les volcans', mode: 'libre' })).id : '0001-volcans';
+  const carte = { lecon, titre: 'Les volcans', categorie: 'sciences', objectifs: 3, jourAcquisition: '2026-11-02', etat: 'generique', essais: 2, calques: sceneGenerique({ lecon, categorie: 'sciences' }), prete: '2026-11-02T10:00:00.000Z', retourne: null };
   await fs.writeFile(path.join(eleves, profil.slug, 'cartes.json'), JSON.stringify({ version: 1, livraison: '2026-10-01T10:00:00.000Z', son: false, ecartees: [], cartes: { [carte.lecon]: carte }, paliers: {} }));
   return profil.slug;
 }
@@ -85,7 +87,7 @@ const visible = (sel) => cdp.evaluer(`(() => { const e = document.querySelector(
 before(async () => {
   if (raison) return;
   dossier = await fs.mkdtemp(path.join(os.tmpdir(), 'cartable-cdp-'));
-  const slugs = { normal: await eleveAvecCarte('Cdp-Normal'), reduit: await eleveAvecCarte('Cdp-Reduit'), etroit: await eleveAvecCarte('Cdp-Etroit') };
+  const slugs = { accueil: await eleveAvecCarte('Cdp-Accueil', { avecLecon: true }), normal: await eleveAvecCarte('Cdp-Normal'), reduit: await eleveAvecCarte('Cdp-Reduit'), etroit: await eleveAvecCarte('Cdp-Etroit') };
   globalThis.__slugs = slugs;
   const port = await portLibre();
   base = `http://127.0.0.1:${port}/`;
@@ -116,7 +118,7 @@ after(async () => {
   if (dossier) await fs.rm(dossier, { recursive: true, force: true });
 });
 
-test('Cérémonie : la carte attend face cachée, la retourner ouvre la cérémonie, « Ajouter » la range dans sa grille', { skip: raison, timeout: 30_000 }, async () => {
+test('Cérémonie : la carte attend face cachée, la retourner ouvre la cérémonie, fermer la range d\'office dans sa grille', { skip: raison, timeout: 30_000 }, async () => {
   await ouvrirBadges(globalThis.__slugs.normal);
   assert.equal(await existe('.cl-nouvelles .carte-cachee .cl-medaillon'), true, 'face cachée : médaillon');
   assert.equal(await existe('.cl-nouvelles .carte-ligne-carte:not(.carte-cachee)'), false, 'rien de dévoilé avant le geste');
@@ -171,4 +173,37 @@ test('Cérémonie : à 390 px de large, la carte tient sans défilement horizont
   await clic('dialog[open] .cer-ok');
   await jusqua(() => cdp.evaluer(`document.querySelectorAll('ul[aria-label="Mon réseau"] li .carte-ligne-carte').length === 1`), 'carte rangée');
   assert.ok(await debordement() <= 0, 'page sans défilement horizontal une fois la carte rangée');
+});
+
+// Ticket #196 : la cérémonie se joue sur l'accueil, dans l'encart de la Leçon, sans changer de page.
+test('Accueil : la carte de la Leçon attend face cachée dans son encart, la cérémonie la range d\'office', { skip: raison, timeout: 30_000 }, async () => {
+  const slug = globalThis.__slugs.accueil;
+  await cdp.envoyer('Emulation.setDeviceMetricsOverride', { width: 1024, height: 800, deviceScaleFactor: 1, mobile: false });
+  await cdp.envoyer('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  await cdp.envoyer('Page.navigate', { url: base });
+  await jusqua(() => cdp.evaluer(`document.readyState === 'complete' && !!document.getElementById('app')`), 'page chargée');
+  await cdp.evaluer(`localStorage.setItem('pseudo', ${JSON.stringify(slug)}); location.hash = '#/'; location.reload(); true`);
+  await jusqua(() => existe('.lecon .lecon-carte .carte-cachee'), 'dos « Nouveau » dans l\'encart');
+  const adresse = await cdp.evaluer('location.hash');
+  assert.equal(await existe('#nav .compteur-etoiles .nouveau'), true, 'pastille « Nouveau » de la navigation');
+  await clic('.lecon .lecon-carte .carte-cachee');
+  await jusqua(() => existe('dialog.cartes-ceremonie[open] .cer-carte .carte-cachee'), 'cérémonie ouverte sur l\'accueil');
+  assert.equal(await cdp.evaluer('location.hash'), adresse, 'sans changer de page');
+  await clic('dialog.cartes-ceremonie .cer-carte .carte-cachee');
+  await jusqua(() => visible('dialog[open] .cer-ok'), 'bouton « Fermer » affiché', 6000);
+  assert.equal(await visible('dialog[open] .cer-plus-tard'), false, 'un seul bouton une fois retournée');
+  await clic('dialog[open] .cer-ok');
+  await jusqua(async () => !(await existe('dialog[open]')) && await existe('.lecon .lecon-carte .carte-ligne-carte:not(.carte-cachee)'), 'carte de ligne rangée dans l\'encart');
+  assert.equal(await existe('#nav .compteur-etoiles .nouveau'), false, 'la pastille tombe quand plus aucune carte n\'est à retourner');
+  const cartes = JSON.parse(await fs.readFile(path.join(dossier, 'eleves', slug, 'cartes.json'), 'utf8')).cartes;
+  assert.ok(Object.values(cartes)[0].retourne, 'retournement enregistré');
+  await cdp.envoyer('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
+  assert.ok(await cdp.evaluer('document.documentElement.scrollWidth - document.documentElement.clientWidth') <= 0, 'accueil sans défilement horizontal à 390 px');
+  // Rechargement : la carte est toujours là, et Mes badges n'a plus de « Nouvelles cartes ».
+  await cdp.evaluer('location.reload(); true');
+  await jusqua(() => existe('.lecon .lecon-carte .carte-ligne-carte:not(.carte-cachee)'), 'carte toujours visible après rechargement');
+  await cdp.evaluer(`location.hash = '#/badges'; true`);
+  await jusqua(() => existe('ul[aria-label="Mon réseau"] li .carte-ligne-carte'), 'dans Mon réseau');
+  assert.equal(await existe('.cl-nouvelles'), false);
+  assert.deepEqual(cdp.erreursPage, []);
 });

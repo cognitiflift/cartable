@@ -5,7 +5,7 @@ import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 import { rangerCollection, rangDeCarte, crans, aFeuilleHolo, libelleCarteBadge, libelleADecouvrir, dosCarteBadge } from '/carte-badge-texte.js';
 import { artDeBadge } from '/carte-badge-art.js';
-import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
+import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
@@ -467,10 +467,12 @@ const controleAVenir = (l) => Number.isInteger(l.joursAvantControle) && l.joursA
 
 // enTete : la Leçon où l'Élève en était, posée en tête de l'accueil ; seul son Continuer est un bouton plein, les
 // autres sont en contour à la couleur de leur ligne.
-function carteLecon(l, { enTete = false } = {}) {
+// `cartes` (#196) : { cartesLigne, son, slug, retourner } ; l'encart porte l'emplacement de la carte de la Leçon, sans
+// quitter l'accueil. Sans `cartes` (badges illisibles), l'encart n'a pas d'emplacement.
+function carteLecon(l, { enTete = false, cartes } = {}) {
   const objectifs = l.objectifs ?? [];
   const adresse = `#/lecon/${l.id}`;
-  return h('article', { className: `lecon${enTete ? ' en-tete' : ''}`, style: styleLigne(l.categorie) },
+  const corps = h('div', { className: 'lecon-corps' },
     h('div', { className: 'lecon-tete' },
       l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
       h('h4', {}, h('a', { href: adresse }, insecables(l.titre))),
@@ -485,6 +487,28 @@ function carteLecon(l, { enTete = false } = {}) {
     objectifs.length > 0 && h('details', { className: 'objectifs' },
       h('summary', {}, h('span', { className: 'voir' }, 'Voir les Objectifs'), h('span', { className: 'cacher' }, 'Cacher les Objectifs')),
       h('ul', {}, objectifs.map((o) => h('li', {}, station(o), h('span', {}, o.texte, h('small', {}, etatStation(o).libelle)))))));
+  return h('article', { className: `lecon${enTete ? ' en-tete' : ''}${cartes ? ' avec-carte' : ''}`, style: styleLigne(l.categorie) },
+    corps, cartes && emplacementCarteLecon(l, cartes));
+}
+
+// L'emplacement de carte de l'encart (#196), à trois états : le template « À découvrir » (aucune carte de ligne), le dos
+// « Nouveau » (carte gagnée : la toucher ouvre la cérémonie ici ; pas cliquable tant qu'elle n'est pas composée), la
+// carte de ligne retournable (retournée, rangée d'office). Redessiné sur place quand la cérémonie retourne la carte.
+function emplacementCarteLecon(l, { cartesLigne, son, slug, retourner }) {
+  const zone = h('div', { className: 'lecon-carte' });
+  const dessiner = () => {
+    const e = emplacementCarte(cartesLigne, l.id);
+    if (e.etat === 'a-decouvrir') return zone.replaceChildren(carteLeconADecouvrir());
+    const carte = { type: 'ligne', id: l.id };
+    zone.dataset.cle = cleCarte(carte);
+    if (e.etat === 'rangee') return zone.replaceChildren(carteLigne(e.carte));
+    const c = { ...carte, cle: cleCarte(carte), medaillon: e.medaillon, ligne: e.carte, libelle: e.libelle };
+    const dos = carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner: (x) => { retourner(x); dessiner(); } }));
+    if (!e.prete) { dos.disabled = true; dos.ariaDisabled = 'true'; } // en composition : l'attente animée est le ticket #197
+    zone.replaceChildren(dos);
+  };
+  dessiner();
+  return zone;
 }
 
 // Une erreur à la place d'un bloc, annoncée comme une alerte, avec de quoi repartir (#169).
@@ -501,6 +525,13 @@ async function ecranAccueil(profil) {
   const { revisions: { valeur: revisions }, rythme: { valeur: rythme }, badges: { valeur: badges }, moment: { valeur: moment } } = lectures;
   if (badges) retenirRecompenses(profil, badges);
   barreNav(profil);
+  // La cérémonie des cartes se joue ici, dans l'encart de la Leçon (#196) : le retournement met à jour les données déjà
+  // lues et la pastille « Nouveau » de la navigation, sans nouvel appel.
+  const cartes = badges && { cartesLigne: badges.cartesLigne ?? [], son: badges.son === true, slug: profil.slug, retourner: (c) => {
+    carteRetournee(badges, c);
+    retenirRecompenses(profil, badges);
+    barreNav(profil);
+  } };
   // « Où j'en étais ? » : la Leçon à la dernière activité la plus récente passe en tête, hors de sa Catégorie (#141).
   const enTete = lecons.reduce((recente, l) => (l.derniereActivite > recente.derniereActivite ? l : recente), lecons[0]);
   const parCategorie = Object.groupBy(lecons.filter((l) => l !== enTete), (l) => l.categorie);
@@ -517,11 +548,11 @@ async function ecranAccueil(profil) {
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
     enTete && h('section', { className: 'categorie reprise', style: styleLigne(enTete.categorie) },
       h('h3', {}, 'Tu en étais là', h('span', { className: 'reprise-categorie' }, `· ${enTete.categorie}`)),
-      carteLecon(enTete, { enTete: true })),
+      carteLecon(enTete, { enTete: true, cartes })),
     h('div', { className: 'reseau' }, config.categories.filter((c) => parCategorie[c]).map((c) => h('section', {
       className: `categorie${parCategorie[c].length > 1 ? ' etendue' : ''}`, style: styleLigne(c) },
     h('h3', {}, c),
-    h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l)))))));
+    h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l, { cartes })))))));
 }
 
 // Le bandeau du jour (#192) : le salut et le lien vers Mes badges, la Série de jours (#75), l'Objectif du jour avec
@@ -652,37 +683,31 @@ function ligneBadge(b, estNouveau) {
 // ligne (`ligneBadge`), le dernier Palier gagné en premier ; les badges surprise trouvés ; puis, à découvrir, les
 // Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. Les Paliers à retourner attendent dans « Nouvelles cartes » ; le mot d'accueil
 // s'affiche à la première ouverture.
-// Cartes retournées dans cette visite mais pas encore ajoutées (« Fermer sans ajouter » : retournée, non rangée) : elles
-// restent dans « Nouvelles cartes », face visible, avec leur bouton d'ajout. À la prochaine visite, elles sont rangées.
-let cartesNonRangees = { slug: null, liste: [] };
+// Une carte retournée est rangée d'office (#196) : elle quitte « Nouvelles cartes » pour « Mon réseau » ou la grille des
+// Badges dès le retournement, sans étape « Ajouter ». Partagé par Mes badges et l'accueil : met à jour les données lues
+// (la carte n'est plus à retourner, la carte de ligne l'est) sans nouvel appel.
+function carteRetournee(donnees, c) {
+  donnees.aRetourner = (donnees.aRetourner ?? []).filter((x) => cleCarte(x) !== c.cle);
+  const l = c.type === 'ligne' && donnees.cartesLigne?.find((x) => x.lecon === c.id);
+  if (l) l.retourne = new Date().toISOString();
+}
 
 async function ecranBadges(profil) {
   const donnees = await api(`eleves/${profil.slug}/badges?ouverture=1`);
   const { nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = donnees;
-  let { aRetourner = [] } = donnees;
-  if (cartesNonRangees.slug !== profil.slug) cartesNonRangees = { slug: profil.slug, liste: [] };
+  donnees.aRetourner ??= [];
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
   const collection = h('section', { className: 'collection', ariaLabel: 'Ma collection' });
   const afficherCollection = () => {
-    const nonRangees = cartesNonRangees.liste;
+    const { aRetourner } = donnees;
     retenirRecompenses(profil, { totaux, aRetourner }); // « Nouveau » reste tant qu'une carte attend ; ouvrir Mes badges ne l'efface pas
     barreNav(profil);
-    const enAttente = [...aRetourner, ...nonRangees];
-    const { obtenues, aDecouvrir } = rangerCollection(collectionRangee(donnees.collection, enAttente));
-    const attente = nouvellesCartes({ aRetourner, collection: donnees.collection, cartesLigne, nonRangees });
+    const { obtenues, aDecouvrir } = rangerCollection(collectionRangee(donnees.collection, aRetourner));
+    const attente = nouvellesCartes({ aRetourner, collection: donnees.collection, cartesLigne });
     collection.replaceChildren(...garder([
       h('h3', {}, 'Ma collection'),
-      attente.length > 0 && nouvellesCartesGroupe(attente, { son: donnees.son === true, slug: profil.slug, retourner: (c) => {
-        aRetourner = aRetourner.filter((x) => cleCarte(x) !== c.cle);
-        const l = c.type === 'ligne' && cartesLigne.find((x) => x.lecon === c.id);
-        if (l) l.retourne = new Date().toISOString(); // lue ici sans nouvel appel : la carte de ligne est retournée
-        cartesNonRangees.liste.push(c.type === 'ligne' ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier });
-        afficherCollection();
-      }, ranger: (c) => {
-        cartesNonRangees.liste = cartesNonRangees.liste.filter((x) => cleCarte(x) !== c.cle);
-        afficherCollection();
-      } }),
-      monReseau(cartesLigneRangees(cartesLigne, nonRangees)),
+      attente.length > 0 && nouvellesCartesGroupe(attente, { son: donnees.son === true, slug: profil.slug, retourner: (c) => { carteRetournee(donnees, c); afficherCollection(); } }),
+      monReseau(cartesLigneRangees(cartesLigne)),
       h('h4', {}, 'Mes Badges'),
       obtenues.length
         ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
@@ -705,17 +730,12 @@ async function ecranBadges(profil) {
 
 // « Nouvelles cartes » : chaque Palier gagné et chaque carte de ligne attend face cachée (médaillon du Badge, ou 🚉, sans
 // dire le Palier) jusqu'au geste de l'Élève, même des jours plus tard, dans l'ordre qu'il veut. Toucher une carte ouvre
-// la cérémonie. Une carte retournée mais pas ajoutée reste ici, face visible, avec son bouton d'ajout.
-function nouvellesCartesGroupe(cartes, { son, slug, retourner, ranger }) {
-  const ajouter = (c) => (c.type === 'ligne' ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
+// la cérémonie ; retournée, la carte est rangée d'office.
+function nouvellesCartesGroupe(cartes, { son, slug, retourner }) {
   return h('div', { className: 'cl-nouvelles' },
     h('h4', { className: 'cl-groupe' }, TEXTES_CEREMONIE.titreGroupe),
     h('ul', { className: 'cartes-reseau cartes-attente', ariaLabel: TEXTES_CEREMONIE.titreGroupe }, cartes.map((c) => {
-      const li = h('li', {},
-        c.retournee
-          ? [c.type === 'ligne' ? carteLigne(c.ligne) : carteBadge(badgeAuPalier(c.badge, c.palier), false),
-            h('button', { type: 'button', className: 'cl-ajouter', onclick: () => ranger(c) }, ajouter(c))]
-          : carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner, ranger })));
+      const li = h('li', {}, carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner })));
       li.dataset.cle = c.cle; // retrouver la carte quand la cérémonie se ferme (le groupe a été redessiné)
       return li;
     })));
@@ -731,10 +751,11 @@ function carteFaceCachee(c, ouvrir) {
 // La cérémonie (spec #182, #187) : un dialogue plein écran sur le voile. La carte attend face cachée ; au geste, elle se
 // retourne (enregistré côté serveur, idempotent), ses couches entrent l'une après l'autre (ciel, décor, ligne, puis le
 // héros qui tombe), les stations s'allument une à une, une gerbe d'éclats part une seule fois, puis le nom, ce que la
-// carte salue et le bouton d'ajout. « Plus tard » ou Échap : la carte reste retournée mais non rangée. Les animations
+// carte salue et le bouton « Fermer ». Fermer (bouton, Échap) après le retournement range la carte d'office ; « Plus tard »
+// avant le retournement la laisse face cachée. Partagée : Mes badges et l'accueil (#196). Les animations
 // sont bornées (moins de 3 s, aucun clignotement) et coupées sous prefers-reduced-motion : tout apparaît d'emblée.
 const DUREE_CEREMONIE = 2400;
-function ceremonie(c, { son, slug, retourner, ranger }) {
+function ceremonie(c, { son, slug, retourner }) {
   const ligne = c.type === 'ligne';
   const badge = ligne ? null : badgeAuPalier(c.badge, c.palier);
   const nom = ligne ? c.ligne.titre : `${c.badge.nom} · ${c.badge.surprise ? 'badge surprise' : `Palier ${c.palier}`}`;
@@ -743,7 +764,7 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
   const dlg = h('dialog', { className: 'cartes-ceremonie', ariaLabel: TEXTES_CEREMONIE.dialogue(ligne ? c.ligne.titre : c.badge.nom) });
   const texte = h('div', { className: 'cer-texte', ariaLive: 'polite' }, h('p', {}, TEXTES_CEREMONIE.aide));
   const scene = h('div', { className: 'cer-carte' });
-  const ok = h('button', { type: 'button', className: 'cer-ok', hidden: true, onclick: () => { dlg.close(); ranger(c); } }, ligne ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
+  const ok = h('button', { type: 'button', className: 'cer-ok', hidden: true, onclick: () => dlg.close() }, TEXTES_CEREMONIE.fermerRetournee);
   const plusTard = h('button', { type: 'button', className: 'secondaire cer-plus-tard', onclick: () => dlg.close() }, TEXTES_CEREMONIE.fermer);
   let retournee = false;
   const dos = carteFaceCachee(c, () => {
@@ -761,7 +782,8 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
       return h('i', { style: `--dx:${(Math.cos(a) * d).toFixed(0)}px; --dy:${(Math.sin(a) * d).toFixed(0)}px; animation-delay:${(1.5 + (i % 4) * 0.03).toFixed(2)}s` });
     })));
     vraie.focus(); // le dos retourné est retiré de la scène : le focus suit la vraie carte (ses boucles tournent, bornées)
-    retourner(c); // retournée : le groupe derrière la cérémonie la garde, non rangée, jusqu'à « Ajouter »
+    plusTard.hidden = true; // retournée : un seul bouton, « Fermer », qui range la carte
+    retourner(c); // rangée d'office : l'écran derrière la cérémonie la montre déjà à sa place
     setTimeout(() => {
       if (!dlg.isConnected) return;
       texte.replaceChildren(h('h3', {}, nom), h('p', {}, salue));
@@ -771,11 +793,11 @@ function ceremonie(c, { son, slug, retourner, ranger }) {
   });
   scene.append(dos);
   dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, plusTard));
-  // À la fermeture, le focus revient à l'Élève là où il était : la carte retournée de « Nouvelles cartes » (le groupe est
-  // redessiné pendant la cérémonie, l'ancien bouton n'existe plus), ou, une fois la carte ajoutée, au titre du groupe.
+  // À la fermeture, le focus revient à l'Élève là où il était. L'écran derrière a été redessiné au retournement et l'ancien
+  // bouton n'existe plus : le focus va à la carte rangée au même endroit (encart de la Leçon, Mon réseau), sinon au titre.
   dlg.addEventListener('close', () => {
     dlg.remove();
-    const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.collection h3');
+    const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.collection h3, .lecons-tete h2');
     if (cible) { if (!cible.matches('button, a')) cible.tabIndex = -1; cible.focus(); }
   });
   document.body.append(dlg);
@@ -814,6 +836,10 @@ function carteBadge(b, nouveau) {
 }
 
 // « À découvrir » : une carte hachurée, sans dessin ni décompte, qui dit ce que le Badge salue.
+// Dans l'encart d'une Leçon sans carte de ligne (#196) : le même gabarit hachuré, sans dessin ni décompte.
+const carteLeconADecouvrir = () => h('div', { className: 'carte-badge-carte verrou', role: 'group', ariaLabel: 'Carte de ligne de cette Leçon, à découvrir' },
+  h('div', { className: 'cl-face', ariaHidden: 'true' }, h('span', { className: 'cl-emoji' }, '🚉'), h('strong', {}, 'À découvrir')));
+
 const carteADecouvrir = (b) => h('div', { className: 'carte-badge-carte verrou', role: 'group', ariaLabel: libelleADecouvrir(b) },
   h('div', { className: 'cl-face', ariaHidden: 'true' }, h('span', { className: 'cl-emoji' }, b.emoji), h('strong', {}, b.nom), h('p', {}, b.phrase)));
 
@@ -873,13 +899,13 @@ function carteLigne(c) {
 }
 
 // « Mon réseau » : les cartes de ligne retournées, de la plus récente à la plus ancienne (le serveur les range ainsi).
-// Une carte prête mais pas encore retournée, ou retournée et pas ajoutée, attend dans « Nouvelles cartes ». Vide : une phrase, sans pression.
+// Une carte prête mais pas encore retournée attend dans « Nouvelles cartes ». Vide : une phrase, sans pression.
 function monReseau(cartesLigne) {
   const visibles = cartesLigne.filter((c) => c.retourne);
   return [
     h('h4', { className: 'cl-groupe' }, 'Mon réseau'),
     visibles.length
-      ? h('ul', { className: 'cartes-reseau', ariaLabel: 'Mon réseau' }, visibles.map((c) => h('li', {}, carteLigne(c))))
+      ? h('ul', { className: 'cartes-reseau', ariaLabel: 'Mon réseau' }, visibles.map((c) => { const li = h('li', {}, carteLigne(c)); li.dataset.cle = `ligne/${c.lecon}`; return li; }))
       : h('p', { className: 'doux' }, 'Chaque Leçon Acquise ajoutera ici sa carte.')];
 }
 

@@ -28,7 +28,7 @@ test('Cartes : chaque libellé dit le nom, le Palier ou la Catégorie, la date e
 
 test('Cartes : une carte face cachée n\'est ni sans nom ni bavarde : elle dit qu\'elle attend, sans le Palier', () => {
   const [ligne, palier] = nouvellesCartes({
-    aRetourner: [{ type: 'ligne', id: 'l1' }, { type: 'palier', id: 'memoire', palier: 'or' }], nonRangees: [],
+    aRetourner: [{ type: 'ligne', id: 'l1' }, { type: 'palier', id: 'memoire', palier: 'or' }],
     collection: [{ id: 'memoire', nom: 'Mémoire', emoji: '🧠', palier: 'or' }], cartesLigne: [{ lecon: 'l1', titre: 'Les volcans' }] });
   for (const c of [ligne, palier]) { assert.match(c.libelle, /face cachée/); assert.match(c.libelle, /Touche pour la retourner/); assert.doesNotMatch(c.libelle, /\bor\b|bronze|argent|diamant/i); }
   assert.match(TEXTES_CEREMONIE.dialogue('Mémoire'), /Mémoire/);
@@ -86,9 +86,9 @@ test('Mouvement : aucun éclair rapide (WCAG 2.3.1) : la lueur d\'éclair ne tom
 });
 
 test('Cibles : chaque bouton de carte et de cérémonie fait au moins 44 px, anneau de focus visible', () => {
-  for (const s of ['.cl-ajouter', '.cer-ok', '.cer-plus-tard']) assert.ok(rem(regle(s), 'min-height') >= 2.75, `${s} : min-height ≥ 2.75rem`);
+  for (const s of ['.cer-ok', '.cer-plus-tard']) assert.ok(rem(regle(s), 'min-height') >= 2.75, `${s} : min-height ≥ 2.75rem`);
   assert.match(regle('.carte-ligne-carte:focus-visible'), /outline:3px solid var\(--accent\)/);
-  assert.match(css, /\.cl-ajouter:focus-visible, \.cer-ok:focus-visible, \.cer-plus-tard:focus-visible \{ outline:3px solid/);
+  assert.match(css, /\.cer-ok:focus-visible, \.cer-plus-tard:focus-visible \{ outline:3px solid/);
   assert.match(css, /\.cartes-ceremonie :focus-visible \{[^}]*outline-color:var\(--sur-nuit\)/, 'sur le voile sombre, l\'anneau est clair');
   assert.match(css, /\.carte-ligne-carte \{[^}]*aspect-ratio:5\/7/);
 });

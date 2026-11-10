@@ -22,6 +22,9 @@ import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, repar
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
+import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
+import { consignesCarte, promptCarte } from './lib/carte-agent.js';
+import { lireCalques } from './lib/carte-svg.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
 import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
@@ -41,6 +44,7 @@ const propositionsEnCours = new Map(); // élève → Propositions précédentes
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
 const variantesEnCours = new Set(); // élèves dont un tour de Variantes travaille : un seul à la fois par Élève
 const variantesARelancer = new Map(); // élève → Leçons dont des Questions ont pu devenir à varier pendant ce tour
+const cartesEnCours = new Set(); // élèves dont une composition de carte travaille : une seule à la fois par Élève
 const preparations = new Map(); // cleLecon → page préparée pendant le quiz (#74) : { prevision, fin }, une seule par Leçon
 const PREPARATION = process.env.CARTABLE_PREPARATION !== '0'; // CARTABLE_PREPARATION=0 coupe les pages préparées
 
@@ -142,7 +146,61 @@ async function occuper(slug, id, operation) {
     return await operation();
   } finally {
     enCours.delete(cle);
+    composerCartes(slug); // la Séance est finie : les cartes en attente peuvent se composer
   }
+}
+
+// Cartes de ligne (#184) : la composition d'une carte « à composer » par l'agent (type de tâche « carte »), en
+// arrière-plan : l'Élève ne l'attend jamais. Une seule composition à la fois par Élève, et seulement quand aucune tâche
+// de Séance (tour du prof, page préparée) ne travaille pour cet Élève ; une Séance qui commence pendant une composition
+// ne l'interrompt pas, la suivante attend. Appelée quand une carte est enregistrée, à la fin d'une tâche de Séance et au
+// démarrage du serveur.
+const seanceEnCours = (slug) => [...enCours].some((cle) => cle.startsWith(`${slug}/`)) || [...preparations].some(([cle, p]) => p.travaille && cle.startsWith(`${slug}/`));
+
+function composerCartes(slug) {
+  if (cartesEnCours.has(slug)) return;
+  cartesEnCours.add(slug);
+  (async () => {
+    while (!seanceEnCours(slug)) {
+      const carte = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, null];
+        const f = generiquesEpuisees(avant, Date.now());
+        const id = prochaineAComposer(f);
+        return [id ? commencerComposition(f, id) : f, id && f.cartes[id]];
+      });
+      if (!carte) break;
+      await composerUneCarte(slug, carte);
+    }
+  })()
+    .catch((e) => console.error(`Cartes de ${slug} : ${e.message}`))
+    .finally(() => cartesEnCours.delete(slug));
+}
+
+// Une tentative de composition : la réponse de l'agent est lue et filtrée (lib/carte-svg.js) ; un SVG refusé, une
+// réponse illisible ou une panne est un échec de la tentative. Le Coût du tour, réussi ou non, est rattaché à la Leçon.
+async function composerUneCarte(slug, carte) {
+  let calques = null;
+  const couts = []; // gardés aussi sur la carte : ils survivent à la suppression de la Leçon
+  try {
+    const [titres, cwd] = await Promise.all([store.titresObjectifs(slug, carte.lecon), store.preparerDossierCarte(slug)]);
+    const { reponse, cout } = await lancerAgent({ cwd, prompt: promptCarte(carte, titres), consignes: consignesCarte(), tache: 'carte', teach: false });
+    await store.ajouterCoutLecon(slug, carte.lecon, cout).catch(() => {});
+    couts.push(cout);
+    const lu = lireCalques(reponse, carte.lecon);
+    if (lu.ok) calques = lu.calques;
+    else console.error(`Carte de ${slug}/${carte.lecon} : calque refusé (${lu.erreurs.slice(0, 3).join(' ; ')})`);
+  } catch (e) {
+    console.error(`Carte de ${slug}/${carte.lecon} : ${e.message}`);
+    if (e.cout) {
+      await store.ajouterCoutLecon(slug, carte.lecon, e.cout).catch(() => {});
+      couts.push(e.cout);
+    }
+  }
+  await store.viderDossierCarte(slug).catch(() => {});
+  await store.modifierCartes(slug, (avant) => {
+    const composee = calques ? terminerComposition(avant, carte.lecon, calques, Date.now()) : echouerComposition(avant, carte.lecon, Date.now());
+    return [couts.reduce((f, cout) => ajouterCoutCarte(f, carte.lecon, cout), composee), null];
+  });
 }
 
 // Attente de l'Élève (#78) le temps de `operation()` (tour du prof, ou page préparée attendue puis retenue), notée en
@@ -260,7 +318,12 @@ function preparerPageSuivante(slug, id) {
       if (e.cout) await store.ajouterCoutLecon(slug, id, { ...e.cout, relais: true, preparee: true, inutilisee: true }).catch(() => {});
       return null;
     });
-    preparations.set(cle, { prevision, fin });
+    const preparation = { prevision, fin, travaille: true };
+    preparations.set(cle, preparation);
+    fin.finally(() => {
+      preparation.travaille = false; // finie, même si la page attend encore l'Élève : la file des cartes peut reprendre
+      composerCartes(slug);
+    });
   })().catch((e) => console.error(`Page préparée de ${id} : ${e.message}`));
 }
 
@@ -492,7 +555,24 @@ async function recalculerBadges(slug, maintenant) {
     const fusion = fusionnerBadges(avant, calcul, maintenant);
     return [fusion.fichier, fusion];
   });
-  return { nouveaux, fichier, calcul, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+  // Cartes de ligne (#183) : au même endroit, une Leçon devenue Acquise enregistre sa carte « à composer ».
+  const cartes = await store.modifierCartes(slug, (avant) => {
+    const fusion = fusionnerCartes(avant, { lecons, badges: fichier, maintenant });
+    return [fusion.fichier, fusion.fichier];
+  });
+  if (prochaineAComposer(cartes)) composerCartes(slug); // en arrière-plan : la réponse n'attend pas la composition
+  return { nouveaux, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+}
+
+// Livraison des cartes (#183) : le premier calcul écarte les Leçons déjà Acquises, il doit donc précéder l'événement qui
+// peut en faire une (le score d'un quiz) : sans cela, la Leçon qui devient Acquise au tout premier quiz serait écartée
+// avec les anciennes. Appelée avant d'enregistrer un score ; sans effet une fois la livraison fixée. Les Badges ne sont
+// ni écrits ni annoncés ici : leurs Paliers déjà justifiés servent seulement à les rendre visibles d'emblée.
+async function fixerLivraison(slug, maintenant) {
+  if ((await store.lireCartes(slug))?.livraison) return;
+  const [lecons, evenements, avantBadges] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug), store.lireBadges(slug)]);
+  const { fichier: badges } = fusionnerBadges(avantBadges, calculerBadges({ lecons, evenements, maintenant }), maintenant);
+  await store.modifierCartes(slug, (avant) => [avant?.livraison ? avant : fusionnerCartes(avant, { lecons, badges, maintenant }).fichier, null]);
 }
 
 // Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
@@ -638,16 +718,17 @@ async function api(req, res, segments) {
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
-      const [lecons, couts, evenements, badges] = await Promise.all([
-        store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug), store.lireBadges(slug)]);
-      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements, badges }));
+      const [lecons, couts, evenements, badges, cartes] = await Promise.all([
+        store.leconsLues(slug, { maintenant }), store.lireCouts(slug), store.lireEvenements(slug), store.lireBadges(slug), store.lireCartes(slug)]);
+      return json(res, 200, vueParent(lecons, { couts, maintenant, evenements, badges, cartes }));
     }
   } else if (r2 === 'indicateurs' && !id) {
     // Indicateurs (#78) : calculés sur la période demandée à partir des événements datés, jamais de tour du prof.
     if (m === 'GET') {
       const periode = periodeDe(new URL(req.url, 'http://x'), maintenant);
-      const [evenements, lecons] = await Promise.all([store.lireEvenements(slug), store.leconsLues(slug, { maintenant })]);
-      return json(res, 200, indicateurs(evenements, { maintenant, lecons, ...periode }));
+      const [evenements, lecons, cartes] = await Promise.all([
+        store.lireEvenements(slug), store.leconsLues(slug, { maintenant }), store.lireCartes(slug)]);
+      return json(res, 200, indicateurs(evenements, { maintenant, lecons, cartes, ...periode }));
     }
   } else if (r2 === 'rythme' && !id) {
     // Rythme (#75) : Objectif du jour, Série de jours avec jokers et récapitulatif de la semaine, pour cet Élève seul.
@@ -711,10 +792,33 @@ async function api(req, res, segments) {
     // le calendrier des Jours travaillés (#99), sans aucun score. Ouverture de l'écran (?ouverture=1) : la réponse
     // montre encore « Nouveau » et le mot d'accueil, effacés pour la suite.
     if (m === 'GET') {
-      const { fichier, calcul, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
+      const { fichier, calcul, cartes, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
       if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
       const jours = calendrier({ lecons, evenements, paliers: paliersObtenus(fichier, calcul), maintenant });
-      return json(res, 200, { ...vueMesBadges(fichier, calcul), totaux, calendrier: jours });
+      return json(res, 200, { ...vueMesBadges(fichier, calcul), ...vueCartes(cartes), totaux, calendrier: jours });
+    }
+  } else if (r2 === 'cartes' && id === 'retournement' && !r3) {
+    // Retournement d'une carte (#183) : { type: 'ligne', id } ou { type: 'palier', id, palier } ; idempotent.
+    if (m === 'POST') {
+      const { type, id: carte, palier } = await lireCorps(req);
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, { statut: 'introuvable' }];
+        const r = retournerCarte(avant, { type, id: carte, palier }, maintenant);
+        return [r.fichier, r];
+      });
+      if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
+      if (statut === 'pas-prete') throw new HttpError(409, "Cette carte n'est pas encore prête");
+      return json(res, 200, { statut });
+    }
+  } else if (r2 === 'cartes' && id === 'son' && !r3) {
+    // Réglage du carillon (#187), éteint par défaut : lu et écrit depuis le Profil. Le réglage ne calcule rien : s'il crée
+    // le fichier, c'est sans livraison (le premier calcul la fixera, voir fusionnerCartes).
+    if (m === 'GET') return json(res, 200, { son: (await store.modifierCartes(slug, (f) => [f, f]))?.son === true });
+    if (m === 'PUT') {
+      const { son } = await lireCorps(req);
+      if (typeof son !== 'boolean') throw new HttpError(400, 'Le réglage du carillon est vrai ou faux');
+      const fichier = await store.modifierCartes(slug, (avant) => { const apres = reglerSon(avant, son); return [apres, apres]; });
+      return json(res, 200, { son: fichier.son === true });
     }
   } else if (r2 === 'propositions' && !id) {
     if (m === 'GET') return json(res, 200, await lirePropositions(slug));
@@ -744,7 +848,9 @@ async function api(req, res, segments) {
         return json(res, 200, lecon);
       }
     } else if (r3 === 'scores' && m === 'POST') {
-      const lecon = await store.enregistrerScore(slug, id, await lireCorps(req), { maintenant });
+      const corps = await lireCorps(req);
+      await fixerLivraison(slug, maintenant); // avant le score : une Acquisition de ce quiz donne sa carte
+      const lecon = await store.enregistrerScore(slug, id, corps, { maintenant });
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {
@@ -780,4 +886,6 @@ const serveur = http.createServer(async (req, res) => {
   }
 });
 
+await store.reprendreCartes(reprendreCompositions);
+for (const { slug } of await store.listerEleves()) composerCartes(slug); // les cartes restées « à composer »
 serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT })));

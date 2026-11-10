@@ -353,13 +353,6 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .collection ul { list-style:none; margin:0; padding:0; }
 .collection li + li, .collection h4 { border-top:1px dashed var(--bord); }
 .collection h4 { margin:0; padding:1rem 0 .2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; color:var(--doux); }
-.badge-tete { display:flex; align-items:flex-start; gap:.8rem; }
-.badge-tete .pastille-badge { flex:none; }
-.badge-tete strong { display:block; margin-top:.2rem; font:800 1.2rem/1.2 var(--police-titre); letter-spacing:-.005em; }
-.badge-tete p { margin:.15rem 0 0; color:var(--doux); line-height:1.35; }
-.lignes-badges li { padding:.9rem 0 .4rem; }
-.badges-simples li { padding:.8rem 0; }
-.a-decouvrir strong { color:var(--doux); }
 .ligne-badge { margin:.7rem 0 0; padding:0 1.9rem 3.2rem; }
 .ligne-badge .bronze { --palier:var(--palier-bronze); } .ligne-badge .argent { --palier:var(--palier-argent); }
 .ligne-badge .or { --palier:var(--palier-or); } .ligne-badge .diamant { --palier:var(--palier-diamant); }
@@ -424,3 +417,143 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .bloc-erreur { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1.2rem; margin:.5rem 0; }
 .bloc-erreur .erreur { min-height:0; margin:0; font-weight:600; }
 .bloc-erreur button { min-height:2.75rem; padding-inline:1.2rem; border-radius:12px; }
+
+/* Mon réseau : la carte de ligne (#185). 5 sur 7, coins de 18px, cadre de .3rem à la couleur de la Catégorie, trois
+   calques et un héros en parallaxe, la ligne de la Leçon à l'avant du décor, le terminus par-dessus le héros. */
+.collection h4.cl-groupe { border-top:0; padding-top:.4rem; }
+.collection .cartes-reseau { display:grid; grid-template-columns:repeat(auto-fill, minmax(8.5rem, 1fr)); gap:1.1rem .9rem; padding:.6rem 0 1.1rem; }
+.collection .cartes-reseau li + li { border-top:0; }
+.collection .cartes-reseau li { width:100%; max-width:12.5rem; justify-self:center; }
+.carte-ligne-carte { container-type:inline-size; --px:0; --py:0; --sur-ligne:var(--sur-accent); position:relative; display:block; width:100%; aspect-ratio:5/7; padding:0; border:0; border-radius:18px; background:none; color:var(--sur-nuit); font:inherit; text-align:left; cursor:pointer; perspective:700px; -webkit-tap-highlight-color:transparent; touch-action:pan-y; }
+.carte-ligne-carte:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+.cl-incl { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform:rotateY(calc(var(--px) * 10deg)) rotateX(calc(var(--py) * -10deg)); }
+.carte-ligne-carte.actif .cl-incl { transition:transform .08s linear; }
+.carte-ligne-carte.retournee .cl-incl { transform:rotateY(180deg); }
+.cl-face { position:absolute; inset:0; border-radius:18px; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
+.cl-avant { box-shadow:0 10px 26px rgb(var(--ombre) / .25); }
+.cl-cadre { position:absolute; inset:0; overflow:hidden; border-radius:18px; background:var(--nuit); }
+.cl-calque { position:absolute; inset:0; transition:transform .5s cubic-bezier(.2,.8,.2,1); pointer-events:none; }
+.cl-calque svg { display:block; width:100%; height:100%; overflow:visible; }
+.cl-l1 { transform:translate(calc(var(--px) * -4px), calc(var(--py) * -4px)) scale(1.06); }
+.cl-l2 { transform:translate(calc(var(--px) * 7px), calc(var(--py) * 7px)); }
+.cl-heros { transform:translate(calc(var(--px) * 14px), calc(var(--py) * 14px)); }
+.cl-heros svg { filter:drop-shadow(0 .35rem .5rem rgb(var(--ombre) / .35)); }
+.carte-ligne-carte.actif .cl-calque { transition:transform .08s linear; }
+.cl-bord { position:absolute; inset:0; border-radius:18px; box-shadow:inset 0 0 0 .3rem var(--ligne); pointer-events:none; }
+/* La ligne : même grammaire que celle de l'accueil (ligneLecon), à l'échelle de la carte ; le trait sort du cadre. */
+.cl-ligne { position:absolute; left:0; right:0; top:58%; padding:0 .3rem 0 0; --st:min(1.35rem, calc(66cqw / var(--n))); }
+.cl-ligne .ligne { min-height:0; }
+.cl-ligne .ligne::before { content:""; flex:0 0 6cqw; height:.4rem; background:var(--ligne); box-shadow:0 0 0 .12rem var(--sur-nuit); }
+.cl-ligne .troncon { height:.4rem; min-width:0; margin:0 -.1rem; box-shadow:0 0 0 .12rem var(--sur-nuit); }
+.cl-ligne .station { width:var(--st); height:var(--st); border-width:calc(var(--st) * .2); box-shadow:0 0 0 .12rem var(--sur-nuit); }
+.cl-texte { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; padding:.7rem .75rem .6rem; border-radius:18px; background:linear-gradient(to bottom, rgb(var(--ombre) / .62), transparent 30%, transparent 78%, rgb(var(--ombre) / .55)); pointer-events:none; }
+.cl-titre { max-width:92%; font:800 .92rem/1.15 var(--police-titre); text-wrap:balance; overflow-wrap:anywhere; text-shadow:0 1px 5px rgb(var(--ombre) / .7); }
+.cl-etiquette { font-size:.78rem; line-height:1.2; color:var(--sur-nuit); text-shadow:0 1px 5px rgb(var(--ombre) / .7); }
+.cl-terminus { position:absolute; right:5cqw; top:68%; pointer-events:none; }
+.cl-terminus .terminus { box-shadow:0 0 0 .2rem var(--nuit); }
+.cl-reflet { position:absolute; inset:0; border-radius:18px; pointer-events:none; mix-blend-mode:soft-light; opacity:0; transition:opacity .3s; background:radial-gradient(circle at calc(50% + var(--px) * 50%) calc(50% + var(--py) * 50%), var(--sur-nuit), transparent 55%); }
+.carte-ligne-carte.actif .cl-reflet { opacity:.5; }
+.cl-dos { transform:rotateY(180deg); display:flex; flex-direction:column; gap:.45rem; padding:.9rem .8rem; overflow:auto; background:var(--carte); color:var(--texte); box-shadow:inset 0 0 0 .3rem var(--ligne), 0 10px 26px rgb(var(--ombre) / .25); }
+.cl-cartouche { align-self:flex-start; max-width:100%; padding:.3rem .5rem .22rem; border-radius:7px; background:var(--ligne); color:var(--sur-ligne); font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; overflow-wrap:anywhere; }
+.cl-dos strong { font:800 1.15rem/1.15 var(--police-titre); text-wrap:balance; overflow-wrap:anywhere; }
+.cl-dos p { margin:0; font-size:.92rem; line-height:1.3; }
+.cl-dos small { margin-top:auto; font-size:.78rem; color:var(--doux); }
+/* Les boucles du décor (liste fermée de la Trousse) ne tournent que quand on regarde la carte, puis s'arrêtent. */
+@keyframes pc-tourne { to { transform:rotate(360deg); } }
+@keyframes pc-flamme { from { transform:scale(1, .82) skewX(-4deg); } to { transform:scale(1.08, 1.12) skewX(5deg); } }
+@keyframes pc-flotte { 50% { transform:translateY(-.5rem); } }
+@keyframes pc-eclair { 0%, 55%, 100% { opacity:.9; } 58% { opacity:.6; } 60% { opacity:1; } 64% { opacity:.65; } 66% { opacity:1; } } /* la lueur varie d'au plus 40 % : jamais un éclair (WCAG 2.3.1) */
+@keyframes pc-scint { 50% { opacity:.15; } }
+@keyframes pc-trace { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
+@keyframes pc-braise { from { transform:translate(0, 0); opacity:1; } to { transform:translate(var(--x, 0), -46px); opacity:0; } }
+.carte-ligne-carte.regarde .pc-a-tourne { animation:pc-tourne 7s linear infinite; }
+.carte-ligne-carte.regarde .pc-a-flamme { animation:pc-flamme .9s ease-in-out infinite alternate; }
+.carte-ligne-carte.regarde .pc-a-flotte { animation:pc-flotte 4.5s ease-in-out infinite; }
+.carte-ligne-carte.regarde .pc-a-eclair { animation:pc-eclair 3.4s linear infinite; }
+.carte-ligne-carte.regarde .pc-a-scintille { animation:pc-scint 2.4s ease-in-out infinite; }
+.carte-ligne-carte.regarde .pc-a-trace { stroke-dasharray:1; animation:pc-trace 3.2s ease-out both; }
+.carte-ligne-carte.regarde .pc-a-braise { animation:pc-braise 3s ease-out infinite; }
+
+/* Mes badges : la carte de Badge (#186). Même carte que celle de ligne ; le cadre prend la couleur du Palier atteint
+   (la surprise : violet unique), les crans du bas s'allument jusqu'à lui, l'or et le diamant ont une feuille
+   holographique qui suit le pointeur. Au dos, la ligne de Badge est la seule jauge, sans noms (le texte alternatif les dit). */
+.carte-badge-carte { --ligne:var(--palier-bronze); }
+.carte-badge-carte .cl-texte { padding-bottom:.55rem; }
+.cl-bas { display:flex; align-items:center; justify-content:space-between; gap:.4rem; }
+.carte-badge-carte .cl-etiquette { font-size:1.2rem; line-height:1; text-shadow:none; }
+.cl-crans { display:flex; gap:.25rem; padding:.28rem .4rem; border-radius:999px; background:rgb(var(--ombre) / .55); }
+.cl-crans i { width:.6rem; height:.6rem; border-radius:50%; background:var(--ligne); box-shadow:0 0 0 .1rem var(--sur-nuit); }
+.cl-crans i.vide { background:transparent; box-shadow:none; border:.14rem dashed var(--station-vide); }
+.carte-badge-carte .nouveau { position:absolute; top:.55rem; right:.55rem; margin:0; box-shadow:0 0 0 .15rem var(--nuit); }
+.carte-badge-carte .cl-titre { max-width:80%; }
+.carte-badge-carte .cl-dos { gap:.25rem; padding:.65rem .6rem .55rem; }
+.carte-badge-carte .cl-dos strong { font-size:.92rem; line-height:1.15; }
+.carte-badge-carte .cl-dos p { font-size:.78rem; line-height:1.25; }
+.carte-badge-carte .cl-etiquette.mot { font-size:.78rem; }
+.cl-dos .ligne-badge { flex:none; margin:.35rem 0 .15rem; padding:0 .5rem; --st:1rem; }
+.cl-dos .ligne-badge .station { width:var(--st); height:var(--st); margin:0; border-width:.2rem; }
+.cl-dos .ligne-badge .station-nom { display:none; }
+.cl-dos .ligne-badge .troncon { min-width:0; }
+.carte-badge-carte .cl-dos small { margin-top:auto; line-height:1.2; }
+/* La feuille holographique : un dégradé de jetons qui suit le pointeur (--px, --py) ; fixe, mais présent, sous
+   prefers-reduced-motion. Aucun éclat : un reflet lent, qui ne clignote pas. */
+.cl-holo { position:absolute; inset:0; border-radius:18px; pointer-events:none; mix-blend-mode:color-dodge; opacity:.2; transition:opacity .3s, background-position .5s cubic-bezier(.2,.8,.2,1);
+  background:linear-gradient(115deg, transparent 20%, var(--palier-diamant) 34%, var(--palier-unique) 44%, var(--nouveau) 54%, var(--retenu) 64%, transparent 78%) calc(50% + var(--px) * 40%) calc(50% + var(--py) * 40%) / 260% 260%; }
+.carte-badge-carte.actif .cl-holo { opacity:.55; transition:opacity .3s, background-position .08s linear; }
+/* À découvrir : une carte hachurée qui dit ce que le Badge salue, sans dessin ni décompte. */
+.carte-badge-carte.verrou { position:relative; aspect-ratio:5/7; border-radius:18px; border:.3rem dashed var(--station-vide); background:repeating-linear-gradient(45deg, var(--carte) 0 .5rem, color-mix(in srgb, var(--hachure) 14%, var(--carte)) .5rem 1rem); color:var(--texte); }
+.carte-badge-carte.verrou .cl-face { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.4rem; padding:.7rem; text-align:center; }
+.carte-badge-carte.verrou .cl-emoji { font-size:2rem; line-height:1; filter:grayscale(1); opacity:.6; }
+.carte-badge-carte.verrou strong { font:800 1.15rem/1.15 var(--police-titre); color:var(--doux); text-wrap:balance; }
+.carte-badge-carte.verrou p { margin:0; font-size:.92rem; line-height:1.25; color:var(--doux); }
+@media (prefers-reduced-motion: reduce) { .cl-holo { transition:none; } }
+
+/* Nouvelles cartes et cérémonie (#187). Face cachée : rayures de la couleur neutre (jamais celle du Palier, qui ne se dit
+   pas avant le geste), médaillon du Badge ou 🚉, « Nouveau ». La cérémonie : un dialogue sur le voile ; les entrées sont
+   bornées (moins de 2,5 s au total), sans clignotement, jouées une fois, et coupées sous prefers-reduced-motion. */
+.cl-nouvelles { margin-bottom:.4rem; }
+.collection .cartes-attente { padding-bottom:.6rem; }
+.carte-cachee { --ligne:var(--station-vide); }
+.carte-cachee.palier-unique { --ligne:var(--palier-unique); }
+.carte-cachee.ligne { --ligne:var(--ligne-autre); }
+.cl-cachee-face { position:absolute; inset:0; display:grid; place-items:center; border-radius:18px; box-shadow:inset 0 0 0 .3rem var(--ligne), 0 10px 26px rgb(var(--ombre) / .25); background:repeating-linear-gradient(135deg, var(--nuit) 0 .7rem, color-mix(in srgb, var(--ligne) 35%, var(--nuit)) .7rem 1.4rem); transition:transform .25s ease; }
+.carte-cachee:hover .cl-cachee-face { transform:translateY(-.2rem); }
+.cl-medaillon { display:grid; place-items:center; width:3.6rem; height:3.6rem; border-radius:50%; background:var(--nuit); box-shadow:0 0 0 .2rem var(--nouveau); font-size:2rem; line-height:1; }
+.carte-cachee .nouveau { position:absolute; top:.55rem; right:.55rem; margin:0; box-shadow:0 0 0 .15rem var(--nuit); }
+.cl-ajouter { display:block; width:100%; min-height:2.75rem; margin-top:.5rem; padding:.45rem .6rem; border:2px solid var(--accent); border-radius:12px; background:var(--carte); color:var(--texte); font:700 .92rem var(--police); cursor:pointer; }
+.cl-ajouter:hover { background:color-mix(in srgb, var(--accent) 12%, var(--carte)); }
+.cl-ajouter:focus-visible, .cer-ok:focus-visible, .cer-plus-tard:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+
+.cartes-ceremonie { border:0; padding:0; background:transparent; max-width:none; max-height:none; width:100vw; height:100dvh; color:var(--sur-nuit); overflow-y:auto; }
+.cartes-ceremonie[open] { display:grid; place-items:center; }
+.cartes-ceremonie::backdrop { background:var(--voile); }
+.cer-scene { display:flex; flex-direction:column; align-items:center; gap:1rem; max-width:24rem; padding:1rem; text-align:center; }
+.cer-carte { position:relative; width:min(62vw, 15rem); }
+.cer-carte .carte-ligne-carte { width:100%; }
+.cer-texte { min-height:4.6rem; }
+.cer-texte h3 { margin:0 0 .3rem; font:800 1.45rem/1.1 var(--police-titre); text-wrap:balance; }
+.cer-texte p { margin:0; color:var(--sur-nuit-doux); }
+.cer-ok { min-height:2.75rem; padding:.55rem 1.2rem; border:0; border-radius:12px; background:var(--nouveau); color:var(--sur-nouveau); font:800 1.15rem var(--police); cursor:pointer; }
+.cer-ok[hidden] { display:none; }
+.cer-plus-tard { min-height:2.75rem; padding-inline:1.2rem; background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
+
+/* La carte entre couche par couche : retournement, ciel, décor, ligne, puis le héros qui tombe ; les stations
+   s'allument une à une. L'état de fin est l'état naturel (fond « backwards ») : la carte reste inclinable ensuite. */
+@keyframes cer-retourne { from { transform:rotateY(-90deg); } }
+@keyframes cer-entre { from { opacity:0; transform:scale(.96); } }
+@keyframes cer-chute { from { opacity:0; transform:translateY(-130%); } 60% { transform:translateY(4%); } }
+@keyframes cer-allume { from { opacity:0; transform:scale(.2); } }
+@keyframes cer-gerbe { 0% { opacity:1; transform:translate(0, 0) scale(1); } 100% { opacity:0; transform:translate(var(--dx), var(--dy)) scale(.2); } }
+.carte-ligne-carte.entree .cl-incl { animation:cer-retourne .45s ease-out backwards; }
+.entree .cl-l1 svg { animation:cer-entre .4s ease-out .4s backwards; }
+.entree .cl-l2 svg { animation:cer-entre .4s ease-out .7s backwards; }
+.entree .cl-ligne { animation:cer-entre .4s ease-out .95s backwards; }
+.entree .cl-heros svg { animation:cer-chute .6s cubic-bezier(.25, 1, .5, 1) 1.3s backwards; }
+.entree .cl-ligne .station { animation:cer-allume .3s ease-out calc(1.1s + var(--i, 0) * var(--pas, .18)) backwards; }
+.entree .cl-terminus { animation:cer-entre .4s ease-out 1.4s backwards; }
+.cer-eclats { position:absolute; left:50%; top:42%; width:0; height:0; pointer-events:none; }
+.cer-eclats i { position:absolute; width:.55rem; height:.55rem; border-radius:50%; background:var(--nouveau); opacity:0; animation:cer-gerbe 1.1s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) { .cer-eclats { display:none; } .cl-cachee-face { transition:none; } }
+.cartes-ceremonie { background:color-mix(in srgb, var(--nuit) 88%, transparent); }
+@media (max-width: 480px) { header button.secondaire { white-space:nowrap; } .compteur-etoiles .nouveau { margin-left:.1rem; padding:0 .35rem; } }
+.cartes-ceremonie :focus-visible { outline-color:var(--sur-nuit); } /* sur le voile sombre, l'accent (encre en thème clair) ne se voit pas */

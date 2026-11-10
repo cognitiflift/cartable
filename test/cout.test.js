@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { coutDuTour, cumulerCouts } from '../lib/cout.js';
 import { TACHES, validerTache } from '../lib/tache.js';
 
-test('Types de tâche : un ensemble fermé (première Séance, page, Rebond, Propositions, Variantes), tout autre refusé', () => {
-  assert.deepEqual(TACHES, ['premiereSeance', 'page', 'rebond', 'propositions', 'variantes']);
+test('Types de tâche : un ensemble fermé (première Séance, page, Rebond, Propositions, Variantes, carte), tout autre refusé', () => {
+  assert.deepEqual(TACHES, ['premiereSeance', 'page', 'rebond', 'propositions', 'variantes', 'carte']);
   assert.equal(validerTache('rebond'), 'rebond');
   assert.throws(() => validerTache('retourQuiz'), /Type de tâche inconnu/);
 });
@@ -47,6 +47,7 @@ test('Cumul : total des tours et détail par type de tâche, chaque type présen
       rebond: { coutUsd: 0.25, tours: 2, entree: 21, sortie: 202, cacheLu: 2003, cacheEcrit: 4, dureeMs: 3005 },
       propositions: vide,
       variantes: vide,
+      carte: vide,
     },
   });
   assert.deepEqual(cumulerCouts([]).total, vide);
@@ -58,5 +59,5 @@ test('Cumul : un tour d\'un type inconnu ou mal formé compte dans le total sans
   assert.equal(total.coutUsd, 0.5);
   assert.equal(total.tours, 1);
   assert.equal(total.entree, 0);
-  assert.deepEqual(Object.keys(parTache), ['premiereSeance', 'page', 'rebond', 'propositions', 'variantes']);
+  assert.deepEqual(Object.keys(parTache), ['premiereSeance', 'page', 'rebond', 'propositions', 'variantes', 'carte']);
 });

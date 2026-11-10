@@ -10,6 +10,7 @@ Une table fermée, tenue par l'appli, associe donc à chaque type de tâche un M
 | Page de leçon : Étape suivante, Revoir, Défi, Réviser | Modèle du Profil | `medium` |
 | Propositions | Haiku | `low` |
 | Variantes des Questions (en arrière-plan) | Haiku | `low` |
+| Carte de ligne (en arrière-plan, à l'Acquisition) | Sonnet | `medium` |
 
 Le Retour de quiz n'est plus une tâche du prof (ADR 0002) : il ne figure pas dans la table. Les nouveaux Profils ont Sonnet par défaut ; les Profils existants gardent leur Modèle, rien ne change sans l'accord du parent. Chaque appel passe aussi un **Modèle de secours** (`--fallback-model`) qui prend le relais quand le Modèle principal est surchargé ou indisponible ; le Modèle réellement utilisé est relevé avec le coût d'un tour.
 
@@ -22,6 +23,19 @@ Le Modèle de secours fait partie de la même table : il n'est jamais le Modèle
 | Opus | Sonnet |
 | Sonnet | Haiku |
 | Haiku | Sonnet |
+
+### Mise à jour : le type de tâche « carte » (spec #182, ticket #184)
+
+Quand une Leçon devient Acquise pour la première fois, l'appli enregistre sa **carte de ligne** « à composer » (`lib/cartes.js`). Le prof compose alors, **à l'Acquisition** et non à l'ouverture de la collection, une scène SVG à trois calques (`l1`, `l2`, `heros`) : c'est le nouveau type de tâche **carte**. Il est fixé à Sonnet, effort `medium`, secours Haiku, **indépendamment du Modèle du Profil** : un dessin exact et lisible demande plus qu'une liste de Propositions, et composer à l'Acquisition, en arrière-plan, évite que l'Élève attende quoi que ce soit (la carte est prête quand il retourne la carte, ou presque).
+
+Règles de la composition (`server.js`, `composerCartes`) : une seule composition à la fois par Élève, lancée seulement quand aucune tâche de Séance (tour du prof, page préparée) ne travaille pour lui, relancée à la fin de la Séance et au démarrage du serveur (une carte « en composition » redevient « à composer »). L'agent reçoit la Trousse (`lib/carte-agent.js`) et répond un objet JSON ; l'appli filtre chaque calque en liste blanche (`lib/carte-svg.js`) et ne stocke que ce qui est conforme. Un calque refusé, une réponse illisible ou une panne sont un échec de la tentative ; **deux tentatives au plus**, puis la carte reçoit sa **scène générique**, composée en code (`lib/carte-generique.js`), sans nouvel appel au prof. Le Coût de chaque tour, réussi ou non, est rattaché à la Leçon (`parTache.carte`).
+
+| Décision | Cadre | Solidité |
+| --- | --- | --- |
+| Composition à l'Acquisition, en arrière-plan, Sonnet | Aucun cadre : décision de coût, mesurée par le Coût d'un tour « carte » | Aucun cadre, hypothèse à mesurer |
+| Animations bornées, sans clignotement rapide (consigne de la Trousse) | WCAG 2.2, critères 2.2.2 et 2.3.1 | Norme |
+
+Mesure (ticket #190) : les choix de cette mise à jour se jugent dans les indicateurs de la Vue parent (`lib/indicateurs.js`, `cartes`), lus dans le fichier de cartes et dans le Coût des tours « carte » : cartes composées contre scènes de repli, échecs de composition (essais perdus) et coût moyen d'une carte (échecs compris). Ils ne demandent aucun suivi de plus de l'Élève.
 
 ## Considered Options
 

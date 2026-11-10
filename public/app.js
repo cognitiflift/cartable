@@ -3,6 +3,11 @@ import { construireFigure } from '/kit/v1/figure-logique.js';
 import { arreterLecture } from '/kit/v1/lecture.js';
 import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
+import { rangerCollection, rangDeCarte, crans, aFeuilleHolo, libelleCarteBadge, libelleADecouvrir, dosCarteBadge } from '/carte-badge-texte.js';
+import { artDeBadge } from '/carte-badge-art.js';
+import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
+import { jouerCarillon } from '/carillon.js';
+import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
   sectionIdees, ECHEC_LECTURE, cartoucheProposition, colonnesPropositions, questionCadrage, carteAttente, carteErreur,
@@ -50,8 +55,8 @@ const pseudoCourant = () => localStorage.getItem('pseudo');
 // En-tête : le total d'Étoiles de l'Élève, qui ouvre Mes badges, puis son Profil. Le total vient de GET …/badges, lu une
 // fois par Élève puis mis à jour par l'accueil et Mes badges (retenirRecompenses), pour ne pas le relire à chaque écran.
 let recompensesConnues = null; // { slug, etoiles, nouveau }
-const retenirRecompenses = (profil, { totaux, nouveaux }) => {
-  recompensesConnues = { slug: profil.slug, etoiles: totaux?.etoiles ?? 0, nouveau: nouveaux?.length > 0 };
+const retenirRecompenses = (profil, { totaux, aRetourner }) => {
+  recompensesConnues = { slug: profil.slug, etoiles: totaux?.etoiles ?? 0, nouveau: contientNouveau(aRetourner) }; // « Nouveau » : tant qu'une carte attend (#187)
 };
 function barreNav(profil) {
   if (!profil) return nav.replaceChildren();
@@ -59,8 +64,8 @@ function barreNav(profil) {
   const compteur = h('a', { className: 'compteur-etoiles', href: '#/badges', title: 'Mes badges' },
     h('span', { ariaHidden: 'true' }, '⭐'),
     h('span', { className: 'nombre' }, connues ? String(connues.etoiles) : '…'),
-    h('span', { className: 'cache' }, ' Étoiles, voir mes badges'),
-    connues?.nouveau && h('span', { className: 'nouveau' }, 'Nouveau'));
+    h('span', { className: 'cache' }, connues?.nouveau ? ' Étoiles, voir mes badges : une nouvelle carte attend' : ' Étoiles, voir mes badges'),
+    connues?.nouveau && h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau'));
   nav.replaceChildren(compteur,
     h('span', { className: 'qui' }, `${profil.pseudo} · ${profil.niveau}`, h('span', { className: 'age' }, ` · ${profil.age} ans`)),
     h('button', { className: 'secondaire', onclick: () => (location.hash = '#/profil') }, 'Mon profil'),
@@ -131,6 +136,25 @@ async function ecranNouvelEleve() {
   } }));
 }
 
+// Carillon du retournement (#187) : éteint par défaut, réglé ici une fois pour toutes. Il s'enregistre à part du reste du
+// Profil, tout de suite, et le dit.
+function reglageCarillon(profil) {
+  const etat = h('p', { className: 'doux', role: 'status' });
+  const case_ = h('input', { type: 'checkbox', name: 'carillon', disabled: true, onchange: async () => {
+    const voulu = case_.checked;
+    try {
+      const { son } = await api(`eleves/${profil.slug}/cartes/son`, { method: 'PUT', body: { son: voulu } });
+      case_.checked = son;
+      etat.textContent = son ? 'Le carillon est allumé.' : 'Le carillon est éteint.';
+    } catch {
+      case_.checked = !voulu;
+      etat.textContent = 'Le réglage n’a pas pu être enregistré. Réessaie.';
+    }
+  } });
+  api(`eleves/${profil.slug}/cartes/son`).then(({ son }) => { case_.checked = son; case_.disabled = false; }).catch(() => { etat.textContent = 'Le réglage du carillon n’a pas pu être lu.'; });
+  return h('div', { className: 'reglage-carillon' }, h('label', {}, case_, TEXTES_CEREMONIE.reglageSon), etat);
+}
+
 async function ecranProfil(profil) {
   // Pour le parent : Coût d'un tour cumulé (CONTEXT.md), un indicateur relatif du quota partagé de l'abonnement, pas de
   // l'argent dépensé : affiché en tokens, avec son équivalent indicatif au tarif de l'API. Jamais pendant la Séance.
@@ -138,7 +162,7 @@ async function ecranProfil(profil) {
   montrer(...formulaireProfil({ profil, titre: 'Mon profil', envoyer: async (champs) => {
     await api(`eleves/${profil.slug}`, { method: 'PUT', body: champs });
     location.hash = '#/';
-  } }), cout);
+  } }), reglageCarillon(profil), cout);
   const couts = await api(`eleves/${profil.slug}/couts`).catch(() => null);
   if (couts) {
     const { coutUsd, tours, entree, sortie, cacheLu, cacheEcrit } = couts.total;
@@ -226,8 +250,8 @@ const SECTIONS_PARENT = [
   { titre: '💶 Coût des Leçons', bloc: 'reglages', replie: true, rendu: ({ cout }) => [
     h('p', {}, `Total (indicatif) : ${equivalentUsd(cout.total.coutUsd)} pour ${foisProf(cout.total.tours)} où le prof a répondu, Propositions comprises. L'abonnement se mesure en quota partagé, pas en argent dépensé.`),
     listeOuVide(cout.lecons.map((l) => h('li', {}, `${l.titre} : ${equivalentUsd(l.coutUsd)} (${foisProf(l.tours)})`)), 'Aucune Leçon.')] },
-  // Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
-  { titre: '📈 Indicateurs', bloc: 'reglages', replie: true, rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs } }) => [
+// Indicateurs (#78) : sur les 4 dernières semaines, pour juger si l'appli aide à retenir et donne envie de revenir.
+  { titre: '📈 Indicateurs', bloc: 'reglages', replie: true, rendu: ({ indicateurs: { periode, planificateur, souvenir, retour, attente, retenu30, calibration, jeNeSaisPas, reussiteParRebond, revisionsDesJoursDus, predictions, questionsSignalees: qs, cartes } }) => [
     h('p', { className: 'doux' }, `Du ${new Date(`${periode.du}T12:00`).toLocaleDateString('fr-BE')} au ${new Date(`${periode.au}T12:00`).toLocaleDateString('fr-BE')}.`),
     h('p', {}, conclusionDesIndicateurs({ souvenir, retour, calibration })),
     h('details', { className: 'pour-les-curieux' }, h('summary', {}, 'Pour les curieux'),
@@ -252,6 +276,7 @@ const SECTIONS_PARENT = [
         ? `${revisionsDesJoursDus.pourcentage} % des jours (${revisionsDesJoursDus.faites} sur ${pluriel(revisionsDesJoursDus.jours, 'jour')})` : 'aucun jour de Questions dues.'),
       h('li', {}, 'Prédictions avant une partie de la page : ', predictions.faites
         ? `${pluriel(predictions.faites, 'faite')}, ${predictions.justes} juste${predictions.justes > 1 ? 's' : ''} (${predictions.pourcentage} %).` : 'aucune pour l’instant.'),
+      h('li', {}, 'Cartes de ligne : ', texteDesCartes(cartes)),
       h('li', {}, 'Questions : ', `${pluriel(qs.signalees, 'signalée')}, ${pluriel(qs.retablies, 'rétablie')} sur la période ; ${pluriel(qs.suspectes, 'suspecte')} en ce moment.`),
     ),
     h('p', {}, h('strong', {}, 'Les rappels tombent-ils au bon moment ?')),
@@ -293,6 +318,16 @@ const texteDuPlanificateur = ({ utilise, reponses, seuil, fsrs5, fsrs6 }) => {
 };
 
 // Part de « Je ne sais pas » d'un indicateur (#147), en mots et en chiffres : « 12 % dans les quiz de page (3 sur 25 réponses). »
+  // Cartes de ligne (#190) dans « Pour les curieux » : retournement, composition, échecs et coût, en mots simples.
+const texteDesCartes = ({ pretes, nonRetourneesA7Jours: n7, delaiMedianHeures, composees, echecs, coutMoyenUsd }) => {
+  if (!pretes) return 'aucune carte prête pour l’instant.';
+  const delai = delaiMedianHeures === null ? 'aucune retournée' : delaiMedianHeures < 48 ? `retournées au bout de ${delaiMedianHeures} h d’habitude` : `retournées au bout de ${Math.round(delaiMedianHeures / 24)} jours d’habitude`;
+  return [`${pluriel(pretes, 'prête')}, ${delai}`,
+    n7.cartes ? `${n7.pourcentage} % pas encore retournées sept jours après (${n7.jamais} sur ${pluriel(n7.cartes, 'carte')})` : null,
+    composees.pourcentage === null ? null : `${composees.pourcentage} % dessinées sur mesure, le reste en scène de repli`,
+    echecs ? `${pluriel(echecs, 'dessin raté')}` : 'aucun dessin raté',
+    coutMoyenUsd === null ? null : `environ ${equivalentUsd(coutMoyenUsd)} par carte (indicatif)`].filter(Boolean).join(' ; ') + '.';
+};
 const partJeNeSaisPas = ({ reponses, jeNeSaisPas, pourcentage }, ou, vide) =>
   reponses ? `${pourcentage} % ${ou} (${jeNeSaisPas} sur ${pluriel(reponses, 'réponse')}).` : `${vide}.`;
 const MESURES_REBOND = [['nouvelle', 'page nouvelle'], ['revoir', 'Revoir'], ['defi', 'Défi'], ['reviser', 'Réviser']];
@@ -628,41 +663,237 @@ function ligneBadge(b, estNouveau) {
 // Mes badges (#95) : en tête, le total d'Étoiles et de Fusées de l'Élève (#96) ; puis le calendrier des Jours
 // travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection : chaque Badge commencé en
 // ligne (`ligneBadge`), le dernier Palier gagné en premier ; les badges surprise trouvés ; puis, à découvrir, les
-// Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. L'ouvrir efface « Nouveau » ; le mot d'accueil
+// Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. Les Paliers à retourner attendent dans « Nouvelles cartes » ; le mot d'accueil
 // s'affiche à la première ouverture.
+// Cartes retournées dans cette visite mais pas encore ajoutées (« Fermer sans ajouter » : retournée, non rangée) : elles
+// restent dans « Nouvelles cartes », face visible, avec leur bouton d'ajout. À la prochaine visite, elles sont rangées.
+let cartesNonRangees = { slug: null, liste: [] };
+
 async function ecranBadges(profil) {
-  const { collection, nouveaux, accueil, totaux, calendrier } = await api(`eleves/${profil.slug}/badges?ouverture=1`);
-  retenirRecompenses(profil, { totaux, nouveaux: [] }); // « Nouveau » s'efface en ouvrant Mes badges
-  barreNav(profil);
+  const donnees = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  const { nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = donnees;
+  let { aRetourner = [] } = donnees;
+  if (cartesNonRangees.slug !== profil.slug) cartesNonRangees = { slug: profil.slug, liste: [] };
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
-  const dernierJour = (b) => b.paliers.filter((p) => p.jour).at(-1).jour;
-  const commences = collection.filter((b) => !b.surprise && b.palier).sort((x, y) => dernierJour(y).localeCompare(dernierJour(x)));
-  const surprises = collection.filter((b) => b.surprise);
-  const aDecouvrir = collection.filter((b) => !b.surprise && !b.palier);
-  const tete = (b, ...detail) => h('div', { className: 'badge-tete' }, pastilleBadge(b, { ariaHidden: 'true', title: undefined }), h('div', {}, h('strong', {}, b.nom), ...detail));
+  const collection = h('section', { className: 'collection', ariaLabel: 'Ma collection' });
+  const afficherCollection = () => {
+    const nonRangees = cartesNonRangees.liste;
+    retenirRecompenses(profil, { totaux, aRetourner }); // « Nouveau » reste tant qu'une carte attend ; ouvrir Mes badges ne l'efface pas
+    barreNav(profil);
+    const enAttente = [...aRetourner, ...nonRangees];
+    const { obtenues, aDecouvrir } = rangerCollection(collectionRangee(donnees.collection, enAttente));
+    const attente = nouvellesCartes({ aRetourner, collection: donnees.collection, cartesLigne, nonRangees });
+    collection.replaceChildren(...garder([
+      h('h3', {}, 'Ma collection'),
+      attente.length > 0 && nouvellesCartesGroupe(attente, { son: donnees.son === true, slug: profil.slug, retourner: (c) => {
+        aRetourner = aRetourner.filter((x) => cleCarte(x) !== c.cle);
+        const l = c.type === 'ligne' && cartesLigne.find((x) => x.lecon === c.id);
+        if (l) l.retourne = new Date().toISOString(); // lue ici sans nouvel appel : la carte de ligne est retournée
+        cartesNonRangees.liste.push(c.type === 'ligne' ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier });
+        afficherCollection();
+      }, ranger: (c) => {
+        cartesNonRangees.liste = cartesNonRangees.liste.filter((x) => cleCarte(x) !== c.cle);
+        afficherCollection();
+      } }),
+      monReseau(cartesLigneRangees(cartesLigne, nonRangees)),
+      h('h4', {}, 'Mes Badges'),
+      obtenues.length
+        ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
+        : h('p', { className: 'doux' }, 'Ton premier Palier donnera ici sa carte.'),
+      aDecouvrir.length > 0 && [
+        h('h4', {}, 'À découvrir'),
+        h('ul', { className: 'cartes-reseau cartes-badges a-decouvrir', ariaLabel: 'À découvrir' }, aDecouvrir.map((b) => h('li', {}, carteADecouvrir(b))))]]));
+  };
+  afficherCollection();
+  const { obtenues } = rangerCollection(donnees.collection);
   montrer(
     h('p', {}, retourAccueil()),
     h('div', { className: 'badges-tete' },
       h('h2', {}, 'Mes badges'),
       totaux && h('p', { className: 'totaux-recompenses', title: 'Toutes tes Leçons et Révisions du jour' },
         `⭐ ${pluriel(totaux.etoiles, 'Étoile')} · 🚀 ${pluriel(totaux.fusees, 'Fusée')}`)),
-    accueil && (commences.length > 0 || surprises.length > 0) && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
-    h('div', { className: 'badges-corps' },
-      calendrierJours(calendrier),
-      h('section', { className: 'collection', ariaLabel: 'Ma collection' },
-        h('h3', {}, 'Ma collection'),
-        commences.length
-          ? h('ul', { className: 'lignes-badges' }, commences.map((b) => h('li', {},
-            tete(b, h('p', {}, b.phrase)),
-            ligneBadge(b, (palier) => estNouveau(b, palier)))))
-          : h('p', { className: 'doux' }, 'Ton premier Palier dessinera ici la ligne de son Badge.'),
-        surprises.length > 0 && [
-          h('h4', {}, 'Surprises trouvées'),
-          h('ul', { className: 'badges-simples' }, surprises.map((b) => h('li', {},
-            tete(b, h('p', {},`Badge surprise · ${dateBadge(b.jour)}`, estNouveau(b, b.palier) && h('span', { className: 'nouveau' }, 'Nouveau'))))))],
-        aDecouvrir.length > 0 && [
-          h('h4', {}, 'À découvrir'),
-          h('ul', { className: 'badges-simples a-decouvrir' }, aDecouvrir.map((b) => h('li', {}, tete(b, h('p', {}, b.phrase)))))])));
+    accueil && obtenues.length > 0 && h('p', { className: 'accueil-badges' }, 'Voici les badges que tu as déjà gagnés !'), // l'appli parle, pas le prof
+    h('div', { className: 'badges-corps' }, calendrierJours(calendrier), collection));
+}
+
+// « Nouvelles cartes » : chaque Palier gagné et chaque carte de ligne attend face cachée (médaillon du Badge, ou 🚉, sans
+// dire le Palier) jusqu'au geste de l'Élève, même des jours plus tard, dans l'ordre qu'il veut. Toucher une carte ouvre
+// la cérémonie. Une carte retournée mais pas ajoutée reste ici, face visible, avec son bouton d'ajout.
+function nouvellesCartesGroupe(cartes, { son, slug, retourner, ranger }) {
+  const ajouter = (c) => (c.type === 'ligne' ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
+  return h('div', { className: 'cl-nouvelles' },
+    h('h4', { className: 'cl-groupe' }, TEXTES_CEREMONIE.titreGroupe),
+    h('ul', { className: 'cartes-reseau cartes-attente', ariaLabel: TEXTES_CEREMONIE.titreGroupe }, cartes.map((c) => {
+      const li = h('li', {},
+        c.retournee
+          ? [c.type === 'ligne' ? carteLigne(c.ligne) : carteBadge(badgeAuPalier(c.badge, c.palier), false),
+            h('button', { type: 'button', className: 'cl-ajouter', onclick: () => ranger(c) }, ajouter(c))]
+          : carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner, ranger })));
+      li.dataset.cle = c.cle; // retrouver la carte quand la cérémonie se ferme (le groupe a été redessiné)
+      return li;
+    })));
+}
+
+function carteFaceCachee(c, ouvrir) {
+  return h('button', { type: 'button', className: `carte-ligne-carte carte-cachee ${c.type === 'ligne' ? 'ligne' : c.badge.surprise ? 'palier-unique' : 'palier-neutre'}`, ariaLabel: c.libelle, onclick: ouvrir },
+    h('span', { className: 'cl-cachee-face' },
+      h('span', { className: 'cl-medaillon', ariaHidden: 'true' }, c.medaillon),
+      h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau')));
+}
+
+// La cérémonie (spec #182, #187) : un dialogue plein écran sur le voile. La carte attend face cachée ; au geste, elle se
+// retourne (enregistré côté serveur, idempotent), ses couches entrent l'une après l'autre (ciel, décor, ligne, puis le
+// héros qui tombe), les stations s'allument une à une, une gerbe d'éclats part une seule fois, puis le nom, ce que la
+// carte salue et le bouton d'ajout. « Plus tard » ou Échap : la carte reste retournée mais non rangée. Les animations
+// sont bornées (moins de 3 s, aucun clignotement) et coupées sous prefers-reduced-motion : tout apparaît d'emblée.
+const DUREE_CEREMONIE = 2400;
+function ceremonie(c, { son, slug, retourner, ranger }) {
+  const ligne = c.type === 'ligne';
+  const badge = ligne ? null : badgeAuPalier(c.badge, c.palier);
+  const nom = ligne ? c.ligne.titre : `${c.badge.nom} · ${c.badge.surprise ? 'badge surprise' : `Palier ${c.palier}`}`;
+  const salue = ligne ? dosCarteLigne(c.ligne, jourEnMots).salue : (c.badge.phrase ?? 'Trouvé sans le chercher.');
+  const ouvreur = document.activeElement; // la carte qui a ouvert : le focus lui revient à la fermeture
+  const dlg = h('dialog', { className: 'cartes-ceremonie', ariaLabel: TEXTES_CEREMONIE.dialogue(ligne ? c.ligne.titre : c.badge.nom) });
+  const texte = h('div', { className: 'cer-texte', ariaLive: 'polite' }, h('p', {}, TEXTES_CEREMONIE.aide));
+  const scene = h('div', { className: 'cer-carte' });
+  const ok = h('button', { type: 'button', className: 'cer-ok', hidden: true, onclick: () => { dlg.close(); ranger(c); } }, ligne ? TEXTES_CEREMONIE.ajouterLigne : TEXTES_CEREMONIE.ajouterBadge);
+  const plusTard = h('button', { type: 'button', className: 'secondaire cer-plus-tard', onclick: () => dlg.close() }, TEXTES_CEREMONIE.fermer);
+  let retournee = false;
+  const dos = carteFaceCachee(c, () => {
+    if (retournee) return;
+    retournee = true;
+    api(`eleves/${slug}/cartes/retournement`, { method: 'POST', body: ligne ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier } }).catch(() => {});
+    jouerCarillon(ligne ? 4 : rangDeCarte(badge) /* carte de ligne : rang fixe, le plus long (voir public/carillon.js) */, { actif: son });
+    const vraie = ligne ? carteLigne(c.ligne) : carteBadge(badge, false);
+    vraie.classList.add('entree');
+    const stations = [...vraie.querySelectorAll('.cl-ligne .station')];
+    stations.forEach((st, i) => st.style.setProperty('--i', String(i)));
+    vraie.style.setProperty('--pas', `${Math.min(0.18, 1.2 / Math.max(stations.length, 1)).toFixed(3)}s`);
+    scene.replaceChildren(vraie, h('div', { className: 'cer-eclats', ariaHidden: 'true' }, Array.from({ length: 18 }, (_, i) => {
+      const a = (i / 18) * Math.PI * 2, d = 90 + (i % 3) * 30;
+      return h('i', { style: `--dx:${(Math.cos(a) * d).toFixed(0)}px; --dy:${(Math.sin(a) * d).toFixed(0)}px; animation-delay:${(1.5 + (i % 4) * 0.03).toFixed(2)}s` });
+    })));
+    vraie.focus(); // le dos retourné est retiré de la scène : le focus suit la vraie carte (ses boucles tournent, bornées)
+    retourner(c); // retournée : le groupe derrière la cérémonie la garde, non rangée, jusqu'à « Ajouter »
+    setTimeout(() => {
+      if (!dlg.isConnected) return;
+      texte.replaceChildren(h('h3', {}, nom), h('p', {}, salue));
+      ok.hidden = false;
+      ok.focus();
+    }, moinsDeMouvement() ? 0 : DUREE_CEREMONIE);
+  });
+  scene.append(dos);
+  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, plusTard));
+  // À la fermeture, le focus revient à l'Élève là où il était : la carte retournée de « Nouvelles cartes » (le groupe est
+  // redessiné pendant la cérémonie, l'ancien bouton n'existe plus), ou, une fois la carte ajoutée, au titre du groupe.
+  dlg.addEventListener('close', () => {
+    dlg.remove();
+    const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.collection h3');
+    if (cible) { if (!cible.matches('button, a')) cible.tabIndex = -1; cible.focus(); }
+  });
+  document.body.append(dlg);
+  dlg.showModal();
+  dos.focus();
+}
+
+// La carte de Badge (spec #182, #186) : la même carte que celle de ligne (5 sur 7, trois calques et un héros en
+// parallaxe, reflet, retournement), dessinée à la main (`artDeBadge`), au cadre de la couleur du Palier atteint, avec
+// autant de crans que la Famille a de Paliers (allumés jusqu'au Palier atteint). L'or et le diamant ont une feuille
+// holographique qui suit le pointeur. Le dos dit ce que le Badge salue, la date, le prochain Palier en mots, puis la
+// ligne de Badge (`ligneBadge`), seule jauge du système, sans chiffre ; ses noms de Palier sont dits par le texte
+// alternatif. Une surprise est violette (`palier-unique`).
+function carteBadge(b, nouveau) {
+  const palier = b.surprise ? 'unique' : b.palier, art = artDeBadge(b, rangDeCarte(b)), dos = dosCarteBadge(b, jourEnMots);
+  const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
+  const el = h('button', { type: 'button', className: `carte-ligne-carte carte-badge-carte ${palier}`, ariaPressed: 'false',
+    ariaLabel: `${libelleCarteBadge(b, jourEnMots, nouveau)} ${dos.prochain}`, style: `--ligne: var(--palier-${palier}); --sur-ligne: var(--sur-accent)` },
+  h('div', { className: 'cl-incl' },
+    h('div', { className: 'cl-face cl-avant' },
+      h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', art.l1), calque('cl-l2', art.l2)),
+      h('div', { className: 'cl-bord', ariaHidden: 'true' }),
+      calque('cl-heros', art.heros),
+      h('div', { className: 'cl-texte', ariaHidden: 'true' }, h('span', { className: 'cl-titre' }, b.nom),
+        h('span', { className: 'cl-bas' }, h('span', { className: b.surprise ? 'cl-etiquette mot' : 'cl-etiquette' }, b.surprise ? 'Surprise' : b.emoji),
+          h('span', { className: 'cl-crans' }, crans(b).map((allume) => h('i', { className: allume ? '' : 'vide' }))))),
+      h('div', { className: 'cl-reflet', ariaHidden: 'true' }),
+      aFeuilleHolo(b) && h('div', { className: 'cl-holo', ariaHidden: 'true' }),
+      nouveau && h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau')),
+    h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
+      h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue),
+      !b.surprise && ligneBadge(b, () => false),
+      h('small', {}, dos.date, ' ', dos.prochain))));
+  animerCarte(el);
+  return el;
+}
+
+// « À découvrir » : une carte hachurée, sans dessin ni décompte, qui dit ce que le Badge salue.
+const carteADecouvrir = (b) => h('div', { className: 'carte-badge-carte verrou', role: 'group', ariaLabel: libelleADecouvrir(b) },
+  h('div', { className: 'cl-face', ariaHidden: 'true' }, h('span', { className: 'cl-emoji' }, b.emoji), h('strong', {}, b.nom), h('p', {}, b.phrase)));
+
+// La carte de ligne (spec #182, #185) : une Leçon Acquise, gardée pour toujours. 5 sur 7, cadre à la couleur de la
+// Catégorie, trois calques (l1 fond, l2 décor, héros qui peut déborder) en parallaxe sous la ligne de la Leçon, dessinée
+// par `ligneLecon` (une station par Objectif) ; le terminus « Acquis ✓ » en est détaché pour passer au-dessus du héros.
+// Face : titre en haut, Catégorie en bas, sur un voile. Dos : cartouche, nom, ce que la carte salue, date. Un bouton :
+// toucher ou Entrée la retourne. Les calques sont déjà filtrés par le serveur ; la scène générique vient du code.
+const jourEnMots = (jour) => `le ${new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^1 /, '1er ')}`;
+const moinsDeMouvement = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const DUREE_BOUCLES = 6000; // les boucles du décor s'arrêtent d'elles-mêmes
+
+// L'inclinaison au pointeur et au toucher, le retournement (toucher ou Entrée) et les boucles du décor, qui ne tournent
+// que quand on regarde la carte : partagés par la carte de ligne et la carte de Badge.
+function animerCarte(el) {
+  let arret;
+  const bouger = (x, y) => { el.style.setProperty('--px', x.toFixed(3)); el.style.setProperty('--py', y.toFixed(3)); };
+  const regarder = () => { el.classList.add('regarde'); clearTimeout(arret); arret = setTimeout(() => el.classList.remove('regarde'), DUREE_BOUCLES); };
+  const pointeur = (e) => { // inclinaison au pointeur et au toucher, de -1 à 1 depuis le centre
+    if (moinsDeMouvement()) return;
+    const r = el.getBoundingClientRect();
+    bouger(Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width - .5) * 2)), Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height - .5) * 2)));
+    el.classList.add('actif');
+  };
+  const repos = () => { bouger(0, 0); el.classList.remove('actif'); };
+  el.addEventListener('pointermove', pointeur);
+  el.addEventListener('pointerdown', pointeur);
+  el.addEventListener('pointerenter', regarder);
+  el.addEventListener('focus', regarder);
+  el.addEventListener('pointerleave', repos);
+  el.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') repos(); });
+  el.addEventListener('pointercancel', repos);
+  el.addEventListener('click', () => { const retournee = el.classList.toggle('retournee'); el.ariaPressed = String(retournee); regarder(); });
+}
+
+function carteLigne(c) {
+  const cle = cleCategorieCarte(c.categorie), calques = calquesDeCarte(c), dos = dosCarteLigne(c, jourEnMots);
+  const ligne = ligneLecon({ objectifs: objectifsDeCarte(c.objectifs), maitrise: { palier: 'acquis', pourcentage: 100 } });
+  const terminus = ligne.querySelector('.terminus');
+  terminus.removeAttribute('title'); // pas de pourcentage : le terminus allumé est la seule annonce
+  terminus.remove();
+  const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
+  const el = h('button', { type: 'button', className: `carte-ligne-carte ${cle}`, ariaPressed: 'false', ariaLabel: libelleCarteLigne(c, jourEnMots),
+    style: `--ligne: var(--ligne-${cle}); --n: ${Math.max(1, c.objectifs ?? 1)}` },
+  h('div', { className: 'cl-incl' },
+    h('div', { className: 'cl-face cl-avant' },
+      h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', calques.l1), calque('cl-l2', calques.l2), h('div', { className: 'cl-ligne' }, ligne)),
+      h('div', { className: 'cl-bord', ariaHidden: 'true' }),
+      calque('cl-heros', calques.heros),
+      h('div', { className: 'cl-texte', ariaHidden: 'true' }, h('span', { className: 'cl-titre' }, c.titre), h('span', { className: 'cl-etiquette' }, c.categorie)),
+      h('div', { className: 'cl-terminus', ariaHidden: 'true' }, terminus),
+      h('div', { className: 'cl-reflet', ariaHidden: 'true' })),
+    h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
+      h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue), h('small', {}, dos.date))));
+  animerCarte(el);
+  return el;
+}
+
+// « Mon réseau » : les cartes de ligne retournées, de la plus récente à la plus ancienne (le serveur les range ainsi).
+// Une carte prête mais pas encore retournée, ou retournée et pas ajoutée, attend dans « Nouvelles cartes ». Vide : une phrase, sans pression.
+function monReseau(cartesLigne) {
+  const visibles = cartesLigne.filter((c) => c.retourne);
+  return [
+    h('h4', { className: 'cl-groupe' }, 'Mon réseau'),
+    visibles.length
+      ? h('ul', { className: 'cartes-reseau', ariaLabel: 'Mon réseau' }, visibles.map((c) => h('li', {}, carteLigne(c))))
+      : h('p', { className: 'doux' }, 'Chaque Leçon Acquise ajoutera ici sa carte.')];
 }
 
 // Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour comme le bandeau de la semaine : pâle quand

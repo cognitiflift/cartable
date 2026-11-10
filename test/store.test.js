@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { createStore, rebondsProposes, depassementReussi, etoilesLecon, nouvellesEtoiles, etoilesGagnees, fuseesLecon, fuseesDesPages, etoilesDesPages } from '../lib/store.js';
 
+import { reprendreCompositions } from '../lib/cartes.js';
+
 let dossier, store;
 
 beforeEach(async () => {
@@ -18,6 +20,15 @@ beforeEach(async () => {
 afterEach(async () => {
   mock.timers.reset();
   await fs.rm(dossier, { recursive: true, force: true });
+});
+
+test('Cartes : au redémarrage, une carte « en composition » redevient « à composer » (essais gardés)', async () => {
+  const carte = { lecon: 'a', titre: 'A', categorie: 'Sciences', objectifs: 3, jourAcquisition: '2026-10-03', etat: 'en-composition', essais: 1, calques: null, prete: null, retourne: null };
+  const fichier = path.join(dossier, 'zoe', 'cartes.json');
+  await fs.writeFile(fichier, JSON.stringify({ version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: { a: carte }, paliers: {} }));
+  await store.reprendreCartes(reprendreCompositions);
+  const apres = JSON.parse(await fs.readFile(fichier, 'utf8')).cartes.a;
+  assert.deepEqual([apres.etat, apres.essais], ['a-composer', 1]);
 });
 
 test('Leçon libre : identifiant date + sujet', async () => {

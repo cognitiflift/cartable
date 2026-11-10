@@ -57,6 +57,40 @@ function esquisse(cat) {
     <g class="motif">${motifDe(cat)}</g></svg><div class="att-reflet" aria-hidden="true"></div>`;
 }
 
+// --- Variantes en boucle de 6 s (B, C, D). Même enveloppe `.att-in` que A (le retournement de fin est commun).
+// B « Le convoi » : un petit train traverse la carte de gare en gare, chaque gare s'allume à son passage.
+function convoi() {
+  const gares = Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="b-gare" cx="${26 + i * 37}" cy="140" r="10" style="--i:${i}"/>`).join('');
+  return `<svg viewBox="0 0 200 280" aria-hidden="true">
+    <path class="b-rail" d="M0 140 H200"/><path class="b-rail b-rail2" d="M0 206 H200"/>${gares}
+    <g class="b-train"><rect x="-34" y="124" width="30" height="22" rx="7"/><rect class="fen" x="-29" y="129" width="7" height="7" rx="2"/><rect class="fen" x="-18" y="129" width="7" height="7" rx="2"/><circle cx="-26" cy="148" r="3.4"/><circle cx="-12" cy="148" r="3.4"/></g></svg>`;
+}
+// C « Les couches » : les quatre couches de la carte (ciel, décor, ligne, héros) se détachent en profondeur et se replient.
+function couches() {
+  const plan = (classe, contenu) => `<div class="c-plan ${classe}"><svg viewBox="0 0 200 280" aria-hidden="true">${contenu}</svg></div>`;
+  return `<div class="c-scene">${plan('c1', '<circle cx="146" cy="62" r="22"/><circle cx="60" cy="40" r="2.5"/><circle cx="92" cy="74" r="2"/><circle cx="30" cy="84" r="2"/>')}
+    ${plan('c2', '<path d="M0 150 Q48 112 96 138 T200 128 V280 H0 Z"/>')}
+    ${plan('c3', `<path d="M0 170 H200"/>${Array.from({ length: OBJECTIFS }, (_, i) => `<circle cx="${26 + i * 37}" cy="170" r="10"/>`).join('')}`)}
+    ${plan('c4', '<path d="M82 226 L112 90 L146 124 L184 180 L158 228 Z"/><path d="M112 90 L130 174 L158 228 M146 124 L130 174 L82 226"/>')}</div>`;
+}
+// D « Crayonné » : des hachures se posent sur le ciel, le décor et le héros, puis s'effacent doucement.
+function crayon() {
+  const hachures = (x0, y0, w, h, n, classe, pas = 8) => Array.from({ length: n }, (_, i) => `<path class="d-trait ${classe}" pathLength="1" d="M${x0 + (i * w) / n} ${y0 + h} L${x0 + (i * w) / n + 22} ${y0}" style="--i:${i}"/>`).join('');
+  return `<svg viewBox="0 0 200 280" aria-hidden="true">
+    <g class="d-ciel" style="--d:0s">${hachures(14, 20, 172, 100, 15, 'ciel')}</g>
+    <g class="d-decor" style="--d:1.2s">${hachures(14, 130, 172, 60, 15, 'decor')}</g>
+    <g style="--d:2.4s"><path class="d-trait ligne" pathLength="1" d="M10 174 H190" style="--i:0"/>${Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="d-gare" cx="${26 + i * 37}" cy="174" r="9" style="--i:${i}"/>`).join('')}</g>
+    <g class="d-heros" style="--d:3s"><path class="d-trait ligne" pathLength="1" d="M88 232 L112 100 L142 130 L176 184 L152 234 Z" style="--i:0"/>${hachures(106, 120, 52, 100, 6, 'heros')}</g></svg>`;
+}
+const VARIANTES = {
+  A: { nom: 'Esquisse (crescendo)', dessin: esquisse },
+  B: { nom: 'Le convoi (boucle 6 s)', dessin: convoi, boucle: true },
+  C: { nom: 'Les couches (boucle 6 s)', dessin: couches, boucle: true },
+  D: { nom: 'Crayonné (boucle 6 s)', dessin: crayon, boucle: true },
+};
+let variante = new URLSearchParams(location.search).get('variant')?.toUpperCase();
+if (!VARIANTES[variante]) variante = 'A';
+
 // --- La « vraie » carte (simulée) : même DOM que carteLigne (public/app.js), scène générique du serveur.
 function carteReelle(cat) {
   const calques = sceneGenerique({ lecon: 'fractions', categorie: cat });
@@ -120,8 +154,9 @@ function ouvrir() {
       h('span', { className: 'cl-cachee-face' }, h('span', { className: 'cl-medaillon', 'aria-hidden': 'true' }, '🚉')));
     scene.append(dos);
   } else {
-    const carte = h('div', { className: `att-carte ${cat}` }, h('div', { className: 'att-in' }));
-    carte.firstChild.innerHTML = esquisse(cat);
+    const v = VARIANTES[variante];
+    const carte = h('div', { className: `att-carte ${cat} ${v.boucle ? `boucle v${variante}` : ''}` }, h('div', { className: 'att-in' }));
+    carte.firstChild.innerHTML = v.dessin(cat);
     texte.append(h('p', {}, 'Ta carte se prépare'));
     scene.append(carte);
     pause.onclick = () => { const p = carte.classList.toggle('pause'); pause.setAttribute('aria-pressed', String(p)); pause.textContent = p ? 'Reprendre' : 'Mettre en pause'; };
@@ -142,13 +177,31 @@ function ouvrir() {
       apres(4500, () => dlg.close());
     });
   }
-  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, pause, plusTard));
+  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, pause, plusTard), bandeau());
   dlg.addEventListener('close', () => { timers.forEach(clearTimeout); dlg.remove(); emplacement.focus(); });
   document.body.append(dlg);
   dlg.showModal();
   (scene.querySelector('button') ?? plusTard).focus();
 }
 
+// Le sélecteur flottant (← →) : dans la page et dans la cérémonie (un dialogue modal rend le reste inerte).
+function changer(sens) {
+  const cles = Object.keys(VARIANTES);
+  variante = cles[(cles.indexOf(variante) + sens + cles.length) % cles.length];
+  const url = new URL(location.href); url.searchParams.set('variant', variante); history.replaceState(null, '', url);
+  document.querySelectorAll('.proto-bandeau output').forEach((o) => { o.textContent = `${variante} · ${VARIANTES[variante].nom}`; });
+  const ouvert = document.querySelector('dialog.cartes-ceremonie[open]');
+  if (ouvert) { ouvert.close(); ouvrir(); }
+}
+function bandeau() {
+  return h('div', { className: 'proto-bandeau' }, h('button', { type: 'button', 'aria-label': 'Variante précédente', onclick: () => changer(-1) }, '←'),
+    h('output', {}, `${variante} · ${VARIANTES[variante].nom}`), h('button', { type: 'button', 'aria-label': 'Variante suivante', onclick: () => changer(1) }, '→'));
+}
+document.body.append(bandeau());
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') changer(-1); else if (e.key === 'ArrowRight') changer(1);
+});
 emplacement.onclick = ouvrir;
 const params = new URLSearchParams(location.search);
 for (const [k, v] of params) { const champ = document.getElementById('reglages').elements[k]; if (champ) champ.value = v; }

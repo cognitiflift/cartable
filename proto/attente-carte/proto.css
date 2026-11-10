@@ -66,3 +66,42 @@
 .att-pause { min-height:2.75rem; }
 .att-pause[hidden] { display:none; }
 .att-etat { min-height:1.4rem; margin:0; color:var(--sur-nuit-doux); }
+
+/* ---- Sélecteur flottant du prototype ---- */
+.proto-bandeau { position:fixed; left:50%; bottom:.8rem; transform:translateX(-50%); z-index:10; display:flex; align-items:center; gap:.5rem; padding:.3rem .5rem; border-radius:999px; background:var(--texte); color:var(--fond); box-shadow:0 4px 14px rgb(var(--ombre) / .35); }
+.cartes-ceremonie .proto-bandeau { position:fixed; }
+.proto-bandeau output { min-width:11rem; text-align:center; font:800 .9rem var(--police); }
+.proto-bandeau button { min-width:2.75rem; min-height:2.75rem; border:0; border-radius:50%; background:transparent; color:inherit; font:800 1.2rem var(--police); cursor:pointer; }
+.proto-bandeau button:focus-visible { outline:3px solid var(--nouveau); }
+
+/* ---- Boucles de 6 s (B, C, D) : calmes, éclat jamais sous 60 %, arrêt par .pose (comme la pause) ---- */
+.att-carte.boucle.pose *, .att-carte.boucle.pause * { animation-play-state:paused !important; }
+.att-carte.boucle .att-in { perspective:520px; }
+
+/* B — Le convoi */
+.b-rail { fill:none; stroke:var(--sur-nuit); stroke-width:6; opacity:.55; stroke-linecap:round; }
+.b-rail2 { stroke:var(--ligne); stroke-width:3; stroke-dasharray:2 10; opacity:.9; }
+.b-gare { fill:var(--nuit); stroke:var(--sur-nuit); stroke-width:3.5; transform-box:fill-box; transform-origin:center; opacity:.75; animation:b-gare 6s ease-in-out infinite; animation-delay:calc(1.29s + var(--i) * .69s - 6s); }
+.b-train rect, .b-train circle { fill:var(--ligne); stroke:var(--sur-nuit); stroke-width:2; }
+.b-train .fen { fill:var(--sur-nuit); stroke:none; }
+.b-train { animation:b-roule 6s linear infinite; }
+@keyframes b-roule { from { transform:translateX(0); } to { transform:translateX(264px); } }
+@keyframes b-gare { 0% { transform:scale(1); opacity:.75; fill:var(--nuit); } 6% { transform:scale(1.35); opacity:1; fill:var(--ligne); } 35% { transform:scale(1); opacity:1; fill:var(--ligne); } 100% { transform:scale(1); opacity:.75; fill:var(--nuit); } }
+
+/* C — Les couches */
+.c-scene { position:absolute; inset:0; transform-style:preserve-3d; animation:c-tourne 6s ease-in-out infinite; }
+.c-plan { position:absolute; inset:7%; border:2px dashed var(--sur-nuit); border-radius:14px; background:color-mix(in srgb, var(--ligne) 14%, transparent); transform-style:preserve-3d; animation:c-ecarte 6s ease-in-out infinite; }
+.c-plan svg { position:absolute; inset:-8%; width:116%; height:116%; fill:color-mix(in srgb, var(--ligne) 55%, transparent); stroke:var(--sur-nuit); stroke-width:2; stroke-linejoin:round; overflow:visible; }
+.c2 { --z:1; animation-delay:.12s; } .c3 { --z:2; animation-delay:.24s; } .c4 { --z:3; animation-delay:.36s; } .c1 { --z:0; }
+.c3 svg { fill:none; } .c3 circle { fill:var(--nuit); }
+.c1 svg circle { fill:var(--sur-nuit); stroke:none; opacity:.8; }
+@keyframes c-ecarte { 0%, 100% { transform:translateZ(0); } 45%, 60% { transform:translateZ(calc(var(--z) * 34px - 20px)); } }
+@keyframes c-tourne { 0%, 100% { transform:rotateY(0) rotateX(0); } 50% { transform:rotateY(-24deg) rotateX(14deg); } }
+
+/* D — Crayonné */
+.d-trait { fill:none; stroke-linecap:round; stroke-dasharray:1; stroke-dashoffset:0; opacity:.8; stroke-width:2.4; animation:d-pose 6s ease-in-out infinite; animation-delay:calc(var(--d, 0s) + var(--i) * .1s); }
+.d-ciel, .d-decor, .d-heros { }
+.d-trait.ciel { stroke:var(--sur-nuit); opacity:.55; } .d-trait.decor { stroke:var(--ligne); } .d-trait.heros { stroke:var(--sur-nuit); } .d-trait.ligne { stroke:var(--ligne); stroke-width:5; opacity:.95; }
+.d-gare { fill:var(--nuit); stroke:var(--sur-nuit); stroke-width:3.5; animation:d-gare 6s ease-in-out infinite; animation-delay:calc(var(--d, 0s) + 1s + var(--i) * .15s); }
+@keyframes d-pose { 0% { stroke-dashoffset:1; opacity:0; } 8% { opacity:.8; } 40% { stroke-dashoffset:0; opacity:.8; } 80% { stroke-dashoffset:0; opacity:.8; } 100% { stroke-dashoffset:0; opacity:0; } }
+@keyframes d-gare { 0% { opacity:.6; } 50% { opacity:1; } 100% { opacity:.6; } }

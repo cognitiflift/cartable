@@ -1,5 +1,5 @@
 /* Prototype #198, jetable. Jetons seulement (public/style.css). L'attente : l'esquisse se trace en ~6 s, puis fond et
-   repart (boucle de ~7,6 s, pilotée en JS). `.corrige` : les corrections de la critique (constats 1 à 6). */
+   repart (boucle de ~7,6 s, pilotée en JS). Corrections de la critique : 3 à 6. */
 .proto { max-width:34rem; margin:0 auto; padding:1rem; }
 .proto h1 { font:800 1.3rem/1.2 var(--police-titre); }
 .reglages { display:grid; grid-template-columns:repeat(auto-fit, minmax(10rem, 1fr)); gap:.6rem; margin:1rem 0; }
@@ -45,9 +45,9 @@
 .att-in .jalon { fill:var(--sur-nuit); opacity:0; transform-box:fill-box; transform-origin:center; animation:att-pop .45s ease-out forwards; animation-delay:calc(4s + var(--i) * .5s); }
 /* Pause (bouton) et repli (.pose) : tout se fige, sans saut */
 .att-carte.pose *, .att-carte.pause * { animation-play-state:paused !important; }
-/* Corrigée : traits plus épais (constat 6) */
-.att-carte.corrige .att-in .trait { stroke-width:2.3; }
-.att-carte.corrige .att-in .couleur { stroke-width:3.2; }
+/* Traits plus épais (constat 6) */
+.att-in .trait { stroke-width:2.3; }
+.att-in .couleur { stroke-width:3.2; }
 /* Fin : l'esquisse se met de profil ; la vraie carte revient du même angle (cer-retourne, public/style.css) */
 .att-carte.fin .att-in { animation:att-sortie .25s ease-in forwards; }
 
@@ -61,10 +61,6 @@
 .att-pause { min-height:2.75rem; }
 .att-pause[hidden] { display:none; }
 
-/* Le fondu entre deux tours. Actuelle : toute la carte (dessin et reflet) fond puis repart. Corrigée : seul le groupe
-   .fondant fond ; cadre, halo et rail restent (constat 2). */
-.att-carte:not(.corrige) .att-in > * { transition:opacity .8s ease-in-out; }
-.att-carte:not(.corrige).rejoue-sortie .att-in > * { opacity:0; }
-.att-carte.corrige .fondant { transition:opacity .8s ease-in-out; }
-.att-carte.corrige.rejoue-sortie .fondant { opacity:0; }
-.proto-version { min-height:2.75rem; }
+/* Le fondu entre deux tours : toute la carte (dessin et reflet) fond, puis le dessin repart. */
+.att-carte .att-in > * { transition:opacity .8s ease-in-out; }
+.att-carte.rejoue-sortie .att-in > * { opacity:0; }

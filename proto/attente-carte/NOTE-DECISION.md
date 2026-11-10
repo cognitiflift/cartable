@@ -9,12 +9,12 @@ Lancer : `python3 -m http.server 8765` à la racine du dépôt, puis `http://127
 Format retenu par l'humain : **l'esquisse, rejouée en boucle** (autres variantes essayées et retirées : crescendo avec respiration, convoi, couches, crayonné, esquisse décalée élément par élément ; elles sont dans l'historique de la branche).
 
 - **Une carte, une scène** : la carte vierge est la carte face cachée (mêmes rayures, même 5/7). Elle s'esquisse **au trait** : cadre, étoiles, collines, rail et stations, motif d'atelier, halo de la couleur de la Catégorie, un reflet. **Aucun héros** : la carte finale a un héros propre à la Leçon, composé par l'agent ; l'esquisse n'en annonce pas un qui n'existerait pas, et le héros n'apparaît qu'avec la vraie carte (il « tombe » dans la cérémonie).
-- **Boucle** : l'esquisse est jouée en entier à 1,15× (~5,5 s), reste posée un instant, s'efface en fondu (0,8 s) puis repart de zéro. Un tour : ~7,6 s. Elle ne s'emballe pas et ne monte pas en puissance : chaque tour est identique.
+- **Boucle** : l'esquisse est jouée en entier à 1,15×, un reflet la traverse, elle fond en entier (0,8 s) puis repart de zéro. Un tour : ~7,6 s. Chaque tour est identique.
 - **Transition sans coupure** : à l'arrivée de la carte, l'esquisse se met de profil (0,25 s, `rotateY(90°)`), la vraie carte revient du même angle avec le `cer-retourne` existant, puis les couches, le héros, la gerbe et les stations de la cérémonie d'aujourd'hui. **Sans second geste**.
 - **Durées** : 0 s (cérémonie actuelle), 3 s, 15 s, 60 s, échec (scène générique à 8 s, sans mot d'échec).
-- **Sorties** : « Plus tard » à tout moment ; **délai maximal (60 s)** : texte calme « Ta carte arrive, elle t'attend sur l'accueil. », la boucle se fige. Version actuelle : fermeture automatique 4,5 s plus tard ; version corrigée : le dialogue reste ouvert avec « Fermer ».
-- **Arrêt du mouvement (WCAG 2.2.2)** : bouton « Mettre en pause / Reprendre » (dès 5 s en version actuelle, dès le départ en version corrigée). **Pas d'immobilisation d'elle-même** (décision de l'humain) : la boucle tourne jusqu'à la pause, la fermeture ou le repli.
-- **`prefers-reduced-motion`** : aucune animation ; état fixe, tout esquissé, « Ta carte se prépare ».
+- **Sorties** : « Plus tard » à tout moment ; **délai maximal (60 s)** : texte calme « Ta carte arrive, elle t'attend sur l'accueil. », la boucle s'arrête sur le dessin complet, le dialogue **reste ouvert** avec « Fermer » (pas de fermeture automatique : pas de limite de temps imposée).
+- **Arrêt du mouvement (WCAG 2.2.2)** : bouton « Mettre en pause / Reprendre » visible dès le départ (libellé seul, sans `aria-pressed`). **Pas d'immobilisation d'elle-même** (décision de l'humain).
+- **`prefers-reduced-motion`** : **écart assumé** (décision de l'humain, constat 1 de la critique non corrigé) : la boucle tourne aussi sous mouvement réduit, et la carte se vide un instant à chaque tour, ce qui contredit le critère du ticket #198 (« aucune animation, un état fixe »). **À rouvrir avant #197** : l'implémentation devra soit figer l'esquisse, soit traiter ce cas explicitement.
 
 ## Recommandation
 
@@ -40,13 +40,15 @@ Format retenu par l'humain : **l'esquisse, rejouée en boucle** (autres variante
 2. `/impeccable critique` sur la page, puis trancher.
 3. Publier cette note (amendée) en commentaire de #197.
 
-## Critique impeccable (version actuelle) et corrections proposées
+## Critique impeccable : ce qui est retenu
 
-| # | Constat | Correction (version « Corrigée ») |
+| # | Constat | Décision |
 | --- | --- | --- |
-| 1 | Bloquant : sous `prefers-reduced-motion`, la boucle tourne et vide la carte | Pas de boucle sous mouvement réduit : esquisse fixe |
-| 2 | La carte se vide à chaque tour | Seul le dessin fond ; cadre, halo et rail restent |
-| 3 | Fermeture automatique au repli (limite de temps, WCAG 2.2.1) | Le dialogue reste ouvert, bouton « Fermer » |
-| 4 | Pause tardive (5 s), `aria-pressed` et libellé changeant à la fois, code mort | Pause dès le départ, libellé seul ; code mort retiré (dans les deux versions) |
-| 5 | Cinq stations inventées | Trois jalons pleins, non lisibles comme un décompte |
-| 6 | Halo écrasant, grille/orbites qui chevauchent, traits fins, reflet invisible | Halo réduit, étoiles moins nombreuses, orbites remontées, traits épais, reflet retiré |
+| 1 | Sous `prefers-reduced-motion`, la boucle tourne et vide la carte | **Gardé tel quel** (écart assumé, voir ci-dessus) |
+| 2 | La carte se vide à chaque tour | **Gardé tel quel** (toute la carte fond) |
+| 3 | Fermeture automatique au repli (WCAG 2.2.1) | **Corrigé** : le dialogue reste ouvert, « Fermer » |
+| 4 | Pause tardive, `aria-pressed` et libellé changeant à la fois, code mort | **Corrigé** : pause dès le départ, libellé seul, code mort retiré |
+| 5 | Cinq stations inventées | **Corrigé** : trois jalons pleins, non lisibles comme un décompte |
+| 6 | Halo écrasant, étoiles nombreuses, orbites sur la ligne, traits fins, reflet invisible | **Corrigé** : halo réduit, 4 étoiles, orbites remontées, traits plus épais ; **reflet conservé** |
+
+Défaut trouvé en vérifiant : si le repli tombait pendant un fondu, la carte restait vide figée ; au repli, le dessin est maintenant redessiné complet puis arrêté.

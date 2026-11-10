@@ -5,7 +5,8 @@ import { avecEmoji, nommer } from '/kit/v1/dom.js';
 import { nomEtPalier, morceauxRecompensesLecon } from '/recompenses-texte.js';
 import { rangerCollection, rangDeCarte, crans, aFeuilleHolo, libelleCarteBadge, libelleADecouvrir, dosCarteBadge } from '/carte-badge-texte.js';
 import { artDeBadge } from '/carte-badge-art.js';
-import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
+import { esquisseCarte } from '/carte-attente-art.js';
+import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, cartesDuGain, ATTENTE, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
@@ -504,7 +505,6 @@ function emplacementCarteLecon(l, { cartesLigne, son, slug, retourner }) {
     if (e.etat === 'rangee') return zone.replaceChildren(carteLigne(e.carte));
     const c = { ...carte, cle: cleCarte(carte), medaillon: e.medaillon, ligne: e.carte, libelle: e.libelle };
     const dos = carteFaceCachee(c, () => ceremonie(c, { son, slug, retourner: (x) => { retourner(x); dessiner(); } }));
-    if (!e.prete) { dos.disabled = true; dos.ariaDisabled = 'true'; } // en composition : l'attente animée est le ticket #197
     zone.replaceChildren(dos);
   };
   dessiner();
@@ -689,7 +689,7 @@ function ligneBadge(b, estNouveau) {
 function carteRetournee(donnees, c) {
   donnees.aRetourner = (donnees.aRetourner ?? []).filter((x) => cleCarte(x) !== c.cle);
   const l = c.type === 'ligne' && donnees.cartesLigne?.find((x) => x.lecon === c.id);
-  if (l) l.retourne = new Date().toISOString();
+  if (l) Object.assign(l, { retourne: new Date().toISOString(), ...(c.ligne?.calques && { calques: c.ligne.calques, etat: c.ligne.etat, prete: c.ligne.prete }) }); // composée pendant l'attente (#197)
 }
 
 async function ecranBadges(profil) {
@@ -741,6 +741,32 @@ function nouvellesCartesGroupe(cartes, { son, slug, retourner }) {
     })));
 }
 
+// Les cartes gagnées, proposées face cachée à l'endroit du gain (#197) : sur le Retour de quiz et l'écran de fin de
+// Révision du jour, à côté de l'annonce. `gain` : { paliers: [{ id, palier }], lignes: [identifiants de Leçon] }, tel que
+// le serveur les annonce. L'état des cartes est lu à l'affichage : une carte déjà retournée n'est plus proposée. Toucher
+// une carte ouvre la même cérémonie, sur la page courante ; jamais d'ouverture d'elle-même. Rien à proposer, ou lecture
+// impossible : rien n'est dessiné, le Retour reste tel quel (la carte attend dans Mes badges ou l'encart de la Leçon).
+function cartesDuGainEcran(profil, gain) {
+  const zone = h('div', { className: 'cartes-gain', hidden: true });
+  if (!gain.paliers?.length && !gain.lignes?.length) return zone;
+  api(`eleves/${profil.slug}/badges`).then((donnees) => {
+    donnees.aRetourner ??= [];
+    const retourner = (c) => { carteRetournee(donnees, c); retenirRecompenses(profil, donnees); barreNav(profil); dessiner(); };
+    const dessiner = () => {
+      const cartes = cartesDuGain({ ...gain, aRetourner: donnees.aRetourner, collection: donnees.collection ?? [], cartesLigne: donnees.cartesLigne ?? [] });
+      zone.hidden = cartes.length === 0;
+      zone.replaceChildren(...(cartes.length ? [h('p', { className: 'cg-mot' }, TEXTES_CEREMONIE.propose(cartes.length)),
+        h('ul', { className: 'cartes-attente', ariaLabel: TEXTES_CEREMONIE.titreGroupe }, cartes.map((c) => {
+          const li = h('li', {}, carteFaceCachee(c, () => ceremonie(c, { son: donnees.son === true, slug: profil.slug, retourner })));
+          li.dataset.cle = c.cle; // retrouver la carte quand la cérémonie se ferme
+          return li;
+        }))] : []));
+    };
+    dessiner();
+  }).catch(() => {});
+  return zone;
+}
+
 function carteFaceCachee(c, ouvrir) {
   return h('button', { type: 'button', className: `carte-ligne-carte carte-cachee ${c.type === 'ligne' ? 'ligne' : c.badge.surprise ? 'palier-unique' : 'palier-neutre'}`, ariaLabel: c.libelle, onclick: ouvrir },
     h('span', { className: 'cl-cachee-face' },
@@ -767,9 +793,12 @@ function ceremonie(c, { son, slug, retourner }) {
   const ok = h('button', { type: 'button', className: 'cer-ok', hidden: true, onclick: () => dlg.close() }, TEXTES_CEREMONIE.fermerRetournee);
   const plusTard = h('button', { type: 'button', className: 'secondaire cer-plus-tard', onclick: () => dlg.close() }, TEXTES_CEREMONIE.fermer);
   let retournee = false;
-  const dos = carteFaceCachee(c, () => {
+  const minuteurs = [];
+  const apres = (ms, f) => minuteurs.push(setTimeout(() => { if (dlg.isConnected) f(); }, ms));
+  const reveler = () => {
     if (retournee) return;
     retournee = true;
+    pause.hidden = true;
     api(`eleves/${slug}/cartes/retournement`, { method: 'POST', body: ligne ? { type: 'ligne', id: c.id } : { type: 'palier', id: c.id, palier: c.palier } }).catch(() => {});
     jouerCarillon(ligne ? 4 : rangDeCarte(badge) /* carte de ligne : rang fixe, le plus long (voir public/carillon.js) */, { actif: son });
     const vraie = ligne ? carteLigne(c.ligne) : carteBadge(badge, false);
@@ -790,13 +819,77 @@ function ceremonie(c, { son, slug, retourner }) {
       ok.hidden = false;
       ok.focus();
     }, moinsDeMouvement() ? 0 : DUREE_CEREMONIE);
-  });
+  };
+  // Carte de ligne pas encore composée (#197) : l'esquisse se dessine en boucle jusqu'à ce que la carte soit prête, puis
+  // la cérémonie prend le relais sans second geste. Le retournement n'est enregistré qu'à ce moment (le serveur refuse
+  // celui d'une carte pas prête). L'état de la carte est relu sans relancer de composition.
+  const pause = h('button', { type: 'button', className: 'secondaire att-pause', hidden: true }, TEXTES_CEREMONIE.pause);
+  const attendre = () => {
+    if (retournee || attenteEnCours) return;
+    attenteEnCours = true;
+    const reduit = moinsDeMouvement();
+    const carte = h('div', { className: `att-carte ${cleCategorieCarte(c.ligne.categorie)}`, style: `--ligne: var(--ligne-${cleCategorieCarte(c.ligne.categorie)}, var(--ligne-autre))` }, h('div', { className: 'att-in' }));
+    const dessin = () => { carte.firstChild.innerHTML = esquisseCarte(c.ligne.categorie); };
+    dessin();
+    scene.replaceChildren(carte);
+    texte.replaceChildren(h('p', {}, reduit ? TEXTES_CEREMONIE.attenteFixe : TEXTES_CEREMONIE.attente));
+    (reduit ? plusTard : pause).focus(); // le dos a quitté la scène : le focus reste dans le dialogue
+    let repli = false, prete = false;
+    const accelerer = () => carte.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = ATTENTE.vitesse; });
+    apres(0, accelerer); // la carte n'est dans le document qu'après ce code : le premier passage est accéléré comme les autres
+    // La boucle (pilotée ici : le CSS global seul laisserait la carte se vider brusquement à chaque tour sous mouvement
+    // réduit) : l'esquisse en entier, un fondu, puis elle repart de zéro. Pas de boucle sous mouvement réduit.
+    const tour = () => apres(ATTENTE.tour, () => {
+      if (retournee || repli || prete) return;
+      if (carte.classList.contains('pause')) return tour();
+      carte.classList.add('rejoue-sortie');
+      apres(ATTENTE.fondu, () => {
+        if (repli || prete) return;
+        dessin(); carte.classList.remove('rejoue-sortie'); accelerer(); tour();
+      });
+    });
+    if (!reduit) tour();
+    pause.hidden = reduit; // WCAG 2.2.2 : visible dès le départ, libellé seul (pas d'aria-pressed)
+    pause.onclick = () => { const p = carte.classList.toggle('pause'); pause.textContent = p ? TEXTES_CEREMONIE.reprendre : TEXTES_CEREMONIE.pause; };
+    const finir = (nouvelle) => { // l'esquisse se met de profil, la vraie carte revient du même angle (cer-retourne)
+      prete = true;
+      c.ligne = nouvelle;
+      carte.classList.remove('pause', 'rejoue-sortie');
+      carte.classList.add('fin');
+      texte.replaceChildren(h('p', {}, ''));
+      apres(reduit ? 0 : ATTENTE.profil, reveler);
+    };
+    const relire = async () => {
+      let nouvelle = null;
+      try { nouvelle = (await api(`eleves/${slug}/cartes/ligne/${c.id}`)).carte; } catch { /* la relecture suivante réessaie */ }
+      if (!dlg.isConnected || retournee || prete || repli) return;
+      if (nouvelle?.calques) return finir(nouvelle);
+      apres(ATTENTE.relecture, relire);
+    };
+    apres(ATTENTE.relecture, relire);
+    // Délai maximal : texte calme, le dessin complet figé, le dialogue reste ouvert (pas de fermeture automatique, WCAG
+    // 2.2.1). La carte reste à retourner dans l'encart de la Leçon.
+    apres(ATTENTE.repli, () => {
+      if (retournee || prete) return;
+      repli = true;
+      pause.hidden = true;
+      carte.classList.remove('rejoue-sortie', 'pause');
+      dessin(); // jamais une carte vide figée en plein fondu
+      carte.getAnimations({ subtree: true }).forEach((a) => { try { a.finish(); } catch { /* rotation sans fin : ignorée */ } });
+      carte.classList.add('pose');
+      texte.replaceChildren(h('p', {}, TEXTES_CEREMONIE.repli));
+      plusTard.textContent = TEXTES_CEREMONIE.fermerRepli;
+    });
+  };
+  let attenteEnCours = false;
+  const dos = carteFaceCachee(c, () => (ligne && !c.ligne.calques ? attendre() : reveler()));
   scene.append(dos);
-  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, plusTard));
+  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, pause, plusTard));
   // À la fermeture, le focus revient à l'Élève là où il était. L'écran derrière a été redessiné au retournement et l'ancien
   // bouton n'existe plus : le focus va à la carte rangée au même endroit (encart de la Leçon, Mon réseau), sinon au titre.
   dlg.addEventListener('close', () => {
     dlg.remove();
+    minuteurs.forEach(clearTimeout);
     const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.collection h3, .lecons-tete h2');
     if (cible) { if (!cible.matches('button, a')) cible.tabIndex = -1; cible.focus(); }
   });
@@ -1038,10 +1131,15 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
 
   // Récompenses de la série menée jusqu'au bout (#94), annoncées en tête de l'écran qui suit : l'Étoile du jour, puis
   // les nouveaux Paliers de Badge dans la phrase préparée par le serveur (#98).
+  // Les cartes gagnées (Paliers, carte de ligne) sont proposées face cachée à côté, sans s'ouvrir d'elles-mêmes (#197).
   const annonces = (recompenses) => [
-    recompenses?.etoile && '⭐ Nouvelle Étoile : Révision du jour terminée !',
-    recompenses?.annonce,
-  ].filter(Boolean).map((texte) => h('p', { className: 'bulle-prof' }, texte));
+    ...[
+      recompenses?.etoile && '⭐ Nouvelle Étoile : Révision du jour terminée !',
+      recompenses?.annonce,
+    ].filter(Boolean).map((texte) => h('p', { className: 'bulle-prof' }, texte)),
+    recompenses && (recompenses.paliers?.length || recompenses.nouvellesCartesLigne?.length)
+      ? cartesDuGainEcran(profil, { paliers: recompenses.paliers, lignes: recompenses.nouvellesCartesLigne }) : null,
+  ].filter(Boolean);
   const fin = (suite, recompenses) => [
     ...annonces(recompenses),
     h('p', { className: 'bulle-prof' }, suite ? '🎉 Tu as tout revu, même en plus. Bravo !' : '🎉 Tu as fini tes révisions du jour ! Tu es libre.'),
@@ -1449,6 +1547,13 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
     panneau.replaceChildren(choix, iframe);
   };
 
+  // Les cartes gagnées par ce quiz (#197) : lues une fois par Retour, la zone survit aux redessins de l'écran.
+  const zonesCartes = new WeakMap();
+  const cartesDuRetour = (retour) => {
+    if (!retour.nouveauxBadges?.length && !retour.nouvellesCartesLigne?.length) return null;
+    if (!zonesCartes.has(retour)) zonesCartes.set(retour, cartesDuGainEcran(profil, { paliers: retour.nouveauxBadges, lignes: retour.nouvellesCartesLigne }));
+    return zonesCartes.get(retour);
+  };
   const afficher = () => {
     afficherPanneau();
     const prof = lecon.messages.findLast((m) => m.role === 'agent');
@@ -1467,6 +1572,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
         !retourFerme && h('div', { className: 'retour' },
           h('button', { className: 'secondaire fermer', title: 'Fermer', ariaLabel: 'Fermer', onclick: () => { retourFerme = true; afficher(); } }, '✕'),
           prof.texte),
+        cartesDuRetour(prof.retourQuiz),
         action === 'terminee'
           ? [h('div', { className: 'lecon-terminee' }, h('strong', {}, '🏆 Leçon terminée'), h('small', {}, `Défi : ${score} %`), recompensesLecon(lecon)),
              ...lecon.rebondsProposes.map((r) => h('button', { className: 'secondaire', onclick: () => choisirRebond(r) }, libelleRebond(r, ensuite)))]

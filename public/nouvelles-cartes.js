@@ -64,12 +64,40 @@ export function emplacementCarte(cartesLigne, leconId) {
     libelle: prete ? LIBELLE_CACHEE : 'Une nouvelle carte, face cachée, en préparation. Elle sera prête dans un instant.' };
 }
 
+// Les cartes que ce gain propose face cachée (#197), sur l'écran du Retour de quiz ou de fin de Révision du jour : les
+// Paliers annoncés (`paliers`, [{ id, palier }]) et les cartes de ligne annoncées (`lignes`, identifiants de Leçon), tant
+// qu'elles attendent (relues sur la vue des cartes : retournée ailleurs, elle n'est plus proposée). Une carte de ligne
+// est proposée prête ou non : `prete: false` ouvre l'attente de la cérémonie, qui relit l'état de la carte.
+export function cartesDuGain({ paliers = [], lignes = [], aRetourner, collection, cartesLigne }) {
+  const attend = (p) => aRetourner.some((c) => c.type === 'palier' && c.id === p.id && c.palier === p.palier);
+  const duPalier = nouvellesCartes({ aRetourner: paliers.filter(attend).map((p) => ({ type: 'palier', id: p.id, palier: p.palier })), collection, cartesLigne });
+  const deLigne = lignes.flatMap((id) => {
+    const e = emplacementCarte(cartesLigne, id);
+    if (e.etat !== 'a-retourner') return [];
+    const carte = { type: 'ligne', id };
+    return [{ ...carte, cle: cleCarte(carte), medaillon: e.medaillon, ligne: e.carte, libelle: e.libelle, prete: e.prete }];
+  });
+  return [...duPalier, ...deLigne];
+}
+
+// Durées de l'attente (ms), décidées au prototype #198 : un tour de boucle (esquisse en entier à `vitesse`×, fondu), le
+// quart de tour de l'esquisse qui cède la place à la carte, la relecture de l'état de la carte, le délai maximal.
+export const ATTENTE = { vitesse: 1.15, tour: 6800, fondu: 800, profil: 250, relecture: 2000, repli: 60_000 };
+
 // Textes de la cérémonie et du réglage.
 export const TEXTES_CEREMONIE = {
   titreGroupe: 'Nouvelles cartes',
   aide: 'Touche la carte pour la retourner.',
   fermer: 'Plus tard', // avant le retournement : la carte reste face cachée
   fermerRetournee: 'Fermer', // après : fermer range la carte d'office
+  // L'attente d'une carte pas encore composée (#197) : un seul texte, sans chiffre (durée inconnue, pas de jauge).
+  attente: 'Ta carte se prépare',
+  attenteFixe: 'Ta carte se prépare', // sous mouvement réduit : esquisse fixe et complète
+  pause: 'Mettre en pause', // libellé seul, sans aria-pressed
+  reprendre: 'Reprendre',
+  repli: 'Ta carte arrive, elle t’attend sur l’accueil.', // passé le délai maximal : calme, le dialogue reste ouvert
+  fermerRepli: 'Fermer',
+  propose: (n) => (n > 1 ? 'De nouvelles cartes t’attendent, à retourner quand tu veux.' : 'Une nouvelle carte t’attend, à retourner quand tu veux.'), // sur l'écran du gain (#197)
   dialogue: (nom) => `Nouvelle carte : ${nom}`,
   reglageSon: ' 🔔 Carillon quand une carte se retourne (éteint tant que tu ne l’actives pas)',
 };

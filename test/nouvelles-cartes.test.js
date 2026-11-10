@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { reglerSon } from '../lib/cartes.js';
-import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, emplacementCarte } from '../public/nouvelles-cartes.js';
+import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, emplacementCarte, cartesDuGain } from '../public/nouvelles-cartes.js';
 import { notesCarillon } from '../public/carillon.js';
 
 const PAL = ['bronze', 'argent', 'or', 'diamant'];
@@ -84,4 +84,20 @@ test('carillon : plus long à mesure que le Palier monte, jamais vide', () => {
   assert.ok(notesCarillon(4).length > notesCarillon(1).length);
   assert.ok(notesCarillon(0).length >= 1);
   assert.ok(notesCarillon(9).length <= 6);
+});
+
+test('cartesDuGain : les cartes gagnées par ce quiz, face cachée, tant qu\'elles attendent (Paliers, puis ligne prête ou en préparation)', () => {
+  const col = [famille(2)];
+  const prete = { lecon: 'a', titre: 'A', calques: { l1: '' }, retourne: null };
+  const attente = { lecon: 'b', titre: 'B', calques: null, retourne: null };
+  const rangee = { lecon: 'c', titre: 'C', calques: { l1: '' }, retourne: '2026-11-10T10:00:00.000Z' };
+  const vue = { collection: col, cartesLigne: [prete, attente, rangee], aRetourner: [{ type: 'palier', id: 'memoire', palier: 'or' }, { type: 'ligne', id: 'a' }] };
+  const gain = cartesDuGain({ ...vue, paliers: [{ id: 'memoire', palier: 'or' }, { id: 'memoire', palier: 'argent' }], lignes: ['a', 'b', 'c', 'inconnue'] });
+  // « argent » est déjà retourné ailleurs, « c » aussi, « inconnue » n'existe pas : ils ne sont pas proposés.
+  assert.deepEqual(gain.map((c) => c.cle), ['palier/memoire/or', 'ligne/a', 'ligne/b']);
+  assert.deepEqual(gain.map((c) => c.prete ?? true), [true, true, false]);
+  assert.match(gain[2].libelle, /en préparation/);
+  assert.doesNotMatch(gain.map((c) => c.libelle).join(' '), /Palier/); // jamais le Palier avant le geste
+  assert.equal(gain[2].ligne, attente);
+  assert.deepEqual(cartesDuGain({ ...vue, paliers: [], lignes: [] }), []);
 });

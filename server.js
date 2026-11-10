@@ -507,8 +507,9 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }, mainte
   // Lecture puis écriture de l'état : la Leçon est occupée le temps du Retour, comme pendant un tour du prof.
   return occuper(slug, id, async () => {
     const { mode, defiEnCours, reviserEnCours, terminee, scores, scoresCommentes, cadrage } = await store.lireLecon(slug, id);
-    const nouveauxBadges = await annoncerBadges(slug, maintenant);
-    const badgesRetour = nouveauxBadges.length ? { nouveauxBadges } : {};
+    const { nouveauxBadges, nouvellesCartesLigne } = await annoncerBadges(slug, maintenant);
+    // `nouvellesCartesLigne` (#197) : de quoi proposer la carte de ligne gagnée, face cachée, sur l'écran du Retour.
+    const badgesRetour = { ...(nouveauxBadges.length && { nouveauxBadges }), ...(nouvellesCartesLigne.length && { nouvellesCartesLigne }) };
     if (pretest === true) {
       // Pré-test refait en cours de Leçon (après un vrai score) : toujours hors score, mais sans « Commencer », et le
       // Défi en cours continue.
@@ -547,7 +548,7 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }, mainte
 // Badges (#95) : recalculés depuis tout l'historique de l'Élève à `maintenant`, puis fusionnés avec son fichier de Badges
 // (lib/badges.js), sans jamais en retirer. Renvoie { nouveaux, fichier, calcul, totaux, lecons, evenements } ;
 // `nouveaux` : Paliers gagnés par ce recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office
-// l'historique) ; `totaux` : total d'Étoiles et de Fusées de l'Élève (#96) ; `lecons`, `evenements` : l'historique lu.
+// l'historique) ; `nouvellesLignes` : Leçons dont la carte de ligne vient d'être enregistrée (#197) ; `totaux` : total d'Étoiles et de Fusées de l'Élève (#96) ; `lecons`, `evenements` : l'historique lu.
 async function recalculerBadges(slug, maintenant) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const calcul = calculerBadges({ lecons, evenements, maintenant });
@@ -556,12 +557,14 @@ async function recalculerBadges(slug, maintenant) {
     return [fusion.fichier, fusion];
   });
   // Cartes de ligne (#183) : au même endroit, une Leçon devenue Acquise enregistre sa carte « à composer ».
+  let nouvellesLignes = [];
   const cartes = await store.modifierCartes(slug, (avant) => {
     const fusion = fusionnerCartes(avant, { lecons, badges: fichier, maintenant });
+    nouvellesLignes = fusion.nouvelles;
     return [fusion.fichier, fusion.fichier];
   });
   if (prochaineAComposer(cartes)) composerCartes(slug); // en arrière-plan : la réponse n'attend pas la composition
-  return { nouveaux, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+  return { nouveaux, nouvellesLignes, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
 }
 
 // Livraison des cartes (#183) : le premier calcul écarte les Leçons déjà Acquises, il doit donc précéder l'événement qui
@@ -576,10 +579,13 @@ async function fixerLivraison(slug, maintenant) {
 }
 
 // Après chaque quiz et chaque fin de Révision du jour : les nouveaux Paliers, nommés pour leur annonce (lib/retour.js),
-// [{ id, nom, palier, jour }].
+// `nouveauxBadges` [{ id, nom, palier, jour }], et les Leçons dont la carte de ligne vient d'être gagnée (#197).
 async function annoncerBadges(slug, maintenant) {
-  const { nouveaux, calcul } = await recalculerBadges(slug, maintenant);
-  return nouveaux.map(({ id, palier, jour }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier, jour }));
+  const { nouveaux, nouvellesLignes, calcul } = await recalculerBadges(slug, maintenant);
+  return {
+    nouveauxBadges: nouveaux.map(({ id, palier, jour }) => ({ id, nom: calcul.find((b) => b.id === id).nom, palier, jour })),
+    nouvellesCartesLigne: nouvellesLignes,
+  };
 }
 
 // Choix d'un Rebond : une action fermée, parmi les Rebonds proposés par la Leçon lue, dont le serveur tire la
@@ -627,11 +633,11 @@ async function terminerRevisionDuJour(slug, maintenant) {
   const etoile = etoileDuJour(evenements, maintenant);
   const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
   await store.enregistrerEvenement(slug, evenement);
-  const nouveaux = await annoncerBadges(slug, maintenant);
+  const { nouveauxBadges: nouveaux, nouvellesCartesLigne } = await annoncerBadges(slug, maintenant);
   const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));
   // Annonce des nouveaux Paliers sur l'écran de fin (#98), par la même phrase préparée que le Retour de quiz.
   const annonce = phraseBadges(nouveaux);
-  return { recompenses: { etoile, paliers, ...(annonce && { annonce }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement], maintenant).length };
+  return { recompenses: { etoile, paliers, ...(annonce && { annonce }), ...(nouvellesCartesLigne.length && { nouvellesCartesLigne }) }, etoilesRevisionDuJour: joursDeRevisionTerminee(lecons, [...evenements, evenement], maintenant).length };
 }
 
 async function api(req, res, segments) {
@@ -809,6 +815,14 @@ async function api(req, res, segments) {
       if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
       if (statut === 'pas-prete') throw new HttpError(409, "Cette carte n'est pas encore prête");
       return json(res, 200, { statut });
+    }
+  } else if (r2 === 'cartes' && id === 'ligne' && r3) {
+    // État d'une carte de ligne (#197) : relu pendant l'attente de la cérémonie, sans recalcul ni composition. Les
+    // calques ne sont montrés que pour une carte prête ou générique.
+    if (m === 'GET') {
+      const carte = vueCartes(await store.lireCartes(slug)).cartesLigne.find((c) => c.lecon === r3);
+      if (!carte) throw new HttpError(404, 'Carte introuvable');
+      return json(res, 200, { carte });
     }
   } else if (r2 === 'cartes' && id === 'son' && !r3) {
     // Réglage du carillon (#187), éteint par défaut : lu et écrit depuis le Profil. Le réglage ne calcule rien : s'il crée

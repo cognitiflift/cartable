@@ -558,3 +558,53 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .cartes-ceremonie { background:color-mix(in srgb, var(--nuit) 88%, transparent); }
 @media (max-width: 480px) { header button.secondaire { white-space:nowrap; } .compteur-etoiles .nouveau { margin-left:.1rem; padding:0 .35rem; } }
 .cartes-ceremonie :focus-visible { outline-color:var(--sur-nuit); } /* sur le voile sombre, l'accent (encre en thème clair) ne se voit pas */
+
+/* L'attente d'une carte pas encore composée (#197, prototype #198) : l'esquisse se dessine au trait, rejouée en boucle
+   (pilotée par public/app.js, `ATTENTE`), sur le même cadre 5/7 que la carte face cachée. Aucun clignotement ; la pause est
+   un bouton ; sous prefers-reduced-motion, l'esquisse est fixe et complète. Jetons seulement. */
+.att-carte { --ligne:var(--ligne-autre); position:relative; width:min(62vw, 15rem); aspect-ratio:5/7; border-radius:18px; perspective:700px; }
+.att-in { position:absolute; inset:0; border-radius:18px; overflow:hidden; box-shadow:0 10px 26px rgb(var(--ombre) / .25); background:repeating-linear-gradient(135deg, var(--nuit) 0 .7rem, color-mix(in srgb, var(--ligne) 22%, var(--nuit)) .7rem 1.4rem); }
+.att-in svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.att-in .trait { fill:none; stroke:var(--sur-nuit); stroke-width:2.3; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:1; stroke-dashoffset:1; }
+.att-in .couleur { stroke:var(--ligne); stroke-width:3.2; }
+.att-in .remplit { fill:var(--ligne); opacity:0; }
+.att-in .point, .att-in .jalon { fill:var(--sur-nuit); opacity:0; transform-box:fill-box; transform-origin:center; }
+@keyframes att-trace { to { stroke-dashoffset:0; } }
+@keyframes att-pop { from { opacity:0; transform:scale(.2); } to { opacity:.9; transform:scale(1); } }
+@keyframes att-fond { from { opacity:0; } to { opacity:.4; } }
+@keyframes att-halo { from { opacity:0; transform:scale(.4); } to { opacity:.6; transform:scale(1); } }
+@keyframes att-tourne { to { transform:rotate(360deg); } }
+@keyframes att-reflet { from { transform:translateX(-130%) skewX(-18deg); } to { transform:translateX(330%) skewX(-18deg); } }
+@keyframes att-sortie { to { transform:rotateY(90deg); } }
+/* Une passe : cadre, ciel, décor, ligne, puis le motif d'atelier de la Catégorie */
+.att-in .cadre { animation:att-trace 1.2s ease-out .1s forwards; }
+.att-in .etoile { animation:att-pop .5s ease-out forwards; animation-delay:calc(1.2s + var(--i) * .22s); }
+.att-in .colline { animation:att-trace 1.1s ease-out forwards; animation-delay:calc(2.3s + var(--i) * .35s); }
+.att-in .colline-f { animation:att-fond 1s ease-out 3.1s forwards; }
+.att-in .rail { animation:att-trace 1s ease-out 3.4s forwards; }
+.att-in .jalon { animation:att-pop .45s ease-out forwards; animation-delay:calc(4s + var(--i) * .5s); }
+.att-in .motif .trait { animation:att-trace 1.6s ease-in-out forwards; animation-delay:calc(1.6s + var(--i) * .7s); }
+.att-in .motif .point { animation:att-pop .5s ease-out forwards; animation-delay:calc(3s + var(--i) * .5s); }
+.att-in .halo { fill:var(--ligne); opacity:0; transform-box:fill-box; transform-origin:center; animation:att-halo 8s ease-out forwards; }
+.att-in .orbite { transform-box:fill-box; transform-origin:center; animation:att-tourne 24s linear infinite; }
+.att-reflet { position:absolute; top:0; bottom:0; left:0; width:30%; background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--sur-nuit) 18%, transparent), transparent); animation:att-reflet 2.2s ease-in-out 5s 1 both; pointer-events:none; }
+.att-carte .att-in > * { transition:opacity .8s ease-in-out; } /* le fondu entre deux tours : toute la carte fond, puis le dessin repart */
+.att-carte.rejoue-sortie .att-in > * { opacity:0; }
+.att-carte.pose *, .att-carte.pause * { animation-play-state:paused !important; } /* pause (bouton) et repli : tout se fige, sans saut */
+.att-carte.fin .att-in { animation:att-sortie .25s ease-in forwards; } /* l'esquisse se met de profil, la vraie carte revient du même angle */
+.att-pause { min-height:2.75rem; padding-inline:1.2rem; background:transparent; color:var(--sur-nuit); border-color:color-mix(in srgb, var(--sur-nuit) 32%, transparent); }
+.att-pause[hidden] { display:none; }
+.att-pause:focus-visible { outline:3px solid var(--sur-nuit); outline-offset:3px; }
+@media (prefers-reduced-motion: reduce) {
+  .att-in .trait { stroke-dashoffset:0; } .att-in .point, .att-in .jalon, .att-in .etoile { opacity:.9; }
+  .att-in .colline-f { opacity:.4; } .att-in .halo { opacity:.5; } .att-reflet { display:none; }
+  .att-carte.fin .att-in { transform:rotateY(90deg); }
+}
+
+/* Les cartes gagnées, proposées face cachée sur l'écran du Retour de quiz ou de fin de Révision du jour (#197) */
+/* À côté de l'annonce, sans lui voler la vedette : de petites cartes côte à côte, un geste facultatif. */
+.cartes-gain { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .8rem; padding:.55rem .8rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
+.cartes-gain .cg-mot { margin:0; flex:1 1 8rem; color:var(--doux); font-size:.92rem; }
+.cartes-gain ul { display:flex; flex-wrap:wrap; gap:.6rem; margin:0; padding:0; list-style:none; }
+.cartes-gain li { width:4.5rem; }
+.cartes-gain .cl-medaillon { width:2.4rem; height:2.4rem; font-size:1.3rem; }

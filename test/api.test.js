@@ -3641,6 +3641,32 @@ test('Cartes de ligne : une Leçon qui devient Acquise après la livraison donne
   assert.equal(prete.etat, 'prete');
 });
 
+// Cérémonie à l'endroit du gain (#197) : le Retour de quiz et la fin de Révision du jour portent de quoi proposer la carte
+// de ligne gagnée (face cachée, prête ou non) ; les réponses sans carte gagnée n'ont pas ce champ.
+test('Cartes de ligne : le Retour de quiz qui fait gagner une carte de ligne la porte, prête ou non', async () => {
+  const { slug, lecon, url } = await leconAcquise('Cartes-Gain-Quiz', ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify({ version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: {}, paliers: {} }));
+  const corps = { score: 90, page: '0001-volcans.html' };
+  const gagne = (await appel(`${url}/retours`, 'POST', corps, le('2026-10-03T10:00:00.000Z'))).data;
+  assert.deepEqual(gagne.messages.at(-1).retourQuiz.nouvellesCartesLigne, [lecon.id]);
+  // Annoncée une seule fois : le quiz suivant ne la repropose pas.
+  const encore = (await appel(`${url}/retours`, 'POST', corps, le('2026-10-03T11:00:00.000Z'))).data;
+  assert.equal(encore.messages.at(-1).retourQuiz.nouvellesCartesLigne, undefined);
+});
+
+test('Cartes de ligne : l\'état d\'une carte se relit seul, sans calques tant qu\'elle n\'est pas prête, sans nouvelle composition', async () => {
+  const { slug, lecon, declencher } = await eleveCarte('Carte-Etat');
+  await avecFichier('carte-attendre', async () => {
+    await declencher();
+    await sonderJusqua(nbLancementsCartes, (n) => n === 1, 'Composition jamais lancée');
+    const attente = (await appel(`/api/eleves/${slug}/cartes/ligne/${lecon.id}`)).data;
+    assert.deepEqual([attente.carte.lecon, attente.carte.etat, attente.carte.calques], [lecon.id, 'en-composition', null]);
+  });
+  await sonderJusqua(async () => (await appel(`/api/eleves/${slug}/cartes/ligne/${lecon.id}`)).data.carte, (c) => c.etat === 'prete' && c.calques, 'Carte jamais prête');
+  assert.equal(await nbLancementsCartes(), 1);
+  assert.equal((await appel(`/api/eleves/${slug}/cartes/ligne/inconnue`)).status, 404);
+});
+
 // Composition des cartes de ligne par l'agent (#184), faux `claude` (voir faux-carte.mjs).
 const nbLancementsCartes = async () => (await fs.readFile(path.join(dossier, 'lancements-carte'), 'utf8').catch(() => '')).trim().split('\n').filter(Boolean).length;
 const carteDe = async (slug) => JSON.parse(await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8')).cartes;

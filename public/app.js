@@ -632,8 +632,7 @@ function bandeauDuJour(profil, { calendrier, rythme, revisions, moment }) {
   return h('section', { className: 'bandeau-jour' },
     h('div', { className: 'bandeau-gauche' },
       h('div', { className: 'bandeau-titre' },
-        h('h2', {}, `Salut ${profil.pseudo} !`),
-        h('a', { href: '#/badges' }, 'Mon calendrier et mes badges')),
+        h('h2', {}, `Salut ${profil.pseudo} !`)),
       // La série (#166, épurée) : un chiffre et « de suite », rien d'autre. Le stock de Jokers, la meilleure série et les Jours
       // travaillés n'y sont plus : un Joker n'apparaît que le jour où il a protégé la série ; le reste est en infobulle.
       h('div', { className: 'serie-de-jours' },
@@ -646,7 +645,8 @@ function bandeauDuJour(profil, { calendrier, rythme, revisions, moment }) {
         serieDeJours.jokersUtilises > 0 && h('p', { className: 'serie-joker' }, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série pendant ta pause.`),
         // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
         reparation && h('p', { className: 'reparation' },
-          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`))),
+          `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`)),
+      h('a', { className: 'bandeau-lien', href: '#/badges' }, 'Mon calendrier et mes badges')),
     h('div', { className: 'bandeau-cote' },
       h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif, gainsAujourdhui,
         moment && momentDeRevision(profil, moment)),

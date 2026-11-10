@@ -32,7 +32,7 @@ const MOTIFS = {
 };
 
 // Les Catégories sans motif propre prennent la constellation.
-export const motifDe = (categorie) => (MOTIFS[cleCategorieCarte(categorie)] ?? MOTIFS.autre)();
+const motifDe = (categorie) => (MOTIFS[cleCategorieCarte(categorie)] ?? MOTIFS.autre)();
 
 const ETOILES = [[60, 30], [126, 24], [150, 60], [40, 70]];
 

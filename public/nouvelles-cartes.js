@@ -92,11 +92,9 @@ export const TEXTES_CEREMONIE = {
   fermerRetournee: 'Fermer', // après : fermer range la carte d'office
   // L'attente d'une carte pas encore composée (#197) : un seul texte, sans chiffre (durée inconnue, pas de jauge).
   attente: 'Ta carte se prépare',
-  attenteFixe: 'Ta carte se prépare', // sous mouvement réduit : esquisse fixe et complète
   pause: 'Mettre en pause', // libellé seul, sans aria-pressed
   reprendre: 'Reprendre',
   repli: 'Ta carte arrive, elle t’attend sur l’accueil.', // passé le délai maximal : calme, le dialogue reste ouvert
-  fermerRepli: 'Fermer',
   propose: (n) => (n > 1 ? 'De nouvelles cartes t’attendent, à retourner quand tu veux.' : 'Une nouvelle carte t’attend, à retourner quand tu veux.'), // sur l'écran du gain (#197)
   dialogue: (nom) => `Nouvelle carte : ${nom}`,
   reglageSon: ' 🔔 Carillon quand une carte se retourne (éteint tant que tu ne l’actives pas)',

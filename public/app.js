@@ -689,7 +689,7 @@ function ligneBadge(b, estNouveau) {
 function carteRetournee(donnees, c) {
   donnees.aRetourner = (donnees.aRetourner ?? []).filter((x) => cleCarte(x) !== c.cle);
   const l = c.type === 'ligne' && donnees.cartesLigne?.find((x) => x.lecon === c.id);
-  if (l) Object.assign(l, { retourne: new Date().toISOString(), ...(c.ligne?.calques && { calques: c.ligne.calques, etat: c.ligne.etat, prete: c.ligne.prete }) }); // composée pendant l'attente (#197)
+  if (l) Object.assign(l, { retourne: new Date().toISOString(), ...(c.ligne?.calques && { calques: c.ligne.calques, etat: c.ligne.etat, prete: c.ligne.prete }) }); // carte composée pendant l'attente (#197)
 }
 
 async function ecranBadges(profil) {
@@ -832,7 +832,7 @@ function ceremonie(c, { son, slug, retourner }) {
     const dessin = () => { carte.firstChild.innerHTML = esquisseCarte(c.ligne.categorie); };
     dessin();
     scene.replaceChildren(carte);
-    texte.replaceChildren(h('p', {}, reduit ? TEXTES_CEREMONIE.attenteFixe : TEXTES_CEREMONIE.attente));
+    texte.replaceChildren(h('p', {}, TEXTES_CEREMONIE.attente));
     (reduit ? plusTard : pause).focus(); // le dos a quitté la scène : le focus reste dans le dialogue
     let repli = false, prete = false;
     const accelerer = () => carte.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = ATTENTE.vitesse; });
@@ -878,7 +878,7 @@ function ceremonie(c, { son, slug, retourner }) {
       carte.getAnimations({ subtree: true }).forEach((a) => { try { a.finish(); } catch { /* rotation sans fin : ignorée */ } });
       carte.classList.add('pose');
       texte.replaceChildren(h('p', {}, TEXTES_CEREMONIE.repli));
-      plusTard.textContent = TEXTES_CEREMONIE.fermerRepli;
+      plusTard.textContent = TEXTES_CEREMONIE.fermerRetournee;
     });
   };
   let attenteEnCours = false;

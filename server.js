@@ -361,6 +361,20 @@ async function adopterPreparation(slug, id, preparation, action, maintenant) {
   return conclureTour({ slug, id, lecon, premier: false, pagesAvant, affiche: REBONDS[action].phrase, etatLecon: ETAT_APRES_REBOND[action], reponse, sessionId, cout, maintenant, rebond: REBOND_DE_PAGE[action] });
 }
 
+// Suppression définitive d'une Leçon archivée (#203). La Leçon est occupée le temps de la suppression (un tour du prof ou
+// un Retour de quiz en cours : 409) ; la page préparée en cours est attendue puis effacée avec elle, et les tâches de
+// fond (Variantes, composition de carte) qui finissent après coup ne recréent rien (voir store.supprimerLecon).
+async function supprimerLecon(slug, id) {
+  const { archivee } = await store.lireLecon(slug, id); // 404 si absente
+  if (!archivee) throw new HttpError(409, "Cette leçon n'est pas rangée : on ne peut pas la supprimer");
+  await occuper(slug, id, async () => {
+    await prendrePreparation(slug, id);
+    await store.supprimerLecon(slug, id);
+  });
+  variantesARelancer.get(slug)?.delete(id);
+  return { supprimee: id };
+}
+
 // Tour d'agent hors Leçon, en arrière-plan : on ne l'attend pas. Pendant ce tour, on sert les `anciennes` Propositions
 // (l'agent réécrit le fichier sur place) ; s'il échoue sans laisser de Propositions utilisables, on les remet.
 // `varier` (« D'autres idées » seulement) : l'agent reçoit l'historique des titres déjà proposés pour s'en écarter.
@@ -369,7 +383,7 @@ function genererPropositions(slug, anciennes = [], { varier = false } = {}) {
   propositionsEnCours.set(slug, anciennes);
   (async () => {
     const profil = await store.lireEleve(slug);
-    const lecons = await store.listerLecons(slug);
+    const lecons = await store.listerLecons(slug, { archivees: 'avec' }); // une Leçon rangée n'est pas reproposée (#203)
     const dejaProposes = varier ? await store.lireHistoriquePropositions(slug) : [];
     const { cout } = await lancerAgent({
       cwd: await store.preparerPropositionsDir(slug),
@@ -839,7 +853,11 @@ async function api(req, res, segments) {
     if (m === 'POST') return json(res, 202, await regenererPropositions(slug));
   } else if (r2 === 'lecons') {
     if (!id) {
-      if (m === 'GET') return json(res, 200, await store.listerLecons(slug, { maintenant }));
+      if (m === 'GET') {
+        // Section « Archivées » (#203) : ?archivees=1 ne liste que les Leçons rangées ; l'accueil ne les voit pas.
+        const archivees = new URL(req.url, 'http://x').searchParams.get('archivees') === '1' ? 'seules' : 'sans';
+        return json(res, 200, await store.listerLecons(slug, { maintenant, archivees }));
+      }
       if (m === 'POST') {
         const corps = await lireCorps(req, 40_000_000);
         if (corps.fichiers) return json(res, 201, await nouvelleRevision(slug, corps, maintenant));
@@ -861,6 +879,12 @@ async function api(req, res, segments) {
         }
         return json(res, 200, lecon);
       }
+      if (m === 'DELETE') return json(res, 200, await supprimerLecon(slug, id));
+    } else if (r3 === 'archivage' && m === 'POST') {
+      // Archiver (#203) : la Leçon n'est pas occupée par un tour du prof (qui réécrit lesson.json) ; rien n'est effacé.
+      return json(res, 200, await occuper(slug, id, () => store.archiverLecon(slug, id, { maintenant })));
+    } else if (r3 === 'restauration' && m === 'POST') {
+      return json(res, 200, await occuper(slug, id, () => store.restaurerLecon(slug, id)));
     } else if (r3 === 'scores' && m === 'POST') {
       const corps = await lireCorps(req);
       await fixerLivraison(slug, maintenant); // avant le score : une Acquisition de ce quiz donne sa carte

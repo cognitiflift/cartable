@@ -18,6 +18,7 @@ import {
 import { RAISONS_SIGNALEMENT } from '/kit/v1/quiz-logique.js';
 import { ErreurApi, chargerProfil, avecAttente, lireEnParallele } from '/chargement.js';
 import { pastilleRevisions } from '/pastille-revisions.js';
+import { plusDActions, ARCHIVER, SUPPRIMER, SECTION_ARCHIVEES, restaurerNom, supprimerNom, ECHEC_ARCHIVAGE } from '/archivage-texte.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -470,14 +471,15 @@ const controleAVenir = (l) => Number.isInteger(l.joursAvantControle) && l.joursA
 // autres sont en contour à la couleur de leur ligne.
 // `cartes` (#196) : { cartesLigne, son, slug, retourner } ; l'encart porte l'emplacement de la carte de la Leçon, sans
 // quitter l'accueil. Sans `cartes` (badges illisibles), l'encart n'a pas d'emplacement.
-function carteLecon(l, { enTete = false, cartes } = {}) {
+function carteLecon(l, { enTete = false, cartes, archiver } = {}) {
   const objectifs = l.objectifs ?? [];
   const adresse = `#/lecon/${l.id}`;
   const corps = h('div', { className: 'lecon-corps' },
     h('div', { className: 'lecon-tete' },
       l.niveauLecon && h('span', { className: 'niveau', title: 'Niveau de Leçon' }, `Niveau ${l.niveauLecon}`),
       h('h4', {}, h('a', { href: adresse }, insecables(l.titre))),
-      l.maitrise?.palier !== 'acquis' && badgeMaitrise(l.maitrise)), // Acquis : dit par le terminus allumé, pas deux fois
+      l.maitrise?.palier !== 'acquis' && badgeMaitrise(l.maitrise), // Acquis : dit par le terminus allumé, pas deux fois
+      archiver && menuLecon(l, archiver)),
     ligneLecon(l, { ici: !!prochaineStation(l) }),
     h('div', { className: 'lecon-bas' },
       prochaineStation(l) ?? h('span', { className: 'prochaine' }),
@@ -490,6 +492,115 @@ function carteLecon(l, { enTete = false, cartes } = {}) {
       h('ul', {}, objectifs.map((o) => h('li', {}, station(o), h('span', {}, o.texte, h('small', {}, etatStation(o).libelle)))))));
   return h('article', { className: `lecon${enTete ? ' en-tete' : ''}${cartes ? ' avec-carte' : ''}`, style: styleLigne(l.categorie) },
     corps, cartes && emplacementCarteLecon(l, cartes));
+}
+
+// Menu ⋯ de la carte (#203) : un bouton de 44 px, nommé pour les lecteurs d'écran, qui ouvre un petit menu (« Archiver »).
+// Il se ferme avec Échap (le focus revient au bouton), au toucher hors du menu et quand le focus en sort.
+function menuLecon(l, archiver) {
+  const bouton = h('button', { type: 'button', className: 'secondaire menu-lecon-bouton', ariaLabel: plusDActions(l.titre), title: 'Plus d’actions', onclick: () => (liste.hidden ? ouvrir() : fermer()) }, '⋯');
+  bouton.setAttribute('aria-haspopup', 'menu');
+  bouton.setAttribute('aria-expanded', 'false');
+  const archive = h('button', { type: 'button', role: 'menuitem', className: 'secondaire', onclick: () => { fermer(); archiver(l); } }, ARCHIVER.menu);
+  const liste = h('div', { className: 'menu-lecon-liste', role: 'menu', ariaLabel: plusDActions(l.titre), hidden: true }, archive);
+  const boite = h('div', { className: 'menu-lecon' }, bouton, liste);
+  const dehors = (e) => { if (!boite.isConnected) return retirer(); if (!boite.contains(e.target)) fermer(); };
+  const touche = (e) => { if (e.key === 'Escape') { fermer(); bouton.focus(); } };
+  const sorti = (e) => { if (e.relatedTarget && !boite.contains(e.relatedTarget)) fermer(); };
+  const retirer = () => { document.removeEventListener('pointerdown', dehors); boite.removeEventListener('keydown', touche); boite.removeEventListener('focusout', sorti); };
+  function ouvrir() {
+    liste.hidden = false;
+    bouton.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', dehors);
+    boite.addEventListener('keydown', touche);
+    boite.addEventListener('focusout', sorti);
+    archive.focus();
+  }
+  function fermer() {
+    liste.hidden = true;
+    bouton.setAttribute('aria-expanded', 'false');
+    retirer();
+  }
+  return boite;
+}
+
+// Confirmation en boîte de dialogue modale (#203), sur le modèle du Cadrage. Résout `true` (confirmer) ou `false`
+// (refuser, ✕ ou Échap). `defaut` : le bouton qui a le focus à l'ouverture (« refuser » pour ce qui ne se défait pas).
+function confirmerAction({ titre, texte, confirmer, refuser, defaut = 'confirmer', danger = false }) {
+  return new Promise((resoudre) => {
+    const fermer = (valeur) => { boite.close(); boite.remove(); resoudre(valeur); };
+    const boite = h('dialog', { className: 'carte cadrage confirmation', oncancel: (e) => { e.preventDefault(); fermer(false); } },
+      h('h2', { id: 'confirmation-titre' }, insecables(titre)),
+      h('p', { id: 'confirmation-texte', className: 'confirmation-texte' }, texte),
+      h('div', { className: 'cadrage-choix' },
+        h('button', { className: 'secondaire', autofocus: defaut === 'refuser', onclick: () => fermer(false) }, refuser),
+        h('button', { className: `secondaire${danger ? ' danger' : ''}`, autofocus: defaut === 'confirmer', onclick: () => fermer(true) }, confirmer)),
+      h('button', { className: 'secondaire annuler', ariaLabel: 'Fermer', title: 'Fermer', onclick: () => fermer(false) }, '✕'));
+    boite.setAttribute('aria-labelledby', 'confirmation-titre');
+    boite.setAttribute('aria-describedby', 'confirmation-texte');
+    app.append(boite);
+    boite.showModal();
+  });
+}
+
+// Message posé sur l'écran après un geste sur une Leçon (#203) : « Leçon rangée · Annuler » reste là le temps de s'en
+// servir (jusqu'à ✕, à un autre écran ou au geste suivant) ; une erreur est une alerte, sans reproche.
+let messageLecon = null;
+const retirerMessageLecon = () => { messageLecon?.remove(); messageLecon = null; };
+function afficherMessageLecon(texte, { action, alerte = false } = {}) {
+  retirerMessageLecon();
+  messageLecon = h('div', { className: 'message-lecon', role: alerte ? 'alert' : 'status' },
+    h('span', { className: 'message-texte' }, texte),
+    action && h('button', { type: 'button', className: 'secondaire', onclick: action.onclick }, action.libelle),
+    h('button', { type: 'button', className: 'secondaire fermer', ariaLabel: 'Fermer ce message', title: 'Fermer', onclick: retirerMessageLecon }, '✕'));
+  document.body.append(messageLecon);
+}
+
+// Archiver (#203) : confirmation, puis la carte quitte l'accueil et « Annuler » reste à portée. Rien n'est effacé.
+async function rangerLecon(profil, l) {
+  if (!(await confirmerAction({ titre: ARCHIVER.titre(l.titre), texte: ARCHIVER.texte, confirmer: ARCHIVER.confirmer, refuser: ARCHIVER.annuler }))) return;
+  const url = `eleves/${profil.slug}/lecons/${l.id}`;
+  try {
+    await api(`${url}/archivage`, { method: 'POST' });
+  } catch {
+    return afficherMessageLecon(ECHEC_ARCHIVAGE, { alerte: true });
+  }
+  await route();
+  afficherMessageLecon(ARCHIVER.rangee, { action: { libelle: ARCHIVER.defaire, onclick: () => restaurerLecon(profil, l) } });
+}
+
+async function restaurerLecon(profil, l) {
+  try {
+    await api(`eleves/${profil.slug}/lecons/${l.id}/restauration`, { method: 'POST' });
+  } catch {
+    return afficherMessageLecon(ECHEC_ARCHIVAGE, { alerte: true });
+  }
+  await route();
+}
+
+// Suppression définitive (#203), depuis la section « Archivées » seulement : la confirmation dit ce qui disparaît et
+// « Garder » a le focus. Pas d'annulation ensuite.
+async function supprimerLecon(profil, l) {
+  if (!(await confirmerAction({ titre: SUPPRIMER.titre(l.titre), texte: SUPPRIMER.texte, confirmer: SUPPRIMER.confirmer, refuser: SUPPRIMER.garder, defaut: 'refuser', danger: true }))) return;
+  try {
+    await api(`eleves/${profil.slug}/lecons/${l.id}`, { method: 'DELETE' });
+  } catch {
+    return afficherMessageLecon(ECHEC_ARCHIVAGE, { alerte: true });
+  }
+  await route();
+}
+
+// Section « Archivées » (#203), repliée, sous « Mes leçons » et seulement s'il y en a : titre et Catégorie, « Restaurer »,
+// et une suppression en retrait. Une Leçon archivée reste ouvrable par son titre.
+let archiveesOuvertes = false;
+function sectionArchivees(profil, archivees) {
+  if (!archivees.length) return null;
+  return h('details', { className: 'archivees', open: archiveesOuvertes, ontoggle: (e) => { archiveesOuvertes = e.target.open; } },
+    h('summary', {}, h('span', {}, SECTION_ARCHIVEES.titre), h('span', { className: 'archivees-compte' }, `(${archivees.length})`)),
+    h('ul', { className: 'archivees-liste' }, archivees.map((l) => h('li', {},
+      h('div', { className: 'archivee-titre' }, h('a', { href: `#/lecon/${l.id}` }, insecables(l.titre)), h('small', {}, l.categorie)),
+      h('div', { className: 'archivee-actions' },
+        h('button', { type: 'button', className: 'secondaire', ariaLabel: restaurerNom(l.titre), onclick: () => restaurerLecon(profil, l) }, SECTION_ARCHIVEES.restaurer),
+        h('button', { type: 'button', className: 'supprimer-lecon', ariaLabel: supprimerNom(l.titre), onclick: () => supprimerLecon(profil, l) }, SECTION_ARCHIVEES.supprimer))))));
 }
 
 // L'emplacement de carte de l'encart (#196), à trois états : le template « À découvrir » (aucune carte de ligne), le dos
@@ -520,8 +631,9 @@ const blocErreur = (texte) => h('div', { className: 'bloc-erreur', role: 'alert'
 // qu'il n'a pas pu s'afficher, sans bloquer l'Élève.
 async function ecranAccueil(profil) {
   const lire = (chemin) => api(`eleves/${profil.slug}/${chemin}`);
-  const lectures = await lireEnParallele({ lecons: lire('lecons'), revisions: lire('revisions'), rythme: lire('rythme'), badges: lire('badges'), moment: lire('moment') });
+  const lectures = await lireEnParallele({ lecons: lire('lecons'), revisions: lire('revisions'), rythme: lire('rythme'), badges: lire('badges'), moment: lire('moment'), archivees: lire('lecons?archivees=1') });
   const lecons = lectures.lecons.valeur ?? [];
+  const archivees = lectures.archivees.valeur ?? []; // accessoire : en échec, la section est omise
   const { revisions: { valeur: revisions }, rythme: { valeur: rythme }, badges: { valeur: badges }, moment: { valeur: moment } } = lectures;
   if (badges) retenirRecompenses(profil, badges);
   barreNav(profil);
@@ -548,11 +660,12 @@ async function ecranAccueil(profil) {
       h('p', {}, "Tu n'as pas encore de leçon. Touche « Apprendre quelque chose de nouveau » pour ouvrir ta première ligne.")),
     enTete && h('section', { className: 'categorie reprise', style: styleLigne(enTete.categorie) },
       h('h3', {}, 'Tu en étais là', h('span', { className: 'reprise-categorie' }, `· ${enTete.categorie}`)),
-      carteLecon(enTete, { enTete: true, cartes })),
+      carteLecon(enTete, { enTete: true, cartes, archiver: (x) => rangerLecon(profil, x) })),
     h('div', { className: 'reseau' }, config.categories.filter((c) => parCategorie[c]).map((c) => h('section', {
       className: `categorie${parCategorie[c].length > 1 ? ' etendue' : ''}`, style: styleLigne(c) },
     h('h3', {}, c),
-    h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l, { cartes })))))));
+    h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l, { cartes, archiver: (x) => rangerLecon(profil, x) })))))),
+    sectionArchivees(profil, archivees));
 }
 
 // Le bandeau du jour (#192) : le salut et le lien vers Mes badges, la Série de jours (#75), l'Objectif du jour avec
@@ -1660,6 +1773,7 @@ async function ecranSession(profil, id, pageDemandee = null, { apercu = false } 
 
 let chargements = 0; // numéro de la navigation en cours : une plus ancienne ne dessine plus rien
 async function route() {
+  retirerMessageLecon(); // « Leçon rangée · Annuler » ne suit pas l'Élève sur un autre écran
   quitterEcran();
   arreterLecture(); // une lecture à voix haute des Révisions du jour s'arrête en changeant d'écran
   quitterEcran = () => {};

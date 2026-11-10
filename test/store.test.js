@@ -354,3 +354,68 @@ test('Événements des indicateurs : ajoutés un à un sans réécrire les préc
   await store.enregistrerEvenement('zoe', { type: 'accueil', date: '2026-10-03T10:00:00.000Z' });
   assert.equal((await store.lireEvenements('zoe')).length, 4);
 });
+
+// Leçon archivée (#203) : rangée par l'Élève, exclue des listes par défaut, restaurable ; supprimable seulement une fois archivée.
+test('Leçon archivée : exposée par lireLecon, exclue de listerLecons sauf option, comptée par leconsLues, restaurable', async () => {
+  const a = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
+  const b = await store.creerLecon('zoe', { sujet: 'Les rivières', mode: 'libre' });
+  assert.equal((await store.lireLecon('zoe', a.id)).archivee, null);
+  await store.archiverLecon('zoe', a.id);
+  assert.match((await store.lireLecon('zoe', a.id)).archivee, /^2026-10-0[34]T/);
+  assert.deepEqual((await store.listerLecons('zoe')).map((l) => l.id), [b.id]);
+  assert.deepEqual((await store.listerLecons('zoe', { archivees: 'seules' })).map((l) => l.id), [a.id]);
+  assert.deepEqual((await store.listerLecons('zoe', { archivees: 'avec' })).map((l) => l.id).sort(), [a.id, b.id].sort());
+  assert.equal((await store.leconsLues('zoe')).length, 2); // l'historique ne se réécrit pas
+  await store.restaurerLecon('zoe', a.id);
+  assert.equal((await store.lireLecon('zoe', a.id)).archivee, null);
+  assert.equal((await store.listerLecons('zoe')).length, 2);
+  const meta = JSON.parse(await fs.readFile(path.join(dossier, 'zoe', 'lecons', a.id, 'lesson.json'), 'utf8'));
+  assert.equal('archivee' in meta, false); // absent quand la Leçon n'est pas archivée
+});
+
+test('Leçon archivée : archiver garde les autres champs de lesson.json, et la date d\'archivage ne change pas si on répète', async () => {
+  const a = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
+  const meta = path.join(dossier, 'zoe', 'lecons', a.id, 'lesson.json');
+  await fs.writeFile(meta, JSON.stringify({ titre: 'Volcans', categorie: 'Sciences' }));
+  await store.archiverLecon('zoe', a.id);
+  const premiere = (await store.lireLecon('zoe', a.id)).archivee;
+  mock.timers.tick(60_000);
+  await store.archiverLecon('zoe', a.id);
+  const l = await store.lireLecon('zoe', a.id);
+  assert.deepEqual([l.titre, l.categorie, l.archivee], ['Volcans', 'Sciences', premiere]);
+});
+
+test('Leçon archivée : archiver, restaurer ou supprimer une Leçon absente répond 404', async () => {
+  for (const op of ['archiverLecon', 'restaurerLecon', 'supprimerLecon']) {
+    await assert.rejects(store[op]('zoe', '2026-10-04-absente'), { status: 404 });
+  }
+});
+
+test('Leçon supprimée : refusée (409, rien d\'effacé) tant que la Leçon n\'est pas archivée', async () => {
+  const a = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
+  await assert.rejects(store.supprimerLecon('zoe', a.id), { status: 409 });
+  assert.equal((await store.lireLecon('zoe', a.id)).id, a.id);
+});
+
+test('Leçon supprimée : efface son dossier et ses pages préparées, disparaît des lectures, laisse badges et cartes', async () => {
+  const a = await store.creerLecon('zoe', { sujet: 'Les volcans', mode: 'libre' });
+  const b = await store.creerLecon('zoe', { sujet: 'Les rivières', mode: 'libre' });
+  const eleve = path.join(dossier, 'zoe');
+  await fs.mkdir(path.join(eleve, 'pages-preparees', a.id), { recursive: true });
+  await fs.writeFile(path.join(eleve, 'pages-preparees', a.id, 'x.html'), '<p>x</p>');
+  await fs.writeFile(path.join(eleve, 'badges.json'), '{"a":1}');
+  await fs.writeFile(path.join(eleve, 'cartes.json'), '{"b":2}');
+  await store.archiverLecon('zoe', a.id);
+  await store.supprimerLecon('zoe', a.id);
+  await assert.rejects(fs.access(path.join(eleve, 'lecons', a.id)));
+  await assert.rejects(fs.access(path.join(eleve, 'pages-preparees', a.id)));
+  await assert.rejects(store.lireLecon('zoe', a.id), { status: 404 });
+  assert.deepEqual((await store.leconsLues('zoe')).map((l) => l.id), [b.id]);
+  assert.deepEqual((await store.listerLecons('zoe', { archivees: 'avec' })).map((l) => l.id), [b.id]);
+  assert.equal(await fs.readFile(path.join(eleve, 'badges.json'), 'utf8'), '{"a":1}');
+  assert.equal(await fs.readFile(path.join(eleve, 'cartes.json'), 'utf8'), '{"b":2}');
+  // Un tour de Variantes qui finit après coup ne recrée rien.
+  assert.deepEqual(await store.demanderVariantes('zoe', a.id), []);
+  await store.rattacherVariantes('zoe', a.id, []);
+  await assert.rejects(fs.access(path.join(eleve, 'lecons', a.id)));
+});

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { joursDeRevisionTerminee } from '../lib/revision-du-jour.js';
+import { revisionsDuJour } from '../lib/revisions.js';
 
 // Dates en heure locale : les jours de l'Élève sont ceux de sa machine (voir lib/jour.js).
 const iso = (jour, heure = 12) => { const [an, mois, j] = jour.split('-').map(Number); return new Date(an, mois - 1, j, heure).toISOString(); };
@@ -46,4 +47,15 @@ test('Révision du jour menée jusqu\'au bout : aujourd\'hui ne compte que par l
   assert.deepEqual(joursDeRevisionTerminee(lecons, [], maintenant), ['2026-10-12']);
   // Une fois menée jusqu'au bout : le 16 compte, par l'événement.
   assert.deepEqual(joursDeRevisionTerminee(lecons, [terminee('2026-10-16', 15)], maintenant), ['2026-10-12', '2026-10-16']);
+});
+
+test('Leçon archivée (#203) : ses Questions ne sont ni servies ni comptées dans les Questions dues, celles des autres Leçons le sont', () => {
+  const question = (id) => ({ page: '0001.html', id, enonce: 'Q', reponses: ['a', 'b'], bonne: 0, journal: [], prochaineRevision: iso('2026-10-30'), rappel: 0.5, variantes: [], contenu: { enonce: 'Q', reponses: ['a', 'b'], bonne: 0 } });
+  const lecons = [
+    { id: 'a', titre: 'A', archivee: '2026-10-20T10:00:00.000Z', questions: [question('q1'), question('q2')] },
+    { id: 'b', titre: 'B', archivee: null, questions: [question('q3')] },
+  ];
+  const { dues, questions } = revisionsDuJour(lecons, { maintenant: APRES });
+  assert.equal(dues, 1);
+  assert.deepEqual(questions.map((q) => q.lecon), ['b']);
 });

@@ -599,6 +599,12 @@ function momentDeRevision(profil, etat) {
   return zone;
 }
 
+// Le détail que le bandeau ne montre plus, gardé en infobulle sur la série.
+const serieInfobulle = ({ serieDeJours: s, meilleureSerie, joursTravailles }) => [
+  `Ta meilleure série : ${pluriel(meilleureSerie, 'jour')}`,
+  `${pluriel(joursTravailles, 'jour')} travaillé${joursTravailles > 1 ? 's' : ''} en tout`,
+  `${pluriel(s.jokers, 'joker')} cette semaine (3 chaque lundi, un joker protège un jour manqué)`].join(' · ');
+
 function bandeauDuJour(profil, { calendrier, rythme, revisions, moment }) {
   const pastille = revisions && pastilleRevisions(revisions, rythme?.objectifDuJour.revisions);
   const boutonRevisions = revisions
@@ -623,22 +629,21 @@ function bandeauDuJour(profil, { calendrier, rythme, revisions, moment }) {
   const objectif = o.atteint
     ? h('strong', {}, 'Objectif du jour atteint')
     : h('strong', {}, `Objectif du jour : ${o.revisions}/${o.revisionsVisees} révisions ou ${pluriel(o.pagesVisees, 'page')}`);
-  const serie = serieDeJours.jours
-    ? `${pluriel(serieDeJours.jours, 'jour')} de suite${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
-    : 'Chaque jour un peu, c’est comme ça qu’on retient';
   return h('section', { className: 'bandeau-jour' },
     h('div', { className: 'bandeau-gauche' },
       h('div', { className: 'bandeau-titre' },
         h('h2', {}, `Salut ${profil.pseudo} !`),
         h('a', { href: '#/badges' }, 'Mon calendrier et mes badges')),
-      // La série, dans la colonne de gauche sous le salut, en corps normal et en --texte (#166).
+      // La série (#166, épurée) : un chiffre et « de suite », rien d'autre. Le stock de Jokers, la meilleure série et les Jours
+      // travaillés n'y sont plus : un Joker n'apparaît que le jour où il a protégé la série ; le reste est en infobulle.
       h('div', { className: 'serie-de-jours' },
-        h('p', {}, serie,
-          serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
-        serieDeJours.jokersUtilises > 0 && h('p', {}, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série de jours pendant ta pause.`),
-        // Série repartie (#159) : la meilleure série et tous les Jours travaillés restent sous les yeux, à la place d'un « 0 » seul.
-        meilleureSerie > serieDeJours.jours && h('p', { className: 'serie-acquis' },
-          `Ta meilleure série : ${pluriel(meilleureSerie, 'jour')} · ${pluriel(joursTravailles, 'jour')} travaillé${joursTravailles > 1 ? 's' : ''} en tout`),
+        serieDeJours.jours > 0
+          ? h('p', { className: 'serie-ligne', title: serieInfobulle(rythme) },
+            h('span', { className: 'serie-nombre' }, String(serieDeJours.jours)),
+            h('span', {}, serieDeJours.jours > 1 ? 'jours de suite' : 'jour de suite'),
+            !serieDeJours.aujourdhui && h('small', {}, 'encore un petit effort aujourd’hui'))
+          : h('p', { className: 'serie-ligne vide' }, 'Chaque jour un peu, c’est comme ça qu’on retient'),
+        serieDeJours.jokersUtilises > 0 && h('p', { className: 'serie-joker' }, `🛡️ ${serieDeJours.jokersUtilises > 1 ? 'Des jokers ont' : 'Un joker a'} protégé ta série pendant ta pause.`),
         // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
         reparation && h('p', { className: 'reparation' },
           `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`))),

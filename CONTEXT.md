@@ -183,10 +183,13 @@ _Avoid_: loot, pack, tirage, rareté, butin
 Carte unique gagnée la première fois qu'une Leçon (libre ou de révision) devient Acquise, composée par l'agent pour son sujet (type de tâche **carte**, en arrière-plan) : trois calques de dessin, la ligne de la Leçon (ses stations sont ses Objectifs) et le terminus « ACQUIS ✓ » dessinés par l'appli. Après deux tentatives ratées, l'appli la dessine elle-même en **scène générique**. Les Leçons déjà Acquises à la livraison des cartes n'en ont pas.
 
 **Mon réseau**:
-La grille des Cartes de ligne de l'Élève dans Mes badges, de la plus récente à la plus ancienne, au-dessus des cartes de Badge. Sans décompte, sans jauge.
+La grille des Cartes de ligne retournées de l'Élève dans Mes badges, de la plus récente à la plus ancienne, au-dessus des cartes de Badge. Sans décompte, sans jauge. Sur l'accueil, la carte de ligne d'une Leçon retournée s'affiche aussi dans l'encart de sa Leçon.
+
+**Carte « À découvrir » d'une Leçon**:
+Dans l'encart d'une Leçon sur l'accueil, la carte hachurée, statique, sans dessin ni décompte, qui tient la place d'une Leçon sans Carte de ligne (pas encore Acquise, ou Acquise avant la livraison des cartes). Même langage que les cartes « À découvrir » de Mes badges ; elle n'est pas cliquable.
 
 **Carte à retourner**:
-Carte gagnée et prête (carte de ligne composée, Palier gagné depuis la livraison) que l'Élève n'a pas encore retournée : elle attend face cachée dans « Nouvelles cartes », autant de temps qu'il le veut. Le retournement ouvre la cérémonie, enregistré une fois pour toutes ; « Nouveau » reste affiché tant qu'il reste une carte à retourner.
+Carte gagnée et prête (carte de ligne composée, Palier gagné depuis la livraison) que l'Élève n'a pas encore retournée : elle attend face cachée, autant de temps qu'il le veut, dans « Nouvelles cartes » de Mes badges ; une carte de ligne attend aussi dans l'encart de sa Leçon sur l'accueil. Le retournement ouvre la cérémonie (depuis l'un ou l'autre endroit), enregistré une fois pour toutes ; une fois retournée, fermer la cérémonie range la carte d'office, sans étape « Ajouter ». « Plus tard » avant le retournement la laisse face cachée. « Nouveau » reste affiché, partout, tant qu'il reste une carte à retourner.
 
 **Trousse**:
 La consigne de composition donnée à l'agent pour une Carte de ligne (format, zones calmes, symboles plutôt que silhouettes exactes, animations d'une liste fermée, JSON de trois calques). L'appli filtre ce qui revient et n'en garde que le conforme.

@@ -142,7 +142,7 @@ function ouvrir() {
         carte.classList.remove('rejoue-sortie'); accelerer(); tour();
       });
     });
-    tour(); // constat 1 gardé tel quel : la boucle tourne aussi sous mouvement réduit (décision de l'humain, voir la note)
+    if (!reduit) tour(); // sous mouvement réduit : esquisse fixe et complète, pas de boucle (WCAG 2.3.3, critère du ticket)
     pause.onclick = () => { const p = carte.classList.toggle('pause'); pause.textContent = p ? 'Reprendre' : 'Mettre en pause'; };
     const finir = (cleScene) => { // le dernier temps de l'attente : l'esquisse se met de profil, la vraie carte entre
       carte.classList.remove('pause'); carte.classList.add('fin');
@@ -150,7 +150,7 @@ function ouvrir() {
     };
     if (attente === 'echec') apres(8000, () => finir('autre')); // repli : scène générique, même cérémonie
     else apres(Number(attente) * 1000, () => finir(cat));
-    pause.hidden = false; // WCAG 2.2.2 : un mouvement de plus de 5 s s'arrête à la demande, visible dès le départ
+    pause.hidden = reduit; // WCAG 2.2.2 : un mouvement de plus de 5 s s'arrête à la demande, visible dès le départ
     apres(Number(max) * 1000, () => { // délai max : texte calme ; la carte reste sur l'accueil
       if (revelee) return;
       repli = true; pause.hidden = true;

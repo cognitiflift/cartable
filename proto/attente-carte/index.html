@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype #198 : attente d'une carte</title>
+<link rel="stylesheet" href="../../public/style.css">
+<link rel="stylesheet" href="proto.css">
+</head>
+<body>
+<main class="proto">
+  <h1>Prototype #198 — attente « carte en cours de façonnage »</h1>
+  <p class="doux">Jetable. Choisis une Catégorie et une attente simulée, puis touche la carte sur l'« accueil ».</p>
+  <form class="reglages" id="reglages">
+    <label>Catégorie
+      <select name="cat">
+        <option value="francais">Français</option>
+        <option value="mathematiques">Mathématiques</option>
+        <option value="sciences">Sciences</option>
+        <option value="histoire">Histoire (motif commun)</option>
+      </select></label>
+    <label>Attente simulée
+      <select name="attente">
+        <option value="0">0 s (déjà prête)</option>
+        <option value="3">3 s</option>
+        <option value="15" selected>15 s</option>
+        <option value="60">60 s</option>
+        <option value="echec">Échec → scène générique (à 8 s)</option>
+      </select></label>
+    <label>Délai max avant repli
+      <select name="max">
+        <option value="45" selected>45 s</option>
+        <option value="90">90 s</option>
+      </select></label>
+    <label>Palier de la respiration
+      <select name="palier">
+        <option value="20" selected>s'immobilise après 20 s</option>
+        <option value="0">ne s'immobilise pas (pause manuelle)</option>
+      </select></label>
+  </form>
+  <div class="accueil">
+    <p class="doux">Encart de la Leçon « Les fractions »</p>
+    <button type="button" id="emplacement" class="carte-attente-emplacement" aria-label="Une nouvelle carte, face cachée. Touche pour la retourner.">
+      <span class="cl-cachee-face"><span class="cl-medaillon" aria-hidden="true">🚉</span></span>
+    </button>
+  </div>
+</main>
+<script type="module" src="proto.js"></script>
+</body>
+</html>

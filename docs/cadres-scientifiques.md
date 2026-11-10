@@ -333,6 +333,17 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Où dans Cartable.** Le préambule de relais donne au prof la réussite moyenne des 5 derniers quiz comptés de la Leçon (hors Pré-test et questions bonus) et lui dit de durcir la page suivante au-delà de 90 %, de la guider sous 70 %, de la garder entre les deux (`lib/difficulte.js`, ticket #152) ; les valeurs 5, 70 % et 90 % sont des hypothèses (voir « Décisions sans fondement écrit »). Distinct du seuil de 80 %, qui est un critère de maîtrise et non une cible de difficulté.
 
+### Illusion du travail (attente occupée)
+
+**Ce qu'il dit.** Montrer le travail que fait un service pendant qu'on attend (transparence opérationnelle) augmente la valeur perçue du résultat et la tolérance à l'attente, même quand l'attente est plus longue. L'effet est mesuré chez des adultes, sur des recherches en ligne.
+
+**Référence.**
+- Buell, R. W., & Norton, M. I. (2011). The Labor Illusion: How Operational Transparency Increases Perceived Value. *Management Science*, 57(9), 1564–1579. doi:[10.1287/mnsc.1110.1376](https://doi.org/10.1287/mnsc.1110.1376) (volume, pages et titre vérifiés dans Crossref)
+
+**Solidité.** Étude isolée (quelques expériences, adultes) ; transposition à un enfant et à une animation de carte : heuristique tirée d'un cadre, non mesurée.
+
+**Où dans Cartable.** Prototype de l'animation d'attente d'une carte de ligne « en cours de façonnage » (ticket #198, alimente #197). Sans progression chiffrée : la durée de composition est inconnue et `PRODUCT.md` exclut les jauges.
+
 ## Ergonomie et accessibilité
 
 ### WCAG 2.2 AA
@@ -494,6 +505,7 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 | Un seul défilement vertical sur mobile : l'écran de Séance tient la hauteur de la fenêtre, seule la page de Leçon défile | `public/style.css`, ticket #172 | Aucun cadre, hypothèse à mesurer (deux zones imbriquées gênent-elles l'Élève ?). |
 | **Retirer les sept jours de l'accueil** : le bandeau ne montre plus que le jour d'aujourd'hui (Objectif du jour et ses gains), les jours d'avant restent dans le calendrier de Mes badges, les contrôles à venir sur les cartes de Leçon ; gains d'aujourd'hui placés sous l'Objectif du jour | `public/app.js` (`bandeauDuJour`), `public/gains-du-jour.js`, `public/style.css`, ticket #192 | Aucun cadre pour le retrait ni pour le placement exact, hypothèse à mesurer : l'Élève ouvre-t-il Mes badges autant ou moins qu'avant (retour de l'Élève, ouvertures de Mes badges) ? Le principe d'une récompense qui suit l'effort est dans « Retours et récompenses ». |
 | Sélecteur de pages à 44 px de haut | `public/style.css`, ticket #172 | WCAG 2.5.5 (niveau AAA), norme. |
+| Animation d'attente de carte différente selon la Catégorie (motif d'atelier propre) ; durées du crescendo (~8 s), du palier (immobile après 20 s) et du délai maximal avant repli (45 s) | `proto/attente-carte/` (prototype jetable), tickets #198 et #197 | Aucun cadre, hypothèse à mesurer : Buell & Norton (2011) ne dit rien des durées ni d'un effet par Catégorie, et porte sur des adultes. |
 
 ## Écarts relevés
 

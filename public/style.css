@@ -76,14 +76,12 @@ button.carte:hover { background:color-mix(in srgb, var(--texte) 4%, var(--carte)
 form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; }
 .erreur { color:var(--rouge); min-height:1.5em; }
 
-/* Accueil, Ma semaine : du lundi au dimanche, comme la page de la semaine du journal de classe. Un jour est un tampon
-   (.jour, .tampon), partagé avec le calendrier de Mes badges ; la colonne du jour (.jours > .jour) est au bandeau seul. */
-.ma-semaine { display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 20rem); gap:1rem 2rem; align-items:center; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
-.semaine-titre { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.2rem 1rem; margin-bottom:.7rem; }
-.semaine-titre h2 { margin:0; font-size:1.45rem; line-height:1.1; }
-.semaine-titre a { font-size:.92rem; font-weight:600; }
-.jours { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.35rem; }
-.jours > .jour { position:relative; display:flex; flex-direction:column; align-items:center; gap:.3rem; padding:.45rem .15rem .5rem; border-radius:12px; }
+/* Accueil, bandeau du jour (#192) : le salut, la série, l'Objectif du jour et ses gains, les Révisions du jour. Un jour
+   en tampon (.jour, .tampon) n'est plus que dans le calendrier de Mes badges. */
+.bandeau-jour { display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 20rem); gap:1rem 2rem; align-items:center; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
+.bandeau-titre { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.2rem 1rem; margin-bottom:.7rem; }
+.bandeau-titre h2 { margin:0; font-size:1.45rem; line-height:1.1; }
+.bandeau-titre a { font-size:.92rem; font-weight:600; }
 .jour.aujourdhui { background:color-mix(in srgb, var(--accent) 9%, transparent); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .jour .nom, .calendrier-grille .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
 .jour.aujourdhui .nom { color:var(--accent); }
@@ -92,12 +90,13 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .jour.pale .tampon { border:2px solid transparent; background:color-mix(in srgb, var(--accent) 22%, var(--carte)); color:var(--texte); }
 .jour.plein .tampon { border:2px solid var(--accent); background:var(--accent); color:var(--sur-accent); }
 .tampon .joker { position:absolute; top:-.45rem; right:-.55rem; font-size:.78rem; }
-.gains { display:flex; justify-content:center; gap:.3rem; font-size:.92rem; line-height:1.25; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.gains-badges { display:flex; flex-wrap:wrap; justify-content:center; gap:.15rem; }
-.gains .controle-jour { text-decoration:none; }
+/* Les gains d'aujourd'hui, sous l'Objectif du jour : Étoiles et Fusées, puis les pastilles de Paliers. Absents sans gain. */
+.gains { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem .6rem; margin-top:.4rem; font-size:.92rem; line-height:1.25; font-variant-numeric:tabular-nums; }
+.gains-nombres { display:flex; gap:.5rem; white-space:nowrap; }
+.gains-badges { display:flex; flex-wrap:wrap; gap:.15rem; }
 .gain-badge .pastille-badge { width:1.6em; height:1.6em; border-width:2px; font-size:.85em; }
-.semaine-cote { display:flex; flex-direction:column; gap:.6rem; }
-/* La série (#166) : sous les sept jours, dans la colonne de gauche, en corps normal et en --texte (WCAG 1.4.3). */
+.bandeau-cote { display:flex; flex-direction:column; gap:.6rem; }
+/* La série (#166) : sous le salut, dans la colonne de gauche, en corps normal et en --texte (WCAG 1.4.3). */
 .serie-de-jours { margin-top:.8rem; color:var(--texte); }
 .serie-de-jours p { margin:0; line-height:1.4; }
 .serie-de-jours p + p { margin-top:.25rem; }
@@ -125,8 +124,8 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .recapitulatif strong { display:block; }
 .recapitulatif .fermer { position:absolute; top:.25rem; right:.25rem; min-width:2.75rem; min-height:2.75rem; padding:.1rem .5rem; }
 /* Tablette : le bandeau se resserre pour que « Mes leçons » remonte ; l'Objectif du jour et Révisions passent côte à côte. */
-@media (max-width: 860px) { .ma-semaine { grid-template-columns:1fr; gap:.75rem; padding:.85rem 1.1rem .95rem; } .semaine-titre { margin-bottom:.45rem; } .jours > .jour { padding:.35rem .15rem .4rem; } .serie-de-jours { margin-top:.6rem; } .semaine-cote { flex-direction:row; align-items:center; gap:1rem; } .objectif-du-jour { flex:1; min-width:0; } .bouton-revisions { width:auto; min-width:15rem; flex:none; } }
-@media (max-width: 520px) { .ma-semaine { padding:.8rem .7rem; gap:.6rem; } .semaine-titre { margin-bottom:.4rem; } .semaine-titre a { display:none; } .jours { gap:.15rem; } .jours > .jour { padding:.35rem 0; } .tampon { width:2rem; height:2rem; font-size:.92rem; } .gains { font-size:.74rem; flex-direction:column; align-items:center; gap:0; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.92rem; } .semaine-cote { flex-direction:column; align-items:stretch; gap:.6rem; } .bouton-revisions { width:100%; min-width:0; flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .bouton-revisions strong { width:auto; } .bouton-revisions .compte { margin-left:0; } .lecons-tete { margin-top:1.4rem; } .bouton-nouvelle:not(.plein) { margin-left:-.7rem; text-align:left; } }
+@media (max-width: 860px) { .bandeau-jour { grid-template-columns:1fr; gap:.75rem; padding:.85rem 1.1rem .95rem; } .bandeau-titre { margin-bottom:.45rem; } .serie-de-jours { margin-top:.6rem; } .bandeau-cote { flex-direction:row; align-items:center; gap:1rem; } .objectif-du-jour { flex:1; min-width:0; } .bouton-revisions { width:auto; min-width:15rem; flex:none; } }
+@media (max-width: 520px) { .bandeau-jour { padding:.8rem .7rem; gap:.6rem; } .bandeau-titre { margin-bottom:.4rem; } .bandeau-titre a { display:none; } .tampon { width:2rem; height:2rem; font-size:.92rem; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.92rem; } .bandeau-cote { flex-direction:column; align-items:stretch; gap:.6rem; } .bouton-revisions { width:100%; min-width:0; flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .bouton-revisions strong { width:auto; } .bouton-revisions .compte { margin-left:0; } .lecons-tete { margin-top:1.4rem; } .bouton-nouvelle:not(.plein) { margin-left:-.7rem; text-align:left; } }
 
 /* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
 .lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }
@@ -365,14 +364,14 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .station-nom small { font-weight:400; color:var(--doux); }
 .station-nom .nouveau { margin:.15rem 0 0; }
 .carte .nouveau, .nouveau { display:inline-block; margin-left:.4rem; padding:0 .45rem; font-size:.74rem; font-weight:700; border-radius:999px; background:var(--nouveau); color:var(--sur-nouveau); }
-/* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau de la semaine, et à côté la collection. */
+/* Mes badges : en-tête de page, puis le calendrier dans une carte comme le bandeau du jour, et à côté la collection. */
 .badges-tete { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.4rem 1.5rem; margin:.4rem 0 1rem; }
 .totaux-recompenses { margin:0; font-size:1.2rem; font-weight:800; font-variant-numeric:tabular-nums; }
 .badges-corps { display:grid; grid-template-columns:minmax(0, 25rem) minmax(0, 1fr); gap:1.4rem 2rem; align-items:start; }
 .badges-corps > * { min-width:0; }
 .collection h3 { margin:0 0 .2rem; font:800 1.45rem/1.1 var(--police-titre); letter-spacing:-.005em; }
 @media (max-width: 900px) { .badges-corps { grid-template-columns:1fr; } }
-/* Calendrier de Mes badges (#99) : les tampons de jour du bandeau de la semaine, mois par mois ; le jour touché est
+/* Calendrier de Mes badges (#99) : les tampons de jour, mois par mois ; le jour touché est
    entouré comme la station « vous êtes ici », et son détail s'affiche dessous. */
 .mon-calendrier { display:flex; flex-direction:column; gap:.8rem; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
 .calendrier-mois { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }

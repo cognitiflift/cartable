@@ -81,7 +81,8 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .bandeau-jour { display:grid; grid-template-columns:minmax(0, 1fr) minmax(16rem, 20rem); gap:1rem 2rem; align-items:center; padding:1rem 1.25rem 1.1rem; background:var(--carte); border:1px solid var(--bord); border-radius:18px; box-shadow:var(--ombre-bandeau); }
 .bandeau-titre { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.2rem 1rem; margin-bottom:.7rem; }
 .bandeau-titre h2 { margin:0; font-size:1.45rem; line-height:1.1; }
-.bandeau-titre a { font-size:.92rem; font-weight:600; }
+/* Le lien du calendrier, sous la série et collé à gauche avec elle : plus de grand vide entre le salut et lui. */
+.bandeau-lien { display:inline-block; margin-top:.7rem; font-size:.92rem; font-weight:600; }
 .jour.aujourdhui { background:color-mix(in srgb, var(--accent) 9%, transparent); box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .jour .nom, .calendrier-grille .nom { font:800 .74rem/1 var(--police-titre); text-transform:uppercase; letter-spacing:.07em; color:var(--doux); }
 .jour.aujourdhui .nom { color:var(--accent); }
@@ -99,7 +100,12 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 /* La série (#166) : sous le salut, dans la colonne de gauche, en corps normal et en --texte (WCAG 1.4.3). */
 .serie-de-jours { margin-top:.8rem; color:var(--texte); }
 .serie-de-jours p { margin:0; line-height:1.4; }
-.serie-de-jours p + p { margin-top:.25rem; }
+.serie-de-jours p + p { margin-top:.35rem; }
+/* La série épurée : un grand chiffre Overpass en accent, « jour(s) de suite » à côté ; l'encouragement en `doux` dessous. */
+.serie-ligne { display:flex; align-items:baseline; flex-wrap:wrap; gap:0 .5rem; }
+.serie-ligne.vide { display:block; color:var(--doux); }
+.serie-nombre { font:800 2rem/1 var(--police-titre); color:var(--accent); font-variant-numeric:tabular-nums; }
+.serie-ligne small { flex-basis:100%; color:var(--doux); }
 .objectif-du-jour strong { display:block; line-height:1.3; text-wrap:balance; }
 .objectif-du-jour small { display:block; color:var(--doux); margin-top:.15rem; }
 .objectif-du-jour.atteint strong { color:var(--vert); }
@@ -125,7 +131,7 @@ form.colonne { display:flex; flex-direction:column; gap:.8rem; max-width:360px; 
 .recapitulatif .fermer { position:absolute; top:.25rem; right:.25rem; min-width:2.75rem; min-height:2.75rem; padding:.1rem .5rem; }
 /* Tablette : le bandeau se resserre pour que « Mes leçons » remonte ; l'Objectif du jour et Révisions passent côte à côte. */
 @media (max-width: 860px) { .bandeau-jour { grid-template-columns:1fr; gap:.75rem; padding:.85rem 1.1rem .95rem; } .bandeau-titre { margin-bottom:.45rem; } .serie-de-jours { margin-top:.6rem; } .bandeau-cote { flex-direction:row; align-items:center; gap:1rem; } .objectif-du-jour { flex:1; min-width:0; } .bouton-revisions { width:auto; min-width:15rem; flex:none; } }
-@media (max-width: 520px) { .bandeau-jour { padding:.8rem .7rem; gap:.6rem; } .bandeau-titre { margin-bottom:.4rem; } .bandeau-titre a { display:none; } .tampon { width:2rem; height:2rem; font-size:.92rem; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.92rem; } .bandeau-cote { flex-direction:column; align-items:stretch; gap:.6rem; } .bouton-revisions { width:100%; min-width:0; flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .bouton-revisions strong { width:auto; } .bouton-revisions .compte { margin-left:0; } .lecons-tete { margin-top:1.4rem; } .bouton-nouvelle:not(.plein) { margin-left:-.7rem; text-align:left; } }
+@media (max-width: 520px) { .bandeau-jour { padding:.8rem .7rem; gap:.6rem; } .bandeau-titre { margin-bottom:.4rem; } .bandeau-lien { display:none; } .tampon { width:2rem; height:2rem; font-size:.92rem; } .objectif-du-jour small { display:inline; } .objectif-du-jour strong { font-size:.92rem; } .bandeau-cote { flex-direction:column; align-items:stretch; gap:.6rem; } .bouton-revisions { width:100%; min-width:0; flex-direction:row; flex-wrap:wrap; align-items:baseline; gap:.1rem .5rem; padding:.5rem .8rem; } .bouton-revisions strong { width:auto; } .bouton-revisions .compte { margin-left:0; } .lecons-tete { margin-top:1.4rem; } .bouton-nouvelle:not(.plein) { margin-left:-.7rem; text-align:left; } }
 
 /* Mes leçons : une section par Catégorie, une carte de ligne par Leçon, toutes de la même anatomie. */
 .lecons-tete { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.8rem 1.5rem; margin:2.2rem 0 .3rem; }

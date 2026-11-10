@@ -102,6 +102,7 @@ function esquisseBoucle(cat) {
 }
 const VARIANTES = {
   A: { nom: 'Esquisse (crescendo)', dessin: esquisse },
+  F: { nom: 'A rejoué en boucle (~6,5 s)', dessin: esquisse, rejoue: true },
   E: { nom: 'Esquisse en boucle (6 s)', dessin: esquisseBoucle, boucle: true },
   B: { nom: 'Le convoi (boucle 6 s)', dessin: convoi, boucle: true },
   C: { nom: 'Les couches (boucle 6 s)', dessin: couches, boucle: true },
@@ -178,6 +179,18 @@ function ouvrir() {
     carte.firstChild.innerHTML = v.dessin(cat);
     texte.append(h('p', {}, 'Ta carte se prépare'));
     scene.append(carte);
+    if (v.rejoue) { // A tel quel, un peu accéléré, puis fondu de sortie et redémarrage : ~5,7 s + 0,8 s de fondu
+      const VITESSE = 1.4, TOUR = 5700, FONDU = 800;
+      const accelerer = () => carte.getAnimations({ subtree: true }).forEach((a) => { a.playbackRate = VITESSE; });
+      accelerer();
+      const tour = () => apres(TOUR, () => {
+        if (revelee) return;
+        if (carte.classList.contains('pose') || carte.classList.contains('pause')) return tour(); // figé : on ne rejoue pas
+        carte.classList.add('rejoue-sortie');
+        apres(FONDU, () => { carte.firstChild.innerHTML = v.dessin(cat); carte.classList.remove('rejoue-sortie'); accelerer(); tour(); });
+      });
+      tour();
+    }
     pause.onclick = () => { const p = carte.classList.toggle('pause'); pause.setAttribute('aria-pressed', String(p)); pause.textContent = p ? 'Reprendre' : 'Mettre en pause'; };
     const finir = (cleScene) => { // le dernier temps de l'attente : l'esquisse se met de profil, la vraie carte entre
       carte.classList.remove('pause'); carte.classList.add('fin');

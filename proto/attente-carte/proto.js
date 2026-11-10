@@ -40,18 +40,29 @@ const motifs = {
 };
 const motifDe = (cat) => (motifs[cat] ?? motifs.autre)();
 
-function esquisse(cat) {
-  const etoiles = [[60, 30], [92, 52], [126, 24], [150, 60], [76, 84], [168, 96], [40, 70]]
-    .map(([x, y], i) => `<circle class="point etoile" cx="${x}" cy="${y}" r="${1 + (i % 3) * .5}" style="--i:${i}"/>`).join('');
-  const stations = Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="station-s" cx="${26 + i * 30}" cy="162" r="9" style="--i:${i}"/>`).join('');
-  return `<svg viewBox="0 0 200 280" aria-hidden="true"><defs><radialGradient id="att-halo"><stop offset="0" stop-color="var(--ligne)" stop-opacity=".9"/><stop offset="1" stop-color="var(--ligne)" stop-opacity="0"/></radialGradient></defs>
-    <circle class="halo" cx="100" cy="120" r="96" fill="url(#att-halo)"/>
-    ${trait('M20 8 H180 a12 12 0 0 1 12 12 V260 a12 12 0 0 1 -12 12 H20 a12 12 0 0 1 -12 -12 V20 a12 12 0 0 1 12 -12 Z', 'cadre couleur')}
-    ${etoiles}
+// Ce qui s'efface à chaque tour (version corrigée : seul ce groupe fond, le cadre, le halo et le rail restent).
+function contenuFondant(cat, corrige) {
+  const positions = corrige ? [[60, 30], [126, 24], [150, 60], [40, 70]] : [[60, 30], [92, 52], [126, 24], [150, 60], [76, 84], [168, 96], [40, 70]];
+  const etoiles = positions.map(([x, y], i) => `<circle class="point etoile" cx="${x}" cy="${y}" r="${1 + (i % 3) * .5}" style="--i:${i}"/>`).join('');
+  // Actuelle : 5 stations, nombre inventé. Corrigée : trois jalons pleins, qui ne se lisent pas comme un décompte.
+  const stations = corrige
+    ? [34, 100, 168].map((x, i) => `<circle class="jalon" cx="${x}" cy="162" r="5" style="--i:${i}"/>`).join('')
+    : Array.from({ length: OBJECTIFS }, (_, i) => `<circle class="station-s" cx="${26 + i * 30}" cy="162" r="9" style="--i:${i}"/>`).join('');
+  const motif = corrige && cat === 'sciences'
+    ? `<g transform="translate(100 58) scale(.6) translate(-100 -110)">${motifDe(cat)}</g>` : motifDe(cat);
+  return `${etoiles}
     ${trait('M8 150 Q48 112 96 138 T192 128', 'colline', 0)}${trait('M8 172 Q60 140 110 164 T192 158', 'colline', 1)}
     <path class="remplit colline-f" d="M8 150 Q48 112 96 138 T192 128 V272 H8 Z"/>
-    ${trait('M8 162 H192', 'rail couleur')}${stations}
-    <g class="motif">${motifDe(cat)}</g></svg><div class="att-reflet" aria-hidden="true"></div>`;
+    ${corrige ? '' : trait('M8 162 H192', 'rail couleur')}${stations}
+    <g class="motif">${motif}</g>`;
+}
+function esquisse(cat, corrige) {
+  const rayon = corrige ? 64 : 96, opacite = corrige ? '.6' : '.9';
+  return `<svg viewBox="0 0 200 280" aria-hidden="true"><defs><radialGradient id="att-halo"><stop offset="0" stop-color="var(--ligne)" stop-opacity="${opacite}"/><stop offset="1" stop-color="var(--ligne)" stop-opacity="0"/></radialGradient></defs>
+    <circle class="halo" cx="100" cy="${corrige ? 105 : 120}" r="${rayon}" fill="url(#att-halo)"/>
+    ${trait('M20 8 H180 a12 12 0 0 1 12 12 V260 a12 12 0 0 1 -12 12 H20 a12 12 0 0 1 -12 -12 V20 a12 12 0 0 1 12 -12 Z', 'cadre couleur')}
+    ${corrige ? trait('M8 162 H192', 'rail couleur') : ''}
+    <g class="fondant">${contenuFondant(cat, corrige)}</g></svg>${corrige ? '' : '<div class="att-reflet" aria-hidden="true"></div>'}`;
 }
 
 // --- La « vraie » carte (simulée) : même DOM que carteLigne (public/app.js), scène générique du serveur.
@@ -87,14 +98,16 @@ const emplacement = document.getElementById('emplacement');
 let enPreparation = null; // la carte du prototype « se compose » en tâche de fond tant qu'on n'a pas fini
 
 function ouvrir() {
-  const { cat, attente, max, palier } = reglage();
+  const { cat, attente, max, version } = reglage();
+  const corrige = version === 'corrigee';
   const reduit = moinsDeMouvement();
   const prete = attente === '0';
   const dlg = h('dialog', { className: 'cartes-ceremonie', 'aria-label': `Nouvelle carte : ${TITRE}` });
   const texte = h('div', { className: 'cer-texte', 'aria-live': 'polite' });
   const scene = h('div', { className: 'cer-carte' });
   const ok = h('button', { type: 'button', className: 'cer-ok', hidden: true, onclick: () => dlg.close() }, 'Fermer');
-  const pause = h('button', { type: 'button', className: 'secondaire att-pause', hidden: true, 'aria-pressed': 'false' }, 'Mettre en pause');
+  const pause = h('button', { type: 'button', className: 'secondaire att-pause', hidden: true, ...(corrige ? {} : { 'aria-pressed': 'false' }) }, 'Mettre en pause');
+  const bascule = h('button', { type: 'button', className: 'secondaire proto-version', onclick: () => { const sel = document.querySelector('[name=version]'); sel.value = corrige ? 'actuelle' : 'corrigee'; dlg.close(); ouvrir(); } }, `Version ${corrige ? 'corrigée' : 'actuelle'} · basculer`);
   const plusTard = h('button', { type: 'button', className: 'secondaire cer-plus-tard', onclick: () => dlg.close() }, 'Plus tard');
   const timers = [];
   const apres = (ms, f) => timers.push(setTimeout(() => { if (dlg.isConnected) f(); }, ms));
@@ -106,7 +119,7 @@ function ouvrir() {
     const vraie = carteReelle(cle);
     vraie.querySelectorAll('.cl-ligne .station').forEach((st, i) => st.style.setProperty('--i', String(i)));
     scene.replaceChildren(vraie, gerbe());
-    pause.hidden = true; plusTard.hidden = true;
+    pause.hidden = true; plusTard.hidden = true; bascule.hidden = true;
     texte.replaceChildren(h('p', {}, ''));
     apres(reduit ? 0 : 2400, () => { texte.replaceChildren(h('h3', {}, TITRE), h('p', {}, SALUE)); ok.hidden = false; ok.focus(); });
   };
@@ -117,8 +130,8 @@ function ouvrir() {
       h('span', { className: 'cl-cachee-face' }, h('span', { className: 'cl-medaillon', 'aria-hidden': 'true' }, '🚉')));
     scene.append(dos);
   } else {
-    const carte = h('div', { className: `att-carte ${cat}` }, h('div', { className: 'att-in' }));
-    carte.firstChild.innerHTML = esquisse(cat);
+    const carte = h('div', { className: `att-carte ${cat}${corrige ? ' corrige' : ''}` }, h('div', { className: 'att-in' }));
+    carte.firstChild.innerHTML = esquisse(cat, corrige);
     texte.append(h('p', {}, 'Ta carte se prépare'));
     scene.append(carte);
     // La boucle : l'esquisse jouée en entier (un peu accélérée), un fondu de sortie, puis elle repart de zéro. Un tour
@@ -131,28 +144,33 @@ function ouvrir() {
       if (revelee) return;
       if (carte.classList.contains('pose') || carte.classList.contains('pause')) return tour(); // figé : on ne rejoue pas
       carte.classList.add('rejoue-sortie');
-      apres(FONDU, () => { carte.firstChild.innerHTML = esquisse(cat); carte.classList.remove('rejoue-sortie'); accelerer(); tour(); });
+      apres(FONDU, () => {
+        if (corrige) carte.querySelector('.fondant').innerHTML = contenuFondant(cat, true); // cadre, halo et rail restent en place
+        else carte.firstChild.innerHTML = esquisse(cat, false);
+        carte.classList.remove('rejoue-sortie'); accelerer(); tour();
+      });
     });
-    tour();
-    pause.onclick = () => { const p = carte.classList.toggle('pause'); pause.setAttribute('aria-pressed', String(p)); pause.textContent = p ? 'Reprendre' : 'Mettre en pause'; };
+    if (!corrige || !reduit) tour(); // constat 1 : sous mouvement réduit, la version actuelle boucle (et vide la carte) quand même
+    pause.onclick = () => { const p = carte.classList.toggle('pause'); if (!corrige) pause.setAttribute('aria-pressed', String(p)); pause.textContent = p ? 'Reprendre' : 'Mettre en pause'; };
     const finir = (cleScene) => { // le dernier temps de l'attente : l'esquisse se met de profil, la vraie carte entre
       carte.classList.remove('pause'); carte.classList.add('fin');
       apres(reduit ? 0 : 250, () => reveler(cleScene));
     };
     if (attente === 'echec') apres(8000, () => finir('autre')); // repli : scène générique, même cérémonie
     else apres(Number(attente) * 1000, () => finir(cat));
-    if (!reduit) {
-      apres(5000, () => { if (!revelee && !carte.classList.contains('pose')) pause.hidden = false; }); // WCAG 2.2.2 : un mouvement de plus de 5 s s'arrête à la demande
-      if (Number(palier) > 0) apres(8000 + Number(palier) * 1000, () => { carte.classList.add('pose'); }); // ou de lui-même
+    if (!reduit) { // WCAG 2.2.2 : un mouvement de plus de 5 s s'arrête à la demande (corrigée : visible dès le départ)
+      if (corrige) pause.hidden = false;
+      else apres(5000, () => { if (!revelee && !carte.classList.contains('pose')) pause.hidden = false; });
     }
-    apres(Number(max) * 1000, () => { // délai max : texte calme et fermeture, la carte reste sur l'accueil
+    apres(Number(max) * 1000, () => { // délai max : texte calme ; la carte reste sur l'accueil
       if (revelee) return;
       carte.classList.add('pose'); pause.hidden = true;
       texte.replaceChildren(h('p', {}, 'Ta carte arrive, elle t’attend sur l’accueil.'));
-      apres(4500, () => dlg.close());
+      if (corrige) plusTard.textContent = 'Fermer'; // constat 3 : le dialogue reste ouvert, sans limite de temps imposée
+      else apres(4500, () => dlg.close());
     });
   }
-  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, pause, plusTard));
+  dlg.append(h('div', { className: 'cer-scene' }, scene, texte, ok, pause, plusTard, bascule));
   dlg.addEventListener('close', () => { timers.forEach(clearTimeout); dlg.remove(); emplacement.focus(); });
   document.body.append(dlg);
   dlg.showModal();

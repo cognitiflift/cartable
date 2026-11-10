@@ -305,7 +305,7 @@ Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes 
 **Key Characteristics:**
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
 - Quatre états de station lisibles sans légende : vide, hachurée, blanche, verte.
-- Bandeau lundi→dimanche à tampons, discret à côté des Leçons.
+- Bandeau du jour sobre : salut, série, Objectif du jour et ses gains, discret à côté des Leçons.
 - Bleu nuit pour la marque, indigo d'encre pour l'action, vert pour ce qui tient ; un seul bouton plein par écran.
 - Overpass 800 en signalétique, Atkinson Hyperlegible Next pour lire, chiffres tabulaires.
 - Plat par défaut, ombres douces teintées de nuit, aucun relief dur.
@@ -361,7 +361,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Marque** (Overpass 800, 1.35rem, 1) : « 🎒 Cartable » dans l'en-tête.
 - **Body** (Atkinson 400, 17px, 1.5) : tout le texte courant ; les détails (prochaine station, Objectifs) passent à 1.3–1.35 d'interligne.
 - **Petit texte d'action** (Atkinson 700, 0.92rem) : « Voir les Objectifs », contrôle à venir, « Terminée », et tout texte secondaire (maîtrise, compteurs, détails d'Objectif, étape du Cadrage).
-- **Label signalétique** (Overpass 800, 0.74rem, 0.07em, capitales) : le terminus « ACQUIS » et les noms de jours du bandeau. Le cartouche de Niveau est à 0.78rem, 0.04em.
+- **Label signalétique** (Overpass 800, 0.74rem, 0.07em, capitales) : le terminus « ACQUIS » et les noms de jours du calendrier de Mes badges. Le cartouche de Niveau est à 0.78rem, 0.04em.
 
 **La règle de l'échelle.** Toute taille de texte de `public/style.css` est un niveau ci-dessus ; `test/style.test.js` échoue sur toute autre. Seules exceptions : les tailles en `em` de la pastille d'un Badge, relatives au texte qui la porte. Sur la Vue parent, chaque niveau voisin vaut au moins 1,25 fois le précédent : corps 17px, section 1.45rem (×1,36), titre 2rem (×1,38).
 
@@ -391,7 +391,7 @@ Le système est plat, avec un soupçon de pose : les cartes de ligne et le bande
 - **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau du jour et le calendrier de Mes badges.
 - **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station. La carte de la Leçon en tête prend un anneau simple de 2px `ligne` (`0 0 0 2px var(--ligne)`), en plus de sa pose, et son titre au corps des autres cartes : elle ne pèse pas plus que l'Objectif du jour (#166).
 - **Découpe du terminus** (`box-shadow: 0 0 0 .2rem var(--carte)`) : sépare le cartouche du trait.
-- **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau et le calendrier.
+- **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le calendrier de Mes badges.
 
 ### Named Rules
 **La règle de la pose légère.** Les ombres sont ambiantes et teintées de nuit, jamais décalées ni dures ; un élément ne monte pas au survol, il change de teinte.
@@ -473,7 +473,7 @@ Un tampon rond par jour, avec le nom du jour en label signalétique au-dessus ; 
 - **Plein (Objectif du jour atteint) :** aplat `accent`, date `sur-accent`.
 - **Joker :** 🛡️ en exposant sur le tampon.
 - **Jour réparé :** 🩹 en exposant sur le tampon, à la place de 🛡️ (une Série de jours réparée, pas un Joker).
-- **Aujourd'hui :** la colonne du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
+- **Aujourd'hui :** la case du jour est teintée d'accent à 9 % et cerclée d'accent à 45 %, son nom passe en `accent`.
 
 ### Mes badges
 L'en-tête de page (« Mes badges » en display, le total d'Étoiles et de Fusées à droite en chiffres tabulaires), puis deux colonnes (une seule sous 900px) : le calendrier à gauche, la collection à droite.

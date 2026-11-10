@@ -220,7 +220,7 @@ components:
     textColor: "{colors.sur-nuit}"
     rounded: "{rounded.carte-ligne}"
     padding: "0.7rem"
-  ma-semaine:
+  bandeau-jour:
     backgroundColor: "{colors.carte}"
     rounded: "{rounded.carte-ligne}"
     padding: "1rem 1.25rem 1.1rem"
@@ -294,13 +294,13 @@ components:
 
 **Creative North Star: "Le plan du réseau"**
 
-Cartable se lit comme le plan d'un réseau de transport en commun (la STIB bruxelloise en est la référence) : chaque Leçon est une ligne épaisse à la couleur de sa Catégorie, ses Objectifs en sont les stations, et la ligne mène à un terminus « Acquis » posé en cartouche de signalétique. L'Élève voit d'un coup d'œil jusqu'où il est allé et ce qui tient en mémoire, sans pourcentage ni décompte. Au-dessus du réseau, un bandeau de la semaine, du lundi au dimanche, reprend la page de la semaine du journal de classe belge : un tampon par jour, et ce qui a été gagné ce jour-là.
+Cartable se lit comme le plan d'un réseau de transport en commun (la STIB bruxelloise en est la référence) : chaque Leçon est une ligne épaisse à la couleur de sa Catégorie, ses Objectifs en sont les stations, et la ligne mène à un terminus « Acquis » posé en cartouche de signalétique. L'Élève voit d'un coup d'œil jusqu'où il est allé et ce qui tient en mémoire, sans pourcentage ni décompte. Au-dessus du réseau, un bandeau du jour dit où l'Élève en est aujourd'hui : l'Objectif du jour, la série et ce qui vient d'être gagné ; les jours d'avant, en tampons comme sur la page de la semaine du journal de classe belge, sont dans le calendrier de Mes badges.
 
 Le monde est sobre et lisible : un en-tête bleu nuit, un fond gris froid, des cartes blanches posées à peine au-dessus du fond, une typographie de signalétique (Overpass) pour les titres et les noms de ligne, une police conçue pour la lisibilité (Atkinson Hyperlegible Next) pour tout le texte. La couleur est réservée au sens : la couleur de ligne dit la Catégorie, l'indigo de l'accent dit l'action et aujourd'hui, le vert dit ce qui est Retenu, le jaune dit ce qui est nouveau. Il convient autant à un enfant de 8 ans qu'à un adulte : rien n'y est infantilisant, rien n'y est compétitif.
 
 Le monde refuse la grille de cartes boutons toutes pareilles remplies de listes de texte. Il existe en clair et en sombre (fond `fond-sombre`, cartes `carte-sombre`), choisi par le bouton de thème de l'en-tête : automatique (la préférence de l'appareil, par défaut), clair ou sombre. Le choix vaut pour l'appareil, pas pour un Élève : retenu dans le stockage de l'appareil, il s'applique dès le choix de l'Élève, avant le premier rendu, et jusque dans les Pages de leçon en iframe. L'en-tête reste bleu nuit dans les deux.
 
-**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau de la semaine, « Mes leçons », cartes de ligne), la Séance (en-tête sur la ligne de la Leçon, bulle du prof, Retour de quiz, Rebond), Nouvelle leçon (Propositions et Cadrage), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Révisions du jour, Vue parent, Profil) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
+**Frontière d'extension.** À ce jour, seuls l'écran d'accueil de l'Élève (bandeau du jour, « Mes leçons », cartes de ligne), la Séance (en-tête sur la ligne de la Leçon, bulle du prof, Retour de quiz, Rebond), Nouvelle leçon (Propositions et Cadrage), Mes badges et son calendrier, et les éléments communs (en-tête, compteur d'Étoiles, boutons, champs, jetons de couleur et polices) portent ce monde. Les autres écrans (choix de l'Élève, Révisions du jour, Vue parent, Profil) héritent des jetons et des polices mais n'ont pas été redessinés : ils gardent des valeurs antérieures (verts et ors codés en dur, ombres noires en `rgba`). Ces valeurs ne font pas partie du système ; la prochaine refonte d'un écran doit les ramener aux jetons et à la grammaire du réseau.
 
 **Key Characteristics:**
 - Une Leçon = une ligne de couleur de Catégorie, des stations, un terminus « Acquis ».
@@ -329,7 +329,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 ### Neutral
 - **Gris froid du fond** (`fond`) : le fond de page, sur lequel les cartes se détachent.
-- **Blanc des cartes** (`carte`) : cartes de ligne, bandeau de la semaine, boutons secondaires, champs.
+- **Blanc des cartes** (`carte`) : cartes de ligne, bandeau du jour, boutons secondaires, champs.
 - **Encre nuit** (`texte`) : le texte, et l'anneau des stations atteintes en clair.
 - **Gris doux** (`doux`) : texte secondaire, libellés (« Prochaine station : »), noms de jours, terminus éteint.
 - **Filet** (`bord`) : bordures des cartes et des champs, séparateur pointillé des Objectifs.
@@ -356,7 +356,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 ### Hierarchy
 - **Display** (Overpass 800, 2rem, 1.1 ; `display-mobile` 1.6rem sous 640px) : le titre « Mes leçons » et celui de la Vue parent.
-- **Headline** (Overpass 800, 1.45rem, 1.1) : le salut du bandeau de la semaine ; les autres titres de section (`h2`) prennent la même voix Overpass 800 ; sur la Vue parent, ses sections (`h3`).
+- **Headline** (Overpass 800, 1.45rem, 1.1) : le salut du bandeau du jour ; les autres titres de section (`h2`) prennent la même voix Overpass 800 ; sur la Vue parent, ses sections (`h3`).
 - **Title** (Overpass 800, 1.3rem, 1.2 ; `title-mobile` 1.15rem sous 640px) : le nom d'une Leçon sur sa carte de ligne, équilibré (`text-wrap: balance`). Les noms de Catégorie sont à 1.2rem, précédés de leur puce de couleur.
 - **Marque** (Overpass 800, 1.35rem, 1) : « 🎒 Cartable » dans l'en-tête.
 - **Body** (Atkinson 400, 17px, 1.5) : tout le texte courant ; les détails (prochaine station, Objectifs) passent à 1.3–1.35 d'interligne.
@@ -374,9 +374,9 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 
 ## Layout
 
-Une colonne centrée de 1200px au plus, avec une marge latérale fluide (`clamp(1rem, 3vw, 2rem)`), partagée par l'en-tête et le contenu. L'accueil se lit de haut en bas : le bandeau de la semaine, puis l'en-tête « Mes leçons » avec le bouton « Apprendre quelque chose de nouveau » aligné à droite, puis « Tu en étais là » : la Leçon à la dernière activité la plus récente, seule et sur toute la largeur, sa carte cerclée « vous êtes ici » et son Continuer plein. Viennent ensuite une section par Catégorie, sans cette Leçon (une Catégorie qui n'avait qu'elle disparaît).
+Une colonne centrée de 1200px au plus, avec une marge latérale fluide (`clamp(1rem, 3vw, 2rem)`), partagée par l'en-tête et le contenu. L'accueil se lit de haut en bas : le bandeau du jour, puis l'en-tête « Mes leçons » avec le bouton « Apprendre quelque chose de nouveau » aligné à droite, puis « Tu en étais là » : la Leçon à la dernière activité la plus récente, seule et sur toute la largeur, sa carte cerclée « vous êtes ici » et son Continuer plein. Viennent ensuite une section par Catégorie, sans cette Leçon (une Catégorie qui n'avait qu'elle disparaît).
 
-Le bandeau de la semaine est une grille de deux colonnes : les sept jours (une grille de 7 colonnes égales) et, à droite, une colonne de 16 à 20rem pour l'Objectif du jour (avec le moment de révision) et les Révisions du jour. La colonne de gauche porte le salut, les sept jours puis la série, en corps normal et en `texte` ; les cases de jours n'ont pas de hauteur minimale, leur hauteur suit leur contenu. Sous 860px (tablette), le bandeau se resserre pour que « Mes leçons » remonte : la colonne de droite passe dessous et l'Objectif du jour et les Révisions s'y mettent côte à côte, les marges se réduisent (à 820px, 268px de bandeau au lieu de 339px). Sous 520px, il se resserre encore (tampons de 2rem, gains empilés, lien du calendrier masqué, Objectif et Révisions de nouveau l'un sous l'autre).
+Le bandeau du jour est une grille de deux colonnes : à gauche, le salut et le lien « Mon calendrier et mes badges » sur une ligne, puis la série ; à droite, une colonne de 16 à 20rem pour l'Objectif du jour (avec les gains d'aujourd'hui et le moment de révision) et les Révisions du jour. Les deux colonnes sont centrées l'une sur l'autre ; le bandeau tient en une hauteur de salut, de deux ou trois lignes de série et de l'Objectif du jour. Sous 860px (tablette), il se resserre pour que « Mes leçons » remonte : la colonne de droite passe dessous et l'Objectif du jour et les Révisions s'y mettent côte à côte, les marges se réduisent. Sous 520px, il se resserre encore (lien du calendrier masqué, Objectif et Révisions de nouveau l'un sous l'autre).
 
 Les cartes de ligne d'une Catégorie forment une grille fluide (`minmax(min(100%, 31rem), 1fr)`, écart 1rem) : deux colonnes sur grand écran, une sur tablette en portrait et sur téléphone. Les Catégories elles-mêmes se posent sur la même grille (`.reseau`) : une Catégorie à une seule Leçon prend une colonne, si bien que deux Catégories à une Leçon qui se suivent partagent un rang au lieu de laisser chacune une demi-rangée vide ; une Catégorie à plusieurs Leçons prend toute la largeur. L'ordre des Catégories reste celui de la configuration. Les titres de Leçon et la prochaine station gardent les espaces insécables du français (guillemets, « : ; ? ! »), pour qu'aucun signe ne reste seul en début de ligne. Toutes les cartes ont la même anatomie : tête (Niveau, nom, mot de Maîtrise), ligne, pied (prochaine station, contrôle, récompenses, Continuer), puis le dépliant des Objectifs.
 
@@ -384,11 +384,11 @@ Le rythme vertical : 2.2rem avant « Mes leçons », 2.2rem sous la Leçon en t�
 
 ## Elevation & Depth
 
-Le système est plat, avec un soupçon de pose : les cartes de ligne et le bandeau de la semaine reposent sur le fond gris froid grâce à leur bordure `bord` et à une ombre ambiante très diffuse teintée de bleu nuit (`--ombre: 20 24 43`, noir en sombre). Il n'y a que deux poses, déclarées en variables sur le `:root` de `public/style.css` : `--ombre-carte` et `--ombre-bandeau`. Hors des cartes de ligne et du bandeau, seuls quatre éléments en portent une : les cartes de Séance posées sur la Page de leçon, la boîte de dialogue du Cadrage et la carte d'attente de Nouvelle leçon prennent la pose de carte de ligne, le calendrier de Mes badges la pose du bandeau. Les cartes simples n'en ont pas. La profondeur sur la ligne est faite de halos : le terminus et la station « vous êtes ici » sont détourés d'un anneau à la couleur de la carte, qui les découpe du trait.
+Le système est plat, avec un soupçon de pose : les cartes de ligne et le bandeau du jour reposent sur le fond gris froid grâce à leur bordure `bord` et à une ombre ambiante très diffuse teintée de bleu nuit (`--ombre: 20 24 43`, noir en sombre). Il n'y a que deux poses, déclarées en variables sur le `:root` de `public/style.css` : `--ombre-carte` et `--ombre-bandeau`. Hors des cartes de ligne et du bandeau, seuls quatre éléments en portent une : les cartes de Séance posées sur la Page de leçon, la boîte de dialogue du Cadrage et la carte d'attente de Nouvelle leçon prennent la pose de carte de ligne, le calendrier de Mes badges la pose du bandeau. Les cartes simples n'en ont pas. La profondeur sur la ligne est faite de halos : le terminus et la station « vous êtes ici » sont détourés d'un anneau à la couleur de la carte, qui les découpe du trait.
 
 ### Shadow Vocabulary
 - **Pose de carte de ligne** (`--ombre-carte` : `0 1px 2px rgb(var(--ombre) / .06), 0 6px 18px rgb(var(--ombre) / .05)`) : les cartes de Leçon, en Séance les cartes posées sur la Page de leçon (bulle du prof, Retour de quiz, Leçon terminée), le Cadrage et la carte d'attente de Nouvelle leçon.
-- **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau de la semaine et le calendrier de Mes badges.
+- **Pose du bandeau** (`--ombre-bandeau` : `0 2px 10px rgb(var(--ombre) / .05)`) : le bandeau du jour et le calendrier de Mes badges.
 - **Vous êtes ici** (`box-shadow: 0 0 0 .2rem var(--carte), 0 0 0 .42rem var(--ligne)`) : la prochaine station. La carte de la Leçon en tête prend un anneau simple de 2px `ligne` (`0 0 0 2px var(--ligne)`), en plus de sa pose, et son titre au corps des autres cartes : elle ne pèse pas plus que l'Objectif du jour (#166).
 - **Découpe du terminus** (`box-shadow: 0 0 0 .2rem var(--carte)`) : sépare le cartouche du trait.
 - **Jour courant** (`box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent)`) : le cadre d'aujourd'hui dans le bandeau et le calendrier.

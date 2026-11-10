@@ -7,6 +7,7 @@ import { rangerCollection, rangDeCarte, crans, aFeuilleHolo, libelleCarteBadge, 
 import { artDeBadge } from '/carte-badge-art.js';
 import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
+import { gainsDuJour } from '/gains-du-jour.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
@@ -15,6 +16,7 @@ import {
 } from '/nouvelle-lecon-texte.js';
 import { RAISONS_SIGNALEMENT } from '/kit/v1/quiz-logique.js';
 import { ErreurApi, chargerProfil, avecAttente, lireEnParallele } from '/chargement.js';
+import { pastilleRevisions } from '/pastille-revisions.js';
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -504,7 +506,7 @@ async function ecranAccueil(profil) {
   const parCategorie = Object.groupBy(lecons.filter((l) => l !== enTete), (l) => l.categorie);
   montrer(
     recapitulatifSemaine(profil, rythme?.recapitulatif),
-    maSemaine(profil, { calendrier: badges?.calendrier, rythme, revisions, lecons, moment }),
+    bandeauDuJour(profil, { calendrier: badges?.calendrier, rythme, revisions, moment }),
     h('div', { className: 'lecons-tete' },
       h('h2', {}, 'Mes leçons'),
       // Une action en retrait, sauf quand le réseau est vide : c'est alors la seule chose à faire, et le seul bouton plein.
@@ -522,21 +524,16 @@ async function ecranAccueil(profil) {
     h('div', { className: 'lecons-grille' }, parCategorie[c].map((l) => carteLecon(l)))))));
 }
 
-// Ma semaine, comme la page de la semaine du journal de classe : du lundi au dimanche, un tampon par jour (vide,
-// pâle quand l'Élève a travaillé, plein quand l'Objectif du jour est atteint, 🛡️ quand un Joker l'a couvert), avec ce
-// qui a été gagné ce jour-là (Étoiles, Fusées, Paliers de Badge) et les contrôles prévus ; à côté, l'Objectif du jour,
-// la Série de jours (#75) et les Révisions du jour (#66). Aucun score.
+// Le bandeau du jour (#192) : le salut et le lien vers Mes badges, la Série de jours (#75), l'Objectif du jour avec
+// ce qui a été gagné aujourd'hui (Étoiles, Fusées, Paliers de Badge) et le Moment de révision, et les Révisions du
+// jour (#66). Les sept jours d'avant sont dans le calendrier de Mes badges, les contrôles sur les cartes de Leçon. Aucun score.
 const JOURS_SEMAINE = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
 const JOURS_ENTIERS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const enJour = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const jourPlus = (jour, n) => { const d = new Date(`${jour}T12:00:00`); d.setDate(d.getDate() + n); return enJour(d); };
-function joursDeLaSemaine(aujourdhui) {
-  const lundi = jourPlus(aujourdhui, -((new Date(`${aujourdhui}T12:00:00`).getDay() + 6) % 7));
-  return Array.from({ length: 7 }, (_, i) => jourPlus(lundi, i));
-}
 const ETATS_JOUR = { vide: '', pale: 'travaillé', plein: 'Objectif du jour atteint' };
 
-// Un jour en tampon, seule façon de dessiner un jour : le bandeau de la semaine et le calendrier de Mes badges.
+// Un jour en tampon, seule façon de dessiner un jour : le calendrier de Mes badges.
 // Une journée : { jour, etat, joker, gains… }, celle du calendrier du serveur ou jourSansRien. classeJour porte l'état
 // (vide, pâle, plein), aujourd'hui et futur ; lectureJour le dit en mots, le tampon étant muet.
 // `debut` (calendrier de Mes badges) : le premier Jour de l'Élève ; un jour d'avant est neutre (« avant »), sans le
@@ -571,49 +568,39 @@ function momentDeRevision(profil, etat) {
   return zone;
 }
 
-function maSemaine(profil, { calendrier, rythme, revisions, lecons, moment }) {
+function bandeauDuJour(profil, { calendrier, rythme, revisions, moment }) {
+  const pastille = revisions && pastilleRevisions(revisions, rythme?.objectifDuJour.revisions);
   const boutonRevisions = revisions
     ? h('button', { className: `bouton-revisions${revisions.dues ? '' : ' secondaire'}`, onclick: () => (location.hash = '#/revisions') },
       h('strong', {}, 'Mes révisions du jour',
-        revisions.dues > 0 && h('span', { className: 'compte' }, String(revisions.dues), h('span', { className: 'cache' }, revisions.dues > 1 ? ' questions' : ' question'))),
-      h('small', {}, revisions.dues ? 'à revoir aujourd’hui' : 'Rien à revoir aujourd’hui'))
+        pastille.compte > 0 && h('span', { className: 'compte' }, String(pastille.compte), h('span', { className: 'cache' }, pastille.cache))),
+      h('small', {}, pastille.sousTitre))
     : blocErreur('Tes révisions du jour n’ont pas pu s’afficher.');
-  if (!calendrier || !rythme) {
-    return h('section', { className: 'ma-semaine' },
-      h('div', { className: 'semaine-jours' }, h('h2', {}, `Salut ${profil.pseudo} !`), h('p', { className: 'doux' }, 'Ta semaine n’a pas pu s’afficher pour le moment.')),
-      h('div', { className: 'semaine-cote' }, boutonRevisions));
+  if (!rythme) {
+    return h('section', { className: 'bandeau-jour' },
+      h('div', { className: 'bandeau-gauche' }, h('h2', {}, `Salut ${profil.pseudo} !`), h('p', { className: 'doux' }, 'Ton objectif du jour n’a pas pu s’afficher pour le moment.')),
+      h('div', { className: 'bandeau-cote' }, boutonRevisions));
   }
-  const { aujourdhui, jours } = calendrier;
   const { objectifDuJour: o, serieDeJours, reparation, meilleureSerie, joursTravailles } = rythme;
-  const parJour = new Map(jours.map((journee) => [journee.jour, journee]));
-  const controles = (jour) => lecons.filter((l) => controleAVenir(l) && jourPlus(aujourdhui, l.joursAvantControle) === jour);
-  const caseJour = (jour, i) => {
-    const journee = parJour.get(jour) ?? jourSansRien(jour);
-    const { gains } = journee;
-    return h('li', { className: classeJour(journee, aujourdhui) },
-      h('span', { className: 'cache' }, lectureJour(JOURS_ENTIERS[i], journee, aujourdhui)),
-      h('span', { className: 'nom', ariaHidden: 'true' }, JOURS_SEMAINE[i]),
-      tamponJour(journee),
-      (gains.etoiles > 0 || gains.fusees > 0) && h('span', { className: 'gains' },
-        gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, nommer(`⭐${gains.etoiles > 1 ? gains.etoiles : ''}`, pluriel(gains.etoiles, 'Étoile'))),
-        gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, nommer(`🚀${gains.fusees > 1 ? gains.fusees : ''}`, pluriel(gains.fusees, 'Fusée')))),
-      gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
-        gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))),
-      controles(jour).map((l) => h('a', { className: 'controle-jour', href: `#/lecon/${l.id}`, title: `Contrôle : ${l.titre}`, ariaLabel: `Contrôle : ${l.titre}` }, '📅')));
-  };
+  const gains = gainsDuJour(calendrier);
+  const gainsAujourdhui = gains && h('div', { className: 'gains' },
+    (gains.etoiles > 0 || gains.fusees > 0) && h('span', { className: 'gains-nombres' },
+      gains.etoiles > 0 && h('span', { title: pluriel(gains.etoiles, 'Étoile') }, nommer(`⭐${gains.etoiles > 1 ? gains.etoiles : ''}`, pluriel(gains.etoiles, 'Étoile'))),
+      gains.fusees > 0 && h('span', { title: pluriel(gains.fusees, 'Fusée') }, nommer(`🚀${gains.fusees > 1 ? gains.fusees : ''}`, pluriel(gains.fusees, 'Fusée')))),
+    gains.paliers.length > 0 && h('span', { className: 'gains-badges' },
+      gains.paliers.map((p) => h('span', { className: 'gain-badge', title: `Badge : ${nomEtPalier(p)}` }, pastilleBadge(p)))));
   const objectif = o.atteint
     ? h('strong', {}, 'Objectif du jour atteint')
     : h('strong', {}, `Objectif du jour : ${o.revisions}/${o.revisionsVisees} révisions ou ${pluriel(o.pagesVisees, 'page')}`);
   const serie = serieDeJours.jours
     ? `${pluriel(serieDeJours.jours, 'jour')} de suite${serieDeJours.aujourdhui ? '' : ' : encore un petit effort aujourd’hui'}`
     : 'Chaque jour un peu, c’est comme ça qu’on retient';
-  return h('section', { className: 'ma-semaine' },
-    h('div', { className: 'semaine-jours' },
-      h('div', { className: 'semaine-titre' },
+  return h('section', { className: 'bandeau-jour' },
+    h('div', { className: 'bandeau-gauche' },
+      h('div', { className: 'bandeau-titre' },
         h('h2', {}, `Salut ${profil.pseudo} !`),
         h('a', { href: '#/badges' }, 'Mon calendrier et mes badges')),
-      h('ol', { className: 'jours' }, joursDeLaSemaine(aujourdhui).map(caseJour)),
-      // La série suit les sept jours, dans la colonne de gauche, en corps normal et en --texte (#166).
+      // La série, dans la colonne de gauche sous le salut, en corps normal et en --texte (#166).
       h('div', { className: 'serie-de-jours' },
         h('p', {}, serie,
           serieDeJours.jokers > 0 && h('span', { title: 'Chaque lundi, tu reçois 3 jokers pour la semaine. Un joker protège ta série de jours pour un jour manqué. Ceux qui restent ne passent pas à la semaine suivante.' }, ` · 🛡️ ${pluriel(serieDeJours.jokers, 'joker')}`)),
@@ -624,8 +611,8 @@ function maSemaine(profil, { calendrier, rythme, revisions, lecons, moment }) {
         // Réparation proposée le jour du retour, sans reproche : deux fois l'Objectif du jour, et la série d'avant reprend.
         reparation && h('p', { className: 'reparation' },
           `🩹 Ta série peut reprendre : aujourd’hui, fais deux fois l’Objectif du jour (${reparation.revisions}/${reparation.revisionsVisees} révisions ou ${reparation.pages}/${pluriel(reparation.pagesVisees, 'page')}) et hier sera réparé.`))),
-    h('div', { className: 'semaine-cote' },
-      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif,
+    h('div', { className: 'bandeau-cote' },
+      h('div', { className: `objectif-du-jour${o.atteint ? ' atteint' : ''}` }, objectif, gainsAujourdhui,
         moment && momentDeRevision(profil, moment)),
       // Des Questions dues : un contour accent et une pastille de compte, jamais un bouton plein (#141).
       boutonRevisions));
@@ -661,7 +648,7 @@ function ligneBadge(b, estNouveau) {
 }
 
 // Mes badges (#95) : en tête, le total d'Étoiles et de Fusées de l'Élève (#96) ; puis le calendrier des Jours
-// travaillés (#99) dans une carte comme le bandeau de la semaine, et à côté la collection : chaque Badge commencé en
+// travaillés (#99) dans une carte comme le bandeau du jour, et à côté la collection : chaque Badge commencé en
 // ligne (`ligneBadge`), le dernier Palier gagné en premier ; les badges surprise trouvés ; puis, à découvrir, les
 // Badges sans Palier avec ce qu'ils saluent, sans ligne ni décompte. Les Paliers à retourner attendent dans « Nouvelles cartes » ; le mot d'accueil
 // s'affiche à la première ouverture.
@@ -896,7 +883,7 @@ function monReseau(cartesLigne) {
       : h('p', { className: 'doux' }, 'Chaque Leçon Acquise ajoutera ici sa carte.')];
 }
 
-// Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour comme le bandeau de la semaine : pâle quand
+// Calendrier des Jours travaillés (#99), mois par mois, en tampons de jour : pâle quand
 // l'Élève a travaillé, plein quand l'Objectif du jour est atteint, 🛡️ quand un Joker a couvert le jour. Toucher un jour
 // montre à côté ce qui a été fait et gagné, sans score ; aujourd'hui est montré à l'ouverture.
 const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];

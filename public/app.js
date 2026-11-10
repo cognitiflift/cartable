@@ -890,7 +890,7 @@ function ceremonie(c, { son, slug, retourner }) {
   dlg.addEventListener('close', () => {
     dlg.remove();
     minuteurs.forEach(clearTimeout);
-    const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.collection h3, .lecons-tete h2');
+    const cible = ouvreur.isConnected ? ouvreur : document.querySelector(`[data-cle="${CSS.escape(c.cle)}"] .carte-ligne-carte`) ?? document.querySelector('.cl-groupe') ?? document.querySelector('.apres-quiz button, .revisions button') ?? document.querySelector('.collection h3, .lecons-tete h2');
     if (cible) { if (!cible.matches('button, a')) cible.tabIndex = -1; cible.focus(); }
   });
   document.body.append(dlg);

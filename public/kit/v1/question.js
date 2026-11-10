@@ -66,10 +66,11 @@ export function rendreQuestion(q, { legende = '', quandCorrigee = () => {}, lect
     const partiel = estPartiel(correction);
     retour.hidden = false;
     retour.classList.add(correction.juste ? 'kit-juste' : partiel ? 'kit-partiel' : 'kit-faux');
+    // `append` écrit « null » pour un null : on n'ajoute que ce qui existe.
     retour.append(
       el('strong', {}, messageCorrection(correction)),
-      correction.raison ? el('p', { className: 'kit-quiz-raison' }, correction.raison) : null,
-      correction.explication ? el('p', {}, correction.explication) : null,
+      ...(correction.raison ? [el('p', { className: 'kit-quiz-raison' }, correction.raison)] : []),
+      ...(correction.explication ? [el('p', {}, correction.explication)] : []),
     );
     if (zoneSignaler) {
       zoneSignaler.hidden = false;

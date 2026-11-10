@@ -6,13 +6,15 @@ Lancer : `python3 -m http.server 8765` à la racine du dépôt, puis `http://127
 
 ## Ce que montre le prototype
 
-- **Une seule carte, une seule scène** : la carte vierge est la carte face cachée (mêmes rayures, même 5/7). Elle s'esquisse **au trait** : cadre (0–1,3 s), étoiles (1,2 s…), collines (2,3 s…), rail et stations (3,4 s…), héros (5 s…), motif d'atelier en parallèle, halo de la couleur de la Catégorie qui monte sur 8 s, un unique reflet à 7 s.
-- **Palier** (après ~8 s) : le halo respire (5 s par cycle, éclat entre 60 % et 100 %), les stations « soufflent » (4 s), les orbites tournent (sciences). Rien ne s'emballe, rien ne boucle de façon visible : les tracés sont terminés, seule la respiration continue.
-- **Transition sans coupure** : à l'arrivée de la carte, l'esquisse se met de profil (0,25 s, `rotateY(90°)`), la vraie carte revient du même angle avec le `cer-retourne` existant, puis les couches, le héros, la gerbe et les stations de la cérémonie d'aujourd'hui. **Sans second geste** : l'Élève a déjà touché la carte pour ouvrir.
-- **Durées** : 0 s (cérémonie actuelle, carte face cachée à retourner), 3 s, 15 s, 60 s, échec (scène générique à 8 s, **sans mot d'échec**, même cérémonie).
-- **Sorties** : « Plus tard » à tout moment ; **délai maximal** : texte calme « Ta carte arrive, elle t'attend sur l'accueil. », l'animation s'immobilise, fermeture 4,5 s plus tard, la carte reste en attente sur l'accueil.
-- **Arrêt du mouvement (WCAG 2.2.2)** : bouton « Mettre en pause / Reprendre » dès 5 s **et** immobilisation d'elle-même après le palier (20 s par défaut, réglable).
-- **`prefers-reduced-motion`** : aucune animation ; état fixe où tout est esquissé, texte « Ta carte se prépare », pas de bouton Pause ; à l'arrivée la vraie carte remplace l'esquisse d'emblée (vérifié en capture à 390 px).
+Format retenu par l'humain : **l'esquisse, rejouée en boucle** (autres variantes essayées et retirées : crescendo avec respiration, convoi, couches, crayonné, esquisse décalée élément par élément ; elles sont dans l'historique de la branche).
+
+- **Une carte, une scène** : la carte vierge est la carte face cachée (mêmes rayures, même 5/7). Elle s'esquisse **au trait** : cadre, étoiles, collines, rail et stations, héros, motif d'atelier, halo de la couleur de la Catégorie, un reflet.
+- **Boucle** : l'esquisse est jouée en entier à 1,15× (~6,3 s), reste posée un instant, s'efface en fondu (0,8 s) puis repart de zéro. Un tour : ~8 s. Elle ne s'emballe pas et ne monte pas en puissance : chaque tour est identique.
+- **Transition sans coupure** : à l'arrivée de la carte, l'esquisse se met de profil (0,25 s, `rotateY(90°)`), la vraie carte revient du même angle avec le `cer-retourne` existant, puis les couches, le héros, la gerbe et les stations de la cérémonie d'aujourd'hui. **Sans second geste**.
+- **Durées** : 0 s (cérémonie actuelle), 3 s, 15 s, 60 s, échec (scène générique à 8 s, sans mot d'échec).
+- **Sorties** : « Plus tard » à tout moment ; **délai maximal** : texte calme « Ta carte arrive, elle t'attend sur l'accueil. », la boucle s'arrête, fermeture 4,5 s plus tard.
+- **Arrêt du mouvement (WCAG 2.2.2)** : bouton « Mettre en pause / Reprendre » dès 5 s **et** immobilisation d'elle-même (la boucle ne rejoue plus) après 28 s.
+- **`prefers-reduced-motion`** : aucune animation ; état fixe, tout esquissé, « Ta carte se prépare ».
 
 ## Recommandation
 
@@ -20,7 +22,7 @@ Lancer : `python3 -m http.server 8765` à la racine du dépôt, puis `http://127
 | --- | --- | --- |
 | Occuper l'attente par le façonnage visible | Oui : esquisse au trait, couche par couche | Buell & Norton (2011), étude isolée sur adultes ; transposition = heuristique |
 | Variante par Catégorie | **Couleur de la Catégorie seule** (halo, cadre, rail : jetons `--ligne-*`, coût nul) pour toutes les Catégories ; **motifs d'atelier écartés** de la livraison. Ils ajoutent 3 dessins à maintenir et à tester par Catégorie pour une différence discrète à 390 px. À rouvrir si les Élèves les remarquent. | Aucun cadre, hypothèse à mesurer |
-| Palier | Crescendo ~8 s, puis respiration 5 s par cycle ; **immobile après 20 s** | Aucun cadre sur les durées ; WCAG 2.2.2 et 2.3.1 pour les bornes |
+| Boucle | Esquisse rejouée en boucle (~8 s par tour, fondu de 0,8 s) ; **immobile après 28 s** | Aucun cadre sur les durées ; WCAG 2.2.2 et 2.3.1 pour les bornes |
 | Délai maximal avant repli | **45 s** (le 60 s du prototype retombe sur le texte calme) ; au-delà, la carte arrive seule sur l'accueil | Aucun cadre, hypothèse à mesurer (journaux : durée réelle de composition) |
 | Échec | Silencieux : scène générique par la même transition | Choix de conception (#184) |
 | Pas de texte chiffré | Un seul texte, « Ta carte se prépare » | `PRODUCT.md` ; durée inconnue |

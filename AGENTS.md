@@ -39,3 +39,12 @@ Un tableau décision / cadre / solidité suffit. Les cadres déjà utilisés son
 - `station`, `ligneLecon`, `carteLecon` et `ligneBadge` (`public/app.js`) sont les seules façons de dessiner une ligne ou ses stations.
 - Exception : les dessins de calque d'une carte (`gare` et `tampon` de `public/carte-badge-art.js`, scène de `lib/carte-generique.js`) sont du décor, pas des lignes de l'appli : ils peuvent dessiner leurs propres stations, en jetons uniquement.
 - `test/style.test.js` fait échouer `npm test` sur toute couleur ou police hors des jetons, et sur tout désaccord entre DESIGN.md et les jetons. Ses exceptions listent les écarts hérités : on en retire, on n'en ajoute pas.
+
+### Commandes impeccable des tickets
+
+Un ticket ou une spec d'interface a une rubrique « Commande impeccable » : l'agent qui le réalise lance lui-même ces commandes, avec l'outil Skill (`impeccable`), sans attendre qu'on le lui demande.
+
+- Dans l'ordre écrit dans la rubrique. Celles qui façonnent (`clarify`, `delight`, `layout`, `harden`…) viennent avant le code ou pendant ; `polish`, puis `critique` sur la cible, viennent en dernier, une fois le code en place.
+- Le ticket n'est pas fini tant que ces commandes n'ont pas tourné. Le rapport dit lesquelles ont été lancées et ce qu'elles ont changé ; pour `critique`, le score est comparé à celui du ticket ou de la spec, s'il y en a un.
+- Quand une commande demande de voir l'appli (`live`, `critique`, captures), l'agent la pilote avec un navigateur : l'outil navigateur de la session s'il y en a un (Claude in Chrome ou le navigateur intégré), sinon Chromium en ligne de commande (`chromium --headless`) sur l'appli lancée en local. Les données de test passent par une copie des Élèves (skill `tester-pr`), jamais par les vrais.
+- Si aucun navigateur n'est utilisable, ou si une commande demande une décision humaine, l'agent le dit dans son rapport et laisse le ticket ouvert pour cette étape : il ne la saute pas en silence.

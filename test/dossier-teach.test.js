@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { trouverDossierTeach } from '../lib/agent.js';
+import { spawnSync } from 'node:child_process';
+import { trouverDossierTeach, DOSSIER_KIT } from '../lib/agent.js';
 
 // Le skill teach lit ses fichiers de format hors du dossier de la leçon : le dossier passé à `claude --add-dir`
 // se trouve là où le plugin est installé. Vérifié avec la CLI (2.1.322) : sans --add-dir, la lecture est refusée.
@@ -55,4 +56,23 @@ test('Dossier du skill teach : TEACH_SKILL_DIR l\'emporte sur les plugins instal
 
 test('Dossier du skill teach : aucun plugin installé, aucun dossier', () => {
   avecMaison(undefined, () => assert.equal(trouverDossierTeach(), null));
+});
+
+test('lancerAgent : passe à claude --add-dir avec le dossier du skill teach (TEACH_SKILL_DIR) puis le kit', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'faux-claude-'));
+  try {
+    const journal = path.join(d, 'args.txt');
+    const faux = path.join(d, 'faux-claude.sh');
+    fs.writeFileSync(faux, `#!/bin/sh\nfor a in "$@"; do echo "$a" >> "${journal}"; done\necho '{"result":"ok","session_id":"s"}'\n`, { mode: 0o755 });
+    const racine = path.join(import.meta.dirname, '..');
+    const r = spawnSync('node', ['--input-type=module', '-e', `import { lancerAgent } from './lib/agent.js'; await lancerAgent({ cwd: process.env.CWD_FAUX, prompt: 'x', consignes: 'c', tache: 'rebond' });`], {
+      cwd: racine, env: { ...process.env, CLAUDE_BIN: faux, TEACH_SKILL_DIR: path.join(d, 'skill'), CWD_FAUX: d }, encoding: 'utf8',
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const args = fs.readFileSync(journal, 'utf8').trim().split('\n');
+    const dossiers = args.flatMap((a, i) => (a === '--add-dir' ? [args[i + 1]] : []));
+    assert.deepEqual(dossiers, [path.join(d, 'skill'), DOSSIER_KIT]);
+  } finally {
+    fs.rmSync(d, { recursive: true, force: true });
+  }
 });

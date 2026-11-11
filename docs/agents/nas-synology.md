@@ -7,7 +7,8 @@ Procédure pas à pas pour héberger Cartable sur un Synology DS718+ (DSM 7.1.1)
 ## Principe
 
 - Un seul conteneur : Node (version de la CI, voir `Dockerfile`), la CLI `claude` et le plugin `mattpocock-skills`. L'image ne contient ni le code ni les données.
-- Deux dossiers du NAS sont montés dans le conteneur : le dépôt cloné (`/app`) et `eleves/` (`/app/eleves`, les Espaces personnels).
+- Un seul dossier du NAS est monté : le dépôt cloné (`/app`). `eleves/` (`/app/eleves`, les Espaces personnels) vit dans ce dépôt cloné. C'est un écart assumé par rapport aux « deux dossiers » de la spec #206, plus simple à installer et à sauvegarder.
+- Node 26 est écrit à deux endroits, `Dockerfile` (`FROM node:26-slim`) et `.github/workflows/ci.yml` (`node-version: 26`) : à changer ensemble.
 - L'appli reste locale (ADR 0001) : elle écoute sur toutes les interfaces et n'a pas de mot de passe. **Toute la protection repose sur le pare-feu de DSM et sur l'absence d'exposition à Internet.**
 - Elle pilote `claude -p` avec l'abonnement du parent, par un jeton longue durée (`CLAUDE_CODE_OAUTH_TOKEN`).
 

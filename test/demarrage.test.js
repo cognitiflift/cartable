@@ -32,9 +32,9 @@ test('sans interface réseau externe : seulement l\'adresse locale', () => {
 });
 
 test('adresse publique donnée (conteneur) : elle remplace les adresses internes du conteneur', () => {
-  const message = messageDemarrage({ host: '0.0.0.0', port: 3000, interfaces, adressePublique: 'nas.local:3000' });
+  const message = messageDemarrage({ host: '0.0.0.0', port: 3000, interfaces, adressePublique: '192.168.1.50:3000' });
   assert.match(message, /http:\/\/localhost:3000/);
-  assert.match(message, /http:\/\/nas\.local:3000/);
+  assert.match(message, /http:\/\/192\.168\.1\.50:3000/);
   assert.doesNotMatch(message, /192\.168\.50\.215|10\.0\.0\.4/);
   assert.match(message, /autre appareil/);
 });

@@ -826,9 +826,9 @@ async function ecranBadges(profil) {
       h('h3', {}, 'Ma collection'),
       attente.length > 0 && nouvellesCartesGroupe(attente, { son: donnees.son === true, slug: profil.slug, retourner: (c) => { carteRetournee(donnees, c); afficherCollection(); } }),
       monReseau(cartesLigneRangees(cartesLigne)),
-      h('h4', {}, 'Mes Badges'),
+      h('h4', {}, 'Mes badges'),
       obtenues.length
-        ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
+        ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
         : h('p', { className: 'doux' }, 'Ton premier Palier donnera ici sa carte.'),
       aDecouvrir.length > 0 && [
         h('h4', {}, 'À découvrir'),

@@ -3892,7 +3892,7 @@ test('Badges surprise : « Mission élargie » quand le prof ajoute des Objectif
   assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-03T13:00:00.000Z'))).data, 'mission-elargie'), undefined);
   await avecFichier('objectifs-elargis', () => messageLe('2026-11-04T12:00:00.000Z'));
   const vue = (await appel(url, 'GET', undefined, le('2026-11-04T13:00:00.000Z'))).data;
-  const mission = { id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', phrase: 'Tu as ajouté des Objectifs à ta mission.', surprise: true, palier: 'unique', jour: '2026-11-04' };
+  const mission = { id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', phrase: 'Tu as élargi ta mission avec de nouveaux Objectifs.', surprise: true, palier: 'unique', jour: '2026-11-04' };
   assert.deepEqual(badgeDe(vue, 'mission-elargie'), mission);
   assert.deepEqual(vue.nouveaux, [{ id: 'mission-elargie', emoji: '🗺️', nom: 'Mission élargie', palier: 'unique', jour: '2026-11-04' }]);
   const journal = (await fs.readFile(path.join(eleves, slug, 'evenements.jsonl'), 'utf8')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
@@ -4595,7 +4595,7 @@ test('Badges surprise du Rythme : rien d\'office avant la livraison ; « Sept d\
   const vue = (await appel(url, 'GET', undefined, le('2026-11-17T13:00:00.000Z'))).data;
   const sept = badgeDe(vue, 'sept-d-un-coup');
   assert.deepEqual({ jour: sept.jour, palier: sept.palier, surprise: sept.surprise }, { jour: '2026-11-17', palier: 'unique', surprise: true });
-  assert.match(sept.phrase, /Sept jours de suite/);
+  assert.match(sept.phrase, /Sept jours d’affilée/);
   assert.deepEqual(vue.nouveaux.filter((n) => n.id === 'sept-d-un-coup').length, 1);
   assert.doesNotMatch(await retour('18'), /Sept d’un coup/, 'pas d\'annonce en double');
   assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-18T13:00:00.000Z'))).data, 'mois-complet'), undefined);

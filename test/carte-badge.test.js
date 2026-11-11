@@ -89,6 +89,7 @@ test('Dessins des surprises : chaque identifiant a son dessin, et deux surprises
   }
   assert.equal(parCalque.heros.size, SURPRISES.length);
   assert.equal(parCalque.l1.size, SURPRISES.length);
+  assert.equal(parCalque.l2.size, SURPRISES.length, 'le décor est propre à chaque surprise');
   // Un identifiant inconnu retombe sur le dessin commun.
   assert.match(artDeBadge({ id: 'inconnue', emoji: '🎁', surprise: true }, 4).heros, /🎁/);
 });

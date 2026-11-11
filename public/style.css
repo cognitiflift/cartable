@@ -305,6 +305,37 @@ body:has(.seance) main { flex:1; min-height:0; width:100%; display:flex; flex-di
 .cadrage-choix { display:flex; flex-direction:column; gap:.5rem; }
 .cadrage-choix button { min-height:2.75rem; padding:.6rem 1rem; border-radius:12px; text-align:left; }
 .cadrage .annuler { position:absolute; top:.9rem; right:.9rem; width:2.75rem; height:2.75rem; padding:0; }
+/* Archivage d'une Leçon (#203). Menu ⋯ : un bouton de 44 px posé dans le coin de la carte (la tête réserve sa place),
+   un petit menu en carte simple dessous. Confirmation : le dialogue du Cadrage. « Leçon rangée · Annuler » : un message
+   posé en bas de l'écran. Section « Archivées » : repliée, des lignes simples, la suppression en retrait. */
+.lecon-tete { position:relative; padding-right:3rem; }
+.menu-lecon { position:absolute; top:-.45rem; right:-.55rem; }
+.menu-lecon-bouton { width:2.75rem; height:2.75rem; padding:0; border-radius:12px; font-size:1.3rem; line-height:1; font-weight:800; color:var(--doux); }
+.menu-lecon-bouton:hover, .menu-lecon-bouton[aria-expanded="true"] { color:var(--texte); }
+.menu-lecon-liste { position:absolute; top:calc(100% + .2rem); right:0; z-index:5; min-width:11rem; padding:.35rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; box-shadow:var(--ombre-carte); }
+.menu-lecon-liste[hidden] { display:none; }
+.menu-lecon-liste button { width:100%; min-height:2.75rem; padding:.5rem .9rem; border-radius:10px; text-align:left; }
+.confirmation-texte { margin:0 0 1.1rem; line-height:1.45; }
+button.danger { color:var(--rouge); border-color:color-mix(in srgb, var(--rouge) 45%, var(--bord)); }
+.message-lecon { position:fixed; left:50%; bottom:1rem; z-index:20; transform:translateX(-50%); display:flex; align-items:center; gap:.5rem; width:min(30rem, calc(100% - 2rem)); padding:.4rem .5rem .4rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; box-shadow:var(--ombre-carte); }
+.message-lecon .message-texte { flex:1; min-width:0; font-weight:700; }
+.message-lecon button { min-height:2.75rem; padding-inline:1rem; border-radius:12px; }
+.message-lecon button.fermer { width:2.75rem; padding:0; }
+details.archivees { margin-top:1.8rem; }
+details.archivees summary { display:flex; align-items:center; gap:.45rem; min-height:2.75rem; cursor:pointer; list-style:none; font-weight:700; color:var(--doux); }
+details.archivees summary::-webkit-details-marker { display:none; }
+details.archivees summary::before { content:""; width:.45rem; height:.45rem; border-right:2px solid; border-bottom:2px solid; transform:translateY(-.1rem) rotate(-45deg); transition:transform .2s ease-out; }
+details.archivees[open] summary::before { transform:translateY(-.1rem) rotate(45deg); }
+details.archivees summary:hover { color:var(--texte); }
+.archivees-liste { list-style:none; margin:.3rem 0 0; padding:0; display:flex; flex-direction:column; gap:.6rem; }
+.archivees-liste li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.4rem 1rem; padding:.55rem .7rem .55rem 1rem; background:var(--carte); border:1px solid var(--bord); border-radius:14px; }
+.archivee-titre { display:flex; flex-direction:column; min-width:0; }
+.archivee-titre a { font-weight:700; color:var(--texte); overflow-wrap:anywhere; }
+.archivee-titre small { color:var(--doux); }
+.archivee-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; }
+.archivee-actions button { min-height:2.75rem; padding-inline:1.1rem; border-radius:12px; }
+button.supprimer-lecon { background:none; border:0; color:var(--doux); font-weight:600; text-decoration:underline; text-underline-offset:.2em; }
+button.supprimer-lecon:hover { background:none; color:var(--rouge); }
 /* Attente du prof : une carte posée au centre sur le voile, à la pose de carte de ligne, jamais rouge. La nouvelle
    ligne y est « en travaux » et ses pointillés avancent tant que le prof prépare. La carte d'erreur prend sa place. */
 .nouvelle-voile { position:fixed; inset:0; z-index:10; display:flex; padding:1rem; overflow-y:auto; background:var(--voile); }

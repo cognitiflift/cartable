@@ -54,6 +54,10 @@ _Avoid_: reprendre
 **Leçon terminée**:
 Leçon de révision dont l'Élève a réussi un Défi (quiz du Défi à 80 % ou plus). Une Leçon libre ne se termine jamais : sa mission peut toujours s'élargir. Reste ouvrable : l'Élève peut la Continuer. Une Leçon terminée le reste pour toujours, mais ce n'est pas un arrêt : ses Questions continuent de revenir dans les Révisions du jour.
 
+**Leçon archivée**:
+Leçon que l'Élève a rangée depuis le menu ⋯ de sa carte : elle quitte l'accueil et les Révisions du jour (ses Questions n'y sont ni servies ni comptées), mais tout ce qu'elle a rapporté reste acquis (Étoiles, Fusées, Badges, Cartes de ligne, Série de jours). Elle se restaure telle qu'elle était et reste ouvrable par son adresse. Seule une Leçon archivée peut être supprimée pour toujours, après confirmation ; le total d'Étoiles et de Fusées baisse alors de celles de la Leçon, les Paliers de Badge et les Cartes de ligne restent à l'Élève.
+_Avoid_: supprimée, effacée (rien n'est effacé)
+
 **Séance**:
 Temps où l'Élève travaille une Leçon ouverte avec l'agent. Chaque Séance produit une Page de leçon, affichée en plein écran. L'Élève n'y écrit jamais : il répond seulement par des **Réponses proposées**, et ne peut pas interroger l'agent de lui-même.
 _Avoid_: chat, conversation

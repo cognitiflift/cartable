@@ -4482,3 +4482,98 @@ test('Vue parent : la réponse fausse choisie en Révision du jour est gardée a
   assert.equal(journal.at(-1).choisie, 'Par les racines');
   assert.equal(journal.at(-1).sur, true);
 });
+
+// Leçon archivée (#203) : rangée depuis l'accueil, exclue des listes et des Révisions du jour, gains et historique intacts.
+const ARCHIVE_JOUR = '2026-11-02T12:00:00.000Z';
+const vueArchive = async (slug) => {
+  const { data } = await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le(ARCHIVE_JOUR));
+  return { totaux: data.totaux, calendrier: data.calendrier, cartes: data.cartesLigne, collection: data.collection };
+};
+
+test('Archiver : la Leçon quitte l\'accueil et les Révisions du jour, mais reste ouvrable ; Étoiles, Badges, cartes et calendrier ne bougent pas ; restaurer remet tout', async () => {
+  const { slug, lecons } = await eleveRevisions('Archive-Test', 2);
+  const [a, b] = lecons;
+  const url = (id) => `/api/eleves/${slug}/lecons/${id}`;
+  const avant = await vueArchive(slug);
+  const duesAvant = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.ok(duesAvant.questions.some((q) => q.lecon === a.id));
+
+  const archivee = await appel(`${url(a.id)}/archivage`, 'POST', undefined, le(ARCHIVE_JOUR));
+  assert.equal(archivee.status, 200);
+  assert.equal(archivee.data.archivee, '2026-11-02T12:00:00.000Z');
+  // Accueil, section « Archivées » et adresse directe.
+  assert.deepEqual((await appel(`/api/eleves/${slug}/lecons`)).data.map((l) => l.id), [b.id]);
+  assert.deepEqual((await appel(`/api/eleves/${slug}/lecons?archivees=1`)).data.map((l) => l.id), [a.id]);
+  assert.equal((await appel(url(a.id))).status, 200);
+  // Révisions du jour : ni servies ni comptées.
+  const duesApres = (await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data;
+  assert.ok(duesApres.questions.every((q) => q.lecon === b.id));
+  assert.ok(duesApres.dues < duesAvant.dues);
+  // Aucun gain ne bouge.
+  assert.deepEqual(await vueArchive(slug), avant);
+  // Recharger (relire les fichiers) donne le même état ; restaurer remet la Leçon et ses Questions dues.
+  assert.equal((await appel(`${url(a.id)}/restauration`, 'POST')).data.archivee, null);
+  assert.deepEqual((await appel(`/api/eleves/${slug}/lecons`)).data.map((l) => l.id).sort(), [a.id, b.id].sort());
+  assert.deepEqual((await appel(`/api/eleves/${slug}/lecons?archivees=1`)).data, []);
+  assert.deepEqual((await appel(`/api/eleves/${slug}/revisions`, 'GET', undefined, le(LENDEMAIN))).data, duesAvant);
+  assert.deepEqual(await vueArchive(slug), avant);
+});
+
+test('Archiver : une Leçon absente répond 404, une Leçon occupée 409', async () => {
+  const { slug } = await eleveRevisions('Archive-404', 0);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/2026-11-02-absente/archivage`, 'POST')).status, 404);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/2026-11-02-absente`, 'DELETE')).status, 404);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/2026-11-02-absente/restauration`, 'POST')).status, 404);
+});
+
+test('Supprimer : refusé (409) tant que la Leçon n\'est pas archivée, rien n\'est effacé', async () => {
+  const { slug, lecons } = await eleveRevisions('Supprime-409', 1);
+  const dir = path.join(eleves, slug, 'lecons', lecons[0].id);
+  const r = await appel(`/api/eleves/${slug}/lecons/${lecons[0].id}`, 'DELETE');
+  assert.equal(r.status, 409);
+  assert.equal(await existe(dir), true);
+  assert.equal((await appel(`/api/eleves/${slug}/lecons/${lecons[0].id}`)).status, 200);
+});
+
+test('Supprimer : le dossier et les pages préparées disparaissent pour de bon ; Paliers de Badge et cartes restent ; le total d\'Étoiles baisse de celles de la Leçon', async () => {
+  const { slug, lecons } = await eleveRevisions('Supprime-Test', 2);
+  const [a, b] = lecons;
+  const url = (id) => `/api/eleves/${slug}/lecons/${id}`;
+  await appel(`${url(a.id)}/scores`, 'POST', { score: 90, page: '0002-volcans.html' }, le('2026-11-01T12:00:00.000Z')); // un jour où seule `a` a travaillé
+  const avant = await vueArchive(slug);
+  await fs.mkdir(path.join(eleves, slug, 'pages-preparees', a.id), { recursive: true });
+  await fs.writeFile(path.join(eleves, slug, 'pages-preparees', a.id, 'x.html'), '<p>x</p>');
+  await appel(`${url(a.id)}/archivage`, 'POST');
+  assert.equal((await appel(url(a.id), 'DELETE')).status, 200);
+  assert.equal(await existe(path.join(eleves, slug, 'lecons', a.id)), false);
+  assert.equal(await existe(path.join(eleves, slug, 'pages-preparees', a.id)), false);
+  assert.equal((await appel(url(a.id))).status, 404);
+  assert.deepEqual((await appel(`/api/eleves/${slug}/lecons`)).data.map((l) => l.id), [b.id]);
+  assert.deepEqual((await appel(`/api/eleves/${slug}/lecons?archivees=1`)).data, []);
+  // Rien ne recrée le dossier (tâches de fond comprises).
+  await pause(400);
+  assert.equal(await existe(path.join(eleves, slug, 'lecons', a.id)), false);
+  // Paliers de Badge acquis : jamais retirés ; les totaux d'Étoiles et de Fusées sont recalculés depuis les Leçons restantes.
+  const apres = await vueArchive(slug);
+  for (const badge of avant.collection) {
+    const reste = badgeDe({ collection: apres.collection }, badge.id);
+    assert.equal(reste.palier, badge.palier, `Palier de ${badge.id} conservé`);
+  }
+  assert.ok(apres.totaux.etoiles <= avant.totaux.etoiles);
+  // Calendrier et Série de jours (#203) : calculés depuis les Leçons restantes. Un jour où seule la Leçon supprimée a travaillé
+  // disparaît ; un jour où une autre Leçon a travaillé reste « plein », avec moins de quiz.
+  const jours = (vue) => Object.fromEntries(vue.calendrier.jours.map((j) => [j.jour, j.quiz]));
+  assert.deepEqual([jours(avant)['2026-11-01'], jours(avant)['2026-11-02']], [1, 2]);
+  assert.deepEqual([jours(apres)['2026-11-01'], jours(apres)['2026-11-02']], [undefined, 1]);
+  assert.deepEqual(apres.cartes, avant.cartes);
+  // Recharger : la Leçon ne revient pas.
+  assert.equal((await appel(`/api/eleves/${slug}/lecons`)).data.some((l) => l.id === a.id), false);
+});
+
+test('Propositions : une Leçon archivée compte toujours parmi les Leçons déjà faites (pas reproposée)', async () => {
+  const { slug, lecons } = await eleveRevisions('Archive-Propositions', 1);
+  await appel(`/api/eleves/${slug}/lecons/${lecons[0].id}/archivage`, 'POST');
+  await appel(`/api/eleves/${slug}/propositions`, 'POST');
+  await attendrePropositions(slug);
+  assert.match(await argsPropositions(), /Les volcans/);
+});

@@ -525,7 +525,11 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .cl-crans i { width:.6rem; height:.6rem; border-radius:50%; background:var(--ligne); box-shadow:0 0 0 .1rem var(--sur-nuit); }
 .cl-crans i.vide { background:transparent; box-shadow:none; border:.14rem dashed var(--station-vide); }
 .carte-badge-carte .nouveau { position:absolute; top:.55rem; right:.55rem; margin:0; box-shadow:0 0 0 .15rem var(--nuit); }
-.carte-badge-carte .cl-titre { max-width:80%; }
+/* Un mot de titre ne se coupe jamais au milieu (« Correspondance ») : le corps suit la largeur de la carte ; le voile du haut
+   est plus dense que celui des cartes de ligne, pour que le titre se lise sur le héros qui monte (lune, sommet, étoile). */
+.carte-badge-carte .cl-titre { max-width:80%; overflow-wrap:break-word; }
+@container (max-width: 11rem) { .carte-badge-carte .cl-titre { font-size:.78rem; } }
+.carte-badge-carte .cl-texte { background:linear-gradient(to bottom, rgb(var(--ombre) / .8), rgb(var(--ombre) / .4) 18%, transparent 34%, transparent 78%, rgb(var(--ombre) / .55)); }
 .carte-badge-carte .cl-dos { gap:.25rem; padding:.65rem .6rem .55rem; }
 .carte-badge-carte .cl-dos strong { font-size:.92rem; line-height:1.15; }
 .carte-badge-carte .cl-dos p { font-size:.78rem; line-height:1.25; }

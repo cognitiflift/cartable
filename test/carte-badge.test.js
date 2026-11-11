@@ -42,7 +42,7 @@ test('Carte de Badge : le libellé lu à voix haute dit nom, Palier, date et ce 
   assert.match(libelleADecouvrir({ nom: 'Curieux', phrase: 'Les bonnes réponses.' }), /à découvrir/);
 });
 
-test('Mes Badges : cartes obtenues (la plus récente d\'abord, puis les surprises), À découvrir sans les surprises cachées', () => {
+test('Mes badges : cartes obtenues (la plus récente d\'abord, puis les surprises), À découvrir sans les surprises cachées', () => {
   const vide = { ...famille('bronze'), id: 'curieux', palier: null, paliers: famille('bronze').paliers.map((p) => ({ ...p, jour: null })), prochain: { palier: 'bronze', seuil: 1 } };
   const recente = { ...famille('argent'), id: 'regulier', paliers: famille('argent').paliers.map((p) => (p.jour ? { ...p, jour: '2026-11-09' } : p)) };
   const { obtenues, aDecouvrir } = rangerCollection([famille('bronze'), vide, recente, surprise]);

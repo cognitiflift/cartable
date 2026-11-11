@@ -91,7 +91,65 @@ export const ARTS_SURPRISES = {
   rentree: (r) => carte(r,
     `<g stroke="var(--sur-nuit-doux)" stroke-width="2" opacity=".18">${[60, 90, 120, 150, 180, 210, 240].map((y) => `<path d="M0 ${y} H200"/>`).join('')}</g>`,
     `<path d="M82 104 V88 Q100 70 118 88 V104" fill="none" stroke="var(--sur-nuit)" stroke-width="7" stroke-linecap="round"/><rect x="56" y="100" width="88" height="116" rx="26" fill="var(--palier-bronze)" ${TRAIT}/><path d="M56 128 Q100 168 144 128 V126 A26 26 0 0 0 118 100 H82 A26 26 0 0 0 56 126Z" fill="var(--palier-or)" ${TRAIT}/><circle cx="100" cy="150" r="7" fill="var(--sur-nuit)" ${TRAIT}/><rect x="70" y="168" width="60" height="38" rx="10" fill="var(--nouveau)" ${TRAIT}/><path d="M80 187 h40" stroke="var(--sur-nuit)" stroke-width="4" stroke-linecap="round"/>`),
+  // Groupe « Curiosité et exploration » (#221).
+  // 🔀 Correspondance : deux voies de Catégories différentes qui se croisent, une gare à chaque bout.
+  correspondance: (r) => carte(r,
+    `${cercle(70, 'stroke-dasharray="3 6" opacity=".8"')}${pointille(244)}`,
+    `<path d="M26 82 C80 82 120 188 174 188" fill="none" stroke="var(--ligne-francais)" stroke-width="22" stroke-linecap="round"/><path d="M26 188 C80 188 120 82 174 82" fill="none" stroke="var(--ligne-sciences)" stroke-width="22" stroke-linecap="round"/><path d="M26 82 C80 82 120 188 174 188 M26 188 C80 188 120 82 174 82" fill="none" stroke="var(--sur-nuit)" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"/><polygon points="164,160 196,188 160,210" fill="var(--ligne-francais)" ${TRAIT}/><polygon points="164,110 196,82 160,60" fill="var(--ligne-sciences)" ${TRAIT}/>${gare(26, 82, 'atteint', 11)}${gare(26, 188, 'atteint', 11)}`),
+  // 🚀 Trois d'un coup : trois fusées en formation, la plus grande devant, hautes sur la carte.
+  'trois-d-un-coup': (r) => {
+    const fusee = (x, y, k, couleur) => `<g transform="translate(${x} ${y}) scale(${k})"><path d="M0 -62 C20 -40 22 -4 14 34 H-14 C-22 -4 -20 -40 0 -62Z" fill="var(--sur-nuit)" ${TRAIT}/><circle cx="0" cy="-16" r="9" fill="${couleur}" ${TRAIT}/><path d="M-14 12 L-34 40 L-14 34Z M14 12 L34 40 L14 34Z" fill="${couleur}" ${TRAIT}/><path d="M-8 42 Q0 78 8 42Z" fill="var(--palier-or)"/></g>`;
+    return carte(r,
+      `<path d="M100 250 L20 40 M100 250 L180 40" stroke="var(--sur-nuit-doux)" stroke-width="2" stroke-dasharray="2 8" opacity=".5"/>${cercle(88, 'stroke-dasharray="3 6" opacity=".6"')}`,
+      `${fusee(46, 130, 0.8, 'var(--palier-bronze)')}${fusee(154, 130, 0.8, 'var(--palier-diamant)')}${fusee(100, 150, 1.2, 'var(--nouveau)')}`);
+  },
+  // 🌍 Curieux de tout : un globe cerclé d'une orbite, trois repères de Catégories différentes.
+  'curieux-de-tout': (r) => carte(r,
+    `<ellipse cx="100" cy="135" rx="96" ry="30" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="2" opacity=".5" transform="rotate(-18 100 135)"/>`,
+    `<circle cx="100" cy="135" r="62" fill="var(--sur-nuit)" ${TRAIT}/><path d="M64 112 C76 92 96 96 98 112 C100 128 80 130 82 150 C72 150 62 134 64 112Z M112 150 C130 138 144 150 138 170 C128 186 114 176 112 150Z" fill="var(--ligne-geographie)"/><path d="M100 73 C70 110 70 160 100 197 M100 73 C130 110 130 160 100 197 M40 135 H160" fill="none" stroke="var(--nuit)" stroke-width="2" opacity=".6"/>${[[58, 100, 'var(--ligne-histoire)'], [150, 104, 'var(--ligne-mathematiques)'], [112, 190, 'var(--ligne-arts)']].map(([x, y, c]) => `<path d="M${x} ${y} l-9 -24 a11 11 0 1 1 18 0Z" fill="${c}" ${TRAIT}/><circle cx="${x}" cy="${y - 28}" r="4" fill="var(--sur-nuit)"/>`).join('')}`),
+  // 🔟 Série pleine : dix quilles-gares rangées en triangle (4, 3, 2, 1), toutes allumées.
+  'serie-pleine': (r) => carte(r,
+    `<polygon points="100,44 188,230 12,230" fill="none" stroke="var(--palier-unique)" stroke-width="2" stroke-dasharray="3 6" opacity=".7"/>${pointille(250)}`,
+    `<polygon points="100,62 176,214 24,214" fill="var(--palier-unique)" ${TRAIT}/>${[4, 3, 2, 1].flatMap((n, rang) => Array.from({ length: n }, (_, i) => gare(100 + (i - (n - 1) / 2) * 34, 196 - rang * 38, 'retenu', 12))).join('')}${etoile(100, 44, 20, 'var(--nouveau)')}`),
+  // 📸 Cliché ! : un appareil photo, son objectif et la photo qui en sort, en paysage.
+  cliche: (r) => carte(r,
+    `<polygon points="100,150 10,40 190,40" fill="var(--palier-or)" opacity=".12"/>${cercle(90, 'stroke-dasharray="3 6" opacity=".7"')}`,
+    `<g transform="rotate(8 150 200)"><rect x="118" y="188" width="62" height="74" rx="4" fill="var(--sur-nuit-doux)" ${TRAIT}/><rect x="126" y="196" width="46" height="46" fill="var(--ligne-geographie)"/></g><path d="M52 112 L68 90 H112 L128 112" fill="var(--sur-nuit)" ${TRAIT}/><rect x="22" y="108" width="156" height="104" rx="18" fill="var(--sur-nuit)" ${TRAIT}/><rect x="22" y="126" width="156" height="14" fill="var(--palier-unique)"/><circle cx="100" cy="168" r="38" fill="var(--nuit)" ${TRAIT}/><circle cx="100" cy="168" r="26" fill="var(--nouveau)" ${TRAIT}/><circle cx="90" cy="158" r="7" fill="var(--sur-nuit)" opacity=".8"/><circle cx="154" cy="124" r="6" fill="var(--palier-or)"/>`),
 };
+
+// Surprises de « Mémoire et progression » (ticket #220) : sept héros à silhouettes distinctes (heurtoir de fin de voie,
+// pic à drapeau, cône de volcan, arche de pont, voie tordue et wagon, ampoule, réveil à deux cloches).
+const ARTS_MEMOIRE = {
+  // 🚉 Terminus : deux rails qui finissent contre un heurtoir, sous le panneau de la gare terminus.
+  terminus: (r) => carte(r,
+    `${cercle(70, 'opacity=".8"')}${pointille(246)}`,
+    `${[40, 64, 88, 112].map((x) => `<rect x="${x}" y="196" width="12" height="40" rx="3" fill="var(--sur-nuit-doux)" ${TRAIT}/>`).join('')}<path d="M10 206 H146 M10 226 H146" stroke="var(--sur-nuit)" stroke-width="7" stroke-linecap="round"/><rect x="146" y="176" width="34" height="62" rx="6" fill="var(--palier-bronze)" ${TRAIT}/><rect x="152" y="184" width="22" height="10" rx="3" fill="var(--nouveau)"/><path d="M40 196 V92" stroke="var(--sur-nuit)" stroke-width="7" stroke-linecap="round"/><rect x="18" y="62" width="88" height="42" rx="8" fill="var(--sur-nuit)" ${TRAIT}/><path d="M42 84 l12 12 l26 -28" fill="none" stroke="var(--retenu)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>${gare(40, 196, 'atteint', 7)}`),
+  // 🏔️ Haut niveau : un pic enneigé, cinq gares sur le chemin, un drapeau au sommet.
+  'haut-niveau': (r) => carte(r,
+    `<polygon points="-10,250 52,170 96,226 150,150 210,250" fill="var(--sur-nuit-doux)" opacity=".25"/>${pointille(252)}`,
+    `<polygon points="18,236 84,64 108,108 128,84 184,236" fill="var(--sur-nuit)" ${TRAIT}/><polygon points="84,64 100,104 91,97 83,110 76,97 72,98" fill="var(--nouveau)" ${TRAIT}/><path d="M128 84 V62" stroke="var(--sur-nuit)" stroke-width="4" stroke-linecap="round"/><polygon points="128,62 150,70 128,78" fill="var(--palier-bronze)" ${TRAIT}/><path d="M50 224 L70 196 L92 176 L80 146 L84 110" fill="none" stroke="var(--palier-unique)" stroke-width="4" stroke-dasharray="2 8" stroke-linecap="round"/>${[[50, 224], [70, 196], [92, 176], [80, 146], [84, 110]].map(([x, y], i) => gare(x, y, i < 4 ? 'retenu' : 'atteint', 6)).join('')}`),
+  // 🌋 Sommet : un cône tronqué, de la lave au cratère, des cendres qui montent.
+  sommet: (r) => carte(r,
+    `${cercle(88, 'stroke-dasharray="3 6" opacity=".8"')}<path d="M0 238 H200" stroke="var(--sur-nuit-doux)" stroke-width="3" opacity=".35"/>`,
+    `${[['var(--sur-nuit)', 22], ['var(--sur-nuit-doux)', 14]].map(([c, w]) => `<path d="M100 120 C74 106 128 98 100 84 C80 74 116 70 104 66" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`).join('')}<polygon points="60,238 78,118 122,118 140,238" fill="var(--sur-nuit)" ${TRAIT}/><path d="M78 118 H122 L116 132 L106 124 L98 138 L90 126 L82 134Z" fill="var(--palier-bronze)" ${TRAIT}/><path d="M104 132 C98 160 112 176 100 204 C94 220 106 230 104 238" fill="none" stroke="var(--palier-or)" stroke-width="7" stroke-linecap="round"/>${[[44, 100], [160, 84], [150, 130], [34, 150]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="var(--palier-or)" ${TRAIT}/>`).join('')}`),
+  // 🏗️ Ça tient bon : une arche de pont sur deux piles, trente jours de pierres.
+  'ca-tient-bon': (r) => carte(r,
+    `<path d="M0 232 C40 220 70 244 100 232 S160 220 200 232" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="3" stroke-dasharray="2 6" opacity=".5"/>${cercle(92, 'opacity=".6"')}`,
+    `<rect x="14" y="116" width="172" height="22" rx="5" fill="var(--sur-nuit)" ${TRAIT}/><rect x="22" y="138" width="34" height="96" fill="var(--sur-nuit-doux)" ${TRAIT}/><rect x="144" y="138" width="34" height="96" fill="var(--sur-nuit-doux)" ${TRAIT}/><path d="M56 234 V190 A44 44 0 0 1 144 190 V234" fill="var(--sur-nuit)" ${TRAIT}/><path d="M72 234 V192 A28 28 0 0 1 128 192 V234Z" fill="var(--nuit)"/>${Array.from({ length: 7 }, (_, i) => { const [x, y] = polaire(100, 190, 36, 180 + i * 30); return `<circle cx="${n1(x)}" cy="${n1(y)}" r="4" fill="${i === 3 ? 'var(--nouveau)' : 'var(--palier-bronze)'}"/>`; }).join('')}${gare(40, 127, 'retenu', 6)}${gare(100, 127, 'retenu', 6)}${gare(160, 127, 'retenu', 6)}`),
+  // 🛤️ Remis sur les rails : une voie qui se redresse, un wagon qui revient sur son rail.
+  'remis-sur-les-rails': (r) => carte(r,
+    `${pointille(246)}<path d="M-10 190 C60 190 90 120 210 120" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="3" stroke-dasharray="2 7" opacity=".4"/>`,
+    `${[0, 10].map((d, i) => `<path d="M-10 ${214 + d} H70 C112 ${214 + d} 108 ${150 + d} 150 ${150 + d} H214" fill="none" stroke="${i ? 'var(--sur-nuit)' : 'var(--sur-nuit-doux)'}" stroke-width="7" stroke-linecap="round"/>`).join('')}${[20, 46, 130, 158, 184].map((x) => `<path d="M${x} ${x > 100 ? 140 : 204} v${x > 100 ? 32 : 32}" stroke="var(--sur-nuit-doux)" stroke-width="5" stroke-linecap="round" opacity=".6"/>`).join('')}<g transform="rotate(-14 96 150)"><rect x="52" y="112" width="86" height="44" rx="8" fill="var(--palier-bronze)" ${TRAIT}/><rect x="62" y="122" width="22" height="16" rx="3" fill="var(--nouveau)"/><rect x="92" y="122" width="22" height="16" rx="3" fill="var(--nouveau)"/><circle cx="72" cy="162" r="10" fill="var(--sur-nuit)" ${TRAIT}/><circle cx="118" cy="162" r="10" fill="var(--sur-nuit)" ${TRAIT}/></g><path d="M40 96 C40 70 66 62 90 74" fill="none" stroke="var(--retenu)" stroke-width="5" stroke-linecap="round"/><polygon points="86,62 104,78 82,86" fill="var(--retenu)"/>`),
+  // 💡 Idée corrigée : une ampoule allumée, son filament en coche, ses rayons.
+  'idee-corrigee': (r) => carte(r,
+    `<circle cx="100" cy="120" r="84" fill="var(--palier-or)" opacity=".16"/>${cercle(100, 'stroke-dasharray="3 6" opacity=".7"')}`,
+    `${Array.from({ length: 9 }, (_, i) => { const [x1, y1] = polaire(100, 118, 66, 200 + i * 17.5), [x2, y2] = polaire(100, 118, 86, 200 + i * 17.5); return `<path d="M${n1(x1)} ${n1(y1)} L${n1(x2)} ${n1(y2)}" stroke="var(--palier-or)" stroke-width="6" stroke-linecap="round"/>`; }).join('')}<path d="M72 150 C42 118 60 62 100 62 C140 62 158 118 128 150 C120 160 118 168 118 176 H82 C82 168 80 160 72 150Z" fill="var(--nouveau)" ${TRAIT}/><path d="M82 112 l14 16 l26 -34" fill="none" stroke="var(--sur-nuit)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><rect x="80" y="176" width="40" height="12" rx="4" fill="var(--sur-nuit)" ${TRAIT}/><rect x="84" y="190" width="32" height="12" rx="4" fill="var(--sur-nuit-doux)" ${TRAIT}/><rect x="90" y="204" width="20" height="10" rx="5" fill="var(--sur-nuit)" ${TRAIT}/>`),
+  // ⏰ À l'heure : un réveil à deux cloches et deux pieds, l'aiguille avant l'heure rouge du contrôle.
+  'a-l-heure': (r) => carte(r,
+    `${cercle(94, 'stroke-dasharray="3 6" opacity=".8"')}`,
+    `<path d="M44 70 A28 28 0 0 1 84 48 Z" fill="var(--palier-bronze)" ${TRAIT}/><path d="M156 70 A28 28 0 0 0 116 48 Z" fill="var(--palier-bronze)" ${TRAIT}/><path d="M70 214 L52 246 M130 214 L148 246" stroke="var(--sur-nuit)" stroke-width="9" stroke-linecap="round"/><circle cx="100" cy="140" r="70" fill="var(--sur-nuit)" ${TRAIT}/><circle cx="100" cy="140" r="54" fill="var(--nouveau)" ${TRAIT}/>${Array.from({ length: 12 }, (_, i) => { const [x1, y1] = polaire(100, 140, i % 3 ? 46 : 42, i * 30), [x2, y2] = polaire(100, 140, 51, i * 30); return `<path d="M${n1(x1)} ${n1(y1)} L${n1(x2)} ${n1(y2)}" stroke="var(--sur-nuit)" stroke-width="${i % 3 ? 2.5 : 4}" stroke-linecap="round"/>`; }).join('')}<path d="M100 140 L100 104" stroke="var(--sur-nuit)" stroke-width="6" stroke-linecap="round"/><path d="M100 140 L124 156" stroke="var(--sur-nuit)" stroke-width="6" stroke-linecap="round"/><circle cx="100" cy="140" r="6" fill="var(--palier-unique)" ${TRAIT}/>`),
+};
+Object.assign(ARTS_SURPRISES, ARTS_MEMOIRE);
 
 // Repli : un identifiant de surprise sans dessin propre. Violette, unique ; son emoji est le héros.
 const surprise = (b, r) => ({ l1: sv(fond(r, 3, 'var(--palier-unique)')),

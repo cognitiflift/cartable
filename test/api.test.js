@@ -25,7 +25,7 @@ before(async () => {
   // lui fait finir sa réponse par une ligne CHOIX ; le fichier `refuser` simule un prof qui refuse le sujet
   // (ni page ni lesson.json, des sujets voisins en CHOIX) ; le fichier `ensuite` lui fait écrire dans lesson.json
   // le titre de la prochaine page qu'il prévoit (`ensuite`) ; le fichier `objectifs` lui fait écrire trois Objectifs dans lesson.json,
-  // et `objectifs-elargis` quatre (une mission élargie).
+  // `objectifs-elargis` quatre (une mission élargie) et `objectifs-dix` dix.
   // Les fichiers `images-page` et `images-manifeste` sont recopiés tels quels en lessons/0002-images.html et images.json.
   // Comme le vrai `claude -p`, il renvoie un coût et un usage (0,25 $ par tour de Leçon, 0,0625 $ par tour de
   // Propositions) ; le fichier `sans-cout` le fait répondre sans ces champs.
@@ -147,6 +147,7 @@ else
   echo '{"titre":"Les volcans","categorie":"Sciences"}' > lesson.json
 fi
 [ -e '${dossier}/objectifs-elargis' ] && echo '{"titre":"Les volcans","categorie":"Sciences","objectifs":["Nommer les parties d’un volcan","Expliquer une éruption","Situer trois volcans","Comparer deux volcans"]}' > lesson.json
+[ -e '${dossier}/objectifs-dix' ] && echo '{"titre":"Les volcans","categorie":"Sciences","objectifs":["O1","O2","O3","O4","O5","O6","O7","O8","O9","O10"]}' > lesson.json
 [ -e '${dossier}/ensuite' ] && echo '{"titre":"Les volcans","categorie":"Sciences","ensuite":"Les volcans endormis"}' > lesson.json
 echo '<h1>Volcans</h1>' > lessons/0001-volcans.html
 [ -e '${dossier}/images-page' ] && cp '${dossier}/images-page' lessons/0002-images.html
@@ -4595,4 +4596,81 @@ test('Badges surprise du Rythme : rien d\'office avant la livraison ; « Sept d\
   assert.deepEqual(vue.nouveaux.filter((n) => n.id === 'sept-d-un-coup').length, 1);
   assert.doesNotMatch(await retour('18'), /Sept d’un coup/, 'pas d\'annonce en double');
   assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-18T13:00:00.000Z'))).data, 'mois-complet'), undefined);
+});
+
+// Badges surprise de la Curiosité (#221) : événements `photo-lecon` et nombre de Questions de la série terminée.
+test('📸 Cliché ! : une Leçon créée à partir d\'une photo note `photo-lecon` et trouve la surprise ; un PDF seul, non', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cliche-Test', age: 11, niveau: 'Primaire 6' })).status, 201);
+  const slug = 'cliche-test';
+  const url = `/api/eleves/${slug}/badges`;
+  const faux = Buffer.from('faux').toString('base64');
+  const creer = (nom, date) => avecFichier('objectifs', () => appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom, data: faux }] }, le(date)));
+  assert.equal((await creer('page.pdf', '2026-11-12T12:00:00.000Z')).status, 201);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'photo-lecon'), []);
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-12T13:00:00.000Z'))).data, 'cliche'), undefined);
+  const photo = await creer('page.JPG', '2026-11-13T12:00:00.000Z');
+  assert.equal(photo.status, 201);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'photo-lecon'), [{ type: 'photo-lecon', date: '2026-11-13T12:00:00.000Z', lecon: photo.data.id }]);
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-13T13:00:00.000Z'))).data;
+  assert.deepEqual(badgeDe(vue, 'cliche'), { id: 'cliche', emoji: '📸', nom: 'Cliché !', phrase: 'Une Leçon créée à partir d’une photo.', surprise: true, palier: 'unique', jour: '2026-11-13' });
+});
+
+test('🔟 Série pleine : la fin de Révision du jour note le nombre de Questions servies que l\'écran envoie', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Serie-Pleine', 1);
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  const fin = (corps, date) => appel(`/api/eleves/${slug}/revisions/terminee`, 'POST', corps, le(date));
+  assert.equal((await fin({ questions: 10 }, LENDEMAIN)).status, 200);
+  assert.equal((await fin({ questions: 'dix' }, LENDEMAIN)).status, 200);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'revision-terminee').map((e) => e.questions), [10, undefined]);
+});
+
+// Badges surprise de Mémoire et progression (#220) : l'événement `niveau-atteint` et « Haut niveau ».
+test('Badges surprise : « Haut niveau » d\'après l\'événement `niveau-atteint`, noté une seule fois, avec sa phrase', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Niveau-Test', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const slug = 'niveau-test';
+  const lecon = await avecFichier('objectifs-elargis', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' }, le('2026-11-12T12:00:00.000Z'))).data);
+  const score = (jour, objectifs) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html', objectifs }, le(`2026-11-${jour}T12:00:00.000Z`));
+  const niveaux = async () => (await evenementsDe(slug)).filter((e) => e.type === 'niveau-atteint');
+  assert.equal((await score('13', [1, 2, 3])).data.niveauLecon, 4);
+  assert.deepEqual(await niveaux(), [], 'Niveau 4 : rien');
+  const url = `/api/eleves/${slug}/badges`;
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-13T13:00:00.000Z'))).data, 'haut-niveau'), undefined);
+  assert.equal((await score('14', [4])).data.niveauLecon, 5);
+  assert.deepEqual(await niveaux(), [{ type: 'niveau-atteint', date: '2026-11-14T12:00:00.000Z', lecon: lecon.id, niveau: 5 }]);
+  await score('15', [1, 2, 3, 4]);
+  assert.equal((await niveaux()).length, 1, 'une seule fois par Leçon et par niveau');
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-15T13:00:00.000Z'))).data;
+  const haut = badgeDe(vue, 'haut-niveau');
+  assert.deepEqual({ jour: haut.jour, palier: haut.palier, surprise: haut.surprise }, { jour: '2026-11-14', palier: 'unique', surprise: true });
+  assert.match(haut.phrase, /Niveau 5/);
+  assert.equal(badgeDe(vue, 'sommet'), undefined);
+});
+
+test('Badges surprise : un saut du Niveau 4 au Niveau 10 en un quiz donne « Haut niveau » et « Sommet », annoncés une seule fois', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Saut-Niveau', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const slug = 'saut-niveau';
+  const lecon = await avecFichier('objectifs-dix', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' }, le('2026-11-12T12:00:00.000Z'))).data);
+  const url = `/api/eleves/${slug}/badges`;
+  const quiz = async (jour, objectifs) => {
+    const corps = { score: 90, page: '0002-volcans.html', objectifs };
+    const date = `2026-11-${jour}T12:00:00.000Z`;
+    const score = await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(date));
+    const retour = await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le(date));
+    return { niveau: score.data.niveauLecon, texte: retour.data.messages.at(-1).texte };
+  };
+  assert.equal((await quiz('13', [1, 2, 3])).niveau, 4);
+  const saut = await quiz('14', [4, 5, 6, 7, 8, 9]);
+  assert.equal(saut.niveau, 10);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'niveau-atteint').map((e) => e.niveau), [5, 10]);
+  assert.match(saut.texte, /Haut niveau/);
+  assert.match(saut.texte, /Sommet/);
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-14T13:00:00.000Z'))).data;
+  assert.deepEqual([badgeDe(vue, 'haut-niveau').jour, badgeDe(vue, 'sommet').jour], ['2026-11-14', '2026-11-14']);
+  assert.equal(vue.nouveaux.filter((n) => n.id === 'haut-niveau').length, 1);
+  assert.equal(vue.nouveaux.filter((n) => n.id === 'sommet').length, 1);
+  const deuxieme = (await appel(url, 'GET', undefined, le('2026-11-14T14:00:00.000Z'))).data;
+  assert.deepEqual(deuxieme.collection.filter((b) => ['haut-niveau', 'sommet'].includes(b.id)), vue.collection.filter((b) => ['haut-niveau', 'sommet'].includes(b.id)));
+  for (const id of ['haut-niveau', 'sommet']) assert.equal(deuxieme.nouveaux.filter((n) => n.id === id).length, 1, 'pas de doublon à la deuxième lecture');
+  const suite = await quiz('15', [10]);
+  assert.doesNotMatch(suite.texte, /Haut niveau|Sommet/, 'pas d\'annonce en double');
 });

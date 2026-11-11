@@ -25,7 +25,7 @@ import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/prep
 import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
 import { consignesCarte, promptCarte } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
 import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
@@ -39,6 +39,7 @@ const store = createStore(ELEVES);
 const SUJET_MAX = 80; // sujet libre, après trim
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.md': 'text/markdown; charset=utf-8', '.woff2': 'font/woff2' };
+const EXTENSIONS_IMAGE = ['.jpg', '.jpeg', '.png', '.webp']; // Documents source qui sont des photos (le reste : PDF)
 const enCours = new Set(); // Leçons (cleLecon) dont l'agent travaille : un seul agent par Leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
@@ -497,6 +498,10 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut },
   const controle = jourValide(dateControle) ? dateControle : null;
   const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage, dateControle: controle });
   const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
+  // Badge surprise « Cliché ! » (#221) : une Leçon créée à partir d'un Document source image (photo), pas d'un PDF seul.
+  if (noms.some((n) => EXTENSIONS_IMAGE.includes(path.extname(n)))) {
+    await noterEvenement(slug, { type: 'photo-lecon', date: new Date(maintenant).toISOString(), lecon: lecon.id });
+  }
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
     `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle}` : ''}.`,
@@ -565,8 +570,8 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }, mainte
 // `nouveaux` : Paliers gagnés par ce recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office
 // l'historique) ; `nouvellesLignes` : Leçons dont la carte de ligne vient d'être enregistrée (#197) ; `totaux` : total d'Étoiles et de Fusées de l'Élève (#96) ; `lecons`, `evenements` : l'historique lu.
 async function recalculerBadges(slug, maintenant) {
-  const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
-  const calcul = calculerBadges({ lecons, evenements, maintenant });
+  const [lecons, evenements, cartesAvant] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug), store.lireCartes(slug)]);
+  const calcul = calculerBadges({ lecons, evenements, maintenant, cartes: cartesAvant }); // cartes : pour 🚉 Terminus (#220)
   const { fichier, nouveaux } = await store.modifierBadges(slug, (avant) => {
     const fusion = fusionnerBadges(avant, calcul, maintenant);
     return [fusion.fichier, fusion];
@@ -580,6 +585,15 @@ async function recalculerBadges(slug, maintenant) {
   });
   if (prochaineAComposer(cartes)) composerCartes(slug); // en arrière-plan : la réponse n'attend pas la composition
   return { nouveaux, nouvellesLignes, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+}
+
+// Niveaux 5 et 10 (#220) : une Leçon libre qui franchit l'un d'eux note un événement `niveau-atteint` (Leçon, niveau),
+// une seule fois par Leçon et par niveau, pour les badges surprise 🏔️ Haut niveau et 🌋 Sommet. Les Objectifs ne sont
+// pas datés : sans cet événement, rien ne dirait quand le niveau a été atteint. Appelé après chaque score.
+async function noterNiveauxFranchis(slug, lecon, niveauAvant, maintenant) {
+  if (lecon.mode !== 'libre') return;
+  const franchis = niveauxFranchis(niveauAvant, lecon.niveauLecon, await store.lireEvenements(slug), lecon.id);
+  for (const niveau of franchis) await noterEvenement(slug, { type: 'niveau-atteint', date: new Date(maintenant).toISOString(), lecon: lecon.id, niveau });
 }
 
 // Livraison des cartes (#183) : le premier calcul écarte les Leçons déjà Acquises, il doit donc précéder l'événement qui
@@ -640,13 +654,14 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
 // (`etoile` : la première de la journée rapporte une Étoile ; `paliers` : Paliers de Badge nouveaux) et le nombre
 // d'Étoiles de Révision du jour de l'Élève. Le serveur ne sait pas quelle série a été servie : il faut au moins une
 // réponse de Révision du jour dans la journée. Jamais de tour du prof.
-async function terminerRevisionDuJour(slug, maintenant) {
+async function terminerRevisionDuJour(slug, maintenant, nbQuestions) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const aujourdhui = jourLocal(maintenant);
   const repondueAujourdhui = lecons.some((l) => reponsesDeRevision(l).some((r) => jourDe(r.date) === aujourdhui));
   if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
   const etoile = etoileDuJour(evenements, maintenant);
-  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
+  // `nbQuestions` : nombre de Questions de la série servie, que seul l'écran connaît (badge surprise « Série pleine », #221).
+  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString(), ...(Number.isInteger(nbQuestions) && nbQuestions > 0 && { questions: nbQuestions }) };
   await store.enregistrerEvenement(slug, evenement);
   const { nouveauxBadges: nouveaux, nouvellesCartesLigne } = await annoncerBadges(slug, maintenant);
   const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));
@@ -717,7 +732,7 @@ async function api(req, res, segments) {
     }
   } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
-    if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
+    if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant, (await lireCorps(req)).questions));
   } else if (r2 === 'parent' && id === 'signalements' && !r3) {
     // Le parent signale lui-même une Question (#148) : même liste fermée de raisons, auteur parent, jamais de tour du prof.
     if (m === 'POST') {
@@ -889,7 +904,9 @@ async function api(req, res, segments) {
     } else if (r3 === 'scores' && m === 'POST') {
       const corps = await lireCorps(req);
       await fixerLivraison(slug, maintenant); // avant le score : une Acquisition de ce quiz donne sa carte
+      const niveauAvant = (await store.lireLecon(slug, id, { maintenant })).niveauLecon;
       const lecon = await store.enregistrerScore(slug, id, corps, { maintenant });
+      await noterNiveauxFranchis(slug, lecon, niveauAvant, maintenant);
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {

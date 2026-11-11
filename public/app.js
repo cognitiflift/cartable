@@ -826,9 +826,9 @@ async function ecranBadges(profil) {
       h('h3', {}, 'Ma collection'),
       attente.length > 0 && nouvellesCartesGroupe(attente, { son: donnees.son === true, slug: profil.slug, retourner: (c) => { carteRetournee(donnees, c); afficherCollection(); } }),
       monReseau(cartesLigneRangees(cartesLigne)),
-      h('h4', {}, 'Mes Badges'),
+      h('h4', {}, 'Mes badges'),
       obtenues.length
-        ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes Badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
+        ? h('ul', { className: 'cartes-reseau cartes-badges', ariaLabel: 'Mes badges' }, obtenues.map((b) => h('li', {}, carteBadge(b, estNouveau(b, b.palier)))))
         : h('p', { className: 'doux' }, 'Ton premier Palier donnera ici sa carte.'),
       aDecouvrir.length > 0 && [
         h('h4', {}, 'À découvrir'),
@@ -1041,7 +1041,7 @@ function carteBadge(b, nouveau) {
     h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
       h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue),
       !b.surprise && ligneBadge(b, () => false),
-      h('small', {}, dos.date, ' ', dos.prochain))));
+      h('small', {}, dos.date, b.surprise ? '' : ` ${dos.prochain}`))));  // le cartouche « Unique » dit déjà « surprise »
   animerCarte(el);
   return el;
 }
@@ -1278,7 +1278,7 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
         // Chaque Question de la série a sa réponse : la Révision du jour est menée jusqu'au bout.
         let nouvelles = null;
         if (repondues === questions.length) {
-          try { ({ recompenses: nouvelles } = await api(`${url}/terminee`, { method: 'POST', body: {} })); } catch (e) { erreur.textContent = e.message; }
+          try { ({ recompenses: nouvelles } = await api(`${url}/terminee`, { method: 'POST', body: { questions: questions.length } })); } catch (e) { erreur.textContent = e.message; }
         }
         return serie(suite, nouvelles);
       }

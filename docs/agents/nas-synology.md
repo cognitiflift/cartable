@@ -70,7 +70,7 @@ Dans le dossier du dépôt, en SSH :
 1. `docker compose build` (le build échoue exprès si la version du plugin du marketplace ne correspond pas à `PLUGIN_VERSION` ; voir `docker/MAJ.md`).
 2. `docker compose up -d`.
 3. Le conteneur redémarre seul (`restart: unless-stopped`), y compris après une coupure de courant ou un redémarrage du NAS, à condition que le paquet Docker démarre avec DSM.
-4. Nom du conteneur : le compose ne fixe pas `container_name`, donc Docker le nomme d'après le dossier (par exemple `cartable-cartable-1`). Or `scripts/publier.sh` utilise par défaut `docker restart cartable`. Relever le nom réel (`docker ps`) et le donner à `RESTART_CMD` (voir section 7), ou utiliser `docker compose restart`.
+4. Nom du conteneur : le compose fixe `container_name: cartable`, ce qui correspond au défaut de `scripts/publier.sh` (`docker restart cartable`). `RESTART_CMD` reste un réglage possible (voir section 7), par exemple `docker compose restart`.
 
 ## 5. Pare-feu et réseau
 

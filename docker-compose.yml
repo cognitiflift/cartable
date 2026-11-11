@@ -2,6 +2,7 @@
 services:
   cartable:
     build: .
+    container_name: cartable
     # Identifiant du propriétaire du dossier partagé (`id -u` et `id -g`), pour que eleves/ lui appartienne.
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped

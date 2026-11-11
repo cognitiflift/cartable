@@ -9,7 +9,7 @@ import { esquisseCarte } from '/carte-attente-art.js';
 import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, cartesDuGain, ATTENTE, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
-import { INTRO_CARTES, VIDE_CARTES, reperesCarte, noteCarte, titreVersions, libelleVersion, libelleChoisir } from '/carte-parent-texte.js';
+import { INTRO_CARTES, VIDE_CARTES, reperesCarte, noteCarte, titreVersions, libelleVersion, libelleChoisir, libelleRegenerer, libelleRegenerationEnCours, libelleRegenererCarte, VERSION_EN_COMPOSITION, notesRegeneration, regenerationAbandonnee } from '/carte-parent-texte.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
@@ -311,8 +311,34 @@ const sectionParent = ({ titre, replie, rendu }, agregats, contexte) => {
 // « Utiliser celle-ci » change la carte vue par l'Élève (la version remplace la sienne partout) sans toucher à son
 // retournement ; aucune version ne se supprime. Une galerie ouverte le reste quand l'écran se recharge.
 const galeriesOuvertes = new Set();
+// « Régénérer » (#237) : un clic, sans confirmation. Le tour part en arrière-plan ; tant qu'un tour travaille, la rubrique
+// regarde de temps en temps si l'état a changé (version arrivée, abandon) et s'affiche alors à jour.
+const SONDE_REGENERATION_MS = 4000;
+const regenerations = (lignes) => lignes.filter((c) => c.regeneration).map((c) => c.lecon).join();
+function surveillerRegenerations(lignes, contexte, ancre) {
+  if (!regenerations(lignes)) return;
+  const attendre = async () => {
+    if (!ancre.isConnected) return;
+    try {
+      const { cartes } = await api(`eleves/${contexte.slug}/parent`);
+      if (regenerations(cartes.lignes) !== regenerations(lignes)) return await contexte.recharger();
+    } catch { /* réseau coupé : on réessaie */ }
+    setTimeout(attendre, SONDE_REGENERATION_MS);
+  };
+  setTimeout(attendre, SONDE_REGENERATION_MS);
+}
 function cartesParent(lignes, contexte) {
   if (!lignes.length) return h('p', { className: 'doux' }, VIDE_CARTES);
+  const regenerer = (c) => {
+    if (c.leconSupprimee) return null;
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire regenerer', type: 'button', disabled: c.regeneration, ariaBusy: String(c.regeneration), ariaLabel: libelleRegenererCarte(c), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/regeneration`, { method: 'POST', body: { id: c.lecon } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, c.regeneration ? libelleRegenerationEnCours : libelleRegenerer);
+    return [bouton, erreur];
+  };
   const choisir = (c, v) => {
     const erreur = h('span', { className: 'erreur', role: 'alert' });
     const bouton = h('button', { className: 'secondaire', type: 'button', ariaLabel: libelleChoisir(c, v), onclick: async () => {
@@ -330,9 +356,12 @@ function cartesParent(lignes, contexte) {
     h('ul', { className: 'versions-carte' }, c.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
       carteLigne({ ...c, calques: v.calques }),
       h('strong', {}, libelleVersion(v)),
-      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(c, v)))));
+      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(c, v))),
+    c.regeneration && h('li', { className: 'version-en-composition', role: 'status' },
+      h('div', { className: 'carte-parent-vide', ariaHidden: 'true' }), h('strong', {}, VERSION_EN_COMPOSITION), h('span', { className: 'doux' }, libelleRegenerationEnCours))));
   };
-  return [h('p', { className: 'doux' }, INTRO_CARTES),
+  const rubrique = h('div', { className: 'cartes-rubrique' });
+  rubrique.append(h('p', { className: 'doux' }, INTRO_CARTES), h('p', { className: 'doux' }),
     h('ul', { className: 'cartes-parent' }, lignes.map((c) => {
       const active = c.versions.find((v) => v.active);
       const note = noteCarte(c);
@@ -341,8 +370,12 @@ function cartesParent(lignes, contexte) {
         h('strong', { className: 'carte-parent-titre' }, c.titre),
         h('p', { className: 'carte-parent-reperes' }, reperesCarte(c).join(' · ')),
         note && h('p', { className: 'doux carte-parent-note' }, note),
+        notesRegeneration(c).map((t) => h('p', { className: regenerationAbandonnee(c) && t.includes('abandonnée') ? 'erreur carte-parent-note' : 'doux carte-parent-note', role: regenerationAbandonnee(c) && t.includes('abandonnée') ? 'alert' : null }, t)),
+        regenerer(c),
         c.versions.length > 0 && galerie(c));
-    }))];
+    })));
+  surveillerRegenerations(lignes, contexte, rubrique);
+  return rubrique;
 }
 
 // Le sommaire mène à un bloc sans toucher au hash (c'est celui du routeur) ; une cible repliée s'ouvre.

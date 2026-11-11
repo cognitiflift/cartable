@@ -460,6 +460,10 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .carte-parent p { margin:0; }
 .carte-parent-reperes { font-weight:600; }
 .carte-parent-note { font-size:.92rem; }
+.carte-parent .erreur.carte-parent-note { min-height:0; font-weight:600; }
+.carte-parent .regenerer { min-height:2.75rem; align-self:flex-start; }
+.carte-parent .regenerer:disabled { opacity:.7; cursor:progress; }
+.versions-carte .version-en-composition { opacity:.85; }
 .galerie-versions summary { cursor:pointer; font-weight:600; }
 .versions-carte li { display:flex; flex-direction:column; align-items:flex-start; gap:.3rem; min-width:0; }
 .versions-carte button { min-height:2.75rem; }

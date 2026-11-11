@@ -3785,6 +3785,76 @@ test('Carte de ligne : une seule composition à la fois par Élève, dans l\'ord
   assert.equal(await nbLancementsCartes(), 2);
 });
 
+// Régénération d'une carte de ligne (#237) : un clic ajoute une version, jamais de scène générique, un tour à la fois.
+const regenerer = (slug, id) => appel(`/api/eleves/${slug}/parent/cartes/regeneration`, 'POST', { id });
+const versionsDe = async (slug, id) => { const c = (await carteDe(slug))[id]; return [c.versions?.length ?? 1, c.versionActive ?? 1, c.regeneration]; };
+
+test('Régénérer : ajoute une version avec la même consigne, sans changer l\'active, Coût compté', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Regenere');
+  await declencher();
+  await etat();
+  const avant = (await carteDe(slug))[lecon.id].calques;
+  const prompt = await fs.readFile(path.join(dossier, 'prompt-carte'), 'utf8');
+  assert.deepEqual((await regenerer(slug, lecon.id)).data, { statut: 'demandee' });
+  await sonderJusqua(() => versionsDe(slug, lecon.id), ([n, , r]) => n === 2 && !r, 'Version jamais ajoutée');
+  const carte = (await carteDe(slug))[lecon.id];
+  assert.deepEqual([carte.versions.map((v) => v.numero), carte.versionActive, carte.calques], [[1, 2], 1, avant]);
+  assert.equal(await fs.readFile(path.join(dossier, 'prompt-carte'), 'utf8'), prompt, 'même consigne');
+  assert.equal((await appel(`/api/eleves/${slug}/couts`)).data.parTache.carte.tours, 2);
+  assert.equal(carte.cout.tours, 2);
+  const vue = (await appel(`/api/eleves/${slug}/parent`)).data.cartes.lignes[0];
+  assert.deepEqual([vue.versions.length, vue.versionActive, vue.regeneration, vue.echecRegeneration], [2, 1, false, false]);
+  assert.equal((await regenerer(slug, 'inconnue')).status, 404);
+});
+
+test('Régénérer : un tour à la fois, la carte est « en composition » dans la galerie le temps du tour', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Regen-Un');
+  await declencher();
+  await etat();
+  await avecFichier('carte-attendre', async () => {
+    await regenerer(slug, lecon.id);
+    await sonderJusqua(nbLancementsCartes, (n) => n === 2, 'Régénération jamais lancée');
+    assert.equal((await appel(`/api/eleves/${slug}/parent`)).data.cartes.lignes[0].regeneration, true);
+    assert.deepEqual((await regenerer(slug, lecon.id)).data, { statut: 'deja' });
+    await pause(300);
+    assert.equal(await nbLancementsCartes(), 2);
+  });
+  await sonderJusqua(() => versionsDe(slug, lecon.id), ([n, , r]) => n === 2 && !r, 'Version jamais ajoutée');
+  assert.equal(await nbLancementsCartes(), 2);
+});
+
+test('Régénérer : deux échecs, version active inchangée, parent averti, aucune scène générique ; une demande suivante efface l\'avertissement', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Regen-Echec');
+  await declencher();
+  await etat();
+  await avecFichier('carte-refusee', async () => {
+    await regenerer(slug, lecon.id);
+    await sonderJusqua(async () => (await appel(`/api/eleves/${slug}/parent`)).data.cartes.lignes[0], (l) => l.echecRegeneration, 'Échec jamais signalé');
+  });
+  const carte = (await carteDe(slug))[lecon.id];
+  assert.deepEqual([carte.etat, carte.versions ?? null, carte.regeneration], ['prete', null, undefined]);
+  assert.equal(await nbLancementsCartes(), 3); // composition + deux essais de régénération
+  assert.equal((await appel(`/api/eleves/${slug}/couts`)).data.parTache.carte.tours, 3); // chaque tour compte
+  await regenerer(slug, lecon.id);
+  await sonderJusqua(() => versionsDe(slug, lecon.id), ([n, , r]) => n === 2 && !r, 'Version jamais ajoutée');
+  assert.equal((await appel(`/api/eleves/${slug}/parent`)).data.cartes.lignes[0].echecRegeneration, false);
+});
+
+test('Régénérer : refusé pour une Leçon supprimée, dont les versions restent choisissables', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-Regen-Supp');
+  await declencher();
+  await etat();
+  await regenerer(slug, lecon.id);
+  await sonderJusqua(() => versionsDe(slug, lecon.id), ([n, , r]) => n === 2 && !r, 'Version jamais ajoutée');
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}/archivage`, 'POST');
+  await appel(`/api/eleves/${slug}/lecons/${lecon.id}`, 'DELETE');
+  const lancements = await nbLancementsCartes();
+  assert.equal((await regenerer(slug, lecon.id)).status, 409);
+  assert.equal(await nbLancementsCartes(), lancements);
+  assert.equal((await appel(`/api/eleves/${slug}/parent/cartes/version`, 'POST', { id: lecon.id, version: 2 })).data.statut, 'choisie');
+  assert.equal((await appel(`/api/eleves/${slug}/parent`)).data.cartes.lignes[0].leconSupprimee, true);
+});
+
 test('Cartes de ligne : une Leçon déjà Acquise à la livraison est écartée, même si elle redescend puis redevient Acquise', async () => {
   const { slug, url } = await leconAcquise('Cartes-Ecartee', ['2026-10-01T10:00:00.000Z', '2026-10-02T10:00:00.000Z']);
   assert.deepEqual((await cartesDe(slug, '2026-10-03T10:00:00.000Z')).cartesLigne, []); // livraison : déjà Acquise

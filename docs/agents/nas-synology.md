@@ -88,11 +88,13 @@ Dans le dossier du dépôt, en SSH :
 
 ## 7. Publier une nouvelle version
 
-Depuis le dossier du dépôt sur le NAS (SSH) : `npm run publier` (qui lance `scripts/publier.sh`). Il enchaîne :
+Depuis le dossier du dépôt sur le NAS (SSH) : `bash scripts/publier.sh` (`npm run publier` fait la même chose, mais seulement là où npm est installé : pas sur ce NAS). Depuis le PC, en une ligne : `ssh admin@<IP> 'cd /volume1/docker/cartable && bash scripts/publier.sh'`. Il enchaîne :
 
 1. `git pull --ff-only` (avance rapide seulement) ;
-2. les vérifications (`VERIFS_CMD`, par défaut `npm run check && npm test`) ;
+2. les vérifications (`VERIFS_CMD`, par défaut `npm run check && npm test`, ou, si npm est absent du NAS, `docker exec cartable sh -c 'npm run check && npm test'`, dans le conteneur) ;
 3. le redémarrage du conteneur (`RESTART_CMD`, par défaut `docker restart cartable`).
+
+Le script ajoute `/usr/local/bin` à la fin du `PATH` : sur Synology, `docker` y est, et ce dossier n'est pas dans le `PATH` d'une session SSH.
 
 Il s'arrête au premier échec avec un message, sans redémarrer. Il ne touche jamais à `eleves/`. Les deux variables se remplacent à l'appel :
 
@@ -100,7 +102,7 @@ Il s'arrête au premier échec avec un message, sans redémarrer. Il ne touche j
 RESTART_CMD="docker compose restart" npm run publier
 ```
 
-Si Node n'est pas installé sur le NAS lui-même (DSM 7.1 propose un paquet Node.js, à confirmer), faire tourner les vérifications dans le conteneur : `VERIFS_CMD="docker compose exec -T cartable sh -c 'npm run check && npm test'"`. À confirmer sur place.
+Si le changement touche `Dockerfile`, `package.json` ou `docker-compose.yml`, un redémarrage ne suffit pas : reconstruire l'image (`docker-compose build` puis `docker-compose up -d`, en ajoutant `/usr/local/bin` au `PATH`).
 
 Une publication ne change pas le jeton ni l'image. Une nouvelle version de la CLI ou du plugin demande de reconstruire l'image : voir `docker/MAJ.md`.
 

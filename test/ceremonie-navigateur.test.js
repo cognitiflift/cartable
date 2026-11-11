@@ -134,6 +134,10 @@ test('Cérémonie : la carte attend face cachée, la retourner ouvre la cérémo
   assert.equal(await visible('dialog[open] .cer-ok'), false, 'le bouton attend la fin de l\'animation');
   await jusqua(() => visible('dialog[open] .cer-ok'), 'bouton d\'ajout affiché', 6000);
   assert.match(await cdp.evaluer(`document.querySelector('dialog[open] .cer-texte h3').textContent`), /volcans/);
+  // #232 : rien ne traverse le dessin ; les 3 Objectifs sont 3 petits crans et le ✓, en bas à droite de la carte.
+  const pastille = await cdp.evaluer(`(() => { const c = document.querySelector('dialog[open] .cer-carte .carte-ligne-carte'); const r = c.getBoundingClientRect(), p = c.querySelector('.cl-stations').getBoundingClientRect();
+    return { crans: c.querySelectorAll('.cl-stations i').length, coche: c.querySelector('.cl-stations b')?.textContent, ancienne: !!c.querySelector('.cl-ligne, .terminus, .station'), droite: p.right > r.left + r.width * .7, bas: p.top > r.top + r.height * .85, large: p.width < r.width * .5 }; })()`);
+  assert.deepEqual(pastille, { crans: 3, coche: '✓', ancienne: false, droite: true, bas: true, large: true });
 
   await clic('dialog[open] .cer-ok');
   await jusqua(async () => !(await existe('dialog[open]')) && !(await existe('.cl-nouvelles')), 'cérémonie fermée, plus de carte en attente');

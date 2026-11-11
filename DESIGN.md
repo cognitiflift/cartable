@@ -70,7 +70,7 @@ colors:
   ligne-geographie-sombre: "#38bdf8"
   ligne-langues-sombre: "#c084fc"
   ligne-arts-sombre: "#f472b6"
-  ligne-numerique-sombre: "#8b7cf6"
+  ligne-numerique-sombre: "#8e7cbf"
   ligne-autre-sombre: "#9ca3af"
 typography:
   display:

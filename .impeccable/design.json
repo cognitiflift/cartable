@@ -855,15 +855,15 @@
       "ligne-numerique-sombre": {
         "role": "secondary",
         "displayName": "Ligne Numérique (sombre)",
-        "canonical": "#8b7cf6",
-        "oklch": "oklch(67.3% 0.182 277)",
+        "canonical": "#8e7cbf",
+        "oklch": "oklch(63% 0.10 296)",
         "tonalRamp": [
           "#06041b",
           "#17114a",
           "#2d2587",
           "#4a43c1",
           "#6a68e0",
-          "#8b7cf6",
+          "#8e7cbf",
           "#b7bdfc",
           "#e9ebff"
         ],

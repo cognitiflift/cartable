@@ -47,7 +47,7 @@
   [data-categorie="geographie"]    { --kit-accent: #38bdf8; }
   [data-categorie="langues"]       { --kit-accent: #c084fc; }
   [data-categorie="arts"]          { --kit-accent: #f472b6; }
-  [data-categorie="numerique"]     { --kit-accent: #8b7cf6; }
+  [data-categorie="numerique"]     { --kit-accent: #8e7cbf; }
   [data-categorie="autre"]         { --kit-accent: #9ca3af; }
   /* En sombre, la ligne elle-même porte le texte sombre --kit-sur-accent. */
   :root, [data-categorie] {

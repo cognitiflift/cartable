@@ -35,7 +35,7 @@
   --rouge:#f58b8b; --orange:#f5b14c; --vert:#5ad98a;
   --palier-bronze:#d99a62; --palier-argent:#b6c0cb; --palier-or:#e8c04a; --palier-diamant:#6cc4ef; --palier-unique:#c792e6;
   --ligne-francais:#fb923c; --ligne-mathematiques:#7aa2ff; --ligne-sciences:#34d399; --ligne-histoire:#e0a75e;
-  --ligne-geographie:#38bdf8; --ligne-langues:#c084fc; --ligne-arts:#f472b6; --ligne-numerique:#8b7cf6; --ligne-autre:#9ca3af;
+  --ligne-geographie:#38bdf8; --ligne-langues:#c084fc; --ligne-arts:#f472b6; --ligne-numerique:#8e7cbf; --ligne-autre:#9ca3af;
   --espacement-lettres:.12em; --espacement-mots:.16em;
 } }
 * { box-sizing: border-box; }

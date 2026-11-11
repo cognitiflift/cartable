@@ -460,6 +460,21 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .carte-parent p { margin:0; }
 .carte-parent-reperes { font-weight:600; }
 .carte-parent-note { font-size:.92rem; }
+/* Cartes de Badge (#238) : une fiche par Badge, le titre et les repères d'abord, puis la version active à chaque Palier
+   (quatre petites cartes côte à côte), la galerie des versions dépliable dessous. */
+.bloc-parent .badges-parent, .bloc-parent .versions-badge, .bloc-parent .paliers-badge { display:grid; margin:.6rem 0; padding:0; list-style:none; }
+.bloc-parent .badges-parent { grid-template-columns:repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); gap:1.6rem 1.4rem; align-items:start; }
+.bloc-parent .badges-parent li, .bloc-parent .paliers-badge li { border-top:0; }
+.badge-parent { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
+.badge-parent p { margin:0; }
+.bloc-parent .paliers-badge { grid-template-columns:repeat(4, minmax(0, 5.6rem)); gap:.5rem; margin:.3rem 0; }
+.paliers-badge li { display:flex; flex-direction:column; gap:.2rem; min-width:0; font-size:.92rem; }
+.carte-badge-carte.apercu { cursor:default; }
+.carte-badge-carte.apercu .cl-titre { display:none; } /* le nom du Badge est au-dessus : sur une petite carte il se coupait */
+.bloc-parent .versions-badge { gap:1rem; padding:.6rem 0 .2rem; }
+.bloc-parent .versions-badge li { display:flex; flex-direction:column; align-items:flex-start; gap:.2rem; min-width:0; padding-top:.5rem; border-top:1px solid var(--bord); }
+.bloc-parent .versions-badge li.active { border-top:2px solid var(--accent); }
+.versions-badge button { min-height:2.75rem; }
 .galerie-versions summary { cursor:pointer; font-weight:600; }
 .versions-carte li { display:flex; flex-direction:column; align-items:flex-start; gap:.3rem; min-width:0; }
 .versions-carte button { min-height:2.75rem; }

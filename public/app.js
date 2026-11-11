@@ -9,6 +9,7 @@ import { esquisseCarte } from '/carte-attente-art.js';
 import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, cartesDuGain, ATTENTE, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
+import { INTRO_BADGES, reperesBadge, noteBadge, titreVersionsBadge, libelleVersionBadge, origineVersion, libellePalierApercu, libelleChoisirBadge, libelleBadgeParent } from '/carte-parent-badge-texte.js';
 import { INTRO_CARTES, VIDE_CARTES, reperesCarte, noteCarte, titreVersions, libelleVersion, libelleChoisir } from '/carte-parent-texte.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
@@ -289,6 +290,7 @@ const SECTIONS_PARENT = [
     h('ul', {}, calibration.map((t) => h('li', {}, `Quand l’appli pensait qu’il s’en souviendrait à ${t.de}–${t.a} % : `, t.reponses
       ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % annoncé en moyenne)` : 'aucune réponse.'))))] },
   { titre: '🃏 Cartes de ligne', bloc: 'cartes', rendu: ({ cartes }, contexte) => cartesParent(cartes.lignes, contexte) },
+  { titre: '🎴 Cartes de Badge', bloc: 'cartes', rendu: ({ cartes }, contexte) => cartesBadgeParent(cartes.badges, contexte) },
   { titre: '🔔 Rappel dans ton calendrier', bloc: 'reglages', replie: true, rendu: (_agregats, { profil, moment }) => rappelCalendrier(profil, moment) },
 ];
 // Les trois blocs de la Vue parent (#164), dans l'ordre de la page ; chaque section de SECTIONS_PARENT dit le sien (`bloc`).
@@ -342,6 +344,47 @@ function cartesParent(lignes, contexte) {
         h('p', { className: 'carte-parent-reperes' }, reperesCarte(c).join(' · ')),
         note && h('p', { className: 'doux carte-parent-note' }, note),
         c.versions.length > 0 && galerie(c));
+    }))];
+}
+
+// Cartes de Badge (#238) : une par Famille et par badge surprise (les surprises pas encore trouvées aussi), la version active
+// montrée à chaque Palier, la galerie des versions dépliable. Le choix vaut pour tous les Paliers de la Famille ; l'appli
+// superpose elle-même les stations et le Palier (carteBadge, apercu), le dessin d'une version n'en contient pas.
+const galeriesBadgeOuvertes = new Set();
+// Le badge tel que l'Élève le verrait au Palier `i` : crans allumés jusqu'à lui, sans jour.
+const apercuDuBadge = (b, i) => ({ id: b.id, emoji: b.emoji, nom: b.nom, phrase: b.phrase, surprise: b.surprise, palier: b.paliers[i].palier,
+  paliers: b.paliers.map((p, j) => ({ palier: p.palier, jour: j <= i ? 'apercu' : null })) });
+const paliersDeVersion = (b, v) => h('ul', { className: 'paliers-badge' }, b.paliers.map((p, i) => h('li', {},
+  carteBadge(apercuDuBadge(b, i), false, { calques: v.calques, apercu: true }), h('span', { className: 'doux' }, libellePalierApercu(p.palier)))));
+function cartesBadgeParent(badges, contexte) {
+  const choisir = (b, v) => {
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire', type: 'button', ariaLabel: libelleChoisirBadge(b, v), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/badge-version`, { method: 'POST', body: { id: b.id, version: v.numero } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, 'Utiliser celle-ci');
+    return [bouton, erreur];
+  };
+  const galerie = (b) => {
+    const cle = `${contexte.slug}/${b.id}`;
+    return h('details', { className: 'galerie-versions', open: galeriesBadgeOuvertes.has(cle),
+      ontoggle: (e) => { if (!e.target.isConnected) return; if (e.target.open) galeriesBadgeOuvertes.add(cle); else galeriesBadgeOuvertes.delete(cle); } },
+    h('summary', {}, titreVersionsBadge(b)),
+    h('ul', { className: 'versions-badge' }, b.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
+      h('strong', {}, libelleVersionBadge(v)), h('span', { className: 'doux' }, origineVersion(v)),
+      paliersDeVersion(b, v),
+      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(b, v)))));
+  };
+  return [h('p', { className: 'doux' }, INTRO_BADGES),
+    h('ul', { className: 'badges-parent' }, badges.map((b) => {
+      const note = noteBadge(b);
+      return h('li', { className: 'badge-parent', role: 'group', ariaLabel: libelleBadgeParent(b) },
+        h('strong', { className: 'carte-parent-titre' }, `${b.emoji} ${b.nom}`),
+        h('p', { className: 'carte-parent-reperes' }, reperesBadge(b).join(' · ')),
+        note && h('p', { className: 'doux carte-parent-note' }, note),
+        paliersDeVersion(b, b.versions.find((v) => v.active)),
+        galerie(b));
     }))];
 }
 
@@ -853,6 +896,7 @@ function carteRetournee(donnees, c) {
 
 async function ecranBadges(profil) {
   const donnees = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  retenirCalquesBadge(donnees);
   const { nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = donnees;
   donnees.aRetourner ??= [];
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
@@ -909,6 +953,7 @@ function cartesDuGainEcran(profil, gain) {
   const zone = h('div', { className: 'cartes-gain', hidden: true });
   if (!gain.paliers?.length && !gain.lignes?.length) return zone;
   api(`eleves/${profil.slug}/badges`).then((donnees) => {
+    retenirCalquesBadge(donnees);
     donnees.aRetourner ??= [];
     const retourner = (c) => { carteRetournee(donnees, c); retenirRecompenses(profil, donnees); barreNav(profil); dessiner(); };
     const dessiner = () => {
@@ -1060,11 +1105,15 @@ function ceremonie(c, { son, slug, retourner }) {
 // holographique qui suit le pointeur. Le dos dit ce que le Badge salue, la date, le prochain Palier en mots, puis la
 // ligne de Badge (`ligneBadge`), seule jauge du système, sans chiffre ; ses noms de Palier sont dits par le texte
 // alternatif. Une surprise est violette (`palier-unique`).
-function carteBadge(b, nouveau) {
-  const palier = b.surprise ? 'unique' : b.palier, art = artDeBadge(b, rangDeCarte(b)), dos = dosCarteBadge(b, jourEnMots);
+// `calques` : ceux de la version choisie par le parent (#238), sinon le dessin du code. `apercu` : la face seule, sans geste,
+// pour la Vue parent.
+let calquesBadgeChoisis = {}; // { id: calques }, de GET …/badges (calquesBadge)
+const retenirCalquesBadge = (donnees) => { calquesBadgeChoisis = donnees.calquesBadge ?? {}; };
+function carteBadge(b, nouveau, { calques, apercu = false } = {}) {
+  // Un aperçu montre la version donnée (null : le dessin du code) ; la carte de l'Élève, celle que le parent a choisie.
+  const palier = b.surprise ? 'unique' : b.palier, art = (apercu ? calques : calquesBadgeChoisis[b.id]) ?? artDeBadge(b, rangDeCarte(b)), dos = dosCarteBadge(b, jourEnMots);
   const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
-  const el = h('button', { type: 'button', className: `carte-ligne-carte carte-badge-carte ${palier}`, ariaPressed: 'false',
-    ariaLabel: `${libelleCarteBadge(b, jourEnMots, nouveau)} ${dos.prochain}`, style: `--ligne: var(--palier-${palier}); --sur-ligne: var(--sur-accent)` },
+  const el = h(apercu ? 'div' : 'button', { ...(apercu ? { ariaHidden: 'true' } : { type: 'button', ariaPressed: 'false', ariaLabel: `${libelleCarteBadge(b, jourEnMots, nouveau)} ${dos.prochain}` }), className: `carte-ligne-carte carte-badge-carte ${palier}${apercu ? ' apercu' : ''}`, style: `--ligne: var(--palier-${palier}); --sur-ligne: var(--sur-accent)` },
   h('div', { className: 'cl-incl' },
     h('div', { className: 'cl-face cl-avant' },
       h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', art.l1), calque('cl-l2', art.l2)),
@@ -1076,11 +1125,11 @@ function carteBadge(b, nouveau) {
       h('div', { className: 'cl-reflet', ariaHidden: 'true' }),
       aFeuilleHolo(b) && h('div', { className: 'cl-holo', ariaHidden: 'true' }),
       nouveau && h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau')),
-    h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
+    !apercu && h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
       h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue),
       !b.surprise && ligneBadge(b, () => false),
       h('small', {}, dos.date, b.surprise ? '' : ` ${dos.prochain}`))));  // le cartouche « Unique » dit déjà « surprise »
-  animerCarte(el);
+  if (!apercu) animerCarte(el);
   return el;
 }
 

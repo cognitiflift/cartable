@@ -17,6 +17,7 @@ import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
 import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
+import { choisirVersionBadge, calquesBadgesActifs } from './lib/cartes-badge.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
 import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, reparationDeSerie, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
@@ -25,7 +26,7 @@ import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/prep
 import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees, choisirVersion } from './lib/cartes.js';
 import { consignesCarte, promptCarte } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
+import { FAMILLES, SURPRISES, calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
 import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
@@ -765,6 +766,19 @@ async function api(req, res, segments) {
       if (statut === 'sans-version') throw new HttpError(404, 'Version introuvable');
       return json(res, 200, { statut });
     }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'badge-version') {
+    // Version active d'une carte de Badge (#238) : une par Famille ou badge surprise, pour tous ses Paliers. Même règles que
+    // pour une carte de ligne : remplace celle de l'Élève dans Mes badges, ne touche pas au retournement.
+    if (m === 'POST') {
+      const { id: badge, version } = await lireCorps(req);
+      if (![...FAMILLES, ...SURPRISES].some((b) => b.id === badge)) throw new HttpError(404, 'Badge introuvable');
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        const r = choisirVersionBadge(avant, badge, version);
+        return [r.fichier, r];
+      });
+      if (statut === 'sans-version') throw new HttpError(404, 'Version introuvable');
+      return json(res, 200, { statut });
+    }
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
@@ -845,7 +859,7 @@ async function api(req, res, segments) {
       const { fichier, calcul, cartes, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
       if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
       const jours = calendrier({ lecons, evenements, paliers: paliersObtenus(fichier, calcul), maintenant });
-      return json(res, 200, { ...vueMesBadges(fichier, calcul), ...vueCartes(cartes), totaux, calendrier: jours });
+      return json(res, 200, { ...vueMesBadges(fichier, calcul), ...vueCartes(cartes), calquesBadge: calquesBadgesActifs(cartes), totaux, calendrier: jours });
     }
   } else if (r2 === 'cartes' && id === 'retournement' && !r3) {
     // Retournement d'une carte (#183) : { type: 'ligne', id } ou { type: 'palier', id, palier } ; idempotent.

@@ -927,4 +927,4 @@ const serveur = http.createServer(async (req, res) => {
 
 await store.reprendreCartes(reprendreCompositions);
 for (const { slug } of await store.listerEleves()) composerCartes(slug); // les cartes restées « à composer »
-serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT })));
+serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT, adressePublique: process.env.ADRESSE_PUBLIQUE })));

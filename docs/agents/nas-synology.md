@@ -76,6 +76,7 @@ Dans le dossier du dépôt, en SSH :
 ## 5. Pare-feu et réseau
 
 - Panneau de configuration > Sécurité > Pare-feu : créer une règle qui **autorise** le port de l'appli (`PORT`) pour le sous-réseau de la maison seulement (par exemple `192.168.1.0/24`, à adapter à celui du routeur), puis une règle qui **refuse** ce port pour tout le reste. Activer le pare-feu. À confirmer : l'ordre des règles et la prise en compte du trafic Docker (le port publié par Docker passe par une chaîne de pare-feu qui peut contourner celui de DSM) ; tester depuis un appareil hors du sous-réseau, par exemple un téléphone en 4G.
+- **Règle SSH, à créer avant d'activer le pare-feu** : dès que le pare-feu est actif, un « Tous / Tous / Refuser » final (ou une règle par pays qui ne reconnaît pas les adresses privées) coupe aussi le port 22, donc `ssh` et `npm run publier`. Créer une règle qui **autorise** TCP 22 pour le même sous-réseau de la maison, et la placer **au-dessus** de toute règle « Refuser » et des règles par pays (glisser avec la poignée `≡`, puis Appliquer). Sans elle, on perd l'accès SSH au NAS. Constaté sur DSM 7.1.1 : l'activation du pare-feu a fait expirer la connexion SSH tant que cette règle manquait. Le même risque vaut pour tout autre service du NAS que l'on veut garder joignable sur le réseau local (SMB, par exemple) : une règle d'autorisation chacun.
 - **Aucune redirection de port** dans le routeur pour ce port. **Pas de QuickConnect** pour l'appli.
 - Quiconque atteint le port a accès à toutes les Espaces personnels et dépense l'abonnement du parent : c'est la raison de ces règles.
 
@@ -132,5 +133,6 @@ Ce qui n'est pas testable en CI (Docker, DSM, pare-feu, routeur, jeton réel). �
 - [ ] L'heure est belge : « aujourd'hui » et la Série de jours basculent à minuit à Bruxelles.
 - [ ] Redémarrer le NAS : le conteneur revient seul, l'accueil répond, l'état est « sain ».
 - [ ] Depuis un appareil hors du sous-réseau (téléphone en 4G) : le port de l'appli ne répond pas.
+- [ ] Pare-feu actif (réglage « Activer le pare-feu » coché **et appliqué**) et SSH répond encore depuis le PC : la règle d'autorisation du port 22 est au-dessus de tout « Refuser ».
 - [ ] Publier une version d'essai (un changement trivial poussé sur `main`) : `npm run publier` passe, le conteneur redémarre, `eleves/` est intact ; un `git pull` impossible ou un test cassé arrête le script sans redémarrer.
 - [ ] Jeton : date d'expiration notée (un an) ; avec un faux jeton, l'appli affiche le message « jeton expiré ou révoqué ».

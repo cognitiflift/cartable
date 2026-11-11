@@ -11,7 +11,7 @@ test('la Trousse donne le format, les zones calmes, l’exactitude, les symboles
   const t = consignesCarte();
   assert.match(t, /200 × 280/);
   assert.match(t, /haut à gauche/i);
-  assert.match(t, /y 185/);
+  assert.match(t, /pastille/);
   assert.match(t, /exact/i);
   assert.match(t, /symbole/i);
   assert.match(t, /clignot/i);

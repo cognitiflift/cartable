@@ -921,9 +921,6 @@ function ceremonie(c, { son, slug, retourner }) {
     jouerCarillon(ligne ? 4 : rangDeCarte(badge) /* carte de ligne : rang fixe, le plus long (voir public/carillon.js) */, { actif: son });
     const vraie = ligne ? carteLigne(c.ligne) : carteBadge(badge, false);
     vraie.classList.add('entree');
-    const stations = [...vraie.querySelectorAll('.cl-ligne .station')];
-    stations.forEach((st, i) => st.style.setProperty('--i', String(i)));
-    vraie.style.setProperty('--pas', `${Math.min(0.18, 1.2 / Math.max(stations.length, 1)).toFixed(3)}s`);
     scene.replaceChildren(vraie, h('div', { className: 'cer-eclats', ariaHidden: 'true' }, Array.from({ length: 18 }, (_, i) => {
       const a = (i / 18) * Math.PI * 2, d = 90 + (i % 3) * 30;
       return h('i', { style: `--dx:${(Math.cos(a) * d).toFixed(0)}px; --dy:${(Math.sin(a) * d).toFixed(0)}px; animation-delay:${(1.5 + (i % 4) * 0.03).toFixed(2)}s` });
@@ -1055,8 +1052,8 @@ const carteADecouvrir = (b) => h('div', { className: 'carte-badge-carte verrou',
   h('div', { className: 'cl-face', ariaHidden: 'true' }, h('span', { className: 'cl-emoji' }, b.emoji), h('strong', {}, b.nom), h('p', {}, b.phrase)));
 
 // La carte de ligne (spec #182, #185) : une Leçon Acquise, gardée pour toujours. 5 sur 7, cadre à la couleur de la
-// Catégorie, trois calques (l1 fond, l2 décor, héros qui peut déborder) en parallaxe sous la ligne de la Leçon, dessinée
-// par `ligneLecon` (une station par Objectif) ; le terminus « Acquis ✓ » en est détaché pour passer au-dessus du héros.
+// Catégorie, trois calques (l1 fond, l2 décor, héros qui peut déborder) en parallaxe. Rien ne traverse le dessin : les stations (une par Objectif,
+// toutes Retenues) et le ✓ d'Acquisition sont de petits crans dans une pastille en bas à droite, comme sur la carte de Badge (#232).
 // Face : titre en haut, Catégorie en bas, sur un voile. Dos : cartouche, nom, ce que la carte salue, date. Un bouton :
 // toucher ou Entrée la retourne. Les calques sont déjà filtrés par le serveur ; la scène générique vient du code.
 const jourEnMots = (jour) => `le ${new Date(`${jour}T12:00:00`).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }).replace(/^1 /, '1er ')}`;
@@ -1086,22 +1083,23 @@ function animerCarte(el) {
   el.addEventListener('click', () => { const retournee = el.classList.toggle('retournee'); el.ariaPressed = String(retournee); regarder(); });
 }
 
+const CRANS_MAX = 8; // la pastille d'une carte de ligne (#232) ; DESIGN.md « Les stations »
 function carteLigne(c) {
   const cle = cleCategorieCarte(c.categorie), calques = calquesDeCarte(c), dos = dosCarteLigne(c, jourEnMots);
-  const ligne = ligneLecon({ objectifs: objectifsDeCarte(c.objectifs), maitrise: { palier: 'acquis', pourcentage: 100 } });
-  const terminus = ligne.querySelector('.terminus');
-  terminus.removeAttribute('title'); // pas de pourcentage : le terminus allumé est la seule annonce
-  terminus.remove();
+  // Une station par Objectif (tous Retenus), en petits crans comme ceux d'une carte de Badge, puis le ✓ de l'Acquisition.
+  const nCrans = Math.min(objectifsDeCarte(c.objectifs).length, CRANS_MAX); // au-delà, la pastille ne grossit plus : le texte alternatif dit le compte exact
+  const crans = Array.from({ length: nCrans }, (_, i) => h('i', { style: `--i:${i}` }));
   const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
   const el = h('button', { type: 'button', className: `carte-ligne-carte ${cle}`, ariaPressed: 'false', ariaLabel: libelleCarteLigne(c, jourEnMots),
-    style: `--ligne: var(--ligne-${cle}); --n: ${Math.max(1, c.objectifs ?? 1)}` },
+    style: `--ligne: var(--ligne-${cle})` },
   h('div', { className: 'cl-incl' },
     h('div', { className: 'cl-face cl-avant' },
-      h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', calques.l1), calque('cl-l2', calques.l2), h('div', { className: 'cl-ligne' }, ligne)),
+      h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', calques.l1), calque('cl-l2', calques.l2)),
       h('div', { className: 'cl-bord', ariaHidden: 'true' }),
       calque('cl-heros', calques.heros),
-      h('div', { className: 'cl-texte', ariaHidden: 'true' }, h('span', { className: 'cl-titre' }, c.titre), h('span', { className: 'cl-etiquette' }, c.categorie)),
-      h('div', { className: 'cl-terminus', ariaHidden: 'true' }, terminus),
+      h('div', { className: 'cl-texte', ariaHidden: 'true' }, h('span', { className: 'cl-titre' }, c.titre),
+        h('span', { className: 'cl-bas' }, h('span', { className: 'cl-etiquette' }, c.categorie),
+          h('span', { className: 'cl-crans cl-stations', style: `--nc:${nCrans}` }, crans, h('b', { className: 'cl-acquis' }, '✓')))),
       h('div', { className: 'cl-reflet', ariaHidden: 'true' })),
     h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
       h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue), h('small', {}, dos.date))));

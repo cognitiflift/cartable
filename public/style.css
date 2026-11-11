@@ -480,17 +480,17 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .cl-heros svg { filter:drop-shadow(0 .35rem .5rem rgb(var(--ombre) / .35)); }
 .carte-ligne-carte.actif .cl-calque { transition:transform .08s linear; }
 .cl-bord { position:absolute; inset:0; border-radius:18px; box-shadow:inset 0 0 0 .3rem var(--ligne); pointer-events:none; }
-/* La ligne : même grammaire que celle de l'accueil (ligneLecon), à l'échelle de la carte ; le trait sort du cadre. */
-.cl-ligne { position:absolute; left:0; right:0; top:58%; padding:0 .3rem 0 0; --st:min(1.35rem, calc(66cqw / var(--n))); }
-.cl-ligne .ligne { min-height:0; }
-.cl-ligne .ligne::before { content:""; flex:0 0 6cqw; height:.4rem; background:var(--ligne); box-shadow:0 0 0 .12rem var(--sur-nuit); }
-.cl-ligne .troncon { height:.4rem; min-width:0; margin:0 -.1rem; box-shadow:0 0 0 .12rem var(--sur-nuit); }
-.cl-ligne .station { width:var(--st); height:var(--st); border-width:calc(var(--st) * .2); box-shadow:0 0 0 .12rem var(--sur-nuit); }
+/* Les stations de la carte (#232) : une pastille en bas à droite, comme les crans d'une carte de Badge. Un cran par Objectif
+   (tous Retenus, en `retenu`), puis le ✓ de l'Acquisition ; ils rétrécissent pour que n tiennent. */
+.cl-stations { --pt:max(.45rem, min(.6rem, calc(42cqw / var(--nc)))); flex:0 0 auto; align-items:center; gap:min(.25rem, calc(8cqw / var(--nc))); margin-left:auto; }
+.cl-stations i { width:var(--pt); height:var(--pt); background:var(--retenu); box-shadow:0 0 0 .1rem var(--sur-nuit); }
+.cl-acquis { margin-left:.15rem; font:800 .78rem/1 var(--police-titre); color:var(--sur-nuit); }
+/* Une Catégorie longue ou beaucoup de crans : la pastille passe seule sur sa rangée, à droite, plutôt que d'écraser le mot. */
+.carte-ligne-carte .cl-bas { flex-wrap:wrap; row-gap:.3rem; align-items:flex-end; }
+.carte-ligne-carte .cl-etiquette { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cl-texte { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; padding:.7rem .75rem .6rem; border-radius:18px; background:linear-gradient(to bottom, rgb(var(--ombre) / .62), transparent 30%, transparent 78%, rgb(var(--ombre) / .55)); pointer-events:none; }
 .cl-titre { max-width:92%; font:800 .92rem/1.15 var(--police-titre); text-wrap:balance; overflow-wrap:anywhere; text-shadow:0 1px 5px rgb(var(--ombre) / .7); }
 .cl-etiquette { font-size:.78rem; line-height:1.2; color:var(--sur-nuit); text-shadow:0 1px 5px rgb(var(--ombre) / .7); }
-.cl-terminus { position:absolute; right:5cqw; top:68%; pointer-events:none; }
-.cl-terminus .terminus { box-shadow:0 0 0 .2rem var(--nuit); }
 .cl-reflet { position:absolute; inset:0; border-radius:18px; pointer-events:none; mix-blend-mode:soft-light; opacity:0; transition:opacity .3s; background:radial-gradient(circle at calc(50% + var(--px) * 50%) calc(50% + var(--py) * 50%), var(--sur-nuit), transparent 55%); }
 .carte-ligne-carte.actif .cl-reflet { opacity:.5; }
 .cl-dos { transform:rotateY(180deg); display:flex; flex-direction:column; gap:.45rem; padding:.9rem .8rem; overflow:auto; background:var(--carte); color:var(--texte); box-shadow:inset 0 0 0 .3rem var(--ligne), 0 10px 26px rgb(var(--ombre) / .25); }
@@ -589,10 +589,10 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .carte-ligne-carte.entree .cl-incl { animation:cer-retourne .45s ease-out backwards; }
 .entree .cl-l1 svg { animation:cer-entre .4s ease-out .4s backwards; }
 .entree .cl-l2 svg { animation:cer-entre .4s ease-out .7s backwards; }
-.entree .cl-ligne { animation:cer-entre .4s ease-out .95s backwards; }
 .entree .cl-heros svg { animation:cer-chute .6s cubic-bezier(.25, 1, .5, 1) 1.3s backwards; }
-.entree .cl-ligne .station { animation:cer-allume .3s ease-out calc(1.1s + var(--i, 0) * var(--pas, .18)) backwards; }
-.entree .cl-terminus { animation:cer-entre .4s ease-out 1.4s backwards; }
+.entree .cl-stations { animation:cer-entre .4s ease-out .95s backwards; }
+.entree .cl-stations i { animation:cer-allume .3s ease-out calc(1.1s + var(--i, 0) * min(.18s, calc(1.2s / var(--nc)))) backwards; }
+.entree .cl-acquis { animation:cer-allume .3s ease-out calc(1.1s + var(--nc) * min(.18s, calc(1.2s / var(--nc)))) backwards; }
 .cer-eclats { position:absolute; left:50%; top:42%; width:0; height:0; pointer-events:none; }
 .cer-eclats i { position:absolute; width:.55rem; height:.55rem; border-radius:50%; background:var(--nouveau); opacity:0; animation:cer-gerbe 1.1s ease-out forwards; }
 @media (prefers-reduced-motion: reduce) { .cer-eclats { display:none; } .cl-cachee-face { transition:none; } }

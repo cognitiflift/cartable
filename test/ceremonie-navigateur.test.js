@@ -76,8 +76,11 @@ async function ouvrirBadges(slug, { largeur = 1024, mouvementReduit = false } = 
   await cdp.envoyer('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mouvementReduit ? 'reduce' : 'no-preference' }] });
   await cdp.envoyer('Page.navigate', { url: base });
   await jusqua(() => cdp.evaluer(`document.readyState === 'complete' && !!document.getElementById('app')`), 'page chargée');
-  await cdp.evaluer(`localStorage.setItem('pseudo', ${JSON.stringify(slug)}); location.hash = '#/badges'; true`);
-  await jusqua(() => cdp.evaluer(`!!document.querySelector('.cl-nouvelles .carte-cachee')`), 'carte face cachée affichée');
+  // Pseudo et adresse posés, puis rechargement : une seule navigation de l'appli, sans route() de l'écran de choix encore en
+  // vol qui redessinerait la page sous l'assertion (cause probable de l'échec intermittent, #229).
+  await cdp.evaluer(`localStorage.setItem('pseudo', ${JSON.stringify(slug)}); true`);
+  await cdp.envoyer('Page.navigate', { url: `${base}?badges=${Date.now()}#/badges` }); // vraie navigation (la requête change), pas un simple changement de hash
+  await jusqua(() => cdp.evaluer(`document.readyState === 'complete' && location.hash === '#/badges' && document.getElementById('app')?.ariaBusy === 'false' && !!document.querySelector('.cl-nouvelles .carte-cachee .cl-medaillon')`), 'Mes badges au repos, carte face cachée affichée');
 }
 
 const clic = (sel) => cdp.evaluer(`document.querySelector(${JSON.stringify(sel)}).click(); true`);

@@ -4626,3 +4626,25 @@ test('🔟 Série pleine : la fin de Révision du jour note le nombre de Questio
   assert.equal((await fin({ questions: 'dix' }, LENDEMAIN)).status, 200);
   assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'revision-terminee').map((e) => e.questions), [10, undefined]);
 });
+
+// Badges surprise de Mémoire et progression (#220) : l'événement `niveau-atteint` et « Haut niveau ».
+test('Badges surprise : « Haut niveau » d\'après l\'événement `niveau-atteint`, noté une seule fois, avec sa phrase', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Niveau-Test', age: 10, niveau: 'Primaire 5' })).status, 201);
+  const slug = 'niveau-test';
+  const lecon = await avecFichier('objectifs-elargis', async () => (await appel(`/api/eleves/${slug}/lecons`, 'POST', { sujet: 'les volcans' }, le('2026-11-12T12:00:00.000Z'))).data);
+  const score = (jour, objectifs) => appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', { score: 90, page: '0002-volcans.html', objectifs }, le(`2026-11-${jour}T12:00:00.000Z`));
+  const niveaux = async () => (await evenementsDe(slug)).filter((e) => e.type === 'niveau-atteint');
+  assert.equal((await score('13', [1, 2, 3])).data.niveauLecon, 4);
+  assert.deepEqual(await niveaux(), [], 'Niveau 4 : rien');
+  const url = `/api/eleves/${slug}/badges`;
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-13T13:00:00.000Z'))).data, 'haut-niveau'), undefined);
+  assert.equal((await score('14', [4])).data.niveauLecon, 5);
+  assert.deepEqual(await niveaux(), [{ type: 'niveau-atteint', date: '2026-11-14T12:00:00.000Z', lecon: lecon.id, niveau: 5 }]);
+  await score('15', [1, 2, 3, 4]);
+  assert.equal((await niveaux()).length, 1, 'une seule fois par Leçon et par niveau');
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-15T13:00:00.000Z'))).data;
+  const haut = badgeDe(vue, 'haut-niveau');
+  assert.deepEqual({ jour: haut.jour, palier: haut.palier, surprise: haut.surprise }, { jour: '2026-11-14', palier: 'unique', surprise: true });
+  assert.match(haut.phrase, /Niveau 5/);
+  assert.equal(badgeDe(vue, 'sommet'), undefined);
+});

@@ -37,7 +37,7 @@ colors:
   ligne-geographie: "#0e7490"
   ligne-langues: "#9333ea"
   ligne-arts: "#db2777"
-  ligne-numerique: "#4338ca"
+  ligne-numerique: "#4f2fd0"
   ligne-autre: "#4b5563"
   fond-sombre: "#0f1220"
   carte-sombre: "#1a1e30"
@@ -70,7 +70,7 @@ colors:
   ligne-geographie-sombre: "#38bdf8"
   ligne-langues-sombre: "#c084fc"
   ligne-arts-sombre: "#f472b6"
-  ligne-numerique-sombre: "#818cf8"
+  ligne-numerique-sombre: "#8b7cf6"
   ligne-autre-sombre: "#9ca3af"
 typography:
   display:

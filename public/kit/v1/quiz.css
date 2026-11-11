@@ -23,7 +23,7 @@
 [data-categorie="geographie"]    { --kit-accent: #0e7490; }
 [data-categorie="langues"]       { --kit-accent: #9333ea; }
 [data-categorie="arts"]          { --kit-accent: #db2777; }
-[data-categorie="numerique"]     { --kit-accent: #4338ca; }
+[data-categorie="numerique"]     { --kit-accent: #4f2fd0; }
 [data-categorie="autre"]         { --kit-accent: #4b5563; }
 /* --kit-accent-fort : l'accent des textes et des aplats sous texte blanc ; en clair, la couleur de ligne foncée de
    DESIGN.md (82 % de ligne, 18 % d'encre noire), pour un contraste AA sur le fond comme sous --kit-sur-accent. */
@@ -47,7 +47,7 @@
   [data-categorie="geographie"]    { --kit-accent: #38bdf8; }
   [data-categorie="langues"]       { --kit-accent: #c084fc; }
   [data-categorie="arts"]          { --kit-accent: #f472b6; }
-  [data-categorie="numerique"]     { --kit-accent: #818cf8; }
+  [data-categorie="numerique"]     { --kit-accent: #8b7cf6; }
   [data-categorie="autre"]         { --kit-accent: #9ca3af; }
   /* En sombre, la ligne elle-même porte le texte sombre --kit-sur-accent. */
   :root, [data-categorie] {

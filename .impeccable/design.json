@@ -430,13 +430,13 @@
       "ligne-numerique": {
         "role": "secondary",
         "displayName": "Ligne Numérique",
-        "canonical": "#4338ca",
+        "canonical": "#4f2fd0",
         "oklch": "oklch(44.1% 0.2 276)",
         "tonalRamp": [
           "#05021c",
           "#150f4e",
           "#2a2090",
-          "#4338ca",
+          "#4f2fd0",
           "#6366f1",
           "#8e95f8",
           "#c3c8fc",
@@ -855,7 +855,7 @@
       "ligne-numerique-sombre": {
         "role": "secondary",
         "displayName": "Ligne Numérique (sombre)",
-        "canonical": "#818cf8",
+        "canonical": "#8b7cf6",
         "oklch": "oklch(67.3% 0.182 277)",
         "tonalRamp": [
           "#06041b",
@@ -863,7 +863,7 @@
           "#2d2587",
           "#4a43c1",
           "#6a68e0",
-          "#818cf8",
+          "#8b7cf6",
           "#b7bdfc",
           "#e9ebff"
         ],

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { consignesCarte, promptCarte } from '../lib/carte-agent.js';
+import { consignesCarte, promptCarte, consignesBadge, promptBadge } from '../lib/carte-agent.js';
 import { JETONS, CLASSES, TAILLE_MAX } from '../lib/carte-svg.js';
 
 const carte = { lecon: '2026-11-10-les-volcans', titre: 'Les volcans', categorie: 'Sciences', objectifs: 4 };
@@ -40,4 +40,28 @@ test('le prompt donne l’identifiant, le sujet, la Catégorie et les titres des
   for (const o of titresObjectifs) assert.ok(p.includes(o));
   assert.match(promptCarte({ ...carte, categorie: 'Numérique' }, []), /var\(--ligne-numerique\)/);
   assert.match(promptCarte({ ...carte, categorie: 'Cuisine' }, []), /var\(--ligne-autre\)/);
+});
+
+test('Trousse de Badge : les règles du filtre et les animations des cartes de ligne, plus une consigne propre', () => {
+  const t = consignesBadge();
+  for (const j of JETONS) assert.ok(t.includes(`--${j}`), `--${j}`);
+  for (const c of CLASSES) assert.ok(t.includes(c), c);
+  assert.match(t, new RegExp(String(TAILLE_MAX)));
+  assert.match(t, /"l1".*"l2".*"heros"/s);
+  assert.match(t, /symboles? de cette Famille/i);
+  assert.match(t, /même pour tous les Paliers/i);
+  assert.match(t, /zones calmes/);
+  assert.match(t, /AUCUNE station/);
+  assert.match(t, /AUCUN texte/);
+  assert.doesNotMatch(t, /pastille/); // la scène d'une carte de ligne n'est pas celle d'un Badge
+});
+
+test('Prompt de Badge : identifiant (préfixe des dégradés), nom, emoji et ce que le badge salue', () => {
+  const famille = { id: 'memoire', emoji: '🧠', nom: 'Mémoire', phrase: 'Les Objectifs qui restent en mémoire.', surprise: false };
+  const p = promptBadge(famille);
+  assert.match(p, /Identifiant de la carte : memoire/);
+  assert.match(p, /Mémoire 🧠/);
+  assert.match(p, /restent en mémoire/);
+  assert.match(p, /Famille de Badges/);
+  assert.match(promptBadge({ ...famille, id: 'cliche', nom: 'Cliché !', surprise: true }), /badge surprise/);
 });

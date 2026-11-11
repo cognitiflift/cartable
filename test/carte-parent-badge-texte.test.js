@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reperesBadge, noteBadge, libelleChoisirBadge, libelleBadgeParent, libellePalierApercu, origineVersion } from '../public/carte-parent-badge-texte.js';
+import { reperesBadge, noteBadge, libelleChoisirBadge, libelleBadgeParent, libellePalierApercu, origineVersion, libelleRegenererBadge, notesRegenerationBadge, badgeRegenerationAbandonnee } from '../public/carte-parent-badge-texte.js';
 
 const famille = (obtenus) => ({ nom: 'Mémoire', surprise: false, trouve: obtenus > 0, versionActive: 1, versions: [{ numero: 1, code: true }],
   paliers: ['bronze', 'argent', 'or', 'diamant'].map((palier, i) => ({ palier, obtenu: i < obtenus })) });
@@ -25,4 +25,15 @@ test('libellés : le choix dit qu’il vaut pour tous les Paliers', () => {
   assert.equal(libellePalierApercu('unique'), 'Surprise');
   assert.equal(libellePalierApercu('or'), 'Or');
   assert.equal(origineVersion({ code: true }), 'Dessin d’origine');
+});
+
+test('régénération : libellés, version en cours, abandon averti', () => {
+  const b = { ...famille(1), regeneration: false, echecRegeneration: false };
+  assert.match(libelleRegenererBadge(b), /Régénérer la carte de Badge « Mémoire » .* tous ses Paliers/);
+  assert.deepEqual(notesRegenerationBadge(b), []);
+  assert.deepEqual(notesRegenerationBadge({ ...b, regeneration: true }), ['Une nouvelle version est en cours : elle arrivera dans la galerie, la version active ne change pas.']);
+  assert.match(notesRegenerationBadge({ ...b, echecRegeneration: true })[0], /abandonnée après deux essais ratés\. La version active n’a pas changé/);
+  assert.equal(badgeRegenerationAbandonnee({ ...b, echecRegeneration: true }), true);
+  assert.equal(badgeRegenerationAbandonnee({ ...b, regeneration: true, echecRegeneration: true }), false);
+  assert.match(libelleBadgeParent({ ...b, regeneration: true }), /nouvelle version en cours/);
 });

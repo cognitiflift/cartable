@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { versionsDeBadge, versionActiveBadge, ajouterVersionBadge, choisirVersionBadge, calquesBadgesActifs, vueParentBadges } from '../lib/cartes-badge.js';
+import { versionsDeBadge, versionActiveBadge, ajouterVersionBadge, choisirVersionBadge, calquesBadgesActifs, vueParentBadges, demanderRegenerationBadge, prochainBadgeARegenerer, commencerRegenerationBadge, terminerRegenerationBadge, echouerRegenerationBadge, reprendreRegenerationsBadge, ajouterCoutBadge } from '../lib/cartes-badge.js';
 import { FAMILLES, SURPRISES } from '../lib/badges.js';
 
 const T0 = Date.parse('2026-11-12T10:00:00.000Z');
@@ -74,4 +74,64 @@ test('vue parent : la version active et ses calques suivent le choix', () => {
   assert.equal(c.versionActive, 2);
   assert.deepEqual(c.versions.map((v) => [v.numero, v.active, v.code]), [[1, false, true], [2, true, false]]);
   assert.deepEqual(c.versions[1].calques, CALQUES);
+});
+
+// Régénération (#239) : demandée → en cours → version ajoutée, ou deux essais ratés → abandon, version active inchangée.
+const regen = (f, id) => f?.badges?.[id]?.regeneration;
+test('régénération : demander, commencer, terminer ajoute une version sans changer l’active', () => {
+  const d = demanderRegenerationBadge(null, 'memoire');
+  assert.equal(d.statut, 'demandee');
+  assert.deepEqual(regen(d.fichier, 'memoire'), { etat: 'demandee', essais: 0 });
+  assert.equal(prochainBadgeARegenerer(d.fichier), 'memoire');
+  assert.equal(demanderRegenerationBadge(d.fichier, 'memoire').statut, 'deja');
+  assert.equal(demanderRegenerationBadge(d.fichier, 'memoire').fichier, d.fichier);
+  const c = commencerRegenerationBadge(d.fichier, 'memoire');
+  assert.deepEqual(regen(c, 'memoire'), { etat: 'en-cours', essais: 1 });
+  assert.equal(prochainBadgeARegenerer(c), null);
+  assert.equal(commencerRegenerationBadge(c, 'memoire'), c, 'sans effet hors « demandée »');
+  const f = terminerRegenerationBadge(c, 'memoire', CALQUES, T0);
+  assert.equal(regen(f, 'memoire'), undefined);
+  assert.deepEqual(versionsDeBadge(f, 'memoire').map((v) => v.numero), [1, 2]);
+  assert.equal(versionActiveBadge(f, 'memoire'), 1);
+  assert.equal(terminerRegenerationBadge(f, 'memoire', CALQUES, T0), f, 'sans effet sans régénération en cours');
+});
+
+test('régénération : deux essais ratés, abandon averti, versions et active inchangées ; une demande suivante efface l’avertissement', () => {
+  let f = choisirVersionBadge(ajouterVersionBadge(null, 'curieux', CALQUES, T0), 'curieux', 2).fichier;
+  f = commencerRegenerationBadge(demanderRegenerationBadge(f, 'curieux').fichier, 'curieux');
+  f = echouerRegenerationBadge(f, 'curieux', T0);
+  assert.deepEqual(regen(f, 'curieux'), { etat: 'demandee', essais: 1 }, 'un essai de plus');
+  f = echouerRegenerationBadge(commencerRegenerationBadge(f, 'curieux'), 'curieux', T0);
+  assert.equal(regen(f, 'curieux'), undefined);
+  assert.equal(f.badges.curieux.echecRegeneration, '2026-11-12T10:00:00.000Z');
+  assert.deepEqual([versionsDeBadge(f, 'curieux').length, versionActiveBadge(f, 'curieux')], [2, 2]);
+  assert.equal(vueParentBadges(f, null).badges.find((b) => b.id === 'curieux').echecRegeneration, true);
+  assert.equal(demanderRegenerationBadge(f, 'curieux').fichier.badges.curieux.echecRegeneration, undefined);
+  assert.equal(echouerRegenerationBadge(f, 'curieux', T0), f, 'sans effet sans régénération en cours');
+});
+
+test('régénération : ajouter une version ou en choisir une garde la demande et le coût', () => {
+  let f = ajouterCoutBadge(demanderRegenerationBadge(null, 'memoire').fichier, 'memoire', { tache: 'carteBadge', coutUsd: 0.5 }, T0);
+  f = choisirVersionBadge(ajouterVersionBadge(f, 'memoire', CALQUES, T0), 'memoire', 2).fichier;
+  assert.deepEqual(regen(f, 'memoire'), { etat: 'demandee', essais: 0 });
+  assert.equal(f.badges.memoire.couts.length, 1);
+});
+
+test('régénération : au redémarrage, un tour interrompu redevient demandé', () => {
+  const f = commencerRegenerationBadge(demanderRegenerationBadge(null, 'memoire').fichier, 'memoire');
+  assert.deepEqual(regen(reprendreRegenerationsBadge(f), 'memoire'), { etat: 'demandee', essais: 1 });
+  const sans = { cartes: {}, badges: {} };
+  assert.equal(reprendreRegenerationsBadge(sans), sans);
+  assert.equal(reprendreRegenerationsBadge(null), null);
+});
+
+test('coût des cartes de Badge : chaque tour est gardé avec le badge et résumé dans la vue parent', () => {
+  let f = ajouterCoutBadge(null, 'memoire', { tache: 'carteBadge', coutUsd: 0.25 }, T0);
+  f = ajouterCoutBadge(f, 'memoire', { tache: 'carteBadge', coutUsd: 0.5 }, T0);
+  assert.equal(ajouterCoutBadge(f, 'memoire', { tache: 'carteBadge' }, T0), f, 'sans coût connu : rien');
+  assert.deepEqual(f.badges.memoire.couts.map((c) => c.coutUsd), [0.25, 0.5]);
+  const b = vueParentBadges(f, null).badges;
+  assert.deepEqual(b.find((x) => x.id === 'memoire').cout, { coutUsd: 0.75, tours: 2 });
+  assert.deepEqual(b.find((x) => x.id === 'curieux').cout, { coutUsd: 0, tours: 0 });
+  assert.equal(b.find((x) => x.id === 'memoire').regeneration, false);
 });

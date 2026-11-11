@@ -9,7 +9,7 @@ import { esquisseCarte } from '/carte-attente-art.js';
 import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, cartesDuGain, ATTENTE, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
-import { INTRO_BADGES, reperesBadge, noteBadge, titreVersionsBadge, libelleVersionBadge, origineVersion, libellePalierApercu, libelleChoisirBadge, libelleBadgeParent } from '/carte-parent-badge-texte.js';
+import { libelleRegenererBadge, notesRegenerationBadge, badgeRegenerationAbandonnee, NOTE_ABANDON_BADGE, INTRO_BADGES, reperesBadge, noteBadge, titreVersionsBadge, libelleVersionBadge, origineVersion, libellePalierApercu, libelleChoisirBadge, libelleBadgeParent } from '/carte-parent-badge-texte.js';
 import { INTRO_CARTES, VIDE_CARTES, reperesCarte, noteCarte, titreVersions, libelleVersion, libelleChoisir, libelleRegenerer, libelleRegenerationEnCours, libelleRegenererCarte, VERSION_EN_COMPOSITION, notesRegeneration, regenerationAbandonnee } from '/carte-parent-texte.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
@@ -316,14 +316,15 @@ const galeriesOuvertes = new Set();
 // « Régénérer » (#237) : un clic, sans confirmation. Le tour part en arrière-plan ; tant qu'un tour travaille, la rubrique
 // regarde de temps en temps si l'état a changé (version arrivée, abandon) et s'affiche alors à jour.
 const SONDE_REGENERATION_MS = 4000;
-const regenerations = (lignes) => lignes.filter((c) => c.regeneration).map((c) => c.lecon).join();
-function surveillerRegenerations(lignes, contexte, ancre) {
-  if (!regenerations(lignes)) return;
+// `sorte` : « lignes » (cartes de ligne, identifiées par leur Leçon) ou « badges » (cartes de Badge, #239, par leur id).
+const regenerations = (liste) => liste.filter((c) => c.regeneration).map((c) => c.lecon ?? c.id).join();
+function surveillerRegenerations(liste, contexte, ancre, sorte = 'lignes') {
+  if (!regenerations(liste)) return;
   const attendre = async () => {
     if (!ancre.isConnected) return;
     try {
       const { cartes } = await api(`eleves/${contexte.slug}/parent`);
-      if (regenerations(cartes.lignes) !== regenerations(lignes)) return await contexte.recharger();
+      if (regenerations(cartes[sorte]) !== regenerations(liste)) return await contexte.recharger();
     } catch { /* réseau coupé : on réessaie */ }
     setTimeout(attendre, SONDE_REGENERATION_MS);
   };
@@ -399,6 +400,16 @@ function cartesBadgeParent(badges, contexte) {
     } }, 'Utiliser celle-ci');
     return [bouton, erreur];
   };
+  // « Régénérer » (#239) : même geste et mêmes mots que pour une carte de ligne ; la version vaut pour tous les Paliers.
+  const regenerer = (b) => {
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire regenerer', type: 'button', disabled: b.regeneration, ariaBusy: String(b.regeneration), ariaLabel: libelleRegenererBadge(b), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/badge-regeneration`, { method: 'POST', body: { id: b.id } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, b.regeneration ? libelleRegenerationEnCours : libelleRegenerer);
+    return [bouton, erreur];
+  };
   const galerie = (b) => {
     const cle = `${contexte.slug}/${b.id}`;
     return h('details', { className: 'galerie-versions', open: galeriesBadgeOuvertes.has(cle),
@@ -407,18 +418,26 @@ function cartesBadgeParent(badges, contexte) {
     h('ul', { className: 'versions-badge' }, b.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
       h('strong', {}, libelleVersionBadge(v)), h('span', { className: 'doux' }, origineVersion(v)),
       paliersDeVersion(b, v),
-      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(b, v)))));
+      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(b, v))),
+    b.regeneration && h('li', { className: 'version-en-composition', role: 'status' },
+      h('strong', {}, VERSION_EN_COMPOSITION), h('span', { className: 'doux' }, libelleRegenerationEnCours),
+      h('ul', { className: 'paliers-badge', ariaHidden: 'true' }, b.paliers.map(() => h('li', {}, h('div', { className: 'carte-parent-vide' })))))));
   };
-  return [h('p', { className: 'doux' }, INTRO_BADGES),
+  const rubrique = h('div', { className: 'cartes-rubrique' });
+  rubrique.append(h('p', { className: 'doux' }, INTRO_BADGES),
     h('ul', { className: 'badges-parent' }, badges.map((b) => {
       const note = noteBadge(b);
       return h('li', { className: 'badge-parent', role: 'group', ariaLabel: libelleBadgeParent(b) },
         h('strong', { className: 'carte-parent-titre' }, `${b.emoji} ${b.nom}`),
         h('p', { className: 'carte-parent-reperes' }, reperesBadge(b).join(' · ')),
         note && h('p', { className: 'doux carte-parent-note' }, note),
+        notesRegenerationBadge(b).map((t) => h('p', { className: badgeRegenerationAbandonnee(b) && t === NOTE_ABANDON_BADGE ? 'erreur carte-parent-note' : 'doux carte-parent-note', role: badgeRegenerationAbandonnee(b) && t === NOTE_ABANDON_BADGE ? 'alert' : null }, t)),
         paliersDeVersion(b, b.versions.find((v) => v.active)),
+        regenerer(b),
         galerie(b));
-    }))];
+    })));
+  surveillerRegenerations(badges, contexte, rubrique, 'badges');
+  return rubrique;
 }
 
 // Le sommaire mène à un bloc sans toucher au hash (c'est celui du routeur) ; une cible repliée s'ouvre.

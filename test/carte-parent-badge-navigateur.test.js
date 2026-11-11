@@ -19,7 +19,7 @@ const CHROMIUM = ['chromium', 'chromium-browser', 'google-chrome-stable', 'googl
 const raison = CHROMIUM ? false : 'Chromium absent : test des cartes de Badge en navigateur ignoré';
 if (raison) console.log(`# ${raison}`);
 
-let dossier, serveur, chrome, base, cdp, slug;
+let dossier, serveur, chrome, base, cdp, slug, faux;
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const portLibre = () => new Promise((resolve, reject) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
@@ -70,11 +70,21 @@ before(async () => {
     paliers: { 'memoire/bronze': { retourne: '2026-10-02T10:00:00.000Z' }, 'memoire/argent': { retourne: null } } };
   await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify(ajouterVersionBadge(cartes, 'memoire', CALQUES, Date.parse('2026-11-05T10:00:00.000Z'))));
   await fs.writeFile(path.join(eleves, slug, 'badges.json'), JSON.stringify({ version: 1, badges: { memoire: { bronze: { jour: '2026-10-02', ajoute: '2026-10-02T10:00:00.000Z' }, argent: { jour: '2026-10-20', ajoute: '2026-10-20T10:00:00.000Z' } } } }));
+  // Faux `claude` de la régénération (#239) : rend trois calques conformes, attend tant que `attendre` existe, échoue si `echec` existe.
+  const agent = { l1: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280"><rect width="200" height="280" fill="var(--nuit)"/></svg>', l2: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280"><path d="M0 200 L100 120 L200 200 Z" fill="var(--encre-noire)"/></svg>',
+    heros: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280"><circle id="curieux-regen" cx="100" cy="140" r="60" fill="var(--orange)"/></svg>' };
+  const reponse = JSON.stringify({ result: JSON.stringify(agent), session_id: 's-badge', is_error: false, total_cost_usd: 0.5, duration_ms: 1000, usage: { input_tokens: 10, output_tokens: 100 }, modelUsage: { 'claude-sonnet-test': { costUSD: 0.5 } } });
+  faux = path.join(dossier, 'faux-claude.sh');
+  await fs.writeFile(faux, `#!/bin/sh
+while [ -e '${dossier}/attendre' ]; do sleep 0.05; done
+if [ -e '${dossier}/echec' ]; then printf '%s\\n' '{"result":"You have hit your limit","is_error":true}'; exit 0; fi
+printf '%s\\n' '${reponse}'
+`, { mode: 0o755 });
   const port = await portLibre();
   base = `http://127.0.0.1:${port}/`;
   serveur = spawn(process.execPath, ['server.js'], {
     cwd: RACINE, stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ELEVES_DIR: eleves, CLAUDE_BIN: path.join(dossier, 'pas-de-claude'), CARTABLE_PREPARATION: '0' },
+    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ELEVES_DIR: eleves, CLAUDE_BIN: faux, CARTABLE_PREPARATION: '0' },
   });
   await jusqua(async () => (await fetch(`${base}api/eleves`)).ok, 'serveur démarré');
   chrome = spawn(CHROMIUM, ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--disable-extensions', '--mute-audio',
@@ -104,9 +114,9 @@ async function ouvrirVueParent(largeur, mobile) {
   await cdp.envoyer('Page.navigate', { url: `${base}?parent=${Date.now()}#/parent` });
   await jusqua(() => cdp.evaluer(`!!document.querySelector('.badges-parent .badge-parent')`), 'cartes de Badge affichées');
 }
-async function capturer(nom) {
+async function capturer(nom, cible = `document.querySelector('.badges-parent').closest('section')`) {
   if (!process.env.CAPTURES) return;
-  await cdp.evaluer(`document.querySelector('.badges-parent').closest('section').scrollIntoView(); true`);
+  await cdp.evaluer(`${cible}.scrollIntoView(); true`);
   const { data } = await cdp.envoyer('Page.captureScreenshot', { format: 'png' });
   await fs.mkdir(process.env.CAPTURES, { recursive: true });
   await fs.writeFile(path.join(process.env.CAPTURES, nom), Buffer.from(data, 'base64'));
@@ -152,4 +162,38 @@ test('Vue parent : à 390 px les cartes de Badge ne débordent pas et les bouton
   assert.equal(mesure.boutons, true);
   assert.ok(mesure.paliers >= 60, 'les cartes de Palier restent lisibles');
   await capturer('badges-parent-390.png');
+});
+
+// « Régénérer » sur un Badge (#239) : un clic, l'état « en composition » le temps du tour, la version arrive dans la galerie
+// (rendue à chaque Palier, active inchangée) ; un échec laisse la version active et avertit le parent.
+test('Vue parent : « Régénérer » un Badge ajoute une version, un échec avertit sans rien changer', { skip: raison, timeout: 60_000 }, async () => {
+  await ouvrirVueParent(1024, false);
+  const curieux = `[...document.querySelectorAll('.badges-parent > li')].find((li) => li.textContent.includes('Curieux'))`;
+  await cdp.evaluer(`${curieux}.querySelector('summary').click(); true`);
+  assert.equal(await cdp.evaluer(`${curieux}.querySelector('button.regenerer').textContent`), 'Régénérer');
+  assert.match(await cdp.evaluer(`${curieux}.querySelector('button.regenerer').getAttribute('aria-label')`), /tous ses Paliers/);
+
+  await fs.writeFile(path.join(dossier, 'attendre'), '');
+  await cdp.evaluer(`${curieux}.querySelector('button.regenerer').click(); true`);
+  await jusqua(() => cdp.evaluer(`${curieux}.querySelector('button.regenerer').disabled && ${curieux}.querySelector('.version-en-composition')`), 'en composition');
+  assert.equal(await cdp.evaluer(`${curieux}.querySelector('button.regenerer').textContent`), 'En composition…');
+  assert.equal(await cdp.evaluer(`${curieux}.querySelector('button.regenerer').getAttribute('aria-busy')`), 'true');
+  assert.match(await cdp.evaluer(`${curieux}.textContent`), /Une nouvelle version est en cours/);
+  await capturer('badges-parent-regeneration-1024.png', curieux);
+
+  await fs.rm(path.join(dossier, 'attendre'));
+  await jusqua(() => cdp.evaluer(`${curieux}.querySelectorAll('.versions-badge > li:not(.version-en-composition)').length === 2 && !${curieux}.querySelector('button.regenerer').disabled`), 'version arrivée', 30_000);
+  assert.equal(await cdp.evaluer(`${curieux}.querySelectorAll('.versions-badge > li:nth-child(2) #curieux-regen').length`), 4, 'la nouvelle version rendue à chaque Palier');
+  assert.match(await cdp.evaluer(`${curieux}.querySelector('.carte-parent-reperes').textContent`), /Version 1 active/);
+  assert.equal(await cdp.evaluer(`${curieux}.querySelector('details').open`), true, 'la galerie reste ouverte');
+  assert.equal(await cdp.evaluer(`${curieux}.querySelectorAll(':scope > .paliers-badge #curieux-regen').length`), 0, 'l\u2019active n\u2019a pas changé');
+  await capturer('badges-parent-regeneree-1024.png', curieux);
+
+  await fs.writeFile(path.join(dossier, 'echec'), '');
+  await cdp.evaluer(`${curieux}.querySelector('button.regenerer').click(); true`);
+  await jusqua(() => cdp.evaluer(`${curieux}.querySelector('.carte-parent-note.erreur[role="alert"]')`), 'abandon signalé', 30_000);
+  assert.match(await cdp.evaluer(`${curieux}.querySelector('.carte-parent-note.erreur').textContent`), /abandonnée après deux essais ratés\. La version active n’a pas changé/);
+  assert.equal(await cdp.evaluer(`${curieux}.querySelectorAll('.versions-badge > li:not(.version-en-composition)').length`), 2, 'aucune version de plus');
+  assert.equal(await cdp.evaluer(`${curieux}.querySelector('button.regenerer').disabled`), false, 'le parent peut réessayer');
+  await capturer('badges-parent-abandon-1024.png', curieux);
 });

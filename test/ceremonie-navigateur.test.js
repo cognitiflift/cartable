@@ -104,7 +104,7 @@ before(async () => {
     `--user-data-dir=${path.join(dossier, 'profil-chrome')}`, '--remote-debugging-port=0', 'about:blank',
   ], { stdio: 'ignore' });
   const fichierPort = path.join(dossier, 'profil-chrome', 'DevToolsActivePort');
-  const portDebug = Number((await jusqua(() => fs.readFile(fichierPort, 'utf8'), 'Chromium démarré', 15_000)).split('\n')[0]);
+  const portDebug = Number((await jusqua(() => fs.readFile(fichierPort, 'utf8'), 'Chromium démarré', 45_000)).split('\n')[0]);
   cdp = await ouvrirPage(portDebug);
 });
 

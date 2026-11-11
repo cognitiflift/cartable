@@ -364,7 +364,7 @@ function cartesParent(lignes, contexte) {
       h('div', { className: 'carte-parent-vide', ariaHidden: 'true' }), h('strong', {}, VERSION_EN_COMPOSITION), h('span', { className: 'doux' }, libelleRegenerationEnCours))));
   };
   const rubrique = h('div', { className: 'cartes-rubrique' });
-  rubrique.append(h('p', { className: 'doux' }, INTRO_CARTES), h('p', { className: 'doux' }),
+  rubrique.append(h('p', { className: 'doux' }, INTRO_CARTES),
     h('ul', { className: 'cartes-parent' }, lignes.map((c) => {
       const active = c.versions.find((v) => v.active);
       const note = noteCarte(c);
@@ -417,8 +417,8 @@ function cartesBadgeParent(badges, contexte) {
     h('summary', {}, titreVersionsBadge(b)),
     h('ul', { className: 'versions-badge' }, b.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
       h('strong', {}, libelleVersionBadge(v)), h('span', { className: 'doux' }, origineVersion(v)),
-      paliersDeVersion(b, v),
-      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(b, v))),
+      // La version active est déjà montrée à chaque Palier au-dessus de la galerie : on ne la redessine pas ici.
+      v.active ? h('span', { className: 'doux' }, 'Active, montrée ci-dessus') : [paliersDeVersion(b, v), choisir(b, v)])),
     b.regeneration && h('li', { className: 'version-en-composition', role: 'status' },
       h('strong', {}, VERSION_EN_COMPOSITION), h('span', { className: 'doux' }, libelleRegenerationEnCours),
       h('ul', { className: 'paliers-badge', ariaHidden: 'true' }, b.paliers.map(() => h('li', {}, h('div', { className: 'carte-parent-vide' })))))));

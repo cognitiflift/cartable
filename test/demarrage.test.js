@@ -31,6 +31,20 @@ test('sans interface réseau externe : seulement l\'adresse locale', () => {
   assert.doesNotMatch(message, /réseau|pare-feu/);
 });
 
+test('adresse publique donnée (conteneur) : elle remplace les adresses internes du conteneur', () => {
+  const message = messageDemarrage({ host: '0.0.0.0', port: 3000, interfaces, adressePublique: 'nas.local:3000' });
+  assert.match(message, /http:\/\/localhost:3000/);
+  assert.match(message, /http:\/\/nas\.local:3000/);
+  assert.doesNotMatch(message, /192\.168\.50\.215|10\.0\.0\.4/);
+  assert.match(message, /autre appareil/);
+});
+
+test('adresse publique avec http:// déjà écrit : pas de doublon', () => {
+  const message = messageDemarrage({ host: '0.0.0.0', port: 3000, interfaces, adressePublique: 'http://192.168.1.20:8080' });
+  assert.match(message, /^ {2}http:\/\/192\.168\.1\.20:8080$/m);
+  assert.doesNotMatch(message, /http:\/\/http/);
+});
+
 test('HOST précis : seulement l\'adresse d\'écoute', () => {
   assert.equal(messageDemarrage({ host: '127.0.0.1', port: 3000, interfaces }), 'Cartable : http://127.0.0.1:3000');
   assert.equal(messageDemarrage({ host: '192.168.50.215', port: 3001, interfaces }), 'Cartable : http://192.168.50.215:3001');

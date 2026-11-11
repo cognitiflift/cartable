@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/check.js",
-    "test": "node --test test/",
+    "test": "node --test --test-timeout=120000 test/",
     "publier": "bash scripts/publier.sh",
     "hooks": "git config core.hooksPath .githooks"
   }

@@ -1,9 +1,9 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { lancerServeur } from './aide-serveur.js';
 
 // Serveur réel en sous-processus, dont `claude` est introuvable ou refuse le jeton, et dont les Élèves vivent
 // dans un dossier extérieur au dépôt (ELEVES_DIR, comme un volume monté).
@@ -23,22 +23,15 @@ async function lancer({ claude }) {
 echo '{"type":"result","is_error":true,"result":"Invalid API key · Please run /login","session_id":"s"}'
 `, { mode: 0o755 });
   }
-  const port = 3700 + Math.floor(Math.random() * 300);
-  const serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, HOST: '127.0.0.1', CLAUDE_BIN: bin, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_PREPARATION: '0' },
-    cwd: racine,
-    stdio: 'pipe',
+  const serveur = await lancerServeur({
+    env: { HOST: '127.0.0.1', CLAUDE_BIN: bin, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_PREPARATION: '0' },
   });
-  let logs = '';
-  serveur.stderr.on('data', (d) => (logs += d));
-  serveur.stdout.on('data', (d) => (logs += d));
   serveurs.push(serveur);
-  await new Promise((r) => serveur.stdout.once('data', r));
-  return { base: `http://127.0.0.1:${port}`, eleves, logs: () => logs };
+  return { base: `http://127.0.0.1:${serveur.port}`, eleves, logs: serveur.logs };
 }
 
 after(async () => {
-  for (const s of serveurs) s.kill();
+  for (const s of serveurs) s.arreter();
   for (const d of dossiers) await fs.rm(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 

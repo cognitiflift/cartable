@@ -2,10 +2,10 @@
 // à part, où la préparation est active (elle est coupée dans test/api.test.js, CARTABLE_PREPARATION=0).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { lancerServeur } from './aide-serveur.js';
 
 let serveur, base, dossier, eleves;
 const journal = () => path.join(dossier, 'journal');
@@ -48,18 +48,14 @@ if [ $QUI = preparation ] && [ -e '${dossier}/echouer-preparation' ]; then
 fi
 echo '{"result":"Page '$N' ('$QUI')","session_id":"s-'$N'","is_error":false,"total_cost_usd":0.25,"modelUsage":{"claude-sonnet-test":{"costUSD":0.25}}}'
 `, { mode: 0o755 });
-  const port = 3700 + Math.floor(Math.random() * 300);
-  base = `http://localhost:${port}`;
-  serveur = spawn('node', ['server.js'], {
-    env: { ...process.env, PORT: port, CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_PREPARATION: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
-    cwd: path.join(import.meta.dirname, '..'),
-    stdio: 'pipe',
+  serveur = await lancerServeur({
+    env: { CLAUDE_BIN: faux, TEACH_SKILL_DIR: dossier, ELEVES_DIR: eleves, CARTABLE_PREPARATION: '1', CARTABLE_HORLOGE_INJECTABLE: '1' },
   });
-  await new Promise((r) => serveur.stdout.once('data', r));
+  base = `http://localhost:${serveur.port}`;
 });
 
 after(async () => {
-  serveur.kill();
+  serveur.arreter();
   await fs.rm(dossier, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 

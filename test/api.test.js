@@ -4577,3 +4577,26 @@ test('Propositions : une Leçon archivée compte toujours parmi les Leçons déj
   await attendrePropositions(slug);
   assert.match(await argsPropositions(), /Les volcans/);
 });
+
+// Badges surprise du Rythme (#219) : sans rétroactivité, annoncées une fois au Retour de quiz qui les gagne, avec leur phrase.
+test('Badges surprise du Rythme : rien d\'office avant la livraison ; « Sept d\'un coup » annoncé une fois, avec sa phrase', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Surprise-Rythme', 1); // lundi 2 novembre : une page terminée
+  const url = `/api/eleves/${slug}/badges`;
+  await appel(`${url}?ouverture=1`, 'GET', undefined, le('2026-11-10T12:00:00.000Z'));
+  const retour = async (jour) => {
+    const corps = { score: 90, page: '0002-volcans.html' };
+    const date = `2026-11-${jour}T12:00:00.000Z`;
+    await appel(`/api/eleves/${slug}/lecons/${lecon.id}/scores`, 'POST', corps, le(date));
+    return (await appel(`/api/eleves/${slug}/lecons/${lecon.id}/retours`, 'POST', corps, le(date))).data.messages.at(-1).texte;
+  };
+  for (const jour of ['11', '12', '13', '14', '15', '16']) assert.doesNotMatch(await retour(jour), /Sept d’un coup/);
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-16T13:00:00.000Z'))).data, 'sept-d-un-coup'), undefined, 'cachée tant que non trouvée');
+  assert.match(await retour('17'), /Nouveau badge : Sept d’un coup/);
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-17T13:00:00.000Z'))).data;
+  const sept = badgeDe(vue, 'sept-d-un-coup');
+  assert.deepEqual({ jour: sept.jour, palier: sept.palier, surprise: sept.surprise }, { jour: '2026-11-17', palier: 'unique', surprise: true });
+  assert.match(sept.phrase, /Sept jours de suite/);
+  assert.deepEqual(vue.nouveaux.filter((n) => n.id === 'sept-d-un-coup').length, 1);
+  assert.doesNotMatch(await retour('18'), /Sept d’un coup/, 'pas d\'annonce en double');
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-18T13:00:00.000Z'))).data, 'mois-complet'), undefined);
+});

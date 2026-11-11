@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu } from '../lib/badges.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, SURPRISES } from '../lib/badges.js';
 import { jourLocal, minuitDu } from '../lib/jour.js';
 
 // Dates en heure locale : les jours de l'Élève sont ceux de sa machine (voir lib/jour.js).
@@ -284,4 +284,76 @@ test('« Mission élargie » : une Leçon libre élargie (événement `mission-e
 test('« Prêt pour le contrôle » : d\'après l\'historique, une Révision du jour répondue la veille avant tout événement compte', () => {
   const ancienne = { ...controle('2026-11-10'), questions: [question('q1', [['2026-11-09', true, { origine: 'revision' }]])] };
   assert.deepEqual(paliersSurprise('pret-pour-le-controle', { lecons: [ancienne] }), [{ palier: 'unique', jour: '2026-11-09' }]);
+});
+
+// Badges surprise du groupe « Rythme » (#219) : première fois, à partir de `depuis` (la livraison : 2026-11-11), sans
+// rétroactivité. Les dates des tests de gain sont donc toutes après le 11 novembre 2026.
+const DEPUIS = '2026-11-11';
+const unJourDeTravail = (jour, pages = 1) => Array.from({ length: pages }, (_, i) => ({ score: 50, date: iso(jour), page: `${jour}-${i}-p.html` }));
+const travail = (liste, pages = 1) => lecon({ scores: liste.flatMap((j) => unJourDeTravail(j, pages)) });
+const surprise = (id, lecons, maintenant = '2028-12-31') => paliersSurprise(id, { lecons, maintenant });
+const unique = (jour) => [{ palier: 'unique', jour }];
+
+test('Surprises du Rythme : chacune a `depuis` ; toutes ont une phrase sans score ni pourcentage', () => {
+  const neuves = ['sept-d-un-coup', 'mois-complet', 'semaine-pleine', 'reparti', 'centenaire', 'rentree'];
+  for (const id of neuves) assert.equal(SURPRISES.find((s) => s.id === id)?.depuis, DEPUIS, id);
+  for (const s of SURPRISES) assert.ok(s.phrase && !/%|score/i.test(s.phrase), s.id);
+});
+
+test('🔥 Sept d\'un coup : la Série de jours atteint 7, datée du 7e jour ; pas à 6', () => {
+  assert.deepEqual(surprise('sept-d-un-coup', [travail(jours('2026-12-01', 6))]), []);
+  assert.deepEqual(surprise('sept-d-un-coup', [travail(jours('2026-12-01', 7))]), unique('2026-12-07'));
+});
+
+test('🗓️ Mois complet : la Série de jours atteint 30, datée du 30e jour ; pas à 29', () => {
+  assert.deepEqual(surprise('mois-complet', [travail(jours('2026-12-01', 29))]), []);
+  assert.deepEqual(surprise('mois-complet', [travail(jours('2026-12-01', 30))]), unique('2026-12-30'));
+});
+
+test('📆 Semaine pleine : les 7 jours du lundi au dimanche travaillés ; pas à 6, pas à cheval sur deux semaines', () => {
+  // Lundi 7 décembre 2026 → dimanche 13.
+  assert.deepEqual(surprise('semaine-pleine', [travail(jours('2026-12-07', 6))]), []);
+  assert.deepEqual(surprise('semaine-pleine', [travail(jours('2026-12-07', 7))]), unique('2026-12-13'));
+  assert.deepEqual(surprise('semaine-pleine', [travail(jours('2026-12-08', 7))]), []);
+});
+
+test('🩹 Reparti ! : une Série de jours réparée, datée du jour de la réparation', () => {
+  // Lundi 7 décembre atteint ; 8, 9, 10 couverts par les Jokers ; vendredi 11 manqué ; samedi 12 : deux fois l'Objectif.
+  const base = unJourDeTravail('2026-12-07');
+  assert.deepEqual(surprise('reparti', [lecon({ scores: [...base, ...unJourDeTravail('2026-12-12', 2)] })]), unique('2026-12-12'));
+  assert.deepEqual(surprise('reparti', [lecon({ scores: [...base, ...unJourDeTravail('2026-12-12', 1)] })]), []);
+});
+
+test('💯 Centenaire : 100 Jours travaillés, datés du 100e ; pas à 99', () => {
+  const espaces = (n) => Array.from({ length: n }, (_, i) => jourLocal(minuitDu('2026-12-01', i * 2))); // un jour sur deux
+  assert.deepEqual(surprise('centenaire', [travail(espaces(99))]), []);
+  assert.deepEqual(surprise('centenaire', [travail(espaces(100))]), unique(espaces(100)[99]));
+});
+
+test('🎒 Rentrée : un Jour travaillé en septembre, pas en août', () => {
+  assert.deepEqual(surprise('rentree', [travail(['2027-08-31'])]), []);
+  assert.deepEqual(surprise('rentree', [travail(['2027-08-31', '2027-09-02', '2027-09-03'])]), unique('2027-09-02'));
+});
+
+test('Surprises du Rythme : rien avant `depuis` ; le même historique prolongé après la donne', () => {
+  // Une série de 40 jours finie le 10 novembre : ni Sept d'un coup ni Mois complet pour l'Élève existant.
+  const avant = travail(jours('2026-10-02', 40));
+  assert.deepEqual(surprise('sept-d-un-coup', [avant]), []);
+  assert.deepEqual(surprise('mois-complet', [avant]), []);
+  // Rentrée en septembre 2026 : avant `depuis`.
+  assert.deepEqual(surprise('rentree', [travail(['2026-09-02'])]), []);
+  // Série de 6 jours finie le 10 novembre, prolongée jusqu'au 12 : elle atteint 7 le 11 novembre.
+  assert.deepEqual(surprise('sept-d-un-coup', [travail(jours('2026-11-05', 8))]), unique('2026-11-11'));
+  // Semaine pleine terminée le dimanche 8 novembre : avant ; celle du 9 au 15 : après.
+  assert.deepEqual(surprise('semaine-pleine', [travail(jours('2026-11-02', 7))]), []);
+  assert.deepEqual(surprise('semaine-pleine', [travail(jours('2026-11-09', 7))]), unique('2026-11-15'));
+});
+
+test('Surprises : une surprise trouvée porte sa phrase dans Mes badges, une non trouvée y reste absente', () => {
+  const calcul = calculerBadges({ lecons: [travail(jours('2026-12-01', 7))], evenements: [], maintenant: a('2026-12-07') });
+  const { fichier } = fusionnerBadges(null, calcul, a('2026-12-07'));
+  const { collection } = vueMesBadges(fichier, calcul);
+  const sept = collection.find((b) => b.id === 'sept-d-un-coup');
+  assert.equal(sept.phrase, SURPRISES.find((s) => s.id === 'sept-d-un-coup').phrase);
+  assert.equal(collection.some((b) => b.id === 'mois-complet'), false);
 });

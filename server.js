@@ -236,6 +236,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
     return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant, rebond });
   } catch (e) {
     if (e instanceof HttpError) throw e;
+    console.error(`Prof de ${slug}/${id} : ${e.message}`);
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
   }
 }

@@ -16,6 +16,10 @@ Single-context : `CONTEXT.md` et `docs/adr/` à la racine. See `docs/agents/doma
 
 Lancer `check`, un seul test ou la suite entière : `docs/agents/verifications.md`.
 
+### Hébergement sur le NAS
+
+Installer et publier Cartable sur le NAS Synology (Docker, jeton Claude, pare-feu, migration, liste de contrôle) : `docs/agents/nas-synology.md`.
+
 ## Fondement scientifique
 
 Toute spec, tout ticket et toute ADR qui prend une décision d'apprentissage (quiz, mémoire, progression, récompenses, consignes du prof) ou d'ergonomie (interface, lecture, accessibilité) donne, pour chaque décision :

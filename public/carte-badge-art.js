@@ -47,7 +47,53 @@ const FAMILLES = {
     heros: sv(`<circle cx="100" cy="125" r="30" fill="var(--sur-nuit)" stroke="var(--nouveau)" stroke-width="4"/><path d="M100 100 L110 125 L100 150 L90 125Z" fill="var(--palier-bronze)"/><circle cx="100" cy="125" r="4" fill="var(--nuit)"/>${CATEGORIES.map((c, i) => { const a = i / 6 * Math.PI * 2 - Math.PI / 2; return gare(+n1(100 + Math.cos(a) * 82), +n1(125 + Math.sin(a) * 82), i < n + 1 ? 'atteint' : 'vide', 8); }).join('')}`) }),
 };
 
-// Une surprise : violette, unique ; son emoji est le héros.
+// Un dessin par surprise (ticket #219) : le cadre violet « unique » est commun, le héros et le décor sont propres à
+// chaque badge. `ARTS_SURPRISES[id](r)` rend les trois calques ; un identifiant inconnu retombe sur `surprise`.
+const TRAIT = 'stroke="var(--sur-nuit)" stroke-width="3" stroke-linejoin="round"'; // le trait des héros
+const carte = (r, l2, heros) => ({ l1: sv(fond(r, 3, 'var(--palier-unique)')), l2: sv(l2), heros: sv(heros) });
+const polaire = (cx, cy, rayon, degres) => [cx + Math.cos(degres * Math.PI / 180) * rayon, cy + Math.sin(degres * Math.PI / 180) * rayon];
+const pointille = (y) => `<path d="M20 ${y} H180" stroke="var(--sur-nuit-doux)" stroke-width="3" stroke-dasharray="2 7" opacity=".4"/>`;
+const cercle = (r, attrs) => `<circle cx="100" cy="135" r="${r}" fill="none" stroke="var(--palier-unique)" stroke-width="2" ${attrs}/>`;
+
+export const ARTS_SURPRISES = {
+  // 👋 Content de te revoir : une porte entrouverte, la lumière sur le seuil.
+  'content-de-te-revoir': (r) => carte(r,
+    '<polygon points="64,224 136,224 190,262 10,262" fill="var(--palier-or)" opacity=".28"/>',
+    `<rect x="54" y="62" width="92" height="166" rx="6" fill="var(--sur-nuit-doux)" ${TRAIT}/><rect x="62" y="70" width="76" height="154" fill="var(--nouveau)"/><polygon points="62,70 106,86 106,214 62,224" fill="var(--palier-unique)" ${TRAIT}/><circle cx="96" cy="150" r="5" fill="var(--nouveau)" ${TRAIT}/><rect x="74" y="236" width="52" height="12" rx="4" fill="var(--palier-bronze)" ${TRAIT}/>`),
+  // 🗺️ Mission élargie : une carte dépliée en trois volets, son itinéraire et la croix du but.
+  'mission-elargie': (r) => carte(r,
+    `${cercle(70, 'opacity=".8"')}${cercle(92, 'stroke-dasharray="3 6" opacity=".8"')}${pointille(238)}`,
+    `<polygon points="30,112 80,100 80,200 30,212" fill="var(--sur-nuit)" ${TRAIT}/><polygon points="80,100 130,114 130,214 80,200" fill="var(--sur-nuit-doux)" ${TRAIT}/><polygon points="130,114 176,100 176,200 130,214" fill="var(--sur-nuit)" ${TRAIT}/><path d="M44 190 C70 150 100 196 122 154 S150 140 158 124" fill="none" stroke="var(--palier-unique)" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round"/><path d="M150 116 l16 16 M166 116 l-16 16" stroke="var(--palier-bronze)" stroke-width="6" stroke-linecap="round"/>${gare(44, 190, 'atteint', 7)}`),
+  // 🎯 Prêt pour le contrôle : une copie annotée, un crayon posé en travers, une grande coche.
+  'pret-pour-le-controle': (r) => carte(r,
+    cercle(92, 'stroke-dasharray="3 6" opacity=".8"'),
+    `<g transform="rotate(-6 100 140)"><rect x="44" y="68" width="100" height="142" rx="6" fill="var(--sur-nuit)" ${TRAIT}/>${[96, 112, 128, 144].map((y, i) => `<path d="M60 ${y} H${128 - i * 12}" stroke="var(--nuit)" stroke-width="4" stroke-linecap="round" opacity=".45"/>`).join('')}<path d="M54 68 V210" stroke="var(--palier-bronze)" stroke-width="2.5"/><path d="M78 178 l16 16 l38 -44" fill="none" stroke="var(--retenu)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></g><g transform="rotate(28 156 120)"><rect x="150" y="62" width="14" height="86" rx="3" fill="var(--palier-or)" ${TRAIT}/><rect x="150" y="54" width="14" height="14" rx="3" fill="var(--nouveau)" ${TRAIT}/><polygon points="150,148 164,148 157,168" fill="var(--sur-nuit)" ${TRAIT}/></g>`),
+  // 🔥 Sept d'un coup : sept flammes de plus en plus hautes sur une même ligne.
+  'sept-d-un-coup': (r) => carte(r, pointille(240),
+    `${Array.from({ length: 7 }, (_, i) => { const cx = 34 + i * 22, h = 38 + i * 10, b = 214; return `<path d="M${cx} ${b - h} C${cx + 11} ${b - h * 0.55} ${cx + 12} ${b - h * 0.3} ${cx + 10} ${b - 10} A10 10 0 0 1 ${cx - 10} ${b - 10} C${cx - 12} ${b - h * 0.35} ${cx - 4} ${b - h * 0.55} ${cx} ${b - h}Z" fill="${i === 6 ? 'var(--nouveau)' : 'var(--palier-bronze)'}" ${TRAIT}/>`; }).join('')}<rect x="20" y="214" width="160" height="10" rx="5" fill="var(--sur-nuit)" ${TRAIT}/>${etoile(166, 100, 11, 'var(--nouveau)', 2)}`),
+  // 🗓️ Mois complet : les phases de la lune, du nouveau croissant à la pleine lune.
+  'mois-complet': (r) => carte(r,
+    '<path d="M-6 150 A106 106 0 0 1 206 150" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="2" stroke-dasharray="2 7" opacity=".5"/>',
+    `${[[32, 196, 'vide'], [58, 140, 'croissant'], [100, 112, 'moitie'], [142, 140, 'gibbeuse'], [156, 196, 'pleine']].map(([cx, cy, phase], i) => { const R = i === 2 ? 22 : 18; const bord = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="2" opacity=".55"/>`; const forme = { vide: '', croissant: `<path d="M${cx} ${cy - R} A${R} ${R} 0 0 1 ${cx} ${cy + R} A${R * 0.5} ${R} 0 0 0 ${cx} ${cy - R}Z" fill="var(--sur-nuit)" ${TRAIT}/>`, moitie: `<path d="M${cx} ${cy - R} A${R} ${R} 0 0 1 ${cx} ${cy + R}Z" fill="var(--sur-nuit)" ${TRAIT}/>`, gibbeuse: `<path d="M${cx} ${cy - R} A${R} ${R} 0 0 1 ${cx} ${cy + R} A${R * 0.5} ${R} 0 0 1 ${cx} ${cy - R}Z" fill="var(--sur-nuit)" ${TRAIT}/>`, pleine: `<circle cx="${cx}" cy="${cy}" r="${R + 8}" fill="var(--palier-or)" ${TRAIT}/><circle cx="${cx - 6}" cy="${cy - 5}" r="4" fill="var(--nouveau)"/><circle cx="${cx + 7}" cy="${cy + 6}" r="3" fill="var(--nouveau)"/>` }[phase]; return bord + forme; }).join('')}<circle cx="156" cy="196" r="38" fill="none" stroke="var(--nouveau)" stroke-width="2" stroke-dasharray="3 7" opacity=".7"/>`),
+  // 📆 Semaine pleine : un semainier, sept lignes cochées, dimanche en étoile.
+  'semaine-pleine': (r) => carte(r,
+    '<rect x="30" y="52" width="140" height="196" rx="22" fill="none" stroke="var(--palier-unique)" stroke-width="2" stroke-dasharray="3 6" opacity=".6"/>',
+    `<rect x="48" y="68" width="104" height="168" rx="14" fill="var(--sur-nuit)" ${TRAIT}/>${Array.from({ length: 7 }, (_, i) => `<rect x="56" y="${76 + i * 22.5}" width="88" height="18" rx="7" fill="${i === 6 ? 'var(--nouveau)' : 'var(--nuit)'}"/>${gare(70, 85 + i * 22.5, i === 6 ? 'atteint' : 'retenu', 6)}`).join('')}${etoile(124, 85 + 6 * 22.5, 8, 'var(--sur-nuit)', 2)}`),
+  // 🩹 Reparti ! : un pansement posé sur la fissure d'une ligne.
+  reparti: (r) => carte(r,
+    `${cercle(56, 'stroke-dasharray="2 6" opacity=".8"')}<path d="M10 196 L58 170 L86 184 L118 150 L148 164 L190 132" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/>`,
+    `<g transform="rotate(-35 100 140)"><rect x="32" y="114" width="136" height="52" rx="26" fill="var(--palier-bronze)" ${TRAIT}/><rect x="78" y="114" width="44" height="52" fill="var(--sur-nuit)" ${TRAIT}/>${Array.from({ length: 6 }, (_, i) => `<circle cx="${48 + (i % 3) * 12}" cy="${128 + Math.floor(i / 3) * 24}" r="2.4" fill="var(--nuit)"/><circle cx="${128 + (i % 3) * 12}" cy="${128 + Math.floor(i / 3) * 24}" r="2.4" fill="var(--nuit)"/>`).join('')}<path d="M88 140 h24 M100 128 v24" stroke="var(--palier-bronze)" stroke-width="4" stroke-linecap="round"/></g>`),
+  // 💯 Centenaire : une rosette, un médaillon à graduations, deux rubans.
+  centenaire: (r) => carte(r,
+    Array.from({ length: 12 }, (_, i) => { const [x1, y1] = polaire(100, 128, 66, i * 30), [x2, y2] = polaire(100, 128, 96, i * 30); return `<path d="M${n1(x1)} ${n1(y1)} L${n1(x2)} ${n1(y2)}" stroke="var(--palier-unique)" stroke-width="2" opacity=".5"/>`; }).join(''),
+    `<polygon points="72,170 102,170 96,246 78,228 56,240" fill="var(--palier-diamant)" ${TRAIT}/><polygon points="98,170 128,170 144,240 122,228 104,246" fill="var(--palier-bronze)" ${TRAIT}/>${Array.from({ length: 16 }, (_, i) => { const [x, y] = polaire(100, 128, 54, i * 22.5); return `<circle cx="${n1(x)}" cy="${n1(y)}" r="10" fill="var(--palier-or)" ${TRAIT}/>`; }).join('')}<circle cx="100" cy="128" r="54" fill="var(--palier-or)" ${TRAIT}/><circle cx="100" cy="128" r="40" fill="var(--sur-nuit)" ${TRAIT}/>${Array.from({ length: 20 }, (_, i) => { const [x1, y1] = polaire(100, 128, 30, i * 18), [x2, y2] = polaire(100, 128, 36, i * 18); return `<path d="M${n1(x1)} ${n1(y1)} L${n1(x2)} ${n1(y2)}" stroke="var(--nuit)" stroke-width="2.5" stroke-linecap="round"/>`; }).join('')}${etoile(100, 128, 21, 'var(--nouveau)', 2.5)}`),
+  // 🎒 Rentrée : un cartable, son rabat, sa poche et un crayon qui dépasse.
+  rentree: (r) => carte(r,
+    `<g stroke="var(--sur-nuit-doux)" stroke-width="2" opacity=".18">${[60, 90, 120, 150, 180, 210, 240].map((y) => `<path d="M0 ${y} H200"/>`).join('')}</g>`,
+    `<path d="M82 104 V88 Q100 70 118 88 V104" fill="none" stroke="var(--sur-nuit)" stroke-width="7" stroke-linecap="round"/><rect x="56" y="100" width="88" height="116" rx="26" fill="var(--palier-bronze)" ${TRAIT}/><path d="M56 128 Q100 168 144 128 V126 A26 26 0 0 0 118 100 H82 A26 26 0 0 0 56 126Z" fill="var(--palier-or)" ${TRAIT}/><circle cx="100" cy="150" r="7" fill="var(--sur-nuit)" ${TRAIT}/><rect x="70" y="168" width="60" height="38" rx="10" fill="var(--nouveau)" ${TRAIT}/><path d="M80 187 h40" stroke="var(--sur-nuit)" stroke-width="4" stroke-linecap="round"/>`),
+};
+
+// Repli : un identifiant de surprise sans dessin propre. Violette, unique ; son emoji est le héros.
 const surprise = (b, r) => ({ l1: sv(fond(r, 3, 'var(--palier-unique)')),
   l2: sv('<g fill="none" stroke="var(--palier-unique)" stroke-width="2" opacity=".8"><circle cx="100" cy="125" r="60"/><circle cx="100" cy="125" r="82" stroke-dasharray="3 6"/></g>'),
   heros: sv(`<path d="M-15 236 Q40 196 90 236 T215 214" fill="none" stroke="var(--palier-unique)" stroke-width="8" stroke-linecap="round"/><text x="100" y="152" text-anchor="middle" font-size="84">${b.emoji}</text>`) });
@@ -57,5 +103,6 @@ export const IDS_FAMILLES = Object.keys(FAMILLES);
 // Les calques d'une carte de Badge : { l1, l2, heros } (chaînes SVG). `rang` : de 1 à 4.
 export function artDeBadge(b, rang) {
   const r = graine(b.id + rang);
-  return b.surprise || !FAMILLES[b.id] ? surprise(b, r) : FAMILLES[b.id](r, rang);
+  if (b.surprise) return (ARTS_SURPRISES[b.id] ?? ((r2) => surprise(b, r2)))(r);
+  return FAMILLES[b.id] ? FAMILLES[b.id](r, rang) : surprise(b, r);
 }

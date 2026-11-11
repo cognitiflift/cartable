@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { aFeuilleHolo, crans, dosCarteBadge, libelleCarteBadge, libelleADecouvrir, prochainEnMots, rangDeCarte, rangerCollection } from '../public/carte-badge-texte.js';
-import { artDeBadge, IDS_FAMILLES } from '../public/carte-badge-art.js';
+import { artDeBadge, ARTS_SURPRISES, IDS_FAMILLES } from '../public/carte-badge-art.js';
 import { FAMILLES, SURPRISES } from '../lib/badges.js';
 
 const dire = (j) => `le ${j}`;
@@ -53,7 +53,7 @@ test('Mes Badges : cartes obtenues (la plus récente d\'abord, puis les surprise
 test('Dessins : une carte par Famille et par surprise, trois calques, jetons seulement, sans police', () => {
   assert.deepEqual([...IDS_FAMILLES].sort(), FAMILLES.map((f) => f.id).sort());
   const badges = [...FAMILLES.map((f) => ({ id: f.id, emoji: f.emoji })), ...SURPRISES.map((s) => ({ id: s.id, emoji: s.emoji, surprise: true }))];
-  assert.equal(badges.length, 11);
+  assert.equal(badges.length, FAMILLES.length + SURPRISES.length);
   for (const b of badges) for (const rang of [1, 2, 3, 4]) {
     const art = artDeBadge(b, rang);
     for (const calque of ['l1', 'l2', 'heros']) {
@@ -77,4 +77,19 @@ test('Dessins : les couleurs employées sont des jetons de DESIGN.md', async () 
   const jetons = new Set([...design.matchAll(/^ {2}([a-z-]+): "#/gm)].map((m) => m[1]));
   for (const f of IDS_FAMILLES) for (const rang of [1, 4]) for (const svg of Object.values(artDeBadge({ id: f, emoji: '' }, rang)))
     for (const m of svg.matchAll(/var\(--([a-z-]+)\)/g)) assert.ok(jetons.has(m[1]), `${f} : --${m[1]} n'est pas un jeton`);
+});
+
+test('Dessins des surprises : chaque identifiant a son dessin, et deux surprises n\'ont jamais les mêmes calques', () => {
+  assert.deepEqual(Object.keys(ARTS_SURPRISES).sort(), SURPRISES.map((s) => s.id).sort());
+  const parCalque = { l1: new Set(), l2: new Set(), heros: new Set() };
+  for (const s of SURPRISES) {
+    const art = artDeBadge({ id: s.id, emoji: s.emoji, surprise: true }, 4);
+    for (const c of Object.keys(parCalque)) parCalque[c].add(art[c]);
+    assert.doesNotMatch(art.heros, /<text/, `${s.id} : le héros est dessiné, pas un emoji`);
+  }
+  assert.equal(parCalque.heros.size, SURPRISES.length);
+  assert.equal(parCalque.l1.size, SURPRISES.length);
+  assert.equal(parCalque.l2.size, SURPRISES.length, 'le décor est propre à chaque surprise');
+  // Un identifiant inconnu retombe sur le dessin commun.
+  assert.match(artDeBadge({ id: 'inconnue', emoji: '🎁', surprise: true }, 4).heros, /🎁/);
 });

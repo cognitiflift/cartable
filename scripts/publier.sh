@@ -3,11 +3,23 @@
 # puis redémarrage du conteneur. S'arrête au premier échec. Ne touche jamais à eleves/.
 #
 # Variables d'environnement (remplaçables, notamment pour les tests) :
-#   VERIFS_CMD   vérifications à passer (défaut : « npm run check && npm test »)
+#   VERIFS_CMD   vérifications à passer (défaut : « npm run check && npm test » ; si npm est absent,
+#                comme sur le NAS Synology, elles tournent dans le conteneur : « docker exec cartable … »)
 #   RESTART_CMD  redémarrage du conteneur (défaut : « docker restart cartable »)
+#   PUBLIER_PATH_EXTRA  dossier ajouté en fin de PATH (défaut : /usr/local/bin, où Synology met docker,
+#                       absent du PATH d'une session SSH)
 set -e
 
-VERIFS_CMD="${VERIFS_CMD:-npm run check && npm test}"
+PATH="$PATH:${PUBLIER_PATH_EXTRA-/usr/local/bin}"
+
+if [ -z "${VERIFS_CMD:-}" ]; then
+  if command -v npm >/dev/null 2>&1; then
+    VERIFS_CMD="npm run check && npm test"
+  else
+    # ELEVES_DIR temporaire : les tests ne doivent jamais voir les vrais Espaces personnels (/app/eleves).
+    VERIFS_CMD="docker exec -e ELEVES_DIR=/tmp/verifs-eleves cartable sh -c 'npm run check && npm test'"
+  fi
+fi
 RESTART_CMD="${RESTART_CMD:-docker restart cartable}"
 
 cd "$(dirname "$0")/.."

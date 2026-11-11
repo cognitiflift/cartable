@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, existsSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, existsSync, chmodSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,5 +77,29 @@ test('vérifications en échec : arrêt avant le redémarrage', () => {
   assert.notEqual(r.status, 0);
   assert.match(r.sortie, /vérifications/i);
   assert.ok(!existsSync(m.marque), 'pas de redémarrage');
+  assert.ok(elevesIntacts(m));
+});
+
+test('sans npm : les vérifications tournent dans le conteneur (docker exec)', () => {
+  const m = monde();
+  // PATH réduit à des liens vers les seuls outils du script, plus un faux docker : pas de npm.
+  const bin = join(m.racine, 'bin');
+  mkdirSync(bin);
+  for (const c of ['bash', 'sh', 'git', 'dirname', 'touch', 'cat', 'env']) {
+    const chemin = execFileSync('sh', ['-c', `command -v ${c}`], { encoding: 'utf8' }).trim();
+    symlinkSync(chemin, join(bin, c));
+  }
+  const journal = join(m.racine, 'docker.log');
+  writeFileSync(join(bin, 'docker'), `#!/bin/sh\necho "$@" >> ${journal}\n`);
+  chmodSync(join(bin, 'docker'), 0o755);
+  const r = spawnSync(join(bin, 'bash'), [join(m.nas, 'scripts', 'publier.sh')], {
+    cwd: m.nas,
+    encoding: 'utf8',
+    env: { PATH: bin, PUBLIER_PATH_EXTRA: '', HOME: process.env.HOME },
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const appels = readFileSync(journal, 'utf8');
+  assert.match(appels, /exec -e ELEVES_DIR=\/tmp\/verifs-eleves cartable sh -c npm run check && npm test/);
+  assert.match(appels, /restart cartable/);
   assert.ok(elevesIntacts(m));
 });

@@ -76,6 +76,7 @@ Dans le dossier du dépôt, en SSH :
 ## 5. Pare-feu et réseau
 
 - Panneau de configuration > Sécurité > Pare-feu : créer une règle qui **autorise** le port de l'appli (`PORT`) pour le sous-réseau de la maison seulement (par exemple `192.168.1.0/24`, à adapter à celui du routeur), puis une règle qui **refuse** ce port pour tout le reste. Activer le pare-feu. À confirmer : l'ordre des règles et la prise en compte du trafic Docker (le port publié par Docker passe par une chaîne de pare-feu qui peut contourner celui de DSM) ; tester depuis un appareil hors du sous-réseau, par exemple un téléphone en 4G.
+- **Règle SSH, à créer avant d'activer le pare-feu** : dès que le pare-feu est actif, un « Tous / Tous / Refuser » final (ou une règle par pays qui ne reconnaît pas les adresses privées) coupe aussi le port 22, donc `ssh` et `npm run publier`. Créer une règle qui **autorise** TCP 22 pour le même sous-réseau de la maison, et la placer **au-dessus** de toute règle « Refuser » et des règles par pays (glisser avec la poignée `≡`, puis Appliquer). Sans elle, on perd l'accès SSH au NAS. Constaté sur DSM 7.1.1 : l'activation du pare-feu a fait expirer la connexion SSH tant que cette règle manquait. Le même risque vaut pour tout autre service du NAS que l'on veut garder joignable sur le réseau local (SMB, par exemple) : une règle d'autorisation chacun.
 - **Aucune redirection de port** dans le routeur pour ce port. **Pas de QuickConnect** pour l'appli.
 - Quiconque atteint le port a accès à toutes les Espaces personnels et dépense l'abonnement du parent : c'est la raison de ces règles.
 
@@ -87,11 +88,13 @@ Dans le dossier du dépôt, en SSH :
 
 ## 7. Publier une nouvelle version
 
-Depuis le dossier du dépôt sur le NAS (SSH) : `npm run publier` (qui lance `scripts/publier.sh`). Il enchaîne :
+Depuis le dossier du dépôt sur le NAS (SSH) : `bash scripts/publier.sh` (`npm run publier` fait la même chose, mais seulement là où npm est installé : pas sur ce NAS). Depuis le PC, en une ligne : `ssh admin@<IP> 'cd /volume1/docker/cartable && bash scripts/publier.sh'`. Il enchaîne :
 
 1. `git pull --ff-only` (avance rapide seulement) ;
-2. les vérifications (`VERIFS_CMD`, par défaut `npm run check && npm test`) ;
+2. les vérifications (`VERIFS_CMD`, par défaut `npm run check && npm test`, ou, si npm est absent du NAS, `docker exec -e ELEVES_DIR=/tmp/verifs-eleves cartable sh -c 'npm run check && npm test'`, dans le conteneur, avec un `ELEVES_DIR` temporaire pour ne jamais approcher les vrais Espaces personnels) ;
 3. le redémarrage du conteneur (`RESTART_CMD`, par défaut `docker restart cartable`).
+
+Le script ajoute `/usr/local/bin` à la fin du `PATH` : sur Synology, `docker` y est, et ce dossier n'est pas dans le `PATH` d'une session SSH.
 
 Il s'arrête au premier échec avec un message, sans redémarrer. Il ne touche jamais à `eleves/`. Les deux variables se remplacent à l'appel :
 
@@ -99,7 +102,7 @@ Il s'arrête au premier échec avec un message, sans redémarrer. Il ne touche j
 RESTART_CMD="docker compose restart" npm run publier
 ```
 
-Si Node n'est pas installé sur le NAS lui-même (DSM 7.1 propose un paquet Node.js, à confirmer), faire tourner les vérifications dans le conteneur : `VERIFS_CMD="docker compose exec -T cartable sh -c 'npm run check && npm test'"`. À confirmer sur place.
+Si le changement touche `Dockerfile`, `package.json` ou `docker-compose.yml`, un redémarrage ne suffit pas : reconstruire l'image (`docker-compose build` puis `docker-compose up -d`, en ajoutant `/usr/local/bin` au `PATH`).
 
 Une publication ne change pas le jeton ni l'image. Une nouvelle version de la CLI ou du plugin demande de reconstruire l'image : voir `docker/MAJ.md`.
 
@@ -132,5 +135,6 @@ Ce qui n'est pas testable en CI (Docker, DSM, pare-feu, routeur, jeton réel). �
 - [ ] L'heure est belge : « aujourd'hui » et la Série de jours basculent à minuit à Bruxelles.
 - [ ] Redémarrer le NAS : le conteneur revient seul, l'accueil répond, l'état est « sain ».
 - [ ] Depuis un appareil hors du sous-réseau (téléphone en 4G) : le port de l'appli ne répond pas.
+- [ ] Pare-feu actif (réglage « Activer le pare-feu » coché **et appliqué**) et SSH répond encore depuis le PC : la règle d'autorisation du port 22 est au-dessus de tout « Refuser ».
 - [ ] Publier une version d'essai (un changement trivial poussé sur `main`) : `npm run publier` passe, le conteneur redémarre, `eleves/` est intact ; un `git pull` impossible ou un test cassé arrête le script sans redémarrer.
 - [ ] Jeton : date d'expiration notée (un an) ; avec un faux jeton, l'appli affiche le message « jeton expiré ou révoqué ».

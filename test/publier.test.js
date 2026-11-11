@@ -99,7 +99,7 @@ test('sans npm : les vérifications tournent dans le conteneur (docker exec)', (
   });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const appels = readFileSync(journal, 'utf8');
-  assert.match(appels, /exec cartable sh -c npm run check && npm test/);
+  assert.match(appels, /exec -e ELEVES_DIR=\/tmp\/verifs-eleves cartable sh -c npm run check && npm test/);
   assert.match(appels, /restart cartable/);
   assert.ok(elevesIntacts(m));
 });

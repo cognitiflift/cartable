@@ -91,7 +91,7 @@ Dans le dossier du dépôt, en SSH :
 Depuis le dossier du dépôt sur le NAS (SSH) : `bash scripts/publier.sh` (`npm run publier` fait la même chose, mais seulement là où npm est installé : pas sur ce NAS). Depuis le PC, en une ligne : `ssh admin@<IP> 'cd /volume1/docker/cartable && bash scripts/publier.sh'`. Il enchaîne :
 
 1. `git pull --ff-only` (avance rapide seulement) ;
-2. les vérifications (`VERIFS_CMD`, par défaut `npm run check && npm test`, ou, si npm est absent du NAS, `docker exec cartable sh -c 'npm run check && npm test'`, dans le conteneur) ;
+2. les vérifications (`VERIFS_CMD`, par défaut `npm run check && npm test`, ou, si npm est absent du NAS, `docker exec -e ELEVES_DIR=/tmp/verifs-eleves cartable sh -c 'npm run check && npm test'`, dans le conteneur, avec un `ELEVES_DIR` temporaire pour ne jamais approcher les vrais Espaces personnels) ;
 3. le redémarrage du conteneur (`RESTART_CMD`, par défaut `docker restart cartable`).
 
 Le script ajoute `/usr/local/bin` à la fin du `PATH` : sur Synology, `docker` y est, et ce dossier n'est pas dans le `PATH` d'une session SSH.

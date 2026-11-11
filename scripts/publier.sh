@@ -16,7 +16,8 @@ if [ -z "${VERIFS_CMD:-}" ]; then
   if command -v npm >/dev/null 2>&1; then
     VERIFS_CMD="npm run check && npm test"
   else
-    VERIFS_CMD="docker exec cartable sh -c 'npm run check && npm test'"
+    # ELEVES_DIR temporaire : les tests ne doivent jamais voir les vrais Espaces personnels (/app/eleves).
+    VERIFS_CMD="docker exec -e ELEVES_DIR=/tmp/verifs-eleves cartable sh -c 'npm run check && npm test'"
   fi
 fi
 RESTART_CMD="${RESTART_CMD:-docker restart cartable}"

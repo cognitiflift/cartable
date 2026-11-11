@@ -654,14 +654,14 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
 // (`etoile` : la première de la journée rapporte une Étoile ; `paliers` : Paliers de Badge nouveaux) et le nombre
 // d'Étoiles de Révision du jour de l'Élève. Le serveur ne sait pas quelle série a été servie : il faut au moins une
 // réponse de Révision du jour dans la journée. Jamais de tour du prof.
-async function terminerRevisionDuJour(slug, maintenant, questions) {
+async function terminerRevisionDuJour(slug, maintenant, nbQuestions) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const aujourdhui = jourLocal(maintenant);
   const repondueAujourdhui = lecons.some((l) => reponsesDeRevision(l).some((r) => jourDe(r.date) === aujourdhui));
   if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
   const etoile = etoileDuJour(evenements, maintenant);
-  // `questions` : nombre de Questions de la série servie, que seul l'écran connaît (badge surprise « Série pleine », #221).
-  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString(), ...(Number.isInteger(questions) && questions > 0 && { questions }) };
+  // `nbQuestions` : nombre de Questions de la série servie, que seul l'écran connaît (badge surprise « Série pleine », #221).
+  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString(), ...(Number.isInteger(nbQuestions) && nbQuestions > 0 && { questions: nbQuestions }) };
   await store.enregistrerEvenement(slug, evenement);
   const { nouveauxBadges: nouveaux, nouvellesCartesLigne } = await annoncerBadges(slug, maintenant);
   const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));

@@ -87,6 +87,11 @@ test('🏗️ Ça tient bon : pas à 29 jours, pas s\'il a été oublié avant, 
   assert.deepEqual(surprise('ca-tient-bon', { lecons: [ancien] }), []);
 });
 
+test('🏗️ Ça tient bon : le Retenu ne décroît pas avec le temps seul (il suit les réponses) ; un an sans réponse, le badge tient', () => {
+  const l = leconRetenue([['2026-12-01', true], ['2026-12-02', true]]);
+  assert.deepEqual(surprise('ca-tient-bon', { lecons: [l], maintenant: '2027-12-01' }), unique('2027-01-01'));
+});
+
 test('🛤️ Remis sur les rails : un Objectif oublié redevient Retenu, daté du jour où il l\'est de nouveau', () => {
   const l = leconRetenue([['2026-12-01', true], ['2026-12-02', true], ['2027-02-01', false], ['2027-02-02', true]]);
   assert.deepEqual(surprise('remis-sur-les-rails', { lecons: [l] }), unique('2027-02-02'));

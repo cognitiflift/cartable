@@ -22,6 +22,7 @@ test('même Leçon, même carte ; une autre Leçon donne une autre scène', () =
 
 test('la couleur de la scène suit la Catégorie', () => {
   assert.match(sceneGenerique({ lecon: 'x', categorie: 'Géographie' }).l1, /var\(--ligne-geographie\)/);
+  assert.match(sceneGenerique({ lecon: 'x', categorie: 'Numérique' }).l1, /var\(--ligne-numerique\)/);
   assert.match(sceneGenerique({ lecon: 'x', categorie: 'Cuisine' }).l1, /var\(--ligne-autre\)/);
 });
 

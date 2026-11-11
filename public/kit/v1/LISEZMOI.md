@@ -344,7 +344,7 @@ Quand le Profil de l'élève l'active, l'appli ajoute `?espacement=1` à l'adres
 
 ## Style de base
 
-`/kit/v1/base.css` règle la typographie, le mode sombre et la couleur de la Catégorie, choisie par `data-categorie` sur `<html>` : `francais`, `mathematiques`, `sciences`, `histoire`, `geographie`, `langues`, `arts` ou `autre`. La classe `encart` (ou `<aside>`) met un bloc en valeur, par exemple l'encart « 🚀 Pour aller plus loin » : une carte teintée et cerclée de la couleur de la Catégorie.
+`/kit/v1/base.css` règle la typographie, le mode sombre et la couleur de la Catégorie, choisie par `data-categorie` sur `<html>` : `francais`, `mathematiques`, `sciences`, `histoire`, `geographie`, `langues`, `arts`, `numerique` ou `autre`. La classe `encart` (ou `<aside>`) met un bloc en valeur, par exemple l'encart « 🚀 Pour aller plus loin » : une carte teintée et cerclée de la couleur de la Catégorie.
 
 La page prend le style de l'appli (le plan du réseau) : fond gris froid, cartes blanches, Overpass pour les titres et Atkinson Hyperlegible Next pour le texte, servies par l'appli, en clair comme en sombre. La couleur de la Catégorie est celle de la ligne de la Leçon à l'accueil. Ce changement d'apparence est entré dans la version 1 : les pages déjà écrites le prennent sans changement.
 

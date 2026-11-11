@@ -37,6 +37,7 @@ colors:
   ligne-geographie: "#0e7490"
   ligne-langues: "#9333ea"
   ligne-arts: "#db2777"
+  ligne-numerique: "#4338ca"
   ligne-autre: "#4b5563"
   fond-sombre: "#0f1220"
   carte-sombre: "#1a1e30"
@@ -69,6 +70,7 @@ colors:
   ligne-geographie-sombre: "#38bdf8"
   ligne-langues-sombre: "#c084fc"
   ligne-arts-sombre: "#f472b6"
+  ligne-numerique-sombre: "#818cf8"
   ligne-autre-sombre: "#9ca3af"
 typography:
   display:
@@ -319,7 +321,7 @@ Une palette froide et neutre où chaque teinte saturée porte un seul sens.
 - **Bleu nuit de la marque** (`nuit`) : l'en-tête dans les deux thèmes. Le texte dessus est `sur-nuit`, le texte secondaire `sur-nuit-doux`.
 
 ### Secondary
-- **Couleurs de ligne** (`ligne-francais`, `ligne-mathematiques`, `ligne-sciences`, `ligne-histoire`, `ligne-geographie`, `ligne-langues`, `ligne-arts`, `ligne-autre`, et leurs variantes `-sombre`) : la Catégorie d'une Leçon. Elles sont identiques à celles des Catégories du Kit (`public/kit/v1/quiz.css`), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. En clair, les surfaces pleines (Continuer de la Leçon en tête, cartouche de Niveau) utilisent la ligne foncée (`color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))`) avec du texte `sur-accent` (blanc) ; en sombre, la ligne elle-même avec du texte `sur-accent-sombre`.
+- **Couleurs de ligne** (`ligne-francais`, `ligne-mathematiques`, `ligne-sciences`, `ligne-histoire`, `ligne-geographie`, `ligne-langues`, `ligne-arts`, `ligne-numerique`, `ligne-autre`, et leurs variantes `-sombre`) : la Catégorie d'une Leçon. Elles sont identiques à celles des Catégories du Kit (`public/kit/v1/quiz.css`), pour qu'une Leçon garde sa couleur de l'accueil à ses pages. En clair, les surfaces pleines (Continuer de la Leçon en tête, cartouche de Niveau) utilisent la ligne foncée (`color-mix(in srgb, var(--ligne) 82%, var(--encre-noire))`) avec du texte `sur-accent` (blanc) ; en sombre, la ligne elle-même avec du texte `sur-accent-sombre`.
 
 ### Tertiary
 - **Vert Retenu** (`retenu`) : ce qui tient en mémoire. Station Retenue, terminus allumé, pastille « Acquis ✓ ».

@@ -38,5 +38,6 @@ test('le prompt donne l’identifiant, le sujet, la Catégorie et les titres des
   assert.match(p, /Les volcans/);
   assert.match(p, /var\(--ligne-sciences\)/);
   for (const o of titresObjectifs) assert.ok(p.includes(o));
+  assert.match(promptCarte({ ...carte, categorie: 'Numérique' }, []), /var\(--ligne-numerique\)/);
   assert.match(promptCarte({ ...carte, categorie: 'Cuisine' }, []), /var\(--ligne-autre\)/);
 });

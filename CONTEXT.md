@@ -36,7 +36,7 @@ Unité d'apprentissage d'un Élève sur un sujet précis. Correspond à un works
 _Avoid_: cours, chapitre
 
 **Catégorie**:
-Matière scolaire servant à classer les Leçons d'un Élève (français, sciences…).
+Matière scolaire servant à classer les Leçons d'un Élève (français, sciences, numérique…).
 
 **Leçon de révision**:
 Leçon issue d'un **Document source** : l'agent propose à l'Élève de réviser puis évalue ses connaissances.

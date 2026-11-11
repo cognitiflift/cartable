@@ -65,7 +65,7 @@ test('Kit : le texte de Valider (sur-accent) tient 4,5:1 sur l\'aplat accent-for
     const j = jetons(sombre);
     const bloc = sombre ? sombreCss : clair;
     const accents = [j['--kit-accent'], ...[...bloc.matchAll(/\[data-categorie="[a-z]+"\]\s*\{\s*--kit-accent:\s*(#[0-9a-f]{6})/g)].map((m) => m[1])];
-    assert.equal(accents.length, 9);
+    assert.equal(accents.length, 10);
     for (const a of accents) {
       const fort = sombre ? a : '#' + rgb(a).map((v) => Math.round(v * 0.82).toString(16).padStart(2, '0')).join('');
       assert.ok(contraste(j['--kit-sur-accent'], fort) >= 4.5, `${a} (${sombre ? 'sombre' : 'clair'}) : ${contraste(j['--kit-sur-accent'], fort).toFixed(2)}`);

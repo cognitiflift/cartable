@@ -166,6 +166,13 @@ test('consignes des Propositions : sans titres déjà proposés, pas de consigne
   }
 });
 
+test('la Catégorie « Numérique » est dans la liste donnée à l\'agent, avant « Autre », et sa consigne la distingue de « Sciences »', () => {
+  for (const consigne of [consignesPropositions({ ...profil, nombrePropositions: 4 }, [], []), consignesLecon(profil)]) {
+    assert.match(consigne, /Arts, Numérique, Autre/);
+    assert.match(consigne, /« Numérique » couvre l'informatique, le matériel, les réseaux et la sécurité/);
+  }
+});
+
 test('consignes des Propositions : « D\'autres idées » liste les titres déjà proposés et demande d\'autres matières et d\'autres angles, suites comprises', () => {
   const consignes = consignesPropositions({ ...profil, nombrePropositions: 4 }, [{ titre: 'Les volcans', categorie: 'Sciences', maitrise: null }], ['Les dinosaures', 'Les pyramides']);
   assert.match(consignes, /déjà proposés/);

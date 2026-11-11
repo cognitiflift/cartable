@@ -4699,3 +4699,29 @@ test('Vue parent : rubrique Cartes et choix de la version active, retournement i
   assert.equal((await appel(url, 'POST', { id: 'sans-lecon', version: 9 })).status, 404);
   assert.equal((await appel(url, 'POST', { id: 'inconnue', version: 1 })).status, 404);
 });
+
+// Cartes de Badge, versions (#238) : la Vue parent liste Familles et surprises (pas encore trouvées comprises), le choix
+// vaut pour tous les Paliers et remplace le dessin de Mes badges, sans toucher au retournement.
+test('Vue parent : cartes de Badge, choix de la version active pour la Famille entière', async () => {
+  const slug = (await appel('/api/eleves', 'POST', { pseudo: 'Cartes-Badges', age: 11, niveau: 'Primaire 6' })).data.slug;
+  const svg = { l1: '<svg id="l1"/>', l2: '<svg id="l2"/>', heros: '<svg id="heros"/>' };
+  const { ajouterVersionBadge } = await import('../lib/cartes-badge.js');
+  const retourne = { 'memoire/bronze': { retourne: '2026-10-04T10:00:00.000Z' }, 'memoire/argent': { retourne: null } };
+  const ancien = { version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: {}, paliers: retourne };
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify(ancien)); // fichier d'avant les cartes de Badge
+  const lire = async () => (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-10T10:00:00.000Z'))).data.cartes.badges;
+  const avant = await lire();
+  assert.ok(avant.find((b) => b.id === 'memoire' && b.versionActive === 1 && b.versions.length === 1));
+  assert.ok(avant.find((b) => b.surprise && !b.trouve), 'une surprise pas encore trouvée est visible du parent');
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify(ajouterVersionBadge(ancien, 'memoire', svg, Date.parse('2026-10-05T10:00:00.000Z'))));
+  const url = `/api/eleves/${slug}/parent/cartes/badge-version`;
+  assert.deepEqual((await appel(url, 'POST', { id: 'memoire', version: 2 })).data, { statut: 'choisie' });
+  const eleve = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-10-10T10:00:00.000Z'))).data;
+  assert.deepEqual(eleve.calquesBadge, { memoire: svg });
+  const fichier = JSON.parse(await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8'));
+  assert.deepEqual(fichier.paliers, retourne, 'le retournement ne change pas');
+  assert.deepEqual((await appel(url, 'POST', { id: 'memoire', version: 1 })).data, { statut: 'choisie' }); // retour au dessin d'origine
+  assert.equal((await lire()).find((b) => b.id === 'memoire').versions.length, 2);
+  assert.equal((await appel(url, 'POST', { id: 'memoire', version: 9 })).status, 404);
+  assert.equal((await appel(url, 'POST', { id: 'inconnu', version: 1 })).status, 404);
+});

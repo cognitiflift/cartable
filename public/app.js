@@ -9,6 +9,7 @@ import { esquisseCarte } from '/carte-attente-art.js';
 import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, cartesDuGain, ATTENTE, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
+import { INTRO_CARTES, VIDE_CARTES, reperesCarte, noteCarte, titreVersions, libelleVersion, libelleChoisir } from '/carte-parent-texte.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
@@ -287,12 +288,14 @@ const SECTIONS_PARENT = [
     h('p', { className: 'doux' }, 'Pour chaque tranche de chances de s’en souvenir annoncées par l’appli avant la réponse, la part de réponses justes aux Révisions du jour.'),
     h('ul', {}, calibration.map((t) => h('li', {}, `Quand l’appli pensait qu’il s’en souviendrait à ${t.de}–${t.a} % : `, t.reponses
       ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % annoncé en moyenne)` : 'aucune réponse.'))))] },
+  { titre: '🃏 Cartes de ligne', bloc: 'cartes', rendu: ({ cartes }, contexte) => cartesParent(cartes.lignes, contexte) },
   { titre: '🔔 Rappel dans ton calendrier', bloc: 'reglages', replie: true, rendu: (_agregats, { profil, moment }) => rappelCalendrier(profil, moment) },
 ];
 // Les trois blocs de la Vue parent (#164), dans l'ordre de la page ; chaque section de SECTIONS_PARENT dit le sien (`bloc`).
 // Une section `replie` s'ouvre à la demande (<details>) ; les autres restent ouvertes.
 const BLOCS_PARENT = [
   { id: 'retient', titre: 'Ce qu’il retient' },
+  { id: 'cartes', titre: 'Cartes' },
   { id: 'aide', titre: 'Ce qui demande de l’aide' },
   { id: 'reglages', titre: 'Réglages et coûts' },
 ];
@@ -304,6 +307,44 @@ const sectionParent = ({ titre, replie, rendu }, agregats, contexte) => {
     ontoggle: (e) => { if (!e.target.isConnected) return; const cle = `${contexte.slug}/${titre}`; if (e.target.open) sectionsParentOuvertes.add(cle); else sectionsParentOuvertes.delete(cle); } },
   h('summary', {}, h('h4', {}, titre)), rendu(agregats, contexte));
 };
+// Rubrique « Cartes » (#236) : toutes les cartes de ligne, la version active à gauche, la galerie des versions dépliable.
+// « Utiliser celle-ci » change la carte vue par l'Élève (la version remplace la sienne partout) sans toucher à son
+// retournement ; aucune version ne se supprime. Une galerie ouverte le reste quand l'écran se recharge.
+const galeriesOuvertes = new Set();
+function cartesParent(lignes, contexte) {
+  if (!lignes.length) return h('p', { className: 'doux' }, VIDE_CARTES);
+  const choisir = (c, v) => {
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire', type: 'button', ariaLabel: libelleChoisir(c, v), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/version`, { method: 'POST', body: { id: c.lecon, version: v.numero } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, 'Utiliser celle-ci');
+    return [bouton, erreur];
+  };
+  const galerie = (c) => {
+    const cle = `${contexte.slug}/${c.lecon}`;
+    return h('details', { className: 'galerie-versions', open: galeriesOuvertes.has(cle),
+      ontoggle: (e) => { if (!e.target.isConnected) return; if (e.target.open) galeriesOuvertes.add(cle); else galeriesOuvertes.delete(cle); } },
+    h('summary', {}, titreVersions(c)),
+    h('ul', { className: 'versions-carte' }, c.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
+      carteLigne({ ...c, calques: v.calques }),
+      h('strong', {}, libelleVersion(v)),
+      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(c, v)))));
+  };
+  return [h('p', { className: 'doux' }, INTRO_CARTES),
+    h('ul', { className: 'cartes-parent' }, lignes.map((c) => {
+      const active = c.versions.find((v) => v.active);
+      const note = noteCarte(c);
+      return h('li', { className: 'carte-parent' },
+        active ? carteLigne({ ...c, calques: active.calques }) : h('div', { className: 'carte-parent-vide', ariaHidden: 'true' }),
+        h('strong', { className: 'carte-parent-titre' }, c.titre),
+        h('p', { className: 'carte-parent-reperes' }, reperesCarte(c).join(' · ')),
+        note && h('p', { className: 'doux carte-parent-note' }, note),
+        c.versions.length > 0 && galerie(c));
+    }))];
+}
+
 // Le sommaire mène à un bloc sans toucher au hash (c'est celui du routeur) ; une cible repliée s'ouvre.
 const allerAuBloc = (id) => (e) => {
   e.preventDefault();

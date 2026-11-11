@@ -4675,3 +4675,27 @@ test('Badges surprise : un saut du Niveau 4 au Niveau 10 en un quiz donne « Hau
   const suite = await quiz('15', [10]);
   assert.doesNotMatch(suite.texte, /Haut niveau|Sommet/, 'pas d\'annonce en double');
 });
+
+// Cartes de ligne, versions (#236) : la Vue parent liste les cartes (Leçon supprimée comprise), le parent choisit la
+// version active, sans changer l'état de retournement de l'Élève.
+test('Vue parent : rubrique Cartes et choix de la version active, retournement intact', async () => {
+  const slug = (await appel('/api/eleves', 'POST', { pseudo: 'Cartes-Versions', age: 11, niveau: 'Primaire 6' })).data.slug;
+  const svg = (n) => ({ l1: `<svg id="a${n}"/>`, l2: `<svg id="b${n}"/>`, heros: `<svg id="c${n}"/>` });
+  const carte = { lecon: 'sans-lecon', titre: 'Les volcans', categorie: 'Sciences', objectifs: 3, jourAcquisition: '2026-10-03', etat: 'prete', essais: 1, calques: svg(1), prete: '2026-10-03T10:00:00.000Z', retourne: '2026-10-04T10:00:00.000Z' };
+  const ancien = { version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: { [carte.lecon]: carte }, paliers: {} };
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify(ancien)); // fichier d'avant les versions
+  const lire = async () => (await appel(`/api/eleves/${slug}/parent`, 'GET', undefined, le('2026-10-10T10:00:00.000Z'))).data.cartes.lignes;
+  const avant = await lire();
+  assert.deepEqual(avant.map((c) => [c.lecon, c.statut, c.leconSupprimee, c.versionActive, c.versions.length]), [['sans-lecon', 'retournee', true, 1, 1]]);
+  // Une deuxième version, ajoutée comme le fera la régénération (#237) : le fichier garde la 1.
+  const { ajouterVersion } = await import('../lib/cartes.js');
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify(ajouterVersion(ancien, 'sans-lecon', svg(2), Date.parse('2026-10-05T10:00:00.000Z'))));
+  const url = `/api/eleves/${slug}/parent/cartes/version`;
+  assert.deepEqual((await appel(url, 'POST', { id: 'sans-lecon', version: 2 })).data, { statut: 'choisie' });
+  const vue = (await appel(`/api/eleves/${slug}/badges`, 'GET', undefined, le('2026-10-10T10:00:00.000Z'))).data.cartesLigne[0];
+  assert.deepEqual([vue.calques, vue.retourne], [svg(2), '2026-10-04T10:00:00.000Z']);
+  assert.deepEqual((await appel(url, 'POST', { id: 'sans-lecon', version: 1 })).data, { statut: 'choisie' }); // retour à la 1
+  assert.equal((await lire())[0].versions.length, 2);
+  assert.equal((await appel(url, 'POST', { id: 'sans-lecon', version: 9 })).status, 404);
+  assert.equal((await appel(url, 'POST', { id: 'inconnue', version: 1 })).status, 404);
+});

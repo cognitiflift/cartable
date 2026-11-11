@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fusionnerCartes, reglerSon, ajouterCoutCarte, retournerCarte, commencerComposition, reprendreCompositions, terminerComposition, echouerComposition, generiquesEpuisees, prochaineAComposer, aRetourner, vueCartes } from '../lib/cartes.js';
+import { fusionnerCartes, reglerSon, ajouterCoutCarte, retournerCarte, commencerComposition, reprendreCompositions, terminerComposition, echouerComposition, generiquesEpuisees, prochaineAComposer, aRetourner, vueCartes, versionsDeCarte, versionActive, ajouterVersion, choisirVersion, vueParentCartes } from '../lib/cartes.js';
 
 const T0 = Date.parse('2026-11-10T12:00:00.000Z');
 const T1 = Date.parse('2026-11-11T12:00:00.000Z');
@@ -177,4 +177,62 @@ test('le coût d\'un tour « carte » est gardé sur la carte, même si la Leço
   const deux = ajouterCoutCarte(un, 'b', { coutUsd: 0.05 });
   assert.deepEqual(deux.cartes.b.cout, { coutUsd: 0.15, tours: 2 });
   assert.equal(ajouterCoutCarte(deux, 'absente', { coutUsd: 1 }), deux);
+});
+
+// Versions de carte (#236) : la carte existante est la version 1, active ; le parent choisit, rien ne se supprime.
+const calquesDe = (n) => ({ l1: `<svg id="l1-${n}"/>`, l2: `<svg id="l2-${n}"/>`, heros: `<svg id="h-${n}"/>` });
+const fichierAvecCarte = (champs = {}) => ({ version: 1, livraison: '2026-10-01T10:00:00.000Z', son: false, ecartees: [], paliers: {},
+  cartes: { a: { lecon: 'a', titre: 'A', categorie: 'Sciences', objectifs: 3, jourAcquisition: '2026-11-02', etat: 'prete', essais: 1, calques: calquesDe(1), prete: '2026-11-02T10:00:00.000Z', retourne: null, ...champs } } });
+
+test('versions : un fichier écrit avant les versions se lit sans migration, la carte est la version 1 active', () => {
+  const carte = fichierAvecCarte().cartes.a;
+  assert.deepEqual(versionsDeCarte(carte), [{ numero: 1, calques: calquesDe(1), creee: '2026-11-02T10:00:00.000Z', generique: false }]);
+  assert.equal(versionActive(carte), 1);
+  assert.equal(versionActive({ ...carte, calques: null, etat: 'en-composition' }), null);
+  assert.equal(versionsDeCarte({ ...carte, etat: 'generique' })[0].generique, true);
+});
+
+test('versions : ajouter garde les précédentes et laisse l’active ; choisir remplace les calques vus, état de retournement intact', () => {
+  const f0 = fichierAvecCarte({ retourne: '2026-11-03T10:00:00.000Z' });
+  const f1 = ajouterVersion(f0, 'a', calquesDe(2), T1);
+  assert.deepEqual(versionsDeCarte(f1.cartes.a).map((v) => v.numero), [1, 2]);
+  assert.equal(versionActive(f1.cartes.a), 1);
+  assert.deepEqual(f1.cartes.a.calques, calquesDe(1));
+  const { fichier: f2, statut } = choisirVersion(f1, 'a', 2);
+  assert.equal(statut, 'choisie');
+  assert.deepEqual(f2.cartes.a.calques, calquesDe(2));
+  assert.equal(f2.cartes.a.retourne, '2026-11-03T10:00:00.000Z');
+  assert.equal(f2.cartes.a.etat, 'prete');
+  // retour à la version 1 : rien n'a été perdu
+  const f3 = choisirVersion(f2, 'a', 1).fichier;
+  assert.deepEqual(f3.cartes.a.calques, calquesDe(1));
+  assert.deepEqual(versionsDeCarte(f3.cartes.a).map((v) => v.numero), [1, 2]);
+  assert.equal(choisirVersion(f3, 'a', 1).statut, 'deja');
+  assert.equal(choisirVersion(f3, 'a', 1).fichier, f3);
+});
+
+test('versions : choisir une carte ou une version inconnue ne change rien', () => {
+  const f = fichierAvecCarte();
+  assert.equal(choisirVersion(f, 'zzz', 1).statut, 'introuvable');
+  assert.equal(choisirVersion(f, 'a', 7).statut, 'sans-version');
+  assert.equal(choisirVersion(f, 'a', 7).fichier, f);
+  assert.equal(choisirVersion(null, 'a', 1).statut, 'introuvable');
+  const enCours = fichierAvecCarte({ etat: 'en-composition', calques: null, prete: null });
+  assert.equal(choisirVersion(enCours, 'a', 1).statut, 'sans-version');
+  assert.equal(ajouterVersion(enCours, 'a', calquesDe(2), T1), enCours);
+});
+
+test('vueParentCartes : toutes les cartes, Leçon supprimée et en composition comprises, avec leur état', () => {
+  const base = fichierAvecCarte();
+  const f = { ...base, cartes: { ...base.cartes,
+    b: { ...base.cartes.a, lecon: 'b', titre: 'B', jourAcquisition: '2026-11-05', retourne: '2026-11-06T10:00:00.000Z' },
+    c: { ...base.cartes.a, lecon: 'c', titre: 'C', jourAcquisition: '2026-11-04', etat: 'generique' },
+    d: { ...base.cartes.a, lecon: 'd', titre: 'D', jourAcquisition: '2026-11-01', etat: 'a-composer', calques: null, prete: null } } };
+  const { lignes } = vueParentCartes(f, ['a', 'b', 'c', 'd']);
+  assert.deepEqual(lignes.map((l) => [l.lecon, l.statut, l.generique]), [['b', 'retournee', false], ['c', 'face-cachee', true], ['a', 'face-cachee', false], ['d', 'en-composition', false]]);
+  assert.deepEqual(lignes.find((l) => l.lecon === 'a').versions.map((v) => [v.numero, v.active]), [[1, true]]);
+  assert.deepEqual(lignes.find((l) => l.lecon === 'd').versions, []);
+  assert.equal(vueParentCartes(f, ['b']).lignes.find((l) => l.lecon === 'a').leconSupprimee, true);
+  assert.equal(vueParentCartes(f, ['a']).lignes.find((l) => l.lecon === 'a').leconSupprimee, false);
+  assert.deepEqual(vueParentCartes(null, []), { lignes: [] });
 });

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Garde-fou avant commit : syntaxe de tout le JavaScript, puis le test de style (couleurs, polices, DESIGN.md).
+# Activer une fois par clone : npm run hooks
+npm run --silent check && node --test test/style.test.js

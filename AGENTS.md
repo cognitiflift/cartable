@@ -12,6 +12,10 @@ Labels par défaut : needs-triage, needs-info, ready-for-agent, ready-for-human,
 
 Single-context : `CONTEXT.md` et `docs/adr/` à la racine. See `docs/agents/domain.md`.
 
+### Vérifications
+
+Lancer `check`, un seul test ou la suite entière : `docs/agents/verifications.md`.
+
 ## Fondement scientifique
 
 Toute spec, tout ticket et toute ADR qui prend une décision d'apprentissage (quiz, mémoire, progression, récompenses, consignes du prof) ou d'ergonomie (interface, lecture, accessibilité) donne, pour chaque décision :

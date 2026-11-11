@@ -25,7 +25,7 @@ import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/prep
 import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
 import { consignesCarte, promptCarte } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus } from './lib/badges.js';
+import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
 import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
@@ -565,8 +565,8 @@ async function retourQuiz(slug, id, { score, bonus, questions, pretest }, mainte
 // `nouveaux` : Paliers gagnés par ce recalcul, [{ id, palier, jour }] (aucun au premier calcul, qui attribue d'office
 // l'historique) ; `nouvellesLignes` : Leçons dont la carte de ligne vient d'être enregistrée (#197) ; `totaux` : total d'Étoiles et de Fusées de l'Élève (#96) ; `lecons`, `evenements` : l'historique lu.
 async function recalculerBadges(slug, maintenant) {
-  const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
-  const calcul = calculerBadges({ lecons, evenements, maintenant });
+  const [lecons, evenements, cartesAvant] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug), store.lireCartes(slug)]);
+  const calcul = calculerBadges({ lecons, evenements, maintenant, cartes: cartesAvant }); // cartes : pour 🚉 Terminus (#220)
   const { fichier, nouveaux } = await store.modifierBadges(slug, (avant) => {
     const fusion = fusionnerBadges(avant, calcul, maintenant);
     return [fusion.fichier, fusion];
@@ -580,6 +580,15 @@ async function recalculerBadges(slug, maintenant) {
   });
   if (prochaineAComposer(cartes)) composerCartes(slug); // en arrière-plan : la réponse n'attend pas la composition
   return { nouveaux, nouvellesLignes, fichier, calcul, cartes, totaux: totauxRecompenses({ lecons, evenements, maintenant }), lecons, evenements };
+}
+
+// Niveaux 5 et 10 (#220) : une Leçon libre qui franchit l'un d'eux note un événement `niveau-atteint` (Leçon, niveau),
+// une seule fois par Leçon et par niveau, pour les badges surprise 🏔️ Haut niveau et 🌋 Sommet. Les Objectifs ne sont
+// pas datés : sans cet événement, rien ne dirait quand le niveau a été atteint. Appelé après chaque score.
+async function noterNiveauxFranchis(slug, lecon, niveauAvant, maintenant) {
+  if (lecon.mode !== 'libre') return;
+  const franchis = niveauxFranchis(niveauAvant, lecon.niveauLecon, await store.lireEvenements(slug), lecon.id);
+  for (const niveau of franchis) await noterEvenement(slug, { type: 'niveau-atteint', date: new Date(maintenant).toISOString(), lecon: lecon.id, niveau });
 }
 
 // Livraison des cartes (#183) : le premier calcul écarte les Leçons déjà Acquises, il doit donc précéder l'événement qui
@@ -889,7 +898,9 @@ async function api(req, res, segments) {
     } else if (r3 === 'scores' && m === 'POST') {
       const corps = await lireCorps(req);
       await fixerLivraison(slug, maintenant); // avant le score : une Acquisition de ce quiz donne sa carte
+      const niveauAvant = (await store.lireLecon(slug, id, { maintenant })).niveauLecon;
       const lecon = await store.enregistrerScore(slug, id, corps, { maintenant });
+      await noterNiveauxFranchis(slug, lecon, niveauAvant, maintenant);
       varierQuestions(slug, id);
       return json(res, 201, lecon);
     } else if (r3 === 'retours' && m === 'POST') {

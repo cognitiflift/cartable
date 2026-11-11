@@ -1083,14 +1083,15 @@ function animerCarte(el) {
   el.addEventListener('click', () => { const retournee = el.classList.toggle('retournee'); el.ariaPressed = String(retournee); regarder(); });
 }
 
+const CRANS_MAX = 8; // la pastille d'une carte de ligne (#232) ; DESIGN.md « Les stations »
 function carteLigne(c) {
   const cle = cleCategorieCarte(c.categorie), calques = calquesDeCarte(c), dos = dosCarteLigne(c, jourEnMots);
   // Une station par Objectif (tous Retenus), en petits crans comme ceux d'une carte de Badge, puis le ✓ de l'Acquisition.
-  const nCrans = Math.min(objectifsDeCarte(c.objectifs).length, 8); // au-delà de 8, la pastille ne grossit plus : le texte alternatif dit le compte exact
+  const nCrans = Math.min(objectifsDeCarte(c.objectifs).length, CRANS_MAX); // au-delà, la pastille ne grossit plus : le texte alternatif dit le compte exact
   const crans = Array.from({ length: nCrans }, (_, i) => h('i', { style: `--i:${i}` }));
   const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
   const el = h('button', { type: 'button', className: `carte-ligne-carte ${cle}`, ariaPressed: 'false', ariaLabel: libelleCarteLigne(c, jourEnMots),
-    style: `--ligne: var(--ligne-${cle}); --n: ${Math.max(1, c.objectifs ?? 1)}` },
+    style: `--ligne: var(--ligne-${cle})` },
   h('div', { className: 'cl-incl' },
     h('div', { className: 'cl-face cl-avant' },
       h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', calques.l1), calque('cl-l2', calques.l2)),

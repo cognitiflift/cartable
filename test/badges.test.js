@@ -357,3 +357,62 @@ test('Surprises : une surprise trouvée porte sa phrase dans Mes badges, une non
   assert.equal(sept.phrase, SURPRISES.find((s) => s.id === 'sept-d-un-coup').phrase);
   assert.equal(collection.some((b) => b.id === 'mois-complet'), false);
 });
+
+// Badges surprise du groupe « Curiosité et exploration » (#221) : même mécanisme que le Rythme (`depuis`, phrase).
+const IDS_CURIOSITE = ['correspondance', 'trois-d-un-coup', 'curieux-de-tout', 'serie-pleine', 'cliche'];
+const unCoupDeTravail = (jour, page, categorie) => lecon({ id: `l-${categorie}-${page}`, categorie, scores: [{ score: 50, date: iso(jour), page: `${page}-p.html` }] });
+// Une Fusée : un quiz de page avec un Dépassement réussi, daté de `jour`.
+const fusee = (jour, page) => ({ score: 90, date: iso(jour), page: `${page}-p.html`, bonus: { reussies: 2, total: 2 } });
+const fuseesLe = (jour, n, categorie = 'Sciences') => lecon({ id: `f-${jour}-${categorie}`, categorie, scores: Array.from({ length: n }, (_, i) => fusee(jour, `${jour}-${i}`)) });
+const termineeLe = (jour, questions) => ({ type: 'revision-terminee', date: iso(jour), ...(questions !== undefined && { questions }) });
+const photoLe = (jour) => ({ type: 'photo-lecon', date: iso(jour), lecon: 'l' });
+
+test('Surprises de la Curiosité : chacune a `depuis` et une phrase sans score ni pourcentage', () => {
+  for (const id of IDS_CURIOSITE) {
+    const s = SURPRISES.find((x) => x.id === id);
+    assert.equal(s?.depuis, DEPUIS, id);
+    assert.ok(s.phrase && !/%|score/i.test(s.phrase), id);
+  }
+});
+
+test('🔀 Correspondance : deux Leçons de Catégories différentes travaillées le même jour ; pas deux de la même Catégorie', () => {
+  assert.deepEqual(surprise('correspondance', [unCoupDeTravail('2026-12-02', 'a', 'Sciences'), unCoupDeTravail('2026-12-02', 'b', 'Sciences')]), []);
+  assert.deepEqual(surprise('correspondance', [unCoupDeTravail('2026-12-02', 'a', 'Sciences'), unCoupDeTravail('2026-12-03', 'b', 'Histoire')]), []);
+  assert.deepEqual(surprise('correspondance', [unCoupDeTravail('2026-12-02', 'a', 'Sciences'), unCoupDeTravail('2026-12-04', 'b', 'Sciences'), unCoupDeTravail('2026-12-04', 'c', 'Histoire')]), unique('2026-12-04'));
+});
+
+test('🚀 Trois d\'un coup : 3 Fusées gagnées le même jour ; pas 2, pas 3 sur trois jours', () => {
+  assert.deepEqual(surprise('trois-d-un-coup', [fuseesLe('2026-12-02', 2)]), []);
+  assert.deepEqual(surprise('trois-d-un-coup', [fuseesLe('2026-12-02', 1), fuseesLe('2026-12-03', 1), fuseesLe('2026-12-04', 1)]), []);
+  assert.deepEqual(surprise('trois-d-un-coup', [fuseesLe('2026-12-02', 1), fuseesLe('2026-12-05', 2, 'Histoire')]), []);
+  assert.deepEqual(surprise('trois-d-un-coup', [fuseesLe('2026-12-05', 1), fuseesLe('2026-12-05', 2, 'Histoire')]), unique('2026-12-05'));
+});
+
+test('🌍 Curieux de tout : des Fusées dans 3 Catégories différentes, datées de la Fusée qui apporte la 3e ; pas 2', () => {
+  assert.deepEqual(surprise('curieux-de-tout', [fuseesLe('2026-12-02', 3, 'Sciences'), fuseesLe('2026-12-03', 1, 'Histoire')]), []);
+  const lecons = [fuseesLe('2026-12-02', 1, 'Sciences'), fuseesLe('2026-12-03', 2, 'Sciences'), fuseesLe('2026-12-04', 1, 'Histoire'), fuseesLe('2026-12-06', 1, 'Maths')];
+  assert.deepEqual(surprise('curieux-de-tout', lecons), unique('2026-12-06'));
+});
+
+test('🔟 Série pleine : une Révision du jour menée jusqu\'au bout avec 10 Questions servies ; pas 9, pas sans le nombre', () => {
+  const avec = (e) => paliersSurprise('serie-pleine', { evenements: [e], maintenant: '2026-12-31' });
+  assert.deepEqual(avec(termineeLe('2026-12-02', 9)), []);
+  assert.deepEqual(avec(termineeLe('2026-12-02')), []);
+  assert.deepEqual(avec(termineeLe('2026-12-02', 10)), unique('2026-12-02'));
+});
+
+test('📸 Cliché ! : l\'événement `photo-lecon`, daté de sa création ; sans événement, rien', () => {
+  const avec = (...evenements) => paliersSurprise('cliche', { evenements, maintenant: '2026-12-31' });
+  assert.deepEqual(avec(), []);
+  assert.deepEqual(avec(photoLe('2026-12-09'), photoLe('2026-12-03')), unique('2026-12-03'));
+});
+
+test('Surprises de la Curiosité : rien avant `depuis`', () => {
+  assert.deepEqual(surprise('correspondance', [unCoupDeTravail('2026-11-10', 'a', 'Sciences'), unCoupDeTravail('2026-11-10', 'b', 'Histoire')]), []);
+  assert.deepEqual(surprise('trois-d-un-coup', [fuseesLe('2026-11-10', 3)]), []);
+  assert.deepEqual(surprise('curieux-de-tout', [fuseesLe('2026-11-02', 1, 'Sciences'), fuseesLe('2026-11-03', 1, 'Histoire'), fuseesLe('2026-11-10', 1, 'Maths')]), []);
+  assert.deepEqual(paliersSurprise('serie-pleine', { evenements: [termineeLe('2026-11-10', 10)] }), []);
+  assert.deepEqual(paliersSurprise('cliche', { evenements: [photoLe('2026-11-10')] }), []);
+  // Le même geste le jour de la donne compte.
+  assert.deepEqual(paliersSurprise('cliche', { evenements: [photoLe('2026-11-11')] }), unique('2026-11-11'));
+});

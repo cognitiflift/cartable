@@ -230,6 +230,8 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Où dans Cartable.** **Dépassement** : un encart « Pour aller plus loin » et 1 question bonus 🚀, hors score (`lib/agent.js`, ticket #128).
 
+**Où aussi (#221).** Badges surprise 🚀 Trois d'un coup et 🌍 Curieux de tout (`lib/badges.js`) : saluer des Fusées gagnées en nombre ou dans plusieurs Catégories. Même solidité : heuristique. Les seuils (3 Fusées, 3 Catégories) n'ont aucun cadre : hypothèse à mesurer.
+
 ### Zone proximale de développement
 
 **Ce qu'il dit.** Ce qu'un élève peut faire avec de l'aide, mais pas encore seul, est ce qu'il est prêt à apprendre ; l'étayage (« scaffolding ») d'un tuteur l'y amène, puis se retire.
@@ -417,6 +419,9 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 
 | Décision | Où | Ce qu'en disent les cadres |
 | --- | --- | --- |
+| Badges surprise de la Curiosité sans cadre (#221) : 🔀 Correspondance (deux Catégories le même jour), 🔟 Série pleine (Révision du jour de 10 Questions), 📸 Cliché ! (Leçon créée depuis une photo) | `lib/badges.js` (`SURPRISES`), `server.js` (`photo-lecon`, nombre de Questions de `revision-terminee`), ticket #221 | Aucun cadre : hypothèse à mesurer (part de ces surprises retournées, délai avant la première). |
+| Seuils de 🚀 Trois d'un coup (3 Fusées en un jour) et 🌍 Curieux de tout (3 Catégories) | `lib/badges.js`, ticket #221 | Le principe (curiosité, Loewenstein 1994 : heuristique) est écrit plus haut ; les seuils n'ont aucun cadre : hypothèse à mesurer. |
+| Aucune rétroactivité des surprises de la Curiosité (`depuis` : 2026-11-11) et un dessin propre à chacune | `lib/badges.js`, `public/carte-badge-art.js`, ticket #221 | Aucun cadre : choix de l'utilisateur et hypothèse à mesurer (part des surprises retournées). |
 | Badges surprise de Mémoire et progression (#220) : 🚉 Terminus (une Leçon passe à Acquise), 🏔️ Haut niveau (Niveau 5), 🌋 Sommet (Niveau 10), ⏰ À l'heure (Leçon de révision terminée avant son contrôle) | `lib/badges.js` (`SURPRISES`), `server.js` (`noterNiveauxFranchis`), ticket #220 | Aucun cadre : hypothèse à mesurer (part de ces surprises trouvées, délai avant la première). Les seuils 5 et 10 sont ceux du Niveau de Leçon, sans cadre. |
 | Seuil de 30 jours de 🏗️ Ça tient bon | `lib/badges.js`, ticket #220 | L'espacement qui soutient la mémoire est étayé (Cepeda et al. 2006) ; 30 jours n'a aucun cadre : hypothèse à mesurer. |
 | Aucune rétroactivité des surprises de Mémoire et progression (`depuis` : 2026-11-11) ; Niveaux 5 et 10 d'une Leçon d'avant la livraison sans événement `niveau-atteint` | `lib/badges.js`, ticket #220 | Aucun cadre : choix de l'utilisateur (la surprise se mérite à la prochaine occasion). |

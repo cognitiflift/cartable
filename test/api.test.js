@@ -4600,3 +4600,29 @@ test('Badges surprise du Rythme : rien d\'office avant la livraison ; « Sept d\
   assert.doesNotMatch(await retour('18'), /Sept d’un coup/, 'pas d\'annonce en double');
   assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-18T13:00:00.000Z'))).data, 'mois-complet'), undefined);
 });
+
+// Badges surprise de la Curiosité (#221) : événements `photo-lecon` et nombre de Questions de la série terminée.
+test('📸 Cliché ! : une Leçon créée à partir d\'une photo note `photo-lecon` et trouve la surprise ; un PDF seul, non', async () => {
+  assert.equal((await appel('/api/eleves', 'POST', { pseudo: 'Cliche-Test', age: 11, niveau: 'Primaire 6' })).status, 201);
+  const slug = 'cliche-test';
+  const url = `/api/eleves/${slug}/badges`;
+  const faux = Buffer.from('faux').toString('base64');
+  const creer = (nom, date) => avecFichier('objectifs', () => appel(`/api/eleves/${slug}/lecons`, 'POST', { fichiers: [{ nom, data: faux }] }, le(date)));
+  assert.equal((await creer('page.pdf', '2026-11-12T12:00:00.000Z')).status, 201);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'photo-lecon'), []);
+  assert.equal(badgeDe((await appel(url, 'GET', undefined, le('2026-11-12T13:00:00.000Z'))).data, 'cliche'), undefined);
+  const photo = await creer('page.JPG', '2026-11-13T12:00:00.000Z');
+  assert.equal(photo.status, 201);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'photo-lecon'), [{ type: 'photo-lecon', date: '2026-11-13T12:00:00.000Z', lecon: photo.data.id }]);
+  const vue = (await appel(url, 'GET', undefined, le('2026-11-13T13:00:00.000Z'))).data;
+  assert.deepEqual(badgeDe(vue, 'cliche'), { id: 'cliche', emoji: '📸', nom: 'Cliché !', phrase: 'Une Leçon créée à partir d’une photo.', surprise: true, palier: 'unique', jour: '2026-11-13' });
+});
+
+test('🔟 Série pleine : la fin de Révision du jour note le nombre de Questions servies que l\'écran envoie', async () => {
+  const { slug, lecons: [lecon] } = await eleveRevisions('Serie-Pleine', 1);
+  await repondreRevision(slug, lecon, 'q1', 0, LENDEMAIN);
+  const fin = (corps, date) => appel(`/api/eleves/${slug}/revisions/terminee`, 'POST', corps, le(date));
+  assert.equal((await fin({ questions: 10 }, LENDEMAIN)).status, 200);
+  assert.equal((await fin({ questions: 'dix' }, LENDEMAIN)).status, 200);
+  assert.deepEqual((await evenementsDe(slug)).filter((e) => e.type === 'revision-terminee').map((e) => e.questions), [10, undefined]);
+});

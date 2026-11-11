@@ -1278,7 +1278,7 @@ function revisionsDuJour(profil, { fin: boutonFin = null } = {}) {
         // Chaque Question de la série a sa réponse : la Révision du jour est menée jusqu'au bout.
         let nouvelles = null;
         if (repondues === questions.length) {
-          try { ({ recompenses: nouvelles } = await api(`${url}/terminee`, { method: 'POST', body: {} })); } catch (e) { erreur.textContent = e.message; }
+          try { ({ recompenses: nouvelles } = await api(`${url}/terminee`, { method: 'POST', body: { questions: questions.length } })); } catch (e) { erreur.textContent = e.message; }
         }
         return serie(suite, nouvelles);
       }

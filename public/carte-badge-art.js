@@ -91,6 +91,30 @@ export const ARTS_SURPRISES = {
   rentree: (r) => carte(r,
     `<g stroke="var(--sur-nuit-doux)" stroke-width="2" opacity=".18">${[60, 90, 120, 150, 180, 210, 240].map((y) => `<path d="M0 ${y} H200"/>`).join('')}</g>`,
     `<path d="M82 104 V88 Q100 70 118 88 V104" fill="none" stroke="var(--sur-nuit)" stroke-width="7" stroke-linecap="round"/><rect x="56" y="100" width="88" height="116" rx="26" fill="var(--palier-bronze)" ${TRAIT}/><path d="M56 128 Q100 168 144 128 V126 A26 26 0 0 0 118 100 H82 A26 26 0 0 0 56 126Z" fill="var(--palier-or)" ${TRAIT}/><circle cx="100" cy="150" r="7" fill="var(--sur-nuit)" ${TRAIT}/><rect x="70" y="168" width="60" height="38" rx="10" fill="var(--nouveau)" ${TRAIT}/><path d="M80 187 h40" stroke="var(--sur-nuit)" stroke-width="4" stroke-linecap="round"/>`),
+  // Groupe « Curiosité et exploration » (#221).
+  // 🔀 Correspondance : deux voies de Catégories différentes qui se croisent, une gare à chaque bout.
+  correspondance: (r) => carte(r,
+    `${cercle(70, 'stroke-dasharray="3 6" opacity=".8"')}${pointille(244)}`,
+    `<path d="M26 82 C80 82 120 188 174 188" fill="none" stroke="var(--ligne-francais)" stroke-width="22" stroke-linecap="round"/><path d="M26 188 C80 188 120 82 174 82" fill="none" stroke="var(--ligne-sciences)" stroke-width="22" stroke-linecap="round"/><path d="M26 82 C80 82 120 188 174 188 M26 188 C80 188 120 82 174 82" fill="none" stroke="var(--sur-nuit)" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"/><polygon points="164,160 196,188 160,210" fill="var(--ligne-francais)" ${TRAIT}/><polygon points="164,110 196,82 160,60" fill="var(--ligne-sciences)" ${TRAIT}/>${gare(26, 82, 'atteint', 11)}${gare(26, 188, 'atteint', 11)}`),
+  // 🚀 Trois d'un coup : trois fusées en formation, la plus grande devant, hautes sur la carte.
+  'trois-d-un-coup': (r) => {
+    const fusee = (x, y, k, couleur) => `<g transform="translate(${x} ${y}) scale(${k})"><path d="M0 -62 C20 -40 22 -4 14 34 H-14 C-22 -4 -20 -40 0 -62Z" fill="var(--sur-nuit)" ${TRAIT}/><circle cx="0" cy="-16" r="9" fill="${couleur}" ${TRAIT}/><path d="M-14 12 L-34 40 L-14 34Z M14 12 L34 40 L14 34Z" fill="${couleur}" ${TRAIT}/><path d="M-8 42 Q0 78 8 42Z" fill="var(--palier-or)"/></g>`;
+    return carte(r,
+      `<path d="M100 250 L20 40 M100 250 L180 40" stroke="var(--sur-nuit-doux)" stroke-width="2" stroke-dasharray="2 8" opacity=".5"/>${cercle(88, 'stroke-dasharray="3 6" opacity=".6"')}`,
+      `${fusee(46, 130, 0.8, 'var(--palier-bronze)')}${fusee(154, 130, 0.8, 'var(--palier-diamant)')}${fusee(100, 150, 1.2, 'var(--nouveau)')}`);
+  },
+  // 🌍 Curieux de tout : un globe cerclé d'une orbite, trois repères de Catégories différentes.
+  'curieux-de-tout': (r) => carte(r,
+    `<ellipse cx="100" cy="135" rx="96" ry="30" fill="none" stroke="var(--sur-nuit-doux)" stroke-width="2" opacity=".5" transform="rotate(-18 100 135)"/>`,
+    `<circle cx="100" cy="135" r="62" fill="var(--sur-nuit)" ${TRAIT}/><path d="M64 112 C76 92 96 96 98 112 C100 128 80 130 82 150 C72 150 62 134 64 112Z M112 150 C130 138 144 150 138 170 C128 186 114 176 112 150Z" fill="var(--ligne-geographie)"/><path d="M100 73 C70 110 70 160 100 197 M100 73 C130 110 130 160 100 197 M40 135 H160" fill="none" stroke="var(--nuit)" stroke-width="2" opacity=".6"/>${[[58, 100, 'var(--ligne-histoire)'], [150, 104, 'var(--ligne-mathematiques)'], [112, 190, 'var(--ligne-arts)']].map(([x, y, c]) => `<path d="M${x} ${y} l-9 -24 a11 11 0 1 1 18 0Z" fill="${c}" ${TRAIT}/><circle cx="${x}" cy="${y - 28}" r="4" fill="var(--sur-nuit)"/>`).join('')}`),
+  // 🔟 Série pleine : dix quilles-gares rangées en triangle (4, 3, 2, 1), toutes allumées.
+  'serie-pleine': (r) => carte(r,
+    `<polygon points="100,44 188,230 12,230" fill="none" stroke="var(--palier-unique)" stroke-width="2" stroke-dasharray="3 6" opacity=".7"/>${pointille(250)}`,
+    `<polygon points="100,62 176,214 24,214" fill="var(--palier-unique)" ${TRAIT}/>${[4, 3, 2, 1].flatMap((n, rang) => Array.from({ length: n }, (_, i) => gare(100 + (i - (n - 1) / 2) * 34, 196 - rang * 38, 'retenu', 12))).join('')}${etoile(100, 44, 20, 'var(--nouveau)')}`),
+  // 📸 Cliché ! : un appareil photo, son objectif et la photo qui en sort, en paysage.
+  cliche: (r) => carte(r,
+    `<polygon points="100,150 10,40 190,40" fill="var(--palier-or)" opacity=".12"/>${cercle(90, 'stroke-dasharray="3 6" opacity=".7"')}`,
+    `<g transform="rotate(8 150 200)"><rect x="118" y="188" width="62" height="74" rx="4" fill="var(--sur-nuit-doux)" ${TRAIT}/><rect x="126" y="196" width="46" height="46" fill="var(--ligne-geographie)"/></g><path d="M52 112 L68 90 H112 L128 112" fill="var(--sur-nuit)" ${TRAIT}/><rect x="22" y="108" width="156" height="104" rx="18" fill="var(--sur-nuit)" ${TRAIT}/><rect x="22" y="126" width="156" height="14" fill="var(--palier-unique)"/><circle cx="100" cy="168" r="38" fill="var(--nuit)" ${TRAIT}/><circle cx="100" cy="168" r="26" fill="var(--nouveau)" ${TRAIT}/><circle cx="90" cy="158" r="7" fill="var(--sur-nuit)" opacity=".8"/><circle cx="154" cy="124" r="6" fill="var(--palier-or)"/>`),
 };
 
 // Repli : un identifiant de surprise sans dessin propre. Violette, unique ; son emoji est le héros.

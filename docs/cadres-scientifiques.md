@@ -230,6 +230,8 @@ Ajouter un cadre : une nouvelle entrée, au même format, avec une référence v
 
 **Où dans Cartable.** **Dépassement** : un encart « Pour aller plus loin » et 1 question bonus 🚀, hors score (`lib/agent.js`, ticket #128).
 
+**Où aussi (#221).** Badges surprise 🚀 Trois d'un coup et 🌍 Curieux de tout (`lib/badges.js`) : saluer des Fusées gagnées en nombre ou dans plusieurs Catégories. Même solidité : heuristique. Les seuils (3 Fusées, 3 Catégories) n'ont aucun cadre : hypothèse à mesurer.
+
 ### Zone proximale de développement
 
 **Ce qu'il dit.** Ce qu'un élève peut faire avec de l'aide, mais pas encore seul, est ce qu'il est prêt à apprendre ; l'étayage (« scaffolding ») d'un tuteur l'y amène, puis se retire.
@@ -417,6 +419,9 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 
 | Décision | Où | Ce qu'en disent les cadres |
 | --- | --- | --- |
+| Badges surprise de la Curiosité sans cadre (#221) : 🔀 Correspondance (deux Catégories le même jour), 🔟 Série pleine (Révision du jour de 10 Questions), 📸 Cliché ! (Leçon créée depuis une photo) | `lib/badges.js` (`SURPRISES`), `server.js` (`photo-lecon`, nombre de Questions de `revision-terminee`), ticket #221 | Aucun cadre : hypothèse à mesurer (part de ces surprises retournées, délai avant la première). |
+| Seuils de 🚀 Trois d'un coup (3 Fusées en un jour) et 🌍 Curieux de tout (3 Catégories) | `lib/badges.js`, ticket #221 | Le principe (curiosité, Loewenstein 1994 : heuristique) est écrit plus haut ; les seuils n'ont aucun cadre : hypothèse à mesurer. |
+| Aucune rétroactivité des surprises de la Curiosité (`depuis` : 2026-11-11) et un dessin propre à chacune | `lib/badges.js`, `public/carte-badge-art.js`, ticket #221 | Aucun cadre : choix de l'utilisateur et hypothèse à mesurer (part des surprises retournées). |
 | Badges surprise du Rythme (#219) : Centenaire (100 Jours travaillés) et Rentrée (un Jour travaillé en septembre) | `lib/badges.js` (`SURPRISES`), ticket #219 | Aucun cadre : hypothèse à mesurer (part de ces surprises retournées dans Mes badges). |
 | Seuils des surprises de série et de semaine (7 jours, 30 jours, semaine du lundi au dimanche) | `lib/badges.js`, ticket #219 | Le principe d'une habitude qui se construit par répétition est étayé (Gollwitzer & Sheeran 2006 ; Singh et al. 2024, voir « Habitudes et intentions de mise en œuvre ») ; les seuils eux-mêmes n'ont aucun cadre : hypothèse à mesurer. |
 | Aucune rétroactivité des surprises du Rythme (`depuis` : 2026-11-11, `trouver` ignore tout événement antérieur) | `lib/badges.js`, ticket #219 | Aucun cadre : choix de l'utilisateur, pour qu'une surprise reste une surprise pour les Élèves existants. |

@@ -39,6 +39,7 @@ const store = createStore(ELEVES);
 const SUJET_MAX = 80; // sujet libre, après trim
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.md': 'text/markdown; charset=utf-8', '.woff2': 'font/woff2' };
+const EXTENSIONS_IMAGE = ['.jpg', '.jpeg', '.png', '.webp']; // Documents source qui sont des photos (le reste : PDF)
 const enCours = new Set(); // Leçons (cleLecon) dont l'agent travaille : un seul agent par Leçon à la fois
 const propositionsEnCours = new Map(); // élève → Propositions précédentes, pendant que les nouvelles se préparent : un seul tour à la fois
 const propositionsARelancer = new Set(); // élèves dont une séance a avancé pendant la génération : une relance à la fin
@@ -497,6 +498,10 @@ async function nouvelleRevision(slug, { fichiers, dateControle, cadrage: brut },
   const controle = jourValide(dateControle) ? dateControle : null;
   const lecon = await store.creerLecon(slug, { sujet: 'Révision', mode: 'revision', cadrage, dateControle: controle });
   const noms = await store.enregistrerSources(slug, lecon.id, fichiers);
+  // Badge surprise « Cliché ! » (#221) : une Leçon créée à partir d'un Document source image (photo), pas d'un PDF seul.
+  if (noms.some((n) => EXTENSIONS_IMAGE.includes(path.extname(n)))) {
+    await noterEvenement(slug, { type: 'photo-lecon', date: new Date(maintenant).toISOString(), lecon: lecon.id });
+  }
   const prompt = [
     `Leçon de révision. L'élève a fourni sa leçon scolaire : ${noms.map((n) => `sources/${n}`).join(', ')} (scan ou photo, parfois manuscrite).`,
     `La mission est déjà fixée, ne la demande pas : réviser cette leçon et être évalué sur son contenu${controle ? `, pour un contrôle le ${controle}` : ''}.`,
@@ -640,13 +645,14 @@ async function nouvelleDepuisProposition(slug, titre, brut, maintenant) {
 // (`etoile` : la première de la journée rapporte une Étoile ; `paliers` : Paliers de Badge nouveaux) et le nombre
 // d'Étoiles de Révision du jour de l'Élève. Le serveur ne sait pas quelle série a été servie : il faut au moins une
 // réponse de Révision du jour dans la journée. Jamais de tour du prof.
-async function terminerRevisionDuJour(slug, maintenant) {
+async function terminerRevisionDuJour(slug, maintenant, questions) {
   const [lecons, evenements] = await Promise.all([store.leconsLues(slug, { maintenant }), store.lireEvenements(slug)]);
   const aujourdhui = jourLocal(maintenant);
   const repondueAujourdhui = lecons.some((l) => reponsesDeRevision(l).some((r) => jourDe(r.date) === aujourdhui));
   if (!repondueAujourdhui) throw new HttpError(400, "Aucune Révision du jour répondue aujourd'hui");
   const etoile = etoileDuJour(evenements, maintenant);
-  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString() };
+  // `questions` : nombre de Questions de la série servie, que seul l'écran connaît (badge surprise « Série pleine », #221).
+  const evenement = { type: 'revision-terminee', date: new Date(maintenant).toISOString(), ...(Number.isInteger(questions) && questions > 0 && { questions }) };
   await store.enregistrerEvenement(slug, evenement);
   const { nouveauxBadges: nouveaux, nouvellesCartesLigne } = await annoncerBadges(slug, maintenant);
   const paliers = nouveaux.map(({ id, palier, jour }) => ({ id, palier, jour }));
@@ -717,7 +723,7 @@ async function api(req, res, segments) {
     }
   } else if (r2 === 'revisions' && id === 'terminee' && !r3) {
     // Révision du jour menée jusqu'au bout (#94) : l'écran le signale après la dernière réponse d'une série.
-    if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant));
+    if (m === 'POST') return json(res, 200, await terminerRevisionDuJour(slug, maintenant, (await lireCorps(req)).questions));
   } else if (r2 === 'parent' && id === 'signalements' && !r3) {
     // Le parent signale lui-même une Question (#148) : même liste fermée de raisons, auteur parent, jamais de tour du prof.
     if (m === 'POST') {

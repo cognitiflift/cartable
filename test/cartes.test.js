@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fusionnerCartes, reglerSon, ajouterCoutCarte, retournerCarte, commencerComposition, reprendreCompositions, terminerComposition, echouerComposition, generiquesEpuisees, prochaineAComposer, aRetourner, vueCartes, versionsDeCarte, versionActive, ajouterVersion, choisirVersion, vueParentCartes } from '../lib/cartes.js';
+import { fusionnerCartes, reglerSon, ajouterCoutCarte, retournerCarte, commencerComposition, reprendreCompositions, terminerComposition, echouerComposition, generiquesEpuisees, prochaineAComposer, aRetourner, vueCartes, versionsDeCarte, versionActive, ajouterVersion, choisirVersion, vueParentCartes, demanderRegeneration, prochaineARegenerer, commencerRegeneration, terminerRegeneration, echouerRegeneration } from '../lib/cartes.js';
 
 const T0 = Date.parse('2026-11-10T12:00:00.000Z');
 const T1 = Date.parse('2026-11-11T12:00:00.000Z');
@@ -235,4 +235,68 @@ test('vueParentCartes : toutes les cartes, Leçon supprimée et en composition c
   assert.equal(vueParentCartes(f, ['b']).lignes.find((l) => l.lecon === 'a').leconSupprimee, true);
   assert.equal(vueParentCartes(f, ['a']).lignes.find((l) => l.lecon === 'a').leconSupprimee, false);
   assert.deepEqual(vueParentCartes(null, []), { lignes: [] });
+});
+
+// Régénération (#237)
+const cycle = (f, id = 'a') => commencerRegeneration(demanderRegeneration(f, id, [id]).fichier, id);
+
+test('régénération : un tour réussi ajoute une version prête, l’active et le retournement ne bougent pas', () => {
+  const f0 = fichierAvecCarte({ retourne: '2026-11-03T10:00:00.000Z' });
+  const demande = demanderRegeneration(f0, 'a', ['a']);
+  assert.equal(demande.statut, 'demandee');
+  assert.equal(prochaineARegenerer(demande.fichier), 'a');
+  assert.equal(vueParentCartes(demande.fichier, ['a']).lignes[0].regeneration, true);
+  const f1 = terminerRegeneration(cycle(f0), 'a', calquesDe(2), T1);
+  assert.deepEqual(versionsDeCarte(f1.cartes.a).map((v) => v.numero), [1, 2]);
+  assert.equal(versionActive(f1.cartes.a), 1);
+  assert.deepEqual(f1.cartes.a.calques, calquesDe(1));
+  assert.equal(f1.cartes.a.retourne, '2026-11-03T10:00:00.000Z');
+  assert.equal(f1.cartes.a.regeneration, undefined);
+  assert.equal(prochaineARegenerer(f1), null);
+  // une autre demande ajoute une troisième version : aucun plafond
+  assert.equal(versionsDeCarte(terminerRegeneration(cycle(f1), 'a', calquesDe(3), T1).cartes.a).length, 3);
+});
+
+test('régénération : un seul tour à la fois par carte, redemandée seulement quand le tour est fini', () => {
+  const f = fichierAvecCarte();
+  const demandee = demanderRegeneration(f, 'a', ['a']).fichier;
+  assert.equal(demanderRegeneration(demandee, 'a', ['a']).statut, 'deja');
+  assert.equal(demanderRegeneration(demandee, 'a', ['a']).fichier, demandee);
+  assert.equal(demanderRegeneration(commencerRegeneration(demandee, 'a'), 'a', ['a']).statut, 'deja');
+  assert.equal(commencerRegeneration(commencerRegeneration(demandee, 'a'), 'a').cartes.a.regeneration.essais, 1);
+  assert.equal(demanderRegeneration(f, 'zzz', ['a']).statut, 'introuvable');
+});
+
+test('régénération : un premier échec redemande le tour, le deuxième abandonne sans rien changer et prévient', () => {
+  const f0 = fichierAvecCarte();
+  const f1 = echouerRegeneration(cycle(f0), 'a', T1);
+  assert.equal(f1.cartes.a.regeneration.etat, 'demandee');
+  assert.equal(prochaineARegenerer(f1), 'a');
+  const f2 = echouerRegeneration(commencerRegeneration(f1, 'a'), 'a', T1);
+  assert.equal(f2.cartes.a.regeneration, undefined);
+  assert.equal(prochaineARegenerer(f2), null);
+  assert.deepEqual(versionsDeCarte(f2.cartes.a), versionsDeCarte(f0.cartes.a));
+  assert.equal(f2.cartes.a.etat, 'prete');
+  assert.equal(vueParentCartes(f2, ['a']).lignes[0].echecRegeneration, true);
+  // la demande suivante efface l'avertissement
+  assert.equal(vueParentCartes(demanderRegeneration(f2, 'a', ['a']).fichier, ['a']).lignes[0].echecRegeneration, false);
+  assert.equal(echouerRegeneration(f0, 'a', T1), f0);
+});
+
+test('régénération : refusée pour une Leçon supprimée, possible pour une carte générique ou en attente de composition', () => {
+  const f = fichierAvecCarte();
+  assert.deepEqual([demanderRegeneration(f, 'a', []).statut, demanderRegeneration(f, 'a', []).fichier === f], ['lecon-supprimee', true]);
+  const generique = fichierAvecCarte({ etat: 'generique' });
+  const g = terminerRegeneration(cycle(generique), 'a', calquesDe(2), T1);
+  assert.deepEqual(versionsDeCarte(g.cartes.a).map((v) => [v.numero, v.generique]), [[1, true], [2, false]]);
+  assert.equal(versionActive(g.cartes.a), 1);
+  const attente = fichierAvecCarte({ etat: 'a-composer', essais: 1, calques: null, prete: null });
+  const p = terminerRegeneration(cycle(attente), 'a', calquesDe(2), T1);
+  assert.deepEqual([p.cartes.a.etat, versionActive(p.cartes.a), p.cartes.a.calques], ['prete', 1, calquesDe(2)]);
+  assert.equal(demanderRegeneration(fichierAvecCarte({ etat: 'en-composition', calques: null }), 'a', ['a']).statut, 'deja');
+});
+
+test('régénération : un tour interrompu par un redémarrage est redemandé', () => {
+  const f = reprendreCompositions(cycle(fichierAvecCarte()));
+  assert.deepEqual(f.cartes.a.regeneration, { etat: 'demandee', essais: 1 });
 });

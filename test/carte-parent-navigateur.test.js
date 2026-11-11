@@ -19,7 +19,7 @@ const CHROMIUM = ['chromium', 'chromium-browser', 'google-chrome-stable', 'googl
 const raison = CHROMIUM ? false : 'Chromium absent : test de la galerie des cartes en navigateur ignoré';
 if (raison) console.log(`# ${raison}`);
 
-let dossier, serveur, chrome, base, cdp, slug;
+let dossier, serveur, chrome, base, cdp, slug, geyser;
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const portLibre = () => new Promise((resolve, reject) => {
   const s = net.createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
@@ -63,8 +63,10 @@ before(async () => {
   const profil = await createStore(eleves).creerEleve({ pseudo: 'Cdp-Cartes', age: 11, niveau: 'Primaire 6' });
   slug = profil.slug;
   const carte = (lecon, titre, jour, retourne) => ({ lecon, titre, categorie: 'sciences', objectifs: 3, jourAcquisition: jour, etat: 'generique', essais: 2, calques: sceneGenerique({ lecon, categorie: 'sciences' }), prete: `${jour}T10:00:00.000Z`, retourne });
+  geyser = (await createStore(eleves).creerLecon(slug, { sujet: 'Les geysers', mode: 'libre' })).id; // la seule dont la Leçon existe encore
   const f = { version: 1, livraison: '2026-10-01T10:00:00.000Z', son: false, ecartees: [], paliers: {},
-    cartes: { volcans: carte('volcans', 'Les volcans', '2026-11-02', '2026-11-03T10:00:00.000Z'), dunes: carte('dunes', 'Les dunes', '2026-11-04', null) } };
+    cartes: { volcans: carte('volcans', 'Les volcans', '2026-11-02', '2026-11-03T10:00:00.000Z'), dunes: carte('dunes', 'Les dunes', '2026-11-04', null),
+      [geyser]: carte(geyser, 'Les geysers', '2026-10-20', null) } };
   const deux = ajouterVersion(f, 'volcans', sceneGenerique({ lecon: 'autre-volcans', categorie: 'maths' }), Date.parse('2026-11-05T10:00:00.000Z'));
   await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify(deux));
   const port = await portLibre();
@@ -102,7 +104,7 @@ test('Vue parent : la rubrique Cartes liste les cartes, la galerie change la ver
   await jusqua(() => cdp.evaluer(`!!document.querySelector('.cartes-parent .carte-parent')`), 'rubrique Cartes affichée');
 
   const resume = await cdp.evaluer(`[...document.querySelectorAll('.cartes-parent > li')].map((li) => [li.querySelector('.carte-parent-titre').textContent, li.querySelector('.carte-parent-reperes').textContent, !!li.querySelector('details')])`);
-  assert.deepEqual(resume, [['Les dunes', 'Face cachée · Scène générique · Leçon supprimée', true], ['Les volcans', 'Retournée · Scène générique · Leçon supprimée', true]]);
+  assert.deepEqual(resume, [['Les dunes', 'Face cachée · Scène générique · Leçon supprimée', true], ['Les volcans', 'Retournée · Scène générique · Leçon supprimée', true], ['Les geysers', 'Face cachée · Scène générique', true]]);
   assert.match(await cdp.evaluer(`document.querySelector('.carte-parent-note').textContent`), /pas encore retournée/);
 
   const versionsVolcans = `.cartes-parent > li:nth-child(2) details`;
@@ -133,4 +135,22 @@ test('Vue parent : à 390 px la grille des cartes ne déborde pas et les boutons
   assert.equal(mesure.debord, false);
   assert.equal(mesure.boutons, true);
   assert.ok(mesure.colonnes >= 2, 'au moins deux cartes de front sur un téléphone');
+});
+
+test('Vue parent : « Régénérer » en un clic, sans bouton pour une Leçon supprimée, avertissement après deux échecs', { skip: raison, timeout: 40_000 }, async () => {
+  await cdp.envoyer('Emulation.setDeviceMetricsOverride', { width: 1024, height: 900, deviceScaleFactor: 1, mobile: false });
+  await cdp.envoyer('Page.navigate', { url: `${base}?regen=${Date.now()}#/parent` });
+  await jusqua(() => cdp.evaluer(`!!document.querySelector('.cartes-parent .carte-parent')`), 'rubrique Cartes affichée');
+  const boutons = await cdp.evaluer(`[...document.querySelectorAll('.cartes-parent > li')].map((li) => [li.querySelector('.carte-parent-titre').textContent, !!li.querySelector('button.regenerer')])`);
+  assert.deepEqual(boutons, [['Les dunes', false], ['Les volcans', false], ['Les geysers', true]]);
+  assert.match(await cdp.evaluer(`document.querySelector('.cartes-parent > li:nth-child(1)').textContent`), /Leçon n’existe plus/);
+  assert.match(await cdp.evaluer(`document.querySelector('.cartes-parent > li:nth-child(3) button.regenerer').getAttribute('aria-label')`), /Régénérer la carte « Les geysers »/);
+
+  // Un clic, sans confirmation : le tour échoue deux fois (pas d'agent ici) ; le parent en est averti, la version active reste.
+  await cdp.evaluer(`document.querySelector('.cartes-parent > li:nth-child(3) button.regenerer').click(); true`);
+  await jusqua(() => cdp.evaluer(`!!document.querySelector('.cartes-parent > li:nth-child(3) p[role=alert]')`), 'avertissement après deux échecs', 20_000);
+  assert.match(await cdp.evaluer(`document.querySelector('.cartes-parent > li:nth-child(3) p[role=alert]').textContent`), /version active n’a pas changé/);
+  const carte = JSON.parse(await fs.readFile(path.join(dossier, 'eleves', slug, 'cartes.json'), 'utf8')).cartes[geyser];
+  assert.deepEqual([carte.etat, carte.versions ?? null, carte.regeneration ?? null], ['generique', null, null]);
+  assert.equal(await cdp.evaluer(`document.querySelector('.cartes-parent > li:nth-child(3) button.regenerer').disabled`), false, 'on peut réessayer');
 });

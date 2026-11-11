@@ -1,0 +1,8 @@
+.git
+node_modules
+eleves
+.env
+.claude
+.impeccable
+docs
+test

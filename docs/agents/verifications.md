@@ -6,6 +6,7 @@
 | `node --test test/<fichier>.test.js` | un fichier de test | selon le fichier |
 | `node --test --test-name-pattern="<nom>" test/<fichier>.test.js` | un seul test | selon le test |
 | `npm test` | toute la suite | ~45 s au repos, plus si des sous-agents tournent en parallèle |
+| `npm run publier` | `scripts/publier.sh` : publie la version courante sur le NAS et **redémarre le conteneur** (à ne pas lancer pour tester) | selon le NAS |
 
 - Le hook `.githooks/pre-commit` lance `check` et `test/style.test.js`. Activation, une fois par clone : `npm run hooks`.
 - La CI (`.github/workflows/ci.yml`) lance `check` puis `npm test` sur chaque PR et sur `main`.

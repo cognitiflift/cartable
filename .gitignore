@@ -1,3 +1,4 @@
 eleves/
 node_modules/
 exemples/
+.env

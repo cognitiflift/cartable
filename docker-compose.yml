@@ -1,0 +1,28 @@
+# Cartable en conteneur. Copier .env.example en .env et le remplir (le jeton ne va jamais dans le dépôt).
+services:
+  cartable:
+    build: .
+    container_name: cartable
+    # Identifiant du propriétaire du dossier partagé (`id -u` et `id -g`), pour que eleves/ lui appartienne.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      TZ: Europe/Brussels
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:?à renseigner dans .env}
+      TEACH_SKILL_DIR: ${TEACH_SKILL_DIR:-/opt/teach}
+      ELEVES_DIR: ${ELEVES_DIR:-/app/eleves}
+      PORT: ${PORT:-3000}
+      # Adresse à ouvrir depuis un autre appareil (ex. 192.168.1.20:3000), affichée au démarrage.
+      ADRESSE_PUBLIQUE: ${ADRESSE_PUBLIQUE:-}
+    volumes:
+      - .:/app
+      - ./eleves:/app/eleves
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Les logs vont sur la sortie standard : `docker compose logs -f cartable`.

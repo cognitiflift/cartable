@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT, FORMATS_RAPPEL_ACTIF, consigneImagesRetirees } from '../lib/agent.js';
+import { consignesPropositions, consignesLecon, extraireChoix, actionApresQuiz, actionRetourQuiz, promptDemarrageLibre, consignePremierTour, consigneRebond, preambuleRelais, REBONDS, DOSSIER_KIT, FORMATS_RAPPEL_ACTIF, consigneImagesRetirees, jetonRefuse } from '../lib/agent.js';
 import path from 'node:path';
 
 const profil = { pseudo: 'Zoé', age: 11, niveau: 'Primaire 6' };
@@ -389,4 +389,14 @@ test('Images retirées : une image trop lourde se remplace par l\'image de parta
   const morte = consigneImagesRetirees([{ url: 'https://exemple.org/x.png', page: '0002.html', raison: 'adresse morte (erreur 404)' }]).join('\n');
   assert.doesNotMatch(morte, /image de partage/);
   assert.match(morte, /par une autre image qui marche \(déclarée dans images\.json\) ou par un schéma SVG/);
+});
+
+test('Jeton refusé : reconnu aux messages d\'authentification, pas à un « 401 » sans rapport', () => {
+  assert.ok(jetonRefuse('Invalid API key · Please run /login'));
+  assert.ok(jetonRefuse('API Error: 401 {"type":"authentication_error"}'));
+  assert.ok(jetonRefuse('OAuth token has expired'));
+  assert.ok(jetonRefuse('Request failed with status 401 Unauthorized'));
+  assert.ok(!jetonRefuse('La leçon compte 401 mots, c\'est trop long'));
+  assert.ok(!jetonRefuse('Écris le fichier /login.html pour la page de connexion'));
+  assert.ok(!jetonRefuse('Erreur 4012 sur la page'));
 });

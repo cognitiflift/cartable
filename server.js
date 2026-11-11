@@ -236,6 +236,7 @@ async function tourDuProf({ slug, id, prompt, affiche = prompt, premier, etatLec
     return await conclureTour({ slug, id, lecon, premier, pagesAvant, affiche, etatLecon, reponse, sessionId, cout: cout && { ...cout, relais: neuve }, maintenant, rebond });
   } catch (e) {
     if (e instanceof HttpError) throw e;
+    console.error(`Prof de ${slug}/${id} : ${e.message}`);
     throw new HttpError(502, /limit/i.test(e.message) ? "Claude est fatigué pour l'instant, réessaie plus tard." : e.message);
   }
 }
@@ -926,4 +927,4 @@ const serveur = http.createServer(async (req, res) => {
 
 await store.reprendreCartes(reprendreCompositions);
 for (const { slug } of await store.listerEleves()) composerCartes(slug); // les cartes restées « à composer »
-serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT })));
+serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT, adressePublique: process.env.ADRESSE_PUBLIQUE })));

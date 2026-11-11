@@ -79,6 +79,7 @@ if [ "$(basename "$PWD")" = carte ]; then
   echo lancement >> '${dossier}/lancements-carte'
   printf '%s\n' "$@" > '${dossier}/args-carte'
   printf '%s' "$2" > '${dossier}/prompt-carte'
+  printf '%s\\n' "$2" | sed -n 's/.*Identifiant de la carte : \\([^ ]*\\).*/\\1/p' >> '${dossier}/ordre-carte'
   while [ -e '${dossier}/carte-attendre' ]; do sleep 0.05; done
   if [ -e '${dossier}/carte-echouer' ]; then
     echo '{"result":"You have hit your limit","is_error":true}'
@@ -4896,4 +4897,33 @@ test('Vue parent : cartes de Badge, choix de la version active pour la Famille e
   assert.equal((await lire()).find((b) => b.id === 'memoire').versions.length, 2);
   assert.equal((await appel(url, 'POST', { id: 'memoire', version: 9 })).status, 404);
   assert.equal((await appel(url, 'POST', { id: 'inconnu', version: 1 })).status, 404);
+});
+
+test('Régénérer un Badge sans fichier de cartes livré : la régénération part, le Badge appartient à l\'Élève', async () => {
+  await attendreCartesAuRepos();
+  const slug = (await appel('/api/eleves', 'POST', { pseudo: 'Badge-Sans-Cartes', age: 11, niveau: 'Primaire 6' })).data.slug;
+  await fs.rm(path.join(eleves, slug, 'cartes.json'), { force: true });
+  for (const f of ['lancements-carte', 'args-carte', 'prompt-carte']) await fs.rm(path.join(dossier, f), { force: true });
+  assert.deepEqual((await regenererBadge(slug, 'memoire')).data, { statut: 'demandee' });
+  const e = await sonderJusqua(async () => (await badgesDe(slug)).memoire, (x) => x && !x.regeneration && x.versions?.length === 1, 'Régénération jamais finie');
+  assert.deepEqual([e.versions.map((v) => v.numero), e.versionActive], [[2], 1]);
+});
+
+test('Régénérer, file mixte : un seul tour à la fois par Élève, les cartes de ligne passent avant les cartes de Badge en attente', async () => {
+  const { slug, lecon, declencher, etat } = await eleveCarte('Carte-File-Mixte');
+  await declencher();
+  await etat();
+  await fs.rm(path.join(dossier, 'ordre-carte'), { force: true });
+  await avecFichier('carte-attendre', async () => {
+    await regenererBadge(slug, 'memoire'); // premier tour : il occupe l'Élève
+    await sonderJusqua(nbLancementsCartes, (n) => n === 2, 'Régénération de Badge jamais lancée');
+    await regenererBadge(slug, 'curieux');
+    await regenerer(slug, lecon.id); // demandée après le Badge en attente, mais passe avant lui
+    await pause(300);
+    assert.equal(await nbLancementsCartes(), 2, 'un seul tour à la fois');
+  });
+  await sonderJusqua(async () => ((await badgesDe(slug)).curieux?.versions?.length ?? 0) + ((await versionsDe(slug, lecon.id))[0] - 1), (n) => n === 2, 'File jamais vidée');
+  await sonderJusqua(async () => (await badgesDe(slug)).curieux, (e) => e && !e.regeneration, 'Régénération jamais finie');
+  assert.equal(await nbLancementsCartes(), 4);
+  assert.deepEqual((await fs.readFile(path.join(dossier, 'ordre-carte'), 'utf8')).trim().split('\n'), ['memoire', lecon.id, 'curieux']);
 });

@@ -126,7 +126,7 @@ if [ "$(basename "$PWD")" = propositions ]; then
   {"titre":"Les dinosaures","categorie":"Sciences","accroche":"Qui était le plus grand ?","type":"original","auProgramme":true},
   {"titre":"Les pyramides","categorie":"Histoire","accroche":"Comment les a-t-on construites ?","type":"original","auProgramme":"oui"},
   {"titre":"Les fractions en cuisine","categorie":"Cuisine","accroche":"Une demi-tarte, ça fait combien ?","type":"original"},
-  {"titre":"Les planètes","categorie":"Sciences","accroche":"Pourquoi Mars est rouge ?","type":"suite","auProgramme":true},
+  {"titre":"Les planètes","categorie":"Numérique","accroche":"Pourquoi Mars est rouge ?","type":"suite","auProgramme":true},
   {"titre":"Les nuages","categorie":"Sciences","accroche":"De quoi sont-ils faits ?","type":"original"}
 ]
 FIN
@@ -1107,6 +1107,7 @@ test('Propositions : générées à la création du profil, Catégorie hors list
   assert.equal(propositions.length, 4);
   assert.deepEqual(propositions[0], { titre: 'Les dinosaures', categorie: 'Sciences', accroche: 'Qui était le plus grand ?', type: 'original', auProgramme: true });
   assert.equal(propositions[2].categorie, 'Autre');
+  assert.equal(propositions[3].categorie, 'Numérique'); // ticket #231 : une Catégorie de la liste est conservée
   assert.deepEqual(propositions.map((p) => p.type), ['original', 'original', 'original', 'suite']);
   // Marque absente ou invalide : pas au programme. Le faux agent en écrit 5 : on n'en garde que 4, le nombre par défaut.
   assert.deepEqual(propositions.map((p) => p.auProgramme), [true, false, false, true]);

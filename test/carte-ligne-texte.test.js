@@ -12,6 +12,7 @@ test('La couleur de la carte est celle de la Catégorie, sans accent ; une Caté
   assert.equal(cleCategorieCarte('Sciences'), 'sciences');
   assert.equal(cleCategorieCarte('Géographie'), 'geographie');
   assert.equal(cleCategorieCarte('Français'), 'francais');
+  assert.equal(cleCategorieCarte('Numérique'), 'numerique');
   assert.equal(cleCategorieCarte('Cuisine'), 'autre');
   assert.equal(cleCategorieCarte(undefined), 'autre');
 });

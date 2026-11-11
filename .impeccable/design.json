@@ -427,6 +427,23 @@
         ],
         "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
       },
+      "ligne-numerique": {
+        "role": "secondary",
+        "displayName": "Ligne Numérique",
+        "canonical": "#4f2fd0",
+        "oklch": "oklch(44.1% 0.2 276)",
+        "tonalRamp": [
+          "#05021c",
+          "#150f4e",
+          "#2a2090",
+          "#4f2fd0",
+          "#6366f1",
+          "#8e95f8",
+          "#c3c8fc",
+          "#eceeff"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
       "ligne-autre": {
         "role": "secondary",
         "displayName": "Ligne Autre",
@@ -832,6 +849,23 @@
           "#f371b5",
           "#feadd3",
           "#fee7f1"
+        ],
+        "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
+      },
+      "ligne-numerique-sombre": {
+        "role": "secondary",
+        "displayName": "Ligne Numérique (sombre)",
+        "canonical": "#8e7cbf",
+        "oklch": "oklch(63% 0.10 296)",
+        "tonalRamp": [
+          "#06041b",
+          "#17114a",
+          "#2d2587",
+          "#4a43c1",
+          "#6a68e0",
+          "#8e7cbf",
+          "#b7bdfc",
+          "#e9ebff"
         ],
         "source": "public/kit/v1/quiz.css (Catégories du Kit, à ne pas modifier ici)"
       },

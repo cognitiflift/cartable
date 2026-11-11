@@ -419,6 +419,8 @@ Décisions actuelles pour lesquelles aucun cadre solide n'a été trouvé. Ce so
 
 | Décision | Où | Ce qu'en disent les cadres |
 | --- | --- | --- |
+| Catégorie « Numérique » distincte, nommée d'après le programme scolaire français (#231) | `lib/store.js`, `public/categories-carte.js`, `public/style.css` | Aucun cadre : taxonomie d'organisation, pas une décision d'apprentissage. Hypothèse à mesurer : la part de Leçons encore sous « Autre » après l'ajout |
+| Pas de migration des Leçons rangées sous « Autre » avant #231 | `lib/store.js`, ticket #231 | Aucun cadre : prudence, ne pas toucher aux données des Élèves |
 | Badges surprise de la Curiosité sans cadre (#221) : 🔀 Correspondance (deux Catégories le même jour), 🔟 Série pleine (Révision du jour de 10 Questions), 📸 Cliché ! (Leçon créée depuis une photo) | `lib/badges.js` (`SURPRISES`), `server.js` (`photo-lecon`, nombre de Questions de `revision-terminee`), ticket #221 | Aucun cadre : hypothèse à mesurer (part de ces surprises retournées, délai avant la première). |
 | Seuils de 🚀 Trois d'un coup (3 Fusées en un jour) et 🌍 Curieux de tout (3 Catégories) | `lib/badges.js`, ticket #221 | Le principe (curiosité, Loewenstein 1994 : heuristique) est écrit plus haut ; les seuils n'ont aucun cadre : hypothèse à mesurer. |
 | Aucune rétroactivité des surprises de la Curiosité (`depuis` : 2026-11-11) et un dessin propre à chacune | `lib/badges.js`, `public/carte-badge-art.js`, ticket #221 | Aucun cadre : choix de l'utilisateur et hypothèse à mesurer (part des surprises retournées). |

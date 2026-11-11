@@ -476,9 +476,12 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 .bloc-parent .versions-badge li.active { border-top:2px solid var(--accent); }
 .versions-badge button { min-height:2.75rem; }
 .carte-parent .erreur.carte-parent-note { min-height:0; font-weight:600; }
-.carte-parent .regenerer { min-height:2.75rem; align-self:flex-start; }
-.carte-parent .regenerer:disabled { opacity:.7; cursor:progress; }
-.versions-carte .version-en-composition { opacity:.85; }
+.carte-parent .regenerer, .badge-parent .regenerer { min-height:2.75rem; align-self:flex-start; }
+.carte-parent .regenerer:disabled, .badge-parent .regenerer:disabled { opacity:.7; cursor:progress; }
+.versions-carte .version-en-composition, .versions-badge .version-en-composition { opacity:.85; }
+.badge-parent .erreur.carte-parent-note { min-height:0; font-weight:600; }
+.bloc-parent .versions-badge .paliers-badge li { padding-top:0; border-top:0; } /* les petites cartes d'une version n'héritent pas du filet de la version */
+.versions-badge .carte-parent-vide { border-radius:12px; } /* l'attente prend la forme des quatre petites cartes qu'elle remplace */
 .galerie-versions summary { cursor:pointer; font-weight:600; }
 .versions-carte li { display:flex; flex-direction:column; align-items:flex-start; gap:.3rem; min-width:0; }
 .versions-carte button { min-height:2.75rem; }

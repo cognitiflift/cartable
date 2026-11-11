@@ -28,4 +28,12 @@ export const libelleVersionBadge = (v) => `Version ${v.numero}`;
 export const origineVersion = (v) => (v.code ? 'Dessin d’origine' : 'Dessinée par le prof');
 export const libellePalierApercu = (p) => (p === 'unique' ? 'Surprise' : p[0].toUpperCase() + p.slice(1));
 export const libelleChoisirBadge = (b, v) => `Utiliser la version ${v.numero} de la carte de Badge « ${b.nom} », pour tous ses Paliers`;
-export const libelleBadgeParent = (b) => `Carte de Badge « ${b.nom} », ${pluriel(b.versions.length, 'version')}, version ${b.versionActive} active`;
+export const libelleBadgeParent = (b) => `Carte de Badge « ${b.nom} », ${pluriel(b.versions.length, 'version')}, version ${b.versionActive} active${b.regeneration ? ', nouvelle version en cours' : ''}`;
+
+// Régénération (ticket #239) : « Régénérer » demande un nouveau dessin, qui s'ajoute à la galerie sans changer la version
+// active et vaut pour tous les Paliers. Mêmes mots que pour une carte de ligne (carte-parent-texte.js).
+export const libelleRegenererBadge = (b) => `Régénérer la carte de Badge « ${b.nom} » : un nouveau dessin s’ajoute aux versions, pour tous ses Paliers`;
+export const badgeRegenerationAbandonnee = (b) => !b.regeneration && Boolean(b.echecRegeneration);
+export const NOTE_REGENERATION_BADGE = 'Une nouvelle version est en cours : elle arrivera dans la galerie, la version active ne change pas.';
+export const NOTE_ABANDON_BADGE = 'Nouvelle version abandonnée après deux essais ratés. La version active n’a pas changé.';
+export const notesRegenerationBadge = (b) => [b.regeneration && NOTE_REGENERATION_BADGE, badgeRegenerationAbandonnee(b) && NOTE_ABANDON_BADGE].filter(Boolean);

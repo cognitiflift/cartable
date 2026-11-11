@@ -1551,7 +1551,7 @@ test('Coût mesuré : la route de l\'Élève donne le total et le détail par Le
   assert.equal(parId[a.id].titre, 'Les volcans');
   assert.equal(parId[a.id].total.coutUsd, 0.75);
   assert.deepEqual(Object.fromEntries(Object.entries(parId[a.id].parTache).map(([t, c]) => [t, c.tours])),
-    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0, variantes: 0, carte: 0 });
+    { premiereSeance: 1, page: 1, rebond: 1, propositions: 0, variantes: 0, carte: 0, carteBadge: 0 });
   assert.equal(parId[b.id].total.coutUsd, 0.5);
   assert.equal(parId[b.id].parTache.premiereSeance.tours, 2);
 
@@ -3677,6 +3677,7 @@ const attendreCartesAuRepos = async () => {
     for (const slug of await fs.readdir(eleves).catch(() => [])) {
       const f = await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8').then(JSON.parse, () => null);
       if (Object.values(f?.cartes ?? {}).some((c) => ['a-composer', 'en-composition'].includes(c.etat) || c.regeneration)) return true;
+      if (Object.values(f?.badges ?? {}).some((b) => b.regeneration)) return true; // régénération de Badge (#239)
     }
     return false;
   };
@@ -3852,6 +3853,93 @@ test('Régénérer : deux échecs, version active inchangée, parent averti, auc
   await regenerer(slug, lecon.id);
   await sonderJusqua(() => versionsDe(slug, lecon.id), ([n, , r]) => n === 2 && !r, 'Version jamais ajoutée');
   assert.equal((await appel(`/api/eleves/${slug}/parent`)).data.cartes.lignes[0].echecRegeneration, false);
+});
+
+// Régénération d'une carte de Badge (#239) : type de tâche « carteBadge », même file et mêmes règles que les cartes de ligne.
+const regenererBadge = (slug, id) => appel(`/api/eleves/${slug}/parent/cartes/badge-regeneration`, 'POST', { id });
+const badgesDe = async (slug) => JSON.parse(await fs.readFile(path.join(eleves, slug, 'cartes.json'), 'utf8')).badges ?? {};
+const eleveBadge = async (pseudo) => {
+  await attendreCartesAuRepos();
+  const slug = (await appel('/api/eleves', 'POST', { pseudo, age: 11, niveau: 'Primaire 6' })).data.slug;
+  await fs.writeFile(path.join(eleves, slug, 'cartes.json'), JSON.stringify({ version: 1, livraison: '2026-09-30T10:00:00.000Z', son: false, ecartees: [], cartes: {}, paliers: {} }));
+  for (const f of ['lancements-carte', 'args-carte', 'prompt-carte']) await fs.rm(path.join(dossier, f), { force: true });
+  const fini = (id, n) => sonderJusqua(async () => (await badgesDe(slug))[id], (e) => e && !e.regeneration && (e.versions?.length === n || e.echecRegeneration), 'Régénération de Badge jamais finie');
+  return { slug, fini };
+};
+
+test('Régénérer un Badge : ajoute une version de Famille avec la Trousse de Badge, sans changer l\'active, Coût compté', async () => {
+  const { slug, fini } = await eleveBadge('Badge-Regenere');
+  assert.deepEqual((await regenererBadge(slug, 'memoire')).data, { statut: 'demandee' });
+  await fini('memoire', 1);
+  const prompt = await fs.readFile(path.join(dossier, 'prompt-carte'), 'utf8');
+  assert.match(prompt, /Identifiant de la carte : memoire/);
+  assert.match(prompt, /Famille de Badges/);
+  assert.match((await fs.readFile(path.join(dossier, 'args-carte'), 'utf8')), /AUCUNE station/); // la Trousse de Badge est la consigne système
+  assert.match((await fs.readFile(path.join(dossier, 'args-carte'), 'utf8')), /sonnet/);
+  const e = (await badgesDe(slug)).memoire;
+  assert.deepEqual([e.versions.map((v) => v.numero), e.versionActive, e.regeneration], [[2], 1, undefined]);
+  assert.deepEqual(Object.keys(e.versions[0].calques), ['l1', 'l2', 'heros']);
+  const couts = (await appel(`/api/eleves/${slug}/couts`)).data;
+  assert.equal(couts.parTache.carteBadge.tours, 1);
+  assert.equal(couts.parTache.carteBadge.coutUsd, 0.5);
+  const vue = (await appel(`/api/eleves/${slug}/parent`)).data.cartes.badges.find((b) => b.id === 'memoire');
+  assert.deepEqual([vue.versions.map((v) => v.numero), vue.versionActive, vue.regeneration, vue.echecRegeneration, vue.cout], [[1, 2], 1, false, false, { coutUsd: 0.5, tours: 1 }]);
+  // La version choisie est celle de l'Élève ; la version 1 et la régénération suivante restent dans la galerie.
+  assert.equal((await appel(`/api/eleves/${slug}/parent/cartes/badge-version`, 'POST', { id: 'memoire', version: 2 })).data.statut, 'choisie');
+  assert.deepEqual((await regenererBadge(slug, 'memoire')).data, { statut: 'demandee' });
+  await fini('memoire', 2);
+  const apres = (await badgesDe(slug)).memoire;
+  assert.deepEqual([apres.versions.map((v) => v.numero), apres.versionActive, apres.couts.length], [[2, 3], 2, 2]);
+  assert.equal((await regenererBadge(slug, 'inconnu')).status, 404);
+});
+
+test('Régénérer un Badge surprise : même chemin, une version de plus', async () => {
+  const { slug, fini } = await eleveBadge('Badge-Surprise');
+  assert.equal((await regenererBadge(slug, 'content-de-te-revoir')).data.statut, 'demandee');
+  await fini('content-de-te-revoir', 1);
+  assert.match(await fs.readFile(path.join(dossier, 'prompt-carte'), 'utf8'), /badge surprise/);
+});
+
+test('Régénérer un Badge : un seul tour à la fois par Élève, les autres attendent leur tour', async () => {
+  const { slug, fini } = await eleveBadge('Badge-Un-Tour');
+  await avecFichier('carte-attendre', async () => {
+    await regenererBadge(slug, 'memoire');
+    await sonderJusqua(nbLancementsCartes, (n) => n === 1, 'Régénération jamais lancée');
+    assert.equal((await appel(`/api/eleves/${slug}/parent`)).data.cartes.badges.find((b) => b.id === 'memoire').regeneration, true);
+    assert.deepEqual((await regenererBadge(slug, 'memoire')).data, { statut: 'deja' });
+    assert.deepEqual((await regenererBadge(slug, 'curieux')).data, { statut: 'demandee' });
+    await pause(300);
+    assert.equal(await nbLancementsCartes(), 1, 'le second badge attend la fin du premier');
+  });
+  await fini('memoire', 1);
+  await fini('curieux', 1);
+  assert.equal(await nbLancementsCartes(), 2);
+});
+
+test('Régénérer un Badge : deux échecs, version active inchangée, parent averti, Coût des deux tours compté ; une demande suivante efface l\'avertissement', async () => {
+  const { slug, fini } = await eleveBadge('Badge-Echec');
+  await avecFichier('carte-refusee', async () => {
+    await regenererBadge(slug, 'memoire');
+    await sonderJusqua(async () => (await appel(`/api/eleves/${slug}/parent`)).data.cartes.badges.find((b) => b.id === 'memoire'), (b) => b.echecRegeneration && !b.regeneration, 'Échec jamais signalé');
+  });
+  const e = (await badgesDe(slug)).memoire;
+  assert.deepEqual([e.versions, e.versionActive, e.regeneration], [[], 1, undefined]);
+  assert.equal(await nbLancementsCartes(), 2); // deux essais, aucun repli générique
+  assert.equal((await appel(`/api/eleves/${slug}/couts`)).data.parTache.carteBadge.tours, 2);
+  assert.deepEqual((await appel(`/api/eleves/${slug}/badges`)).data.calquesBadge ?? {}, {});
+  await regenererBadge(slug, 'memoire');
+  await fini('memoire', 1);
+  assert.equal((await appel(`/api/eleves/${slug}/parent`)).data.cartes.badges.find((b) => b.id === 'memoire').echecRegeneration, false);
+});
+
+test('Régénérer un Badge : une panne de l\'agent compte aussi comme essai raté', async () => {
+  const { slug } = await eleveBadge('Badge-Panne');
+  await avecFichier('carte-echouer', async () => {
+    await regenererBadge(slug, 'curieux');
+    await sonderJusqua(async () => (await badgesDe(slug)).curieux, (e) => e?.echecRegeneration, 'Échec jamais signalé');
+  });
+  assert.equal(await nbLancementsCartes(), 2);
+  assert.equal((await badgesDe(slug)).curieux.versions.length, 0);
 });
 
 test('Régénérer : refusé pour une Leçon supprimée, dont les versions restent choisissables', async () => {

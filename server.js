@@ -24,7 +24,8 @@ import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees, choisirVersion, demanderRegeneration, prochaineARegenerer, commencerRegeneration, terminerRegeneration, echouerRegeneration } from './lib/cartes.js';
-import { consignesCarte, promptCarte } from './lib/carte-agent.js';
+import { demanderRegenerationBadge, prochainBadgeARegenerer, commencerRegenerationBadge, terminerRegenerationBadge, echouerRegenerationBadge, reprendreRegenerationsBadge, ajouterCoutBadge } from './lib/cartes-badge.js';
+import { consignesCarte, promptCarte, consignesBadge, promptBadge } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
 import { FAMILLES, SURPRISES, calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
@@ -165,14 +166,18 @@ function composerCartes(slug) {
   (async () => {
     while (!seanceEnCours(slug)) {
       // Les régénérations demandées par le parent (#237) passent avant les premières compositions : même file, même tour unique.
-      const { carte, regeneration } = await store.modifierCartes(slug, (avant) => {
+      const { carte, regeneration, badge } = await store.modifierCartes(slug, (avant) => {
         if (!avant) return [avant, {}];
         const f = generiquesEpuisees(avant, Date.now());
         const redo = prochaineARegenerer(f);
         if (redo) return [commencerRegeneration(f, redo), { carte: f.cartes[redo], regeneration: true }];
+        // Les cartes de Badge (#239) passent dans la même file, juste après les cartes de ligne régénérées.
+        const redoBadge = prochainBadgeARegenerer(f);
+        if (redoBadge) return [commencerRegenerationBadge(f, redoBadge), { badge: redoBadge }];
         const id = prochaineAComposer(f);
         return [id ? commencerComposition(f, id) : f, { carte: id && f.cartes[id] }];
       });
+      if (badge) { await regenererUnBadge(slug, badge); continue; }
       if (!carte) break;
       await composerUneCarte(slug, carte, regeneration);
     }
@@ -207,6 +212,33 @@ async function composerUneCarte(slug, carte, regeneration = false) {
     const [reussir, echouer] = regeneration ? [terminerRegeneration, echouerRegeneration] : [terminerComposition, echouerComposition];
     const composee = calques ? reussir(avant, carte.lecon, calques, Date.now()) : echouer(avant, carte.lecon, Date.now());
     return [couts.reduce((f, cout) => ajouterCoutCarte(f, carte.lecon, cout), composee), null];
+  });
+}
+
+// Une tentative de régénération d'une carte de Badge (#239), type de tâche « carteBadge » : même filtre SVG que les cartes de
+// ligne (lib/carte-svg.js, l'identifiant du badge préfixe les dégradés). Réussie, elle ajoute une version sans changer l'active ;
+// deux essais ratés l'abandonnent (la version active ne change pas, le parent est averti). Le Coût du tour, réussi ou non,
+// est gardé avec le badge : il n'a pas de Leçon.
+async function regenererUnBadge(slug, id) {
+  const badge = [...FAMILLES.map((f) => ({ ...f, surprise: false })), ...SURPRISES.map((s) => ({ ...s, surprise: true }))].find((b) => b.id === id);
+  let calques = null;
+  let cout = null;
+  try {
+    const cwd = await store.preparerDossierCarte(slug);
+    const reponse = await lancerAgent({ cwd, prompt: promptBadge(badge), consignes: consignesBadge(), tache: 'carteBadge', teach: false });
+    cout = reponse.cout;
+    const lu = lireCalques(reponse.reponse, id);
+    if (lu.ok) calques = lu.calques;
+    else console.error(`Carte de Badge de ${slug}/${id} : calque refusé (${lu.erreurs.slice(0, 3).join(' ; ')})`);
+  } catch (e) {
+    console.error(`Carte de Badge de ${slug}/${id} : ${e.message}`);
+    cout = e.cout ?? null;
+  }
+  await store.viderDossierCarte(slug).catch(() => {});
+  await store.modifierCartes(slug, (avant) => {
+    const maintenant = Date.now();
+    const suite = calques ? terminerRegenerationBadge(avant, id, calques, maintenant) : echouerRegenerationBadge(avant, id, maintenant);
+    return [ajouterCoutBadge(suite, id, cout, maintenant), null];
   });
 }
 
@@ -784,6 +816,19 @@ async function api(req, res, segments) {
       if (statut === 'sans-version') throw new HttpError(404, 'Version introuvable');
       return json(res, 200, { statut });
     }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'badge-regeneration') {
+    // Régénérer une carte de Badge (#239) : un clic, sans confirmation ni plafond ; même file et mêmes règles que pour une
+    // carte de ligne (un seul tour à la fois par Élève, après les tâches de Séance), la réponse n'attend pas l'agent.
+    if (m === 'POST') {
+      const { id: badge } = await lireCorps(req);
+      if (![...FAMILLES, ...SURPRISES].some((b) => b.id === badge)) throw new HttpError(404, 'Badge introuvable');
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        const r = demanderRegenerationBadge(avant, badge);
+        return [r.fichier, r];
+      });
+      if (statut === 'demandee') composerCartes(slug);
+      return json(res, 200, { statut });
+    }
   } else if (r2 === 'parent' && id === 'cartes' && r3 === 'regeneration') {
     // Régénérer une carte de ligne (#237) : un clic, sans confirmation ni plafond. Le tour part en arrière-plan (un seul à la
     // fois par Élève, après les tâches de Séance) et ajoute une version ; la réponse n'attend pas l'agent.
@@ -991,6 +1036,6 @@ const serveur = http.createServer(async (req, res) => {
   }
 });
 
-await store.reprendreCartes(reprendreCompositions);
+await store.reprendreCartes((f) => reprendreRegenerationsBadge(reprendreCompositions(f)));
 for (const { slug } of await store.listerEleves()) composerCartes(slug); // les cartes restées « à composer »
 serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT, adressePublique: process.env.ADRESSE_PUBLIQUE })));

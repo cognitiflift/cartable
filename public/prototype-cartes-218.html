@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROTOTYPE 218 : cartes Mémoire et Retour gagnant</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+body { padding:1rem 1rem 5rem; } h2 { font:800 1.2rem var(--police-titre); margin:1.4rem 0 .4rem; } p.v { color:var(--doux); margin:.1rem 0 .6rem; }
+.rang { display:grid; grid-template-columns:repeat(4, 8rem); gap:1rem; } .rang.petit { grid-template-columns:repeat(8, 4rem); gap:.5rem; }
+.rang .carte-ligne-carte { cursor:default; } .gris .carte-ligne-carte { filter:grayscale(1); }
+#bar { position:fixed; bottom:.8rem; left:50%; transform:translateX(-50%); display:flex; gap:.8rem; align-items:center; padding:.5rem 1rem; border-radius:999px; background:#111; color:#fff; box-shadow:0 4px 18px #0006; z-index:99; font:700 .95rem sans-serif; }
+#bar button { background:#333; color:#fff; border:0; border-radius:50%; width:2.2rem; height:2.2rem; cursor:pointer; font-size:1.1rem; }
+</style></head><body>
+<h1 style="font:800 1.2rem var(--police-titre)">PROTOTYPE 218 : ?variant=A|B|C (flèches ← →), g = niveaux de gris</h1>
+<div id="app"></div>
+<div id="bar"><button id="pre">←</button><span id="lab"></span><button id="sui">→</button><button id="g" title="niveaux de gris">◐</button></div>
+<script type="module">
+import { VARIANTES, calques } from './prototype-cartes-218.js';
+import { IDS_FAMILLES } from './carte-badge-art.js';
+const cle = ['A', 'B', 'C'];
+const q = new URLSearchParams(location.search);
+let v = cle.includes(q.get('variant')) ? q.get('variant') : 'A';
+let gris = q.get('gris') === '1';
+if (q.get('theme')) document.documentElement.dataset.theme = q.get('theme');
+const carte = (id, vr, rang) => { const a = calques(id, vr, rang); return `<div class="carte-ligne-carte carte-badge-carte bronze"><div class="cl-incl"><div class="cl-face cl-avant"><div class="cl-cadre"><div class="cl-calque cl-l1">${a.l1}</div><div class="cl-calque cl-l2">${a.l2}</div><div class="cl-calque cl-heros">${a.heros}</div></div><div class="cl-bord"></div></div></div></div>`; };
+function rendre() {
+  const rangs = (id) => `<div class="rang">${[1, 2, 3, 4].map((r) => carte(id, v, r)).join('')}</div>`;
+  const autres = IDS_FAMILLES.filter((i) => i !== 'memoire' && i !== 'retour-gagnant');
+  const huit = ['memoire', 'retour-gagnant', ...autres].map((i) => carte(i, VARIANTES[i] ? v : null, 4)).join('');
+  const app = document.getElementById('app');
+  app.className = gris ? 'gris' : '';
+  app.innerHTML = ['memoire', 'retour-gagnant'].map((id) => `<h2>${id} : variante ${v}</h2><p class="v">${VARIANTES[id][v].nom}</p>${rangs(id)}`).join('') + `<h2>Les huit cartes au rang 4, petite taille (variante ${v})</h2><div class="rang petit">${huit}</div>`;
+  document.getElementById('lab').textContent = `${v} : ${VARIANTES.memoire[v].nom.split(':')[0]} / ${VARIANTES['retour-gagnant'][v].nom.split(':')[0]}`;
+  history.replaceState(null, '', `?variant=${v}${gris ? '&gris=1' : ''}${q.get('theme') ? '&theme=' + q.get('theme') : ''}`);
+}
+const aller = (d) => { v = cle[(cle.indexOf(v) + d + 3) % 3]; rendre(); };
+document.getElementById('pre').onclick = () => aller(-1); document.getElementById('sui').onclick = () => aller(1);
+document.getElementById('g').onclick = () => { gris = !gris; rendre(); };
+addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') aller(-1); if (e.key === 'ArrowRight') aller(1); if (e.key === 'g') { gris = !gris; rendre(); } });
+rendre();
+</script></body></html>

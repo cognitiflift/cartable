@@ -29,7 +29,7 @@ _Avoid_: niveau tout court (confusion avec Niveau de Leçon)
 Dossier propre à un Élève, qui contient son Profil, toutes ses Leçons et ses Badges. Cloisonné : l'agent n'accède jamais à l'Espace personnel d'un autre Élève.
 
 **Vue parent**:
-Écran d'un Élève destiné au parent, ouvert depuis le Profil (jamais depuis l'accueil de l'Élève, sans mot de passe) : Révisions du jour et quiz faits ces 7 derniers jours, Objectifs Retenus, Objectifs fragiles (atteints mais pas encore Retenus), Questions fragiles (moins de 80 % de chances de s'en souvenir aujourd'hui), contrôles à venir avec leur préparation (Maîtrise, Questions dues), Badges récents et total d'Étoiles et de Fusées, Coût des Leçons, **Questions signalées** (avec « Rétablir ») et **Questions suspectes** (avec « Signaler »). Agrégée par l'appli à partir des données existantes, sans tour de l'agent.
+Écran d'un Élève destiné au parent, ouvert depuis le Profil (jamais depuis l'accueil de l'Élève, sans mot de passe) : Révisions du jour et quiz faits ces 7 derniers jours, Objectifs Retenus, Objectifs fragiles (atteints mais pas encore Retenus), Questions fragiles (moins de 80 % de chances de s'en souvenir aujourd'hui), contrôles à venir avec leur préparation (Maîtrise, Questions dues), Badges récents et total d'Étoiles et de Fusées, Coût des Leçons, **Questions signalées** (avec « Rétablir »), **Questions suspectes** (avec « Signaler ») et une rubrique **Cartes** : les cartes de ligne de l'Élève, Leçon supprimée comprise, retournées ou non (face cachée, retournée, en composition, scène générique), chacune avec sa galerie de **Versions de carte** et « Utiliser celle-ci ». Agrégée par l'appli à partir des données existantes, sans tour de l'agent.
 
 **Leçon**:
 Unité d'apprentissage d'un Élève sur un sujet précis. Correspond à un workspace du skill `teach` (mission, leçons HTML, fiches, traces d'apprentissage). Appartient à une seule **Catégorie**.
@@ -188,6 +188,9 @@ Carte unique gagnée la première fois qu'une Leçon (libre ou de révision) dev
 
 **Mon réseau**:
 La grille des Cartes de ligne retournées de l'Élève dans Mes badges, de la plus récente à la plus ancienne, au-dessus des cartes de Badge. Sans décompte, sans jauge. Sur l'accueil, la carte de ligne d'une Leçon retournée s'affiche aussi dans l'encart de sa Leçon.
+
+**Version de carte**:
+Un des dessins (trois calques) d'une carte. La carte de ligne existante est sa **version 1**, active ; un fichier de cartes écrit avant les versions se lit tel quel, sans migration. Le parent voit toutes les versions d'une carte dans la rubrique « Cartes » de la Vue parent et choisit l'active par « Utiliser celle-ci », retour à une version précédente compris. La version active **remplace** celle de l'Élève partout (encart de Leçon, Mes badges), y compris pour une carte déjà retournée : le retournement reste tel quel, la cérémonie n'est jamais rejouée. Aucune version n'est jamais supprimée.
 
 **Carte « À découvrir » d'une Leçon**:
 Dans l'encart d'une Leçon sur l'accueil, la carte hachurée, statique, sans dessin ni décompte, qui tient la place d'une Leçon sans Carte de ligne (pas encore Acquise, ou Acquise avant la livraison des cartes). Même langage que les cartes « À découvrir » de Mes badges ; elle n'est pas cliquable.

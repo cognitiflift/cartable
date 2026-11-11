@@ -22,7 +22,7 @@ import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, repar
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
-import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
+import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees, choisirVersion } from './lib/cartes.js';
 import { consignesCarte, promptCarte } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
 import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
@@ -750,6 +750,20 @@ async function api(req, res, segments) {
       const reponse = await store.retablirQuestion(slug, corps);
       await noterEvenement(slug, { type: 'retablissement', date: new Date(maintenant).toISOString(), lecon: corps.lecon });
       return json(res, 200, reponse);
+    }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'version') {
+    // Version active d'une carte (#236) : le parent la choisit, retour à une version précédente compris. Remplace celle de
+    // l'Élève partout, sans changer l'état de retournement ni rejouer la cérémonie. Aucune version n'est supprimée.
+    if (m === 'POST') {
+      const { id: carte, version } = await lireCorps(req);
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, { statut: 'introuvable' }];
+        const r = choisirVersion(avant, carte, version);
+        return [r.fichier, r];
+      });
+      if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
+      if (statut === 'sans-version') throw new HttpError(404, 'Version introuvable');
+      return json(res, 200, { statut });
     }
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).

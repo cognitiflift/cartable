@@ -17,15 +17,18 @@ import { maintenantDe } from './lib/horloge.js';
 import { revisionsDuJour } from './lib/revisions.js';
 import { joursDeRevisionTerminee, etoileDuJour } from './lib/revision-du-jour.js';
 import { vueParent } from './lib/parent.js';
+import { choisirVersionBadge, calquesBadgesActifs } from './lib/cartes-badge.js';
 import { indicateurs, periodeDesIndicateurs, joursDesEvenements } from './lib/indicateurs.js';
 import { activiteParJour, joursTravailles, meilleureSerie, objectifDuJour, reparationDeSerie, serieDeJours, recapitulatifSemaine, reponsesDeRevision } from './lib/rythme.js';
 import { VARIANTES_PAR_QUESTION } from './lib/variantes.js';
 import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
-import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees } from './lib/cartes.js';
-import { consignesCarte, promptCarte } from './lib/carte-agent.js';
+import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees, choisirVersion, demanderRegeneration, prochaineARegenerer, commencerRegeneration, terminerRegeneration, echouerRegeneration } from './lib/cartes.js';
+import { demanderRegenerationBadge, prochainBadgeARegenerer, commencerRegenerationBadge, terminerRegenerationBadge, echouerRegenerationBadge, reprendreRegenerationsBadge, ajouterCoutBadge } from './lib/cartes-badge.js';
+import { STATUT_DEMANDEE } from './lib/regeneration.js';
+import { consignesCarte, promptCarte, consignesBadge, promptBadge } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
-import { calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
+import { FAMILLES, SURPRISES, calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
 import { calendrier } from './lib/calendrier.js';
 import { MOMENTS, validerMoment, validerHeures, heuresDe, fichierIcal } from './lib/moment.js';
 import { totauxRecompenses } from './lib/recompenses.js';
@@ -163,14 +166,21 @@ function composerCartes(slug) {
   cartesEnCours.add(slug);
   (async () => {
     while (!seanceEnCours(slug)) {
-      const carte = await store.modifierCartes(slug, (avant) => {
-        if (!avant) return [avant, null];
+      // Les régénérations demandées par le parent (#237) passent avant les premières compositions : même file, même tour unique.
+      const { carte, regeneration, badge } = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, {}];
         const f = generiquesEpuisees(avant, Date.now());
+        const redo = prochaineARegenerer(f);
+        if (redo) return [commencerRegeneration(f, redo), { carte: f.cartes[redo], regeneration: true }];
+        // Les cartes de Badge (#239) passent dans la même file, juste après les cartes de ligne régénérées.
+        const redoBadge = prochainBadgeARegenerer(f);
+        if (redoBadge) return [commencerRegenerationBadge(f, redoBadge), { badge: redoBadge }];
         const id = prochaineAComposer(f);
-        return [id ? commencerComposition(f, id) : f, id && f.cartes[id]];
+        return [id ? commencerComposition(f, id) : f, { carte: id && f.cartes[id] }];
       });
+      if (badge) { await regenererUnBadge(slug, badge); continue; }
       if (!carte) break;
-      await composerUneCarte(slug, carte);
+      await composerUneCarte(slug, carte, regeneration);
     }
   })()
     .catch((e) => console.error(`Cartes de ${slug} : ${e.message}`))
@@ -179,7 +189,8 @@ function composerCartes(slug) {
 
 // Une tentative de composition : la réponse de l'agent est lue et filtrée (lib/carte-svg.js) ; un SVG refusé, une
 // réponse illisible ou une panne est un échec de la tentative. Le Coût du tour, réussi ou non, est rattaché à la Leçon.
-async function composerUneCarte(slug, carte) {
+// `regeneration` : le tour ajoute une version (#237) au lieu de composer la carte ; un échec n'ajoute jamais de scène générique.
+async function composerUneCarte(slug, carte, regeneration = false) {
   let calques = null;
   const couts = []; // gardés aussi sur la carte : ils survivent à la suppression de la Leçon
   try {
@@ -199,8 +210,36 @@ async function composerUneCarte(slug, carte) {
   }
   await store.viderDossierCarte(slug).catch(() => {});
   await store.modifierCartes(slug, (avant) => {
-    const composee = calques ? terminerComposition(avant, carte.lecon, calques, Date.now()) : echouerComposition(avant, carte.lecon, Date.now());
+    const [reussir, echouer] = regeneration ? [terminerRegeneration, echouerRegeneration] : [terminerComposition, echouerComposition];
+    const composee = calques ? reussir(avant, carte.lecon, calques, Date.now()) : echouer(avant, carte.lecon, Date.now());
     return [couts.reduce((f, cout) => ajouterCoutCarte(f, carte.lecon, cout), composee), null];
+  });
+}
+
+// Une tentative de régénération d'une carte de Badge (#239), type de tâche « carteBadge » : même filtre SVG que les cartes de
+// ligne (lib/carte-svg.js, l'identifiant du badge préfixe les dégradés). Réussie, elle ajoute une version sans changer l'active ;
+// deux essais ratés l'abandonnent (la version active ne change pas, le parent est averti). Le Coût du tour, réussi ou non,
+// est gardé avec le badge : il n'a pas de Leçon.
+async function regenererUnBadge(slug, id) {
+  const badge = [...FAMILLES.map((f) => ({ ...f, surprise: false })), ...SURPRISES.map((s) => ({ ...s, surprise: true }))].find((b) => b.id === id);
+  let calques = null;
+  let cout = null;
+  try {
+    const cwd = await store.preparerDossierCarte(slug);
+    const reponse = await lancerAgent({ cwd, prompt: promptBadge(badge), consignes: consignesBadge(), tache: 'carteBadge', teach: false });
+    cout = reponse.cout;
+    const lu = lireCalques(reponse.reponse, id);
+    if (lu.ok) calques = lu.calques;
+    else console.error(`Carte de Badge de ${slug}/${id} : calque refusé (${lu.erreurs.slice(0, 3).join(' ; ')})`);
+  } catch (e) {
+    console.error(`Carte de Badge de ${slug}/${id} : ${e.message}`);
+    cout = e.cout ?? null;
+  }
+  await store.viderDossierCarte(slug).catch(() => {});
+  await store.modifierCartes(slug, (avant) => {
+    const maintenant = Date.now();
+    const suite = calques ? terminerRegenerationBadge(avant, id, calques, maintenant) : echouerRegenerationBadge(avant, id, maintenant);
+    return [ajouterCoutBadge(suite, id, cout, maintenant), null];
   });
 }
 
@@ -751,6 +790,62 @@ async function api(req, res, segments) {
       await noterEvenement(slug, { type: 'retablissement', date: new Date(maintenant).toISOString(), lecon: corps.lecon });
       return json(res, 200, reponse);
     }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'version') {
+    // Version active d'une carte (#236) : le parent la choisit, retour à une version précédente compris. Remplace celle de
+    // l'Élève partout, sans changer l'état de retournement ni rejouer la cérémonie. Aucune version n'est supprimée.
+    if (m === 'POST') {
+      const { id: carte, version } = await lireCorps(req);
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, { statut: 'introuvable' }];
+        const r = choisirVersion(avant, carte, version);
+        return [r.fichier, r];
+      });
+      if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
+      if (statut === 'sans-version') throw new HttpError(404, 'Version introuvable');
+      return json(res, 200, { statut });
+    }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'badge-version') {
+    // Version active d'une carte de Badge (#238) : une par Famille ou badge surprise, pour tous ses Paliers. Même règles que
+    // pour une carte de ligne : remplace celle de l'Élève dans Mes badges, ne touche pas au retournement.
+    if (m === 'POST') {
+      const { id: badge, version } = await lireCorps(req);
+      if (![...FAMILLES, ...SURPRISES].some((b) => b.id === badge)) throw new HttpError(404, 'Badge introuvable');
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        const r = choisirVersionBadge(avant, badge, version);
+        return [r.fichier, r];
+      });
+      if (statut === 'sans-version') throw new HttpError(404, 'Version introuvable');
+      return json(res, 200, { statut });
+    }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'badge-regeneration') {
+    // Régénérer une carte de Badge (#239) : un clic, sans confirmation ni plafond ; même file et mêmes règles que pour une
+    // carte de ligne (un seul tour à la fois par Élève, après les tâches de Séance), la réponse n'attend pas l'agent.
+    if (m === 'POST') {
+      const { id: badge } = await lireCorps(req);
+      if (![...FAMILLES, ...SURPRISES].some((b) => b.id === badge)) throw new HttpError(404, 'Badge introuvable');
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        const r = demanderRegenerationBadge(avant, badge);
+        return [r.fichier, r];
+      });
+      if (statut === STATUT_DEMANDEE) composerCartes(slug);
+      return json(res, 200, { statut });
+    }
+  } else if (r2 === 'parent' && id === 'cartes' && r3 === 'regeneration') {
+    // Régénérer une carte de ligne (#237) : un clic, sans confirmation ni plafond. Le tour part en arrière-plan (un seul à la
+    // fois par Élève, après les tâches de Séance) et ajoute une version ; la réponse n'attend pas l'agent.
+    if (m === 'POST') {
+      const { id: carte } = await lireCorps(req);
+      const existantes = (await store.leconsLues(slug, { maintenant })).map((l) => l.id);
+      const { statut } = await store.modifierCartes(slug, (avant) => {
+        if (!avant) return [avant, { statut: 'introuvable' }];
+        const r = demanderRegeneration(avant, carte, existantes);
+        return [r.fichier, r];
+      });
+      if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
+      if (statut === 'lecon-supprimee') throw new HttpError(409, 'La Leçon de cette carte n’existe plus : on ne peut pas la redessiner');
+      if (statut === STATUT_DEMANDEE) composerCartes(slug);
+      return json(res, 200, { statut });
+    }
   } else if (r2 === 'parent' && !id) {
     // Vue parent (#77) : agrégats lus seulement, jamais de tour du prof. Le fichier de Badges est lu, jamais modifié (#100).
     if (m === 'GET') {
@@ -831,7 +926,7 @@ async function api(req, res, segments) {
       const { fichier, calcul, cartes, totaux, lecons, evenements } = await recalculerBadges(slug, maintenant);
       if (new URL(req.url, 'http://x').searchParams.get('ouverture') === '1') await store.modifierBadges(slug, (f) => [marquerVu(f, maintenant), null]);
       const jours = calendrier({ lecons, evenements, paliers: paliersObtenus(fichier, calcul), maintenant });
-      return json(res, 200, { ...vueMesBadges(fichier, calcul), ...vueCartes(cartes), totaux, calendrier: jours });
+      return json(res, 200, { ...vueMesBadges(fichier, calcul), ...vueCartes(cartes), calquesBadge: calquesBadgesActifs(cartes), totaux, calendrier: jours });
     }
   } else if (r2 === 'cartes' && id === 'retournement' && !r3) {
     // Retournement d'une carte (#183) : { type: 'ligne', id } ou { type: 'palier', id, palier } ; idempotent.
@@ -942,6 +1037,6 @@ const serveur = http.createServer(async (req, res) => {
   }
 });
 
-await store.reprendreCartes(reprendreCompositions);
+await store.reprendreCartes((f) => reprendreRegenerationsBadge(reprendreCompositions(f)));
 for (const { slug } of await store.listerEleves()) composerCartes(slug); // les cartes restées « à composer »
 serveur.listen(PORT, HOST, () => console.log(messageDemarrage({ host: HOST, port: PORT, adressePublique: process.env.ADRESSE_PUBLIQUE })));

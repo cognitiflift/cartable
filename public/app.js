@@ -9,6 +9,8 @@ import { esquisseCarte } from '/carte-attente-art.js';
 import { badgeAuPalier, collectionRangee, nouvellesCartes, cartesLigneRangees, contientNouveau, cleCarte, emplacementCarte, cartesDuGain, ATTENTE, TEXTES_CEREMONIE } from '/nouvelles-cartes.js';
 import { jouerCarillon } from '/carillon.js';
 import { gainsDuJour } from '/gains-du-jour.js';
+import { libelleRegenererBadge, notesRegenerationBadge, badgeRegenerationAbandonnee, NOTE_ABANDON_BADGE, INTRO_BADGES, reperesBadge, noteBadge, titreVersionsBadge, libelleVersionBadge, origineVersion, libellePalierApercu, libelleChoisirBadge, libelleBadgeParent } from '/carte-parent-badge-texte.js';
+import { INTRO_CARTES, VIDE_CARTES, reperesCarte, noteCarte, titreVersions, libelleVersion, libelleChoisir, libelleRegenerer, libelleRegenerationEnCours, libelleRegenererCarte, VERSION_EN_COMPOSITION, notesRegeneration, regenerationAbandonnee } from '/carte-parent-texte.js';
 import { cleCategorieCarte, objectifsDeCarte, libelleCarteLigne, dosCarteLigne, calquesDeCarte } from '/carte-ligne-texte.js';
 import { conclusionDesIndicateurs } from '/conclusion-parent.js';
 import {
@@ -287,12 +289,15 @@ const SECTIONS_PARENT = [
     h('p', { className: 'doux' }, 'Pour chaque tranche de chances de s’en souvenir annoncées par l’appli avant la réponse, la part de réponses justes aux Révisions du jour.'),
     h('ul', {}, calibration.map((t) => h('li', {}, `Quand l’appli pensait qu’il s’en souviendrait à ${t.de}–${t.a} % : `, t.reponses
       ? `${t.pourcentage} % de réponses justes (${t.justes} sur ${pluriel(t.reponses, 'réponse')}, ${t.predit} % annoncé en moyenne)` : 'aucune réponse.'))))] },
+  { titre: '🃏 Cartes de ligne', bloc: 'cartes', rendu: ({ cartes }, contexte) => cartesParent(cartes.lignes, contexte) },
+  { titre: '🎴 Cartes de Badge', bloc: 'cartes', rendu: ({ cartes }, contexte) => cartesBadgeParent(cartes.badges, contexte) },
   { titre: '🔔 Rappel dans ton calendrier', bloc: 'reglages', replie: true, rendu: (_agregats, { profil, moment }) => rappelCalendrier(profil, moment) },
 ];
 // Les trois blocs de la Vue parent (#164), dans l'ordre de la page ; chaque section de SECTIONS_PARENT dit le sien (`bloc`).
 // Une section `replie` s'ouvre à la demande (<details>) ; les autres restent ouvertes.
 const BLOCS_PARENT = [
   { id: 'retient', titre: 'Ce qu’il retient' },
+  { id: 'cartes', titre: 'Cartes' },
   { id: 'aide', titre: 'Ce qui demande de l’aide' },
   { id: 'reglages', titre: 'Réglages et coûts' },
 ];
@@ -304,6 +309,137 @@ const sectionParent = ({ titre, replie, rendu }, agregats, contexte) => {
     ontoggle: (e) => { if (!e.target.isConnected) return; const cle = `${contexte.slug}/${titre}`; if (e.target.open) sectionsParentOuvertes.add(cle); else sectionsParentOuvertes.delete(cle); } },
   h('summary', {}, h('h4', {}, titre)), rendu(agregats, contexte));
 };
+// Rubrique « Cartes » (#236) : toutes les cartes de ligne, la version active à gauche, la galerie des versions dépliable.
+// « Utiliser celle-ci » change la carte vue par l'Élève (la version remplace la sienne partout) sans toucher à son
+// retournement ; aucune version ne se supprime. Une galerie ouverte le reste quand l'écran se recharge.
+const galeriesOuvertes = new Set();
+// « Régénérer » (#237) : un clic, sans confirmation. Le tour part en arrière-plan ; tant qu'un tour travaille, la rubrique
+// regarde de temps en temps si l'état a changé (version arrivée, abandon) et s'affiche alors à jour.
+const SONDE_REGENERATION_MS = 4000;
+// `sorte` : « lignes » (cartes de ligne, identifiées par leur Leçon) ou « badges » (cartes de Badge, #239, par leur id).
+const regenerations = (liste) => liste.filter((c) => c.regeneration).map((c) => c.lecon ?? c.id).join();
+function surveillerRegenerations(liste, contexte, ancre, sorte = 'lignes') {
+  if (!regenerations(liste)) return;
+  const attendre = async () => {
+    if (!ancre.isConnected) return;
+    try {
+      const { cartes } = await api(`eleves/${contexte.slug}/parent`);
+      if (regenerations(cartes[sorte]) !== regenerations(liste)) return await contexte.recharger();
+    } catch { /* réseau coupé : on réessaie */ }
+    setTimeout(attendre, SONDE_REGENERATION_MS);
+  };
+  setTimeout(attendre, SONDE_REGENERATION_MS);
+}
+function cartesParent(lignes, contexte) {
+  if (!lignes.length) return h('p', { className: 'doux' }, VIDE_CARTES);
+  const regenerer = (c) => {
+    if (c.leconSupprimee) return null;
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire regenerer', type: 'button', disabled: c.regeneration, ariaBusy: String(c.regeneration), ariaLabel: libelleRegenererCarte(c), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/regeneration`, { method: 'POST', body: { id: c.lecon } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, c.regeneration ? libelleRegenerationEnCours : libelleRegenerer);
+    return [bouton, erreur];
+  };
+  const choisir = (c, v) => {
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire', type: 'button', ariaLabel: libelleChoisir(c, v), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/version`, { method: 'POST', body: { id: c.lecon, version: v.numero } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, 'Utiliser celle-ci');
+    return [bouton, erreur];
+  };
+  const galerie = (c) => {
+    const cle = `${contexte.slug}/${c.lecon}`;
+    return h('details', { className: 'galerie-versions', open: galeriesOuvertes.has(cle),
+      ontoggle: (e) => { if (!e.target.isConnected) return; if (e.target.open) galeriesOuvertes.add(cle); else galeriesOuvertes.delete(cle); } },
+    h('summary', {}, titreVersions(c)),
+    h('ul', { className: 'versions-carte' }, c.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
+      carteLigne({ ...c, calques: v.calques }),
+      h('strong', {}, libelleVersion(v)),
+      v.active ? h('span', { className: 'doux' }, 'Active') : choisir(c, v))),
+    c.regeneration && h('li', { className: 'version-en-composition', role: 'status' },
+      h('div', { className: 'carte-parent-vide', ariaHidden: 'true' }), h('strong', {}, VERSION_EN_COMPOSITION), h('span', { className: 'doux' }, libelleRegenerationEnCours))));
+  };
+  const rubrique = h('div', { className: 'cartes-rubrique' });
+  rubrique.append(h('p', { className: 'doux' }, INTRO_CARTES),
+    h('ul', { className: 'cartes-parent' }, lignes.map((c) => {
+      const active = c.versions.find((v) => v.active);
+      const note = noteCarte(c);
+      return h('li', { className: 'carte-parent' },
+        active ? carteLigne({ ...c, calques: active.calques }) : h('div', { className: 'carte-parent-vide', ariaHidden: 'true' }),
+        h('strong', { className: 'carte-parent-titre' }, c.titre),
+        h('p', { className: 'carte-parent-reperes' }, reperesCarte(c).join(' · ')),
+        note && h('p', { className: 'doux carte-parent-note' }, note),
+        notesRegeneration(c).map((t) => h('p', { className: regenerationAbandonnee(c) && t.includes('abandonnée') ? 'erreur carte-parent-note' : 'doux carte-parent-note', role: regenerationAbandonnee(c) && t.includes('abandonnée') ? 'alert' : null }, t)),
+        regenerer(c),
+        c.versions.length > 0 && galerie(c));
+    })));
+  surveillerRegenerations(lignes, contexte, rubrique);
+  return rubrique;
+}
+
+// Cartes de Badge (#238) : une par Famille et par badge surprise (les surprises pas encore trouvées aussi), la version active
+// montrée à chaque Palier, la galerie des versions dépliable. Le choix vaut pour tous les Paliers de la Famille ; l'appli
+// superpose elle-même les stations et le Palier (carteBadge, apercu), le dessin d'une version n'en contient pas.
+const galeriesBadgeOuvertes = new Set();
+// Le badge tel que l'Élève le verrait au Palier `i` : crans allumés jusqu'à lui, sans jour.
+const apercuDuBadge = (b, i) => ({ id: b.id, emoji: b.emoji, nom: b.nom, phrase: b.phrase, surprise: b.surprise, palier: b.paliers[i].palier,
+  paliers: b.paliers.map((p, j) => ({ palier: p.palier, jour: j <= i ? 'apercu' : null })) });
+const paliersDeVersion = (b, v) => h('ul', { className: 'paliers-badge' }, b.paliers.map((p, i) => h('li', {},
+  carteBadge(apercuDuBadge(b, i), false, { calques: v.calques, apercu: true }), h('span', { className: 'doux' }, libellePalierApercu(p.palier)))));
+function cartesBadgeParent(badges, contexte) {
+  const choisir = (b, v) => {
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire', type: 'button', ariaLabel: libelleChoisirBadge(b, v), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/badge-version`, { method: 'POST', body: { id: b.id, version: v.numero } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, 'Utiliser celle-ci');
+    return [bouton, erreur];
+  };
+  // « Régénérer » (#239) : même geste et mêmes mots que pour une carte de ligne ; la version vaut pour tous les Paliers.
+  const regenerer = (b) => {
+    const erreur = h('span', { className: 'erreur', role: 'alert' });
+    const bouton = h('button', { className: 'secondaire regenerer', type: 'button', disabled: b.regeneration, ariaBusy: String(b.regeneration), ariaLabel: libelleRegenererBadge(b), onclick: async () => {
+      bouton.disabled = true;
+      try { await api(`eleves/${contexte.slug}/parent/cartes/badge-regeneration`, { method: 'POST', body: { id: b.id } }); await contexte.recharger(); }
+      catch (e) { erreur.textContent = e.message; bouton.disabled = false; }
+    } }, b.regeneration ? libelleRegenerationEnCours : libelleRegenerer);
+    return [bouton, erreur];
+  };
+  const galerie = (b) => {
+    const cle = `${contexte.slug}/${b.id}`;
+    return h('details', { className: 'galerie-versions', open: galeriesBadgeOuvertes.has(cle),
+      ontoggle: (e) => { if (!e.target.isConnected) return; if (e.target.open) galeriesBadgeOuvertes.add(cle); else galeriesBadgeOuvertes.delete(cle); } },
+    h('summary', {}, titreVersionsBadge(b)),
+    h('ul', { className: 'versions-badge' }, b.versions.map((v) => h('li', { className: v.active ? 'active' : '' },
+      h('strong', {}, libelleVersionBadge(v)), h('span', { className: 'doux' }, origineVersion(v)),
+      // La version active est déjà montrée à chaque Palier au-dessus de la galerie : on ne la redessine pas ici.
+      v.active ? h('span', { className: 'doux' }, 'Active, montrée ci-dessus') : [paliersDeVersion(b, v), choisir(b, v)])),
+    b.regeneration && h('li', { className: 'version-en-composition', role: 'status' },
+      h('strong', {}, VERSION_EN_COMPOSITION), h('span', { className: 'doux' }, libelleRegenerationEnCours),
+      h('ul', { className: 'paliers-badge', ariaHidden: 'true' }, b.paliers.map(() => h('li', {}, h('div', { className: 'carte-parent-vide' })))))));
+  };
+  const rubrique = h('div', { className: 'cartes-rubrique' });
+  rubrique.append(h('p', { className: 'doux' }, INTRO_BADGES),
+    h('ul', { className: 'badges-parent' }, badges.map((b) => {
+      const note = noteBadge(b);
+      return h('li', { className: 'badge-parent', role: 'group', ariaLabel: libelleBadgeParent(b) },
+        h('strong', { className: 'carte-parent-titre' }, `${b.emoji} ${b.nom}`),
+        h('p', { className: 'carte-parent-reperes' }, reperesBadge(b).join(' · ')),
+        note && h('p', { className: 'doux carte-parent-note' }, note),
+        notesRegenerationBadge(b).map((t) => h('p', { className: badgeRegenerationAbandonnee(b) && t === NOTE_ABANDON_BADGE ? 'erreur carte-parent-note' : 'doux carte-parent-note', role: badgeRegenerationAbandonnee(b) && t === NOTE_ABANDON_BADGE ? 'alert' : null }, t)),
+        paliersDeVersion(b, b.versions.find((v) => v.active)),
+        regenerer(b),
+        galerie(b));
+    })));
+  surveillerRegenerations(badges, contexte, rubrique, 'badges');
+  return rubrique;
+}
+
 // Le sommaire mène à un bloc sans toucher au hash (c'est celui du routeur) ; une cible repliée s'ouvre.
 const allerAuBloc = (id) => (e) => {
   e.preventDefault();
@@ -812,6 +948,7 @@ function carteRetournee(donnees, c) {
 
 async function ecranBadges(profil) {
   const donnees = await api(`eleves/${profil.slug}/badges?ouverture=1`);
+  retenirCalquesBadge(donnees);
   const { nouveaux, accueil, totaux, calendrier, cartesLigne = [] } = donnees;
   donnees.aRetourner ??= [];
   const estNouveau = (b, palier) => nouveaux.some((n) => n.id === b.id && n.palier === palier);
@@ -868,6 +1005,7 @@ function cartesDuGainEcran(profil, gain) {
   const zone = h('div', { className: 'cartes-gain', hidden: true });
   if (!gain.paliers?.length && !gain.lignes?.length) return zone;
   api(`eleves/${profil.slug}/badges`).then((donnees) => {
+    retenirCalquesBadge(donnees);
     donnees.aRetourner ??= [];
     const retourner = (c) => { carteRetournee(donnees, c); retenirRecompenses(profil, donnees); barreNav(profil); dessiner(); };
     const dessiner = () => {
@@ -1019,11 +1157,15 @@ function ceremonie(c, { son, slug, retourner }) {
 // holographique qui suit le pointeur. Le dos dit ce que le Badge salue, la date, le prochain Palier en mots, puis la
 // ligne de Badge (`ligneBadge`), seule jauge du système, sans chiffre ; ses noms de Palier sont dits par le texte
 // alternatif. Une surprise est violette (`palier-unique`).
-function carteBadge(b, nouveau) {
-  const palier = b.surprise ? 'unique' : b.palier, art = artDeBadge(b, rangDeCarte(b)), dos = dosCarteBadge(b, jourEnMots);
+// `calques` : ceux de la version choisie par le parent (#238), sinon le dessin du code. `apercu` : la face seule, sans geste,
+// pour la Vue parent.
+let calquesBadgeChoisis = {}; // { id: calques }, de GET …/badges (calquesBadge)
+const retenirCalquesBadge = (donnees) => { calquesBadgeChoisis = donnees.calquesBadge ?? {}; };
+function carteBadge(b, nouveau, { calques, apercu = false } = {}) {
+  // Un aperçu montre la version donnée (null : le dessin du code) ; la carte de l'Élève, celle que le parent a choisie.
+  const palier = b.surprise ? 'unique' : b.palier, art = (apercu ? calques : calquesBadgeChoisis[b.id]) ?? artDeBadge(b, rangDeCarte(b)), dos = dosCarteBadge(b, jourEnMots);
   const calque = (classe, svg) => h('div', { className: `cl-calque ${classe}`, ariaHidden: 'true', innerHTML: svg });
-  const el = h('button', { type: 'button', className: `carte-ligne-carte carte-badge-carte ${palier}`, ariaPressed: 'false',
-    ariaLabel: `${libelleCarteBadge(b, jourEnMots, nouveau)} ${dos.prochain}`, style: `--ligne: var(--palier-${palier}); --sur-ligne: var(--sur-accent)` },
+  const el = h(apercu ? 'div' : 'button', { ...(apercu ? { ariaHidden: 'true' } : { type: 'button', ariaPressed: 'false', ariaLabel: `${libelleCarteBadge(b, jourEnMots, nouveau)} ${dos.prochain}` }), className: `carte-ligne-carte carte-badge-carte ${palier}${apercu ? ' apercu' : ''}`, style: `--ligne: var(--palier-${palier}); --sur-ligne: var(--sur-accent)` },
   h('div', { className: 'cl-incl' },
     h('div', { className: 'cl-face cl-avant' },
       h('div', { className: 'cl-cadre', ariaHidden: 'true' }, calque('cl-l1', art.l1), calque('cl-l2', art.l2)),
@@ -1035,11 +1177,11 @@ function carteBadge(b, nouveau) {
       h('div', { className: 'cl-reflet', ariaHidden: 'true' }),
       aFeuilleHolo(b) && h('div', { className: 'cl-holo', ariaHidden: 'true' }),
       nouveau && h('span', { className: 'nouveau', ariaHidden: 'true' }, 'Nouveau')),
-    h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
+    !apercu && h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
       h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue),
       !b.surprise && ligneBadge(b, () => false),
       h('small', {}, dos.date, b.surprise ? '' : ` ${dos.prochain}`))));  // le cartouche « Unique » dit déjà « surprise »
-  animerCarte(el);
+  if (!apercu) animerCarte(el);
   return el;
 }
 

@@ -24,6 +24,12 @@ test('Modèle selon la tâche : la carte de ligne passe toujours par Sonnet, eff
   }
 });
 
+test('Modèle selon la tâche : la carte de Badge passe aussi toujours par Sonnet, effort medium, secours Haiku', () => {
+  for (const profil of ['haiku', 'sonnet', 'opus']) {
+    assert.deepEqual(modeleDeLaTache('carteBadge', profil), { modele: 'sonnet', effort: 'medium', secours: 'haiku' });
+  }
+});
+
 test('Modèle selon la tâche : chaque type de tâche a un Modèle de secours différent du Modèle principal', () => {
   for (const tache of TACHES) {
     for (const profil of ['haiku', 'sonnet', 'opus']) {

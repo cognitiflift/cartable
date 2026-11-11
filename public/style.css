@@ -448,6 +448,48 @@ details.pour-les-curieux summary:hover { color:var(--texte); }
 /* Cibles tactiles de la Vue parent (#167) : liens de Leçon, listes et champs à au moins 2.75rem, sans changer la grille. */
 .vue-parent a { display:inline-flex; align-items:center; min-height:2.75rem; }
 .vue-parent :is(select, input, summary) { min-height:2.75rem; }
+/* Rubrique « Cartes » de la Vue parent (#236) : une grille de cartes (version active), la galerie des versions sous chacune. */
+.bloc-parent .cartes-parent, .bloc-parent .versions-carte { display:grid; gap:1.2rem 1rem; margin:.6rem 0; padding:0; list-style:none; }
+.bloc-parent .cartes-parent { grid-template-columns:repeat(auto-fill, minmax(9rem, 1fr)); align-items:start; }
+.bloc-parent .versions-carte { grid-template-columns:repeat(auto-fill, minmax(7.5rem, 1fr)); padding:.6rem 0 .2rem; }
+.bloc-parent .cartes-parent li, .bloc-parent .versions-carte li { border-top:0; }
+.carte-parent { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
+.carte-parent > .carte-ligne-carte { max-width:12.5rem; }
+.carte-parent-vide { width:100%; max-width:12.5rem; aspect-ratio:5/7; border:2px dashed var(--bord); border-radius:18px; }
+.carte-parent-titre { font:700 17px/1.25 var(--police-titre); overflow-wrap:anywhere; }
+.carte-parent p { margin:0; }
+.carte-parent-reperes { font-size:.92rem; font-weight:600; } /* sous le titre : un cran plus petit, sinon les deux se disputent la première place */
+.carte-parent-note { font-size:.92rem; }
+/* Cartes de Badge (#238) : une fiche par Badge, le titre et les repères d'abord, puis la version active à chaque Palier
+   (quatre petites cartes côte à côte), la galerie des versions dépliable dessous. */
+.bloc-parent .badges-parent, .bloc-parent .versions-badge, .bloc-parent .paliers-badge { display:grid; margin:.6rem 0; padding:0; list-style:none; }
+.bloc-parent .badges-parent { grid-template-columns:repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); gap:1.6rem 1.4rem; align-items:start; }
+.bloc-parent .badges-parent li, .bloc-parent .paliers-badge li { border-top:0; }
+.badge-parent { display:flex; flex-direction:column; gap:.35rem; min-width:0; }
+.badge-parent p { margin:0; }
+.bloc-parent .paliers-badge { grid-template-columns:repeat(4, minmax(0, 5.6rem)); gap:.5rem; margin:.3rem 0; }
+.paliers-badge li { display:flex; flex-direction:column; gap:.2rem; min-width:0; font-size:.92rem; }
+.carte-badge-carte.apercu { cursor:default; }
+.carte-badge-carte.apercu .cl-calque svg { overflow:hidden; } /* en rangée de quatre, un dessin qui déborde mordrait sur la carte voisine */
+.carte-badge-carte.apercu .cl-titre { display:none; } /* le nom du Badge est au-dessus : sur une petite carte il se coupait */
+.bloc-parent .versions-badge { gap:1rem; padding:.6rem 0 .2rem; }
+.bloc-parent .versions-badge li { display:flex; flex-direction:column; align-items:flex-start; gap:.2rem; min-width:0; padding-top:.5rem; border-top:1px solid var(--bord); }
+.bloc-parent .versions-badge li.active { border-top:2px solid var(--accent); }
+.versions-badge button { min-height:2.75rem; }
+.carte-parent .erreur.carte-parent-note { min-height:0; font-weight:600; }
+.carte-parent .regenerer, .badge-parent .regenerer { min-height:2.75rem; align-self:flex-start; }
+.carte-parent .regenerer:disabled, .badge-parent .regenerer:disabled { opacity:.7; cursor:progress; }
+.versions-carte .version-en-composition, .versions-badge .version-en-composition { opacity:.85; }
+.badge-parent .erreur.carte-parent-note { min-height:0; font-weight:600; }
+.bloc-parent .versions-badge .paliers-badge li { padding-top:0; border-top:0; } /* les petites cartes d'une version n'héritent pas du filet de la version */
+.versions-badge .carte-parent-vide { border-radius:12px; } /* l'attente prend la forme des quatre petites cartes qu'elle remplace */
+.galerie-versions summary { cursor:pointer; font-weight:600; }
+.galerie-versions summary:focus-visible { outline:3px solid var(--accent); outline-offset:2px; border-radius:6px; }
+/* Une galerie ouverte prend toute la rangée : ses versions se rangent côte à côte au lieu de s'empiler dans une cellule étroite. */
+.bloc-parent :is(.carte-parent, .badge-parent):has(details[open]) { grid-column:1 / -1; }
+.carte-parent :is(.carte-parent-note, .carte-parent-reperes) { max-width:34rem; }
+.versions-carte li { display:flex; flex-direction:column; align-items:flex-start; gap:.3rem; min-width:0; }
+.versions-carte button { min-height:2.75rem; }
 /* Chargement et pannes (#169) : l'indicateur d'attente est une carte simple avec la ligne « en travaux », jamais rouge ;
    le bloc d'erreur prend la place du bloc en échec, avec « Réessayer ». */
 .attente-chargement { display:flex; flex-direction:column; gap:.8rem; max-width:24rem; margin:2rem 0; padding:1.2rem 1.4rem; }

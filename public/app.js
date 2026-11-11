@@ -1041,7 +1041,7 @@ function carteBadge(b, nouveau) {
     h('div', { className: 'cl-face cl-dos', ariaHidden: 'true' },
       h('span', { className: 'cl-cartouche' }, dos.cartouche), h('strong', {}, dos.nom), h('p', {}, dos.salue),
       !b.surprise && ligneBadge(b, () => false),
-      h('small', {}, dos.date, ' ', dos.prochain))));
+      h('small', {}, dos.date, b.surprise ? '' : ` ${dos.prochain}`))));  // le cartouche « Unique » dit déjà « surprise »
   animerCarte(el);
   return el;
 }

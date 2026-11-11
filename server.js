@@ -25,6 +25,7 @@ import { jourValide, minuitDu, jourLocal, jourDe } from './lib/jour.js';
 import { pagePrevue, preparationUtilisable, bilanPreparations } from './lib/preparation.js';
 import { fusionnerCartes, ajouterCoutCarte, retournerCarte, reglerSon, reprendreCompositions, vueCartes, prochaineAComposer, commencerComposition, terminerComposition, echouerComposition, generiquesEpuisees, choisirVersion, demanderRegeneration, prochaineARegenerer, commencerRegeneration, terminerRegeneration, echouerRegeneration } from './lib/cartes.js';
 import { demanderRegenerationBadge, prochainBadgeARegenerer, commencerRegenerationBadge, terminerRegenerationBadge, echouerRegenerationBadge, reprendreRegenerationsBadge, ajouterCoutBadge } from './lib/cartes-badge.js';
+import { STATUT_DEMANDEE } from './lib/regeneration.js';
 import { consignesCarte, promptCarte, consignesBadge, promptBadge } from './lib/carte-agent.js';
 import { lireCalques } from './lib/carte-svg.js';
 import { FAMILLES, SURPRISES, calculerBadges, fusionnerBadges, vueMesBadges, marquerVu, paliersObtenus, niveauxFranchis } from './lib/badges.js';
@@ -826,7 +827,7 @@ async function api(req, res, segments) {
         const r = demanderRegenerationBadge(avant, badge);
         return [r.fichier, r];
       });
-      if (statut === 'demandee') composerCartes(slug);
+      if (statut === STATUT_DEMANDEE) composerCartes(slug);
       return json(res, 200, { statut });
     }
   } else if (r2 === 'parent' && id === 'cartes' && r3 === 'regeneration') {
@@ -842,7 +843,7 @@ async function api(req, res, segments) {
       });
       if (statut === 'introuvable') throw new HttpError(404, 'Carte introuvable');
       if (statut === 'lecon-supprimee') throw new HttpError(409, 'La Leçon de cette carte n’existe plus : on ne peut pas la redessiner');
-      if (statut === 'demandee') composerCartes(slug);
+      if (statut === STATUT_DEMANDEE) composerCartes(slug);
       return json(res, 200, { statut });
     }
   } else if (r2 === 'parent' && !id) {

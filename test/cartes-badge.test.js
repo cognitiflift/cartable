@@ -135,3 +135,20 @@ test('coût des cartes de Badge : chaque tour est gardé avec le badge et résum
   assert.deepEqual(b.find((x) => x.id === 'curieux').cout, { coutUsd: 0, tours: 0 });
   assert.equal(b.find((x) => x.id === 'memoire').regeneration, false);
 });
+
+test('un ancien fichier de cartes sans clé badges se lit et se complète sans migration, le reste intact', () => {
+  const ancien = { version: 1, livraison: '2026-09-30T10:00:00.000Z', son: true, ecartees: ['a'], cartes: { x: { lecon: 'x' } }, paliers: { 'memoire/bronze': { retourne: null } } };
+  assert.equal(versionActiveBadge(ancien, 'memoire'), 1);
+  assert.deepEqual(calquesBadgesActifs(ancien), {});
+  assert.equal(vueParentBadges(ancien, null).badges.find((b) => b.id === 'memoire').regeneration, false);
+  assert.equal(reprendreRegenerationsBadge(ancien), ancien);
+  const { fichier, statut } = demanderRegenerationBadge(ancien, 'memoire');
+  assert.equal(statut, 'demandee');
+  assert.deepEqual({ ...fichier, badges: undefined }, { ...ancien, badges: undefined });
+  assert.deepEqual(fichier.badges.memoire.regeneration, { etat: 'demandee', essais: 0 });
+});
+
+test('demander sans fichier de cartes : un fichier sans livraison est créé, la régénération est demandée', () => {
+  const { fichier, statut } = demanderRegenerationBadge(null, 'memoire');
+  assert.deepEqual([statut, fichier.livraison, prochainBadgeARegenerer(fichier)], ['demandee', null, 'memoire']);
+});
